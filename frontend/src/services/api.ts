@@ -147,6 +147,18 @@ export async function deleteConversation(conversationId: string): Promise<any> {
   return res.json();
 }
 
+export async function undoConversationTurn(conversationId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}/undo`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'annulation" }));
+    throw new Error(err.detail || "Impossible d'annuler le dernier tour");
+  }
+  return res.json();
+}
+
 export function getExportHtmlUrl(conversationId: string): string {
   const token = getAuthToken();
   return `${API_BASE}/conversations/${conversationId}/export/html${token ? `?token=${encodeURIComponent(token)}` : ''}`;

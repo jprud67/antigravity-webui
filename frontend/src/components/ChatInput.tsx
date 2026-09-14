@@ -113,6 +113,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const basePromptRef = useRef<string>('');
+  const finalSpeechRef = useRef<string>('');
 
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'info') => {
     setToastMessage({ text, type });
@@ -125,6 +127,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         recognitionRef.current.stop();
       }
       setIsListening(false);
+      basePromptRef.current = '';
+      finalSpeechRef.current = '';
       return;
     }
 
@@ -142,28 +146,38 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
       recognition.onstart = () => {
         setIsListening(true);
+        basePromptRef.current = prompt;
+        finalSpeechRef.current = '';
       };
 
       recognition.onresult = (event: any) => {
-        let transcript = '';
+        let interim = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          transcript += event.results[i][0].transcript;
+          const res = event.results[i];
+          const text = res[0]?.transcript || '';
+          if (res.isFinal) {
+            finalSpeechRef.current += (finalSpeechRef.current ? ' ' : '') + text.trim();
+          } else {
+            interim += (interim ? ' ' : '') + text.trim();
+          }
         }
-        if (transcript.trim()) {
-          setPrompt((prev) => {
-            const separator = prev && !prev.endsWith(' ') ? ' ' : '';
-            return prev + separator + transcript.trim();
-          });
-        }
+        const spoken = (finalSpeechRef.current + (interim ? ' ' + interim : '')).trim();
+        const base = basePromptRef.current;
+        const separator = base && !base.endsWith(' ') && spoken ? ' ' : '';
+        setPrompt(base + separator + spoken);
       };
 
       recognition.onerror = (e: any) => {
         console.warn('Speech recognition event:', e);
         setIsListening(false);
+        basePromptRef.current = '';
+        finalSpeechRef.current = '';
       };
 
       recognition.onend = () => {
         setIsListening(false);
+        basePromptRef.current = '';
+        finalSpeechRef.current = '';
       };
 
       recognitionRef.current = recognition;
@@ -171,6 +185,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     } catch (err) {
       console.error('Failed to start speech recognition', err);
       setIsListening(false);
+      basePromptRef.current = '';
+      finalSpeechRef.current = '';
     }
   };
 

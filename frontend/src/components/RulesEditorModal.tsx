@@ -142,21 +142,48 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-[#0b101f] border border-slate-700/80 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col h-[88vh] animate-fadeIn">
+      <div
+        className="border rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col h-[88vh] animate-fadeIn"
+        style={{
+          backgroundColor: 'var(--surface)',
+          borderColor: 'var(--border2)',
+          color: 'var(--text)'
+        }}
+      >
         {/* Header */}
-        <div className="p-4 bg-[#0f172a] border-b border-slate-800 flex items-center justify-between shrink-0">
+        <div
+          className="p-4 border-b flex items-center justify-between shrink-0"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)'
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500/20 to-sky-500/20 border border-indigo-500/30 flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5 text-indigo-400" />
+            <div
+              className="w-9 h-9 rounded-xl border flex items-center justify-center"
+              style={{
+                backgroundColor: 'var(--accent-bg)',
+                borderColor: 'var(--accent-bg-strong)',
+                color: 'var(--accent)'
+              }}
+            >
+              <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                 <span>Éditeur de Règles & Mémoire Système</span>
-                <span className="text-[10px] font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded-full">
+                <span
+                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+                  style={{
+                    backgroundColor: 'var(--accent-bg)',
+                    borderColor: 'var(--accent)',
+                    color: 'var(--accent-text)'
+                  }}
+                >
                   Zero Token Hermes
                 </span>
               </h2>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
                 Gouvernance globale, permissions, règles d'agents et mémoire unifiée
               </p>
             </div>
@@ -164,14 +191,21 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer transition-colors"
+            className="p-1.5 rounded-lg transition-colors cursor-pointer hover:opacity-100 opacity-70"
+            style={{ color: 'var(--muted)' }}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* File Selector Tabs */}
-        <div className="px-4 py-2 bg-[#0c1222] border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto scrollbar-thin shrink-0">
+        <div
+          className="px-4 py-2 border-b flex items-center gap-2 overflow-x-auto scrollbar-thin shrink-0"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)'
+          }}
+        >
           {fileList.map(f => {
             const IconComp = getIconForFile(f.id);
             const isSelected = f.id === selectedFileId;
@@ -184,14 +218,15 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
                   }
                   setSelectedFileId(f.id);
                 }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer border ${
-                  isSelected
-                    ? 'bg-sky-500/20 text-sky-700 dark:text-sky-200 border-sky-500/40 shadow-inner'
-                    : 'bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border-slate-300 dark:border-slate-700/50'
-                }`}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer border"
+                style={{
+                  backgroundColor: isSelected ? 'var(--accent-bg)' : 'var(--surface)',
+                  borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                  color: isSelected ? 'var(--accent-text)' : 'var(--text)'
+                }}
                 title={f.description}
               >
-                <IconComp className={`w-3.5 h-3.5 ${isSelected ? 'text-sky-400' : 'text-slate-500'}`} />
+                <IconComp className="w-3.5 h-3.5" style={{ color: isSelected ? 'var(--accent)' : 'var(--muted)' }} />
                 <span>{f.name}</span>
                 {f.id === selectedFileId && hasUnsavedChanges && (
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
@@ -202,23 +237,33 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
         </div>
 
         {/* Editor Main Section */}
-        <div className="flex-1 flex flex-col min-h-0 bg-[#060a14] relative">
+        <div
+          className="flex-1 flex flex-col min-h-0 relative"
+          style={{ backgroundColor: 'var(--code-bg, var(--surface))' }}
+        >
           {/* Editor Sub-toolbar */}
-          <div className="px-4 py-2 bg-[#0d1424] border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400 shrink-0">
+          <div
+            className="px-4 py-2 border-b flex items-center justify-between text-xs shrink-0"
+            style={{
+              backgroundColor: 'var(--surface-subtle)',
+              borderColor: 'var(--border)',
+              color: 'var(--muted)'
+            }}
+          >
             <div className="flex items-center gap-3">
-              <span className="font-mono text-[11px] text-slate-300">
+              <span className="font-mono text-[11px]" style={{ color: 'var(--strong)' }}>
                 {currentFileMeta?.path || selectedFileId}
               </span>
-              <span className="text-slate-600">|</span>
-              <span className="text-[10px] text-slate-500">
+              <span>|</span>
+              <span className="text-[10px]">
                 {linesCount} lignes • {fileContent.length} caractères
               </span>
               {currentFileMeta?.syntax === 'json' && (
                 <span
                   className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                     jsonError
-                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      ? 'bg-rose-500/20 text-rose-500 border-rose-500/40'
+                      : 'bg-emerald-500/20 text-emerald-500 border-emerald-500/40'
                   }`}
                 >
                   {jsonError ? 'JSON Invalide' : 'JSON Valide'}
@@ -230,7 +275,12 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
               <button
                 onClick={() => loadContent(selectedFileId)}
                 disabled={loadingContent}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-[11px] cursor-pointer transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] cursor-pointer transition-colors border hover:opacity-100 opacity-70"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text)'
+                }}
                 title="Recharger le fichier depuis le disque"
               >
                 <RefreshCw className={`w-3 h-3 ${loadingContent ? 'animate-spin' : ''}`} />
@@ -241,7 +291,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
 
           {/* JSON Error Banner if any */}
           {jsonError && (
-            <div className="px-4 py-2 bg-rose-500/10 border-b border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+            <div className="px-4 py-2 bg-rose-500/10 border-b border-rose-500/30 text-rose-500 text-xs flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span className="font-mono text-[11px] truncate">Erreur de syntaxe : {jsonError}</span>
             </div>
@@ -252,7 +302,12 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
             {/* Gutter */}
             <div 
               ref={gutterRef}
-              className="w-14 bg-[#090e1c] border-r border-slate-800/80 py-3 px-2 select-none text-right font-mono text-[11px] text-slate-600 overflow-hidden leading-6"
+              className="w-14 border-r py-3 px-2 select-none text-right font-mono text-[11px] overflow-hidden leading-6"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                borderColor: 'var(--border)',
+                color: 'var(--muted)'
+              }}
             >
               {lineNumbers.map(n => (
                 <div key={n} className="h-6">{n}</div>
@@ -273,14 +328,21 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
                 disabled={loadingContent}
                 spellCheck={false}
                 wrap="off"
-                className="w-full h-full bg-transparent font-mono text-[11px] text-slate-200 placeholder-slate-600 focus:outline-none resize-none leading-6 selection:bg-sky-500/30 py-3 px-4 overflow-auto whitespace-pre"
+                className="w-full h-full bg-transparent font-mono text-[11px] focus:outline-none resize-none leading-6 py-3 px-4 overflow-auto whitespace-pre"
+                style={{ color: 'var(--pre-text, var(--text))' }}
               />
             </div>
           </div>
         </div>
 
         {/* Footer / Action Bar */}
-        <div className="p-3.5 bg-[#0f172a] border-t border-slate-800 flex items-center justify-between shrink-0">
+        <div
+          className="p-3.5 border-t flex items-center justify-between shrink-0"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)'
+          }}
+        >
           <div className="flex items-center gap-2 text-[11px] text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <span>Copie de sécurité (.bak) créée automatiquement avant enregistrement</span>

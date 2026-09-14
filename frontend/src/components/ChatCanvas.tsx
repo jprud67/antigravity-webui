@@ -861,6 +861,17 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                       remarkPlugins={[remarkGfm]}
                       components={{
                         code: CodeBlock,
+                        a: ({ href, children, ...props }: any) => (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sky-500 dark:text-sky-400 hover:underline font-medium break-all"
+                            {...props}
+                          >
+                            {children}
+                          </a>
+                        ),
                       }}
                     >
                       {msg.content}

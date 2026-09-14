@@ -185,11 +185,24 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
   return (
     <div className="flex flex-col h-full bg-[#060a12] text-slate-200">
       {/* Terminal Toolbar */}
-      <div className="flex items-center justify-between px-3 py-2 bg-[#0a101f] border-b border-slate-800/80 text-xs shrink-0">
+      <div
+        className="flex items-center justify-between px-3 py-2 border-b text-xs shrink-0"
+        style={{
+          backgroundColor: 'var(--surface-subtle)',
+          borderColor: 'var(--border)'
+        }}
+      >
         <div className="flex items-center gap-2">
-          <TerminalIcon className="w-3.5 h-3.5 text-sky-400" />
-          <span className="font-semibold text-slate-300">Terminal PTY</span>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono border bg-slate-800/60 border-slate-700/60 text-slate-400">
+          <TerminalIcon className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+          <span className="font-semibold" style={{ color: 'var(--strong)' }}>Terminal PTY</span>
+          <span
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono border"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border-subtle)',
+              color: 'var(--muted)'
+            }}
+          >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
                 connected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'
@@ -203,14 +216,16 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
           <button
             onClick={handleClear}
             title="Effacer le terminal"
-            className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 transition-colors cursor-pointer"
+            className="p-1.5 rounded-md transition-colors cursor-pointer hover:opacity-100 opacity-70"
+            style={{ color: 'var(--muted)' }}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={connectTerminal}
             title="Relancer le terminal"
-            className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 transition-colors cursor-pointer"
+            className="p-1.5 rounded-md transition-colors cursor-pointer hover:opacity-100 opacity-70"
+            style={{ color: 'var(--muted)' }}
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>

@@ -138,6 +138,16 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
     }
   }, [isOpen, activeTab, conversationId]);
 
+  useEffect(() => {
+    const handleArtifactsUpdated = () => {
+      if (isOpen && activeTab === 'artifacts') {
+        loadArtifactsList();
+      }
+    };
+    window.addEventListener('antigravity:artifacts_updated', handleArtifactsUpdated);
+    return () => window.removeEventListener('antigravity:artifacts_updated', handleArtifactsUpdated);
+  }, [isOpen, activeTab, conversationId]);
+
   const handleSelectFile = async (path: string) => {
     setSelectedFilePath(path);
     setIsEditingFile(false);

@@ -27,9 +27,10 @@ async def chat_websocket(websocket: WebSocket, token: Optional[str] = None):
     active_proc: Optional[asyncio.subprocess.Process] = None
     active_task: Optional[asyncio.Task] = None
     is_turn_running = False
+    is_steering = False
 
     async def run_turn(params: Dict[str, Any]):
-        nonlocal active_proc, is_turn_running
+        nonlocal active_proc, is_turn_running, is_steering
         is_turn_running = True
         prompt = params.get("prompt", "")
         conv_id = params.get("conversation_id")
@@ -62,8 +63,11 @@ async def chat_websocket(websocket: WebSocket, token: Optional[str] = None):
 
             await safe_send({"event": "done", "queue_size": message_queue.qsize()})
         except asyncio.CancelledError:
-            logger.info("Turn cancelled / interrupted by client")
-            await safe_send({"event": "interrupted", "message": "Exécution interrompue."})
+            if not is_steering:
+                logger.info("Turn cancelled / interrupted by client")
+                await safe_send({"event": "interrupted", "message": "Exécution interrompue."})
+            else:
+                logger.info("Turn cancelled for steering handover - suppressing premature interrupted event")
         except Exception as e:
             logger.error(f"Error in turn: {e}")
             await safe_send({"event": "error", "message": str(e)})
@@ -72,9 +76,10 @@ async def chat_websocket(websocket: WebSocket, token: Optional[str] = None):
             is_turn_running = False
 
     async def queue_worker():
-        nonlocal active_task
+        nonlocal active_task, is_steering
         while True:
             item = await message_queue.get()
+            is_steering = False
             active_task = asyncio.create_task(run_turn(item))
             try:
                 await active_task
@@ -101,6 +106,7 @@ async def chat_websocket(websocket: WebSocket, token: Optional[str] = None):
                     if mode == "steer":
                         # Steer: cancel current turn and immediately prioritize new instruction
                         logger.info("Steering agent with new directive")
+                        is_steering = True
                         if active_task and not active_task.done():
                             active_task.cancel()
                         # Prepend steering flag

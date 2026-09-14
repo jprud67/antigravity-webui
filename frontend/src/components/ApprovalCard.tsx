@@ -54,28 +54,49 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
   }
 
   return (
-    <div className="my-3 p-4 rounded-2xl bg-gradient-to-b from-[#111827] to-[#0b101c] border border-amber-500/40 shadow-xl shadow-amber-500/5 animate-fadeIn">
+    <div
+      className="my-3 p-4 rounded-2xl border shadow-xl animate-fadeIn"
+      style={{
+        backgroundColor: 'var(--surface)',
+        borderColor: 'var(--border2)',
+        color: 'var(--text)'
+      }}
+    >
       <div className="flex items-start gap-3">
-        <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+        <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 shrink-0">
           <AlertTriangle className="w-5 h-5" />
         </div>
 
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+            <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-amber-500">
               <span>Confirmation de Sécurité Requise</span>
             </h4>
-            <span className="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700">
+            <span
+              className="text-[10px] font-mono px-2 py-0.5 rounded-full border"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                borderColor: 'var(--border)',
+                color: 'var(--muted)'
+              }}
+            >
               {toolName}
             </span>
           </div>
 
-          <p className="text-xs text-slate-300 leading-relaxed">
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text)' }}>
             L'agent sollicite votre approbation pour exécuter cette opération sur le système :
           </p>
 
           {(command || path) && (
-            <div className="p-2.5 rounded-xl bg-[#060a12] border border-slate-800 font-mono text-xs text-amber-200/90 break-all select-text">
+            <div
+              className="p-2.5 rounded-xl font-mono text-xs break-all select-text border"
+              style={{
+                backgroundColor: 'var(--code-bg, var(--surface-subtle))',
+                borderColor: 'var(--border)',
+                color: 'var(--pre-text, var(--text))'
+              }}
+            >
               <code>{command || path}</code>
             </div>
           )}

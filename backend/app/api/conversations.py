@@ -9,6 +9,7 @@ from app.services.storage import (
     calculate_conversation_tokens,
     fork_conversation,
     delete_conversation,
+    undo_conversation_turn,
     search_conversations,
     update_conversation_title,
     export_conversation_html,
@@ -91,6 +92,14 @@ def update_metadata(conversation_id: str, req: MetadataUpdateRequest, _ = Depend
 def remove_conversation(conversation_id: str, _ = Depends(require_auth)):
     success = delete_conversation(conversation_id)
     return {"success": success, "conversation_id": conversation_id}
+
+@router.post("/{conversation_id}/undo")
+def undo_turn(conversation_id: str, _ = Depends(require_auth)):
+    try:
+        res = undo_conversation_turn(conversation_id)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/{conversation_id}/export/html")
 def export_html(conversation_id: str, _ = Depends(require_auth)):

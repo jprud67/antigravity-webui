@@ -357,6 +357,67 @@ def update_conversation_title(conversation_id: str, new_title: str) -> bool:
         conn.close()
     return True
 
+def undo_conversation_turn(conversation_id: str) -> Dict[str, Any]:
+    conv_dir = BRAIN_DIR / conversation_id
+    transcript_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
+    transcript_full_file = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
+
+    steps = get_conversation_transcript(conversation_id)
+    if not steps:
+        return {"conversation_id": conversation_id, "step_count": 0, "steps": [], "usage": calculate_conversation_tokens([])}
+
+    # Locate the last user input step
+    last_user_idx = -1
+    for i in range(len(steps) - 1, -1, -1):
+        s = steps[i]
+        if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
+            last_user_idx = i
+            break
+
+    if last_user_idx != -1:
+        remaining_steps = steps[:last_user_idx]
+    else:
+        remaining_steps = steps[:-1]
+
+    # Persist updated transcript files
+    if transcript_file.exists():
+        with open(transcript_file, "w", encoding="utf-8") as f:
+            for s in remaining_steps:
+                f.write(json.dumps(s, ensure_ascii=False) + "\n")
+
+    if transcript_full_file.exists():
+        with open(transcript_full_file, "w", encoding="utf-8") as f:
+            for s in remaining_steps:
+                f.write(json.dumps(s, ensure_ascii=False) + "\n")
+
+    # Update summary in SQLite database
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
+        last_step = remaining_steps[-1] if remaining_steps else {}
+        new_preview = (last_step.get("content") or last_step.get("thinking") or "")[:150]
+
+        cursor.execute(
+            """
+            UPDATE conversation_summaries
+            SET step_count = ?, preview = ?, last_modified_time = ?
+            WHERE conversation_id = ?
+            """,
+            (len(remaining_steps), new_preview, now_str, conversation_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    usage = calculate_conversation_tokens(remaining_steps)
+    return {
+        "conversation_id": conversation_id,
+        "step_count": len(remaining_steps),
+        "steps": remaining_steps,
+        "usage": usage
+    }
+
 def search_conversations(query: str, limit: int = 50) -> List[Dict[str, Any]]:
     if not query.strip():
         return list_conversations(limit=limit)

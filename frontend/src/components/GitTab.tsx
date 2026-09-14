@@ -144,23 +144,35 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
   ];
 
   return (
-    <div className="flex flex-col h-full bg-[#060a12] text-slate-200">
+    <div
+      className="flex flex-col h-full"
+      style={{
+        backgroundColor: 'var(--bg)',
+        color: 'var(--text)'
+      }}
+    >
       {/* Top Git Header */}
-      <div className="flex items-center justify-between px-3 py-2 bg-[#0a101f] border-b border-slate-800/80 text-xs shrink-0">
+      <div
+        className="flex items-center justify-between px-3 py-2 border-b text-xs shrink-0"
+        style={{
+          backgroundColor: 'var(--surface-subtle)',
+          borderColor: 'var(--border)'
+        }}
+      >
         <div className="flex items-center gap-2">
-          <GitBranch className="w-3.5 h-3.5 text-sky-400" />
-          <span className="font-semibold text-slate-200 font-mono">{status?.branch || 'main'}</span>
+          <GitBranch className="w-3.5 h-3.5 text-sky-500" />
+          <span className="font-semibold font-mono" style={{ color: 'var(--strong)' }}>{status?.branch || 'main'}</span>
           {status?.tracking && (
-            <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
+            <span className="text-[10px] font-mono hidden sm:inline" style={{ color: 'var(--muted)' }}>
               ({status.tracking})
             </span>
           )}
           {status?.clean ? (
-            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
               <CheckCircle2 className="w-3 h-3" /> Propre
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+            <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
               <AlertCircle className="w-3 h-3" /> {allChangedFiles.length} fichier(s)
             </span>
           )}
@@ -170,7 +182,8 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
           onClick={loadStatus}
           disabled={loading}
           title="Actualiser"
-          className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 transition-colors cursor-pointer"
+          className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+          style={{ color: 'var(--muted)' }}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -178,14 +191,14 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
 
       {/* Notifications */}
       {actionSuccess && (
-        <div className="p-2 bg-emerald-500/10 border-b border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 shrink-0">
-          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+        <div className="p-2 bg-emerald-500/10 border-b border-emerald-500/30 text-emerald-600 dark:text-emerald-300 text-xs flex items-center gap-2 shrink-0">
+          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
           <span>{actionSuccess}</span>
         </div>
       )}
       {error && (
-        <div className="p-2 bg-rose-500/10 border-b border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 shrink-0">
-          <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
+        <div className="p-2 bg-rose-500/10 border-b border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2 shrink-0">
+          <ShieldAlert className="w-4 h-4 shrink-0 text-rose-500" />
           <span>{error}</span>
         </div>
       )}
@@ -193,16 +206,22 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
       {/* Main Content Area: Split File List & Diff */}
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
         {/* Changed Files Section */}
-        <div className="p-3 border-b border-slate-800/80 shrink-0">
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+        <div
+          className="p-3 border-b shrink-0"
+          style={{ borderColor: 'var(--border)' }}
+        >
+          <div
+            className="text-[11px] font-semibold uppercase tracking-wider mb-2 flex items-center justify-between"
+            style={{ color: 'var(--muted)' }}
+          >
             <span>Fichiers modifiés ({allChangedFiles.length})</span>
             {allChangedFiles.length > 0 && (
-              <span className="text-[10px] text-slate-500">Cliquez pour voir le diff</span>
+              <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Cliquez pour voir le diff</span>
             )}
           </div>
 
           {allChangedFiles.length === 0 ? (
-            <div className="text-xs text-slate-500 py-3 text-center italic">
+            <div className="text-xs py-3 text-center italic" style={{ color: 'var(--muted)' }}>
               Aucune modification non validée dans l'arbre de travail.
             </div>
           ) : (
@@ -215,21 +234,22 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                     onClick={() => handleSelectFile(file.path)}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
                       isSelected
-                        ? 'bg-sky-500/15 border border-sky-500/30 text-sky-200'
-                        : 'hover:bg-slate-800/50 text-slate-300'
+                        ? 'bg-sky-500/15 border border-sky-500/30 text-sky-600 dark:text-sky-200'
+                        : 'hover:bg-black/5 dark:hover:bg-white/5'
                     }`}
+                    style={!isSelected ? { color: 'var(--text)' } : undefined}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <FileCode className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <FileCode className="w-3.5 h-3.5 shrink-0 opacity-70" />
                       <span className="font-mono truncate">{file.path}</span>
                     </div>
                     <span
                       className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                         file.type === 'M'
-                          ? 'bg-amber-500/20 text-amber-400'
+                          ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
                           : file.type === 'D'
-                          ? 'bg-rose-500/20 text-rose-400'
-                          : 'bg-sky-500/20 text-sky-400'
+                          ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+                          : 'bg-sky-500/20 text-sky-600 dark:text-sky-400'
                       }`}
                     >
                       {file.type}
@@ -243,26 +263,40 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
 
         {/* Diff Preview Section */}
         {selectedFile && (
-          <div className="flex-1 flex flex-col min-h-0 border-b border-slate-800/80">
-            <div className="flex items-center justify-between px-3 py-1.5 bg-[#090e1c] border-b border-slate-800 text-[11px] text-slate-400 shrink-0">
+          <div
+            className="flex-1 flex flex-col min-h-0 border-b"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <div
+              className="flex items-center justify-between px-3 py-1.5 border-b text-[11px] shrink-0"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                borderColor: 'var(--border)',
+                color: 'var(--muted)'
+              }}
+            >
               <span className="font-mono flex items-center gap-1.5">
-                <FileDiff className="w-3.5 h-3.5 text-sky-400" />
-                Diff : <strong className="text-slate-200">{selectedFile}</strong>
+                <FileDiff className="w-3.5 h-3.5 text-sky-500" />
+                Diff : <strong style={{ color: 'var(--strong)' }}>{selectedFile}</strong>
               </span>
               <button
                 onClick={() => setSelectedFile(null)}
-                className="text-[10px] text-slate-500 hover:text-slate-300 cursor-pointer"
+                className="text-[10px] hover:underline cursor-pointer"
+                style={{ color: 'var(--muted)' }}
               >
                 Fermer diff
               </button>
             </div>
-            <div className="flex-1 overflow-auto p-2 bg-[#050810]">
+            <div
+              className="flex-1 overflow-auto p-2"
+              style={{ backgroundColor: 'var(--code-bg)' }}
+            >
               {loadingDiff ? (
-                <div className="p-4 text-center text-xs text-slate-500">Chargement du diff...</div>
+                <div className="p-4 text-center text-xs" style={{ color: 'var(--muted)' }}>Chargement du diff...</div>
               ) : activeDiff ? (
                 <DiffViewer diffText={activeDiff} filename={selectedFile} />
               ) : (
-                <div className="p-4 text-center text-xs text-slate-500 italic">
+                <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>
                   Aucun diff textuel disponible pour ce fichier.
                 </div>
               )}
@@ -272,13 +306,22 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
 
         {/* Last Commit Info */}
         {status?.last_commit && (
-          <div className="p-3 bg-[#080d1a] border-b border-slate-800/80 text-xs shrink-0">
-            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-              <Clock className="w-3 h-3 text-slate-500" />
+          <div
+            className="p-3 border-b text-xs shrink-0"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border)'
+            }}
+          >
+            <div
+              className="text-[10px] font-semibold uppercase tracking-wider mb-1 flex items-center gap-1"
+              style={{ color: 'var(--muted)' }}
+            >
+              <Clock className="w-3 h-3" />
               Dernier commit ({status.last_commit.time})
             </div>
-            <div className="font-mono text-slate-300 text-[11px] truncate">
-              <span className="text-sky-400 font-bold mr-2">{status.last_commit.hash}</span>
+            <div className="font-mono text-[11px] truncate" style={{ color: 'var(--text)' }}>
+              <span className="text-sky-500 font-bold mr-2">{status.last_commit.hash}</span>
               {status.last_commit.subject}
             </div>
           </div>
@@ -286,7 +329,13 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
       </div>
 
       {/* Bottom Commit & Push Toolbar */}
-      <div className="p-3 bg-[#0a101f] border-t border-slate-800/80 shrink-0 space-y-2.5">
+      <div
+        className="p-3 border-t shrink-0 space-y-2.5"
+        style={{
+          backgroundColor: 'var(--surface-subtle)',
+          borderColor: 'var(--border)'
+        }}
+      >
         <form onSubmit={handleCommit} className="space-y-2">
           <input
             type="text"
@@ -294,16 +343,21 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
             onChange={(e) => setCommitMessage(e.target.value)}
             placeholder="Message de commit (ex: Add feature X)..."
             disabled={committing || allChangedFiles.length === 0}
-            className="w-full px-3 py-2 bg-[#060a12] border border-slate-700/80 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:opacity-50"
+            className="w-full px-3 py-2 border rounded-xl text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50"
+            style={{
+              backgroundColor: 'var(--bg)',
+              borderColor: 'var(--border)',
+              color: 'var(--text)'
+            }}
           />
 
           <div className="flex items-center justify-between gap-2">
-            <label className="flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer select-none">
+            <label className="flex items-center gap-1.5 text-[11px] cursor-pointer select-none" style={{ color: 'var(--muted)' }}>
               <input
                 type="checkbox"
                 checked={stageAll}
                 onChange={(e) => setStageAll(e.target.checked)}
-                className="rounded border-slate-700 text-sky-500 focus:ring-0"
+                className="rounded border-slate-400 dark:border-slate-700 text-sky-500 focus:ring-0"
               />
               <span>Indexer tous les fichiers (`git add -A`)</span>
             </label>
@@ -319,17 +373,25 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
           </div>
         </form>
 
-        <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between">
-          <span className="text-[10px] text-slate-500">
-            Auteur : <code className="text-slate-400">jprud67 &lt;jprud67@gmail.com&gt;</code>
+        <div
+          className="pt-2 border-t flex items-center justify-between"
+          style={{ borderColor: 'var(--border)' }}
+        >
+          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+            Auteur : <code style={{ color: 'var(--strong)' }}>jprud67 &lt;jprud67@gmail.com&gt;</code>
           </span>
 
           <button
             onClick={handlePush}
             disabled={pushing}
-            className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+            className="py-1.5 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border)',
+              color: 'var(--text)'
+            }}
           >
-            <UploadCloud className={`w-3.5 h-3.5 ${pushing ? 'animate-bounce text-sky-400' : ''}`} />
+            <UploadCloud className={`w-3.5 h-3.5 ${pushing ? 'animate-bounce text-sky-500' : ''}`} />
             <span>{pushing ? 'Push en cours...' : 'Pousser vers Origin'}</span>
           </button>
         </div>

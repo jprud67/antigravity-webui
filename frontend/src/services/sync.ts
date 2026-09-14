@@ -6,11 +6,12 @@
  *  - "transcript_updated"    → refresh messages if active conversation matches
  */
 
-type SyncEventType = 'conversations_updated' | 'transcript_updated' | 'ping';
+type SyncEventType = 'conversations_updated' | 'transcript_updated' | 'artifacts_updated' | 'ping';
 
 interface SyncEvent {
   type: SyncEventType;
   conversation_id?: string;
+  filename?: string;
   ts?: number;
 }
 

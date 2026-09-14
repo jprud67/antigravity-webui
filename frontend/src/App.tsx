@@ -24,6 +24,7 @@ import {
   clearAuthToken,
   forkConversation,
   updateConversationMetadata,
+  undoConversationTurn,
   fetchGoogleAccounts,
   saveSettings,
   type GoogleAccountInfo
@@ -113,6 +114,9 @@ export function App() {
       if (event.type === 'conversations_updated') {
         // Refresh sidebar without disrupting active chat
         fetchConversations(50).then((c) => setConversations(c)).catch(() => {});
+      } else if (event.type === 'artifacts_updated') {
+        // Dispatch custom event for WorkspacePanel & artifact viewers
+        window.dispatchEvent(new CustomEvent('antigravity:artifacts_updated', { detail: event }));
       } else if (event.type === 'transcript_updated' && event.conversation_id) {
         const convId = event.conversation_id;
         // Only reload transcript if it's the active conversation AND we're not streaming
@@ -124,13 +128,22 @@ export function App() {
               const role = s.source === 'USER_EXPLICIT' || s.type === 'USER_INPUT' ? 'user' : 'assistant';
               const content = s.content || '';
               const thought = s.thinking || '';
+              const isStepRunning = s.status === 'RUNNING' || s.status === 'IN_PROGRESS';
               const toolCalls = (s.tool_calls || []).map((t: any) => ({
                 name: t.name || 'tool',
                 args: t.args,
-                status: 'done' as const
+                status: (t.status === 'running' || isStepRunning) ? ('running' as const) : ('done' as const)
               }));
               if (content || thought || toolCalls.length > 0) {
-                chatMsgs.push({ id: `step-${idx}`, role, content, thought, toolCalls, stepIndex: s.step_index });
+                chatMsgs.push({
+                  id: `step-${idx}`,
+                  role,
+                  content,
+                  thought,
+                  toolCalls,
+                  stepIndex: s.step_index,
+                  isLive: isStepRunning
+                });
               }
             });
             setMessages(chatMsgs);
@@ -612,6 +625,22 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
     if (mode === 'queue') {
       setMessages((prev) => [...prev, userMsg]);
       setQueueCount((prev) => prev + 1);
+    } else if (mode === 'steer') {
+      // Steer mode: cleanly close the previous turn and open a steered assistant bubble
+      const liveAssistantMsg: ChatMessage = {
+        id: `live-assistant-${Date.now()}`,
+        role: 'assistant',
+        content: '',
+        thought: '',
+        toolCalls: [],
+        isLive: true,
+        timestamp: new Date().toISOString()
+      };
+      setMessages((prev) => {
+        const finalized = prev.map((m) => (m.isLive ? { ...m, isLive: false } : m));
+        return [...finalized, userMsg, liveAssistantMsg];
+      });
+      setIsStreaming(true);
     } else {
       const liveAssistantMsg: ChatMessage = {
         id: `live-assistant-${Date.now()}`,
@@ -759,18 +788,75 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
     }
   };
 
-  const handleUndo = () => {
-    setMessages((prev) => {
-      if (prev.length === 0) return prev;
-      const next = [...prev];
-      if (next[next.length - 1]?.role === 'assistant') {
-        next.pop();
+  const handleUndo = async () => {
+    if (!activeConversationId) {
+      setMessages((prev) => {
+        if (prev.length === 0) return prev;
+        const next = [...prev];
+        if (next[next.length - 1]?.role === 'assistant') {
+          next.pop();
+        }
+        if (next.length > 0 && next[next.length - 1]?.role === 'user') {
+          next.pop();
+        }
+        return next;
+      });
+      return;
+    }
+
+    try {
+      const data = await undoConversationTurn(activeConversationId);
+      const steps = data.steps || [];
+      const chatMsgs: ChatMessage[] = [];
+      steps.forEach((s: any, idx: number) => {
+        const role = s.source === 'USER_EXPLICIT' || s.type === 'USER_INPUT' ? 'user' : 'assistant';
+        const content = s.content || '';
+        const thought = s.thinking || '';
+        const isStepRunning = s.status === 'RUNNING' || s.status === 'IN_PROGRESS';
+        const toolCalls = (s.tool_calls || []).map((t: any) => ({
+          name: t.name || 'tool',
+          args: t.args,
+          status: (t.status === 'running' || isStepRunning) ? ('running' as const) : ('done' as const)
+        }));
+        if (content || thought || toolCalls.length > 0) {
+          chatMsgs.push({
+            id: `step-${idx}`,
+            role,
+            content,
+            thought,
+            toolCalls,
+            stepIndex: s.step_index,
+            isLive: isStepRunning
+          });
+        }
+      });
+      setMessages(chatMsgs);
+      if (data.usage && data.usage.total_tokens > 0) {
+        setTokenUsage({
+          inputTokens: data.usage.input_tokens || 0,
+          outputTokens: data.usage.output_tokens || 0,
+          thinkingTokens: data.usage.thinking_tokens || 0,
+          totalTokens: data.usage.total_tokens || 0,
+          isEstimated: data.usage.is_estimated ?? true
+        });
+      } else {
+        setTokenUsage(estimateUsageFromMessages(chatMsgs));
       }
-      if (next.length > 0 && next[next.length - 1]?.role === 'user') {
-        next.pop();
-      }
-      return next;
-    });
+      fetchConversations(50).then((c) => setConversations(c)).catch(() => {});
+    } catch (e) {
+      console.error('Failed to undo turn on backend:', e);
+      setMessages((prev) => {
+        if (prev.length === 0) return prev;
+        const next = [...prev];
+        if (next[next.length - 1]?.role === 'assistant') {
+          next.pop();
+        }
+        if (next.length > 0 && next[next.length - 1]?.role === 'user') {
+          next.pop();
+        }
+        return next;
+      });
+    }
   };
 
   const activeConv = conversations.find((c) => c.conversation_id === activeConversationId);

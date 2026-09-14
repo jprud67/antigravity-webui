@@ -74,6 +74,8 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
     prev_db_mtime: float = conv_db.stat().st_mtime if conv_db.exists() else 0.0
     # transcript path → last mtime
     transcript_mtimes: Dict[str, float] = {}
+    # artifact path → last mtime
+    artifact_mtimes: Dict[str, float] = {}
 
     def _scan_transcripts() -> Dict[str, float]:
         result = {}
@@ -102,8 +104,27 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
             pass
         return result
 
+    def _scan_artifacts() -> Dict[str, float]:
+        result = {}
+        if not brain_dir.exists():
+            return result
+        try:
+            for child in brain_dir.iterdir():
+                if not child.is_dir() or not _UUID_PATTERN.match(child.name):
+                    continue
+                try:
+                    for f in child.iterdir():
+                        if f.is_file() and f.name not in [".system_generated", "scratch"]:
+                            result[str(f)] = f.stat().st_mtime
+                except OSError:
+                    pass
+        except OSError:
+            pass
+        return result
+
     # Initial scan
     transcript_mtimes = _scan_transcripts()
+    artifact_mtimes = _scan_artifacts()
 
     while True:
         await asyncio.sleep(poll_interval)
@@ -139,6 +160,22 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                     })
 
             transcript_mtimes = cur_transcripts
+
+            # --- 3. Check artifact files (new/updated artifacts) ---
+            cur_artifacts = _scan_artifacts()
+            for a_path, a_mtime in cur_artifacts.items():
+                prev = artifact_mtimes.get(a_path, 0.0)
+                if a_mtime != prev:
+                    p = Path(a_path)
+                    conv_id = p.parent.name
+                    logger.debug(f"Artifact changed for conv {conv_id} ({p.name}) → broadcasting artifacts_updated")
+                    await _broadcast({
+                        "type": "artifacts_updated",
+                        "conversation_id": conv_id,
+                        "filename": p.name,
+                        "ts": time.time()
+                    })
+            artifact_mtimes = cur_artifacts
 
         except Exception as e:
             logger.warning(f"Watcher error: {e}")
