@@ -16,9 +16,11 @@ import {
   Compass, 
   FileCheck, 
   Cpu,
-  HardDrive,
   Activity,
-  FileText
+  FileText,
+  FolderTree,
+  GitBranch,
+  PanelRight
 } from 'lucide-react';
 import type { ChatMessage } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
@@ -36,6 +38,11 @@ interface ChatCanvasProps {
   onOpenFiles?: () => void;
   onOpenTasks?: () => void;
   onOpenArtifacts?: () => void;
+  onOpenTerminal?: () => void;
+  onOpenGit?: () => void;
+  isRightPanelOpen?: boolean;
+  activeRightPanelTab?: string;
+  onToggleRightPanel?: () => void;
 }
 
 const CodeBlock = ({ inline, className, children, ...props }: any) => {
@@ -102,6 +109,11 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   onOpenFiles,
   onOpenTasks,
   onOpenArtifacts,
+  onOpenTerminal,
+  onOpenGit,
+  isRightPanelOpen,
+  activeRightPanelTab,
+  onToggleRightPanel,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
@@ -139,34 +151,31 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
         </div>
 
         {/* Right Tools & Status */}
-        <div className="flex items-center gap-2">
-          {/* Quick Action Badges */}
+        <div className="flex items-center gap-1.5">
+          {/* Quick 3-Panel Action Badges */}
           {onOpenFiles && (
             <button
               onClick={onOpenFiles}
-              className="py-1.5 px-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700/60"
-              title="Explorateur de fichiers du Workspace"
+              className={`py-1.5 px-2.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border ${
+                isRightPanelOpen && activeRightPanelTab === 'files'
+                  ? 'bg-sky-500/20 text-sky-200 border-sky-500/40 shadow-inner'
+                  : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border-slate-700/60'
+              }`}
+              title="Explorateur de fichiers"
             >
-              <HardDrive className="w-3.5 h-3.5 text-sky-400" />
-              <span className="text-[11px] font-medium hidden sm:inline">Workspace</span>
-            </button>
-          )}
-
-          {onOpenTasks && (
-            <button
-              onClick={onOpenTasks}
-              className="py-1.5 px-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700/60"
-              title="Supervision des Tâches et Sous-Agents"
-            >
-              <Activity className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="text-[11px] font-medium hidden sm:inline">Tâches</span>
+              <FolderTree className="w-3.5 h-3.5 text-sky-400" />
+              <span className="text-[11px] font-medium hidden sm:inline">Fichiers</span>
             </button>
           )}
 
           {onOpenArtifacts && (
             <button
               onClick={onOpenArtifacts}
-              className="py-1.5 px-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700/60"
+              className={`py-1.5 px-2.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border ${
+                isRightPanelOpen && activeRightPanelTab === 'artifacts'
+                  ? 'bg-sky-500/20 text-sky-200 border-sky-500/40 shadow-inner'
+                  : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border-slate-700/60'
+              }`}
               title="Artifacts et Documents"
             >
               <FileText className="w-3.5 h-3.5 text-emerald-400" />
@@ -174,10 +183,64 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             </button>
           )}
 
+          {onOpenTerminal && (
+            <button
+              onClick={onOpenTerminal}
+              className={`py-1.5 px-2.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border ${
+                isRightPanelOpen && activeRightPanelTab === 'terminal'
+                  ? 'bg-sky-500/20 text-sky-200 border-sky-500/40 shadow-inner'
+                  : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border-slate-700/60'
+              }`}
+              title="Terminal PTY interactif"
+            >
+              <Terminal className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-[11px] font-medium hidden sm:inline">Terminal</span>
+            </button>
+          )}
+
+          {onOpenGit && (
+            <button
+              onClick={onOpenGit}
+              className={`py-1.5 px-2.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border ${
+                isRightPanelOpen && activeRightPanelTab === 'git'
+                  ? 'bg-sky-500/20 text-sky-200 border-sky-500/40 shadow-inner'
+                  : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border-slate-700/60'
+              }`}
+              title="Cockpit Git (statut, diff, commit, push)"
+            >
+              <GitBranch className="w-3.5 h-3.5 text-fuchsia-400" />
+              <span className="text-[11px] font-medium hidden sm:inline">Git</span>
+            </button>
+          )}
+
+          {onOpenTasks && (
+            <button
+              onClick={onOpenTasks}
+              className="py-1.5 px-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700/60"
+              title="Supervision des Tâches et Sous-Agents"
+            >
+              <Activity className="w-3.5 h-3.5 text-indigo-400" />
+            </button>
+          )}
+
+          {onToggleRightPanel && (
+            <button
+              onClick={onToggleRightPanel}
+              className={`p-1.5 rounded-lg text-xs flex items-center transition-colors cursor-pointer border ml-1 ${
+                isRightPanelOpen
+                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 shadow-inner'
+                  : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border-slate-700/60'
+              }`}
+              title={isRightPanelOpen ? 'Fermer le volet latéral' : 'Ouvrir le volet latéral'}
+            >
+              <PanelRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           {isStreaming && (
-            <div className="flex items-center gap-2 text-[11px] text-amber-400 bg-amber-950/30 border border-amber-800/40 px-3 py-1 rounded-full animate-pulse shadow-sm ml-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-              <span className="font-medium">Antigravity réfléchit...</span>
+            <div className="flex items-center gap-2 text-[11px] text-amber-400 bg-amber-950/30 border border-amber-800/40 px-2.5 py-1 rounded-full animate-pulse shadow-sm ml-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+              <span className="font-medium hidden md:inline">En cours...</span>
             </div>
           )}
         </div>

@@ -208,3 +208,75 @@ export async function fetchSkillDetail(skillId: string): Promise<any> {
   if (!res.ok) throw new Error(`Failed to load skill details: ${res.statusText}`);
   return res.json();
 }
+
+// Git Cockpit API
+export interface GitStatusResult {
+  is_repo: boolean;
+  workspace: string;
+  branch: string;
+  tracking?: string | null;
+  ahead: number;
+  behind: number;
+  clean: boolean;
+  modified: string[];
+  staged: string[];
+  untracked: string[];
+  deleted: string[];
+  last_commit?: {
+    hash: string;
+    author: string;
+    subject: string;
+    time: string;
+  } | null;
+  message?: string;
+}
+
+export async function fetchGitStatus(workspace?: string): Promise<GitStatusResult> {
+  const url = workspace ? `${API_BASE}/git/status?workspace=${encodeURIComponent(workspace)}` : `${API_BASE}/git/status`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) throw new Error(`Failed to fetch Git status: ${res.statusText}`);
+  return res.json();
+}
+
+export async function fetchGitDiff(workspace?: string, path?: string, staged: boolean = false): Promise<{ workspace: string; path?: string; diff: string }> {
+  const params = new URLSearchParams();
+  if (workspace) params.append('workspace', workspace);
+  if (path) params.append('path', path);
+  if (staged) params.append('staged', 'true');
+  const res = await fetch(`${API_BASE}/git/diff?${params.toString()}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(`Failed to fetch Git diff: ${res.statusText}`);
+  return res.json();
+}
+
+export async function fetchGitBranches(workspace?: string): Promise<{ current: string; branches: string[] }> {
+  const url = workspace ? `${API_BASE}/git/branches?workspace=${encodeURIComponent(workspace)}` : `${API_BASE}/git/branches`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) throw new Error(`Failed to fetch branches: ${res.statusText}`);
+  return res.json();
+}
+
+export async function gitCommit(message: string, workspace?: string, stageAll: boolean = true): Promise<{ success: boolean; output: string }> {
+  const res = await fetch(`${API_BASE}/git/commit`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ message, workspace, stage_all: stageAll })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du commit' }));
+    throw new Error(err.detail || 'Erreur lors du commit');
+  }
+  return res.json();
+}
+
+export async function gitPush(workspace?: string, remote: string = 'origin', branch?: string): Promise<{ success: boolean; output: string }> {
+  const res = await fetch(`${API_BASE}/git/push`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ workspace, remote, branch })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du push' }));
+    throw new Error(err.detail || 'Erreur lors du push');
+  }
+  return res.json();
+}

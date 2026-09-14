@@ -8,6 +8,7 @@ import { WorkspaceModal } from './components/WorkspaceModal';
 import { LoginModal } from './components/LoginModal';
 import { FileExplorerModal } from './components/FileExplorerModal';
 import { TaskDashboardModal } from './components/TaskDashboardModal';
+import { WorkspacePanel, type RightPanelTab } from './components/WorkspacePanel';
 import type { Conversation, ChatMessage, ModelOption } from './types';
 import { 
   fetchConversations, 
@@ -30,6 +31,15 @@ export function App() {
   const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash-high');
   const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
   const [quickPrompt, setQuickPrompt] = useState('');
+
+  // 3-Panel Demand-Driven Workspace Panel
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('files');
+
+  const openRightPanel = (tab: RightPanelTab) => {
+    setRightPanelTab(tab);
+    setIsRightPanelOpen(true);
+  };
 
   // Authentication & Modals State
   const [isAuthenticated, setIsAuthenticated] = useState(true);
@@ -272,8 +282,8 @@ export function App() {
         onNewConversation={handleNewConversation}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenWorkspaces={() => setIsWorkspacesOpen(true)}
-        onOpenArtifacts={() => setIsArtifactsOpen(true)}
-        onOpenFiles={() => setIsFileExplorerOpen(true)}
+        onOpenArtifacts={() => openRightPanel('artifacts')}
+        onOpenFiles={() => openRightPanel('files')}
         onOpenTasks={() => setIsTaskDashboardOpen(true)}
         onLogout={handleLogout}
         currentWorkspace={currentWorkspace}
@@ -296,9 +306,14 @@ export function App() {
               effort: selectedEffort,
             })
           }
-          onOpenFiles={() => setIsFileExplorerOpen(true)}
+          onOpenFiles={() => openRightPanel('files')}
+          onOpenArtifacts={() => openRightPanel('artifacts')}
+          onOpenTerminal={() => openRightPanel('terminal')}
+          onOpenGit={() => openRightPanel('git')}
           onOpenTasks={() => setIsTaskDashboardOpen(true)}
-          onOpenArtifacts={() => setIsArtifactsOpen(true)}
+          isRightPanelOpen={isRightPanelOpen}
+          activeRightPanelTab={rightPanelTab}
+          onToggleRightPanel={() => setIsRightPanelOpen(!isRightPanelOpen)}
         />
 
         <ChatInput
@@ -313,6 +328,17 @@ export function App() {
           initialPrompt={quickPrompt}
         />
       </main>
+
+      {/* 3-Panel Demand-Driven Workspace Panel */}
+      <WorkspacePanel
+        isOpen={isRightPanelOpen}
+        onClose={() => setIsRightPanelOpen(false)}
+        activeTab={rightPanelTab}
+        onTabChange={setRightPanelTab}
+        currentWorkspace={currentWorkspace}
+        conversationId={activeConversationId || undefined}
+        onInsertPath={handleInsertPath}
+      />
 
       {/* Modals & Panels */}
       <LoginModal
