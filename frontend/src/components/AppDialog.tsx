@@ -23,7 +23,14 @@ let _pushConfirm: ((req: ConfirmRequest) => void) | null = null;
  *   if (await showConfirm('Supprimer ?', { destructive: true })) { ... }
  */
 export function showConfirm(
-  message: string,
+  messageOrOpts: string | {
+    title?: string;
+    message: string;
+    confirmText?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    destructive?: boolean;
+  },
   opts?: {
     title?: string;
     confirmLabel?: string;
@@ -31,16 +38,23 @@ export function showConfirm(
     destructive?: boolean;
   }
 ): Promise<boolean> {
+  const isObj = typeof messageOrOpts === 'object';
+  const message = isObj ? messageOrOpts.message : messageOrOpts;
+  const title = isObj ? (messageOrOpts.title || 'Confirmation') : (opts?.title || 'Confirmation');
+  const confirmLabel = isObj ? (messageOrOpts.confirmLabel || messageOrOpts.confirmText) : opts?.confirmLabel;
+  const cancelLabel = isObj ? messageOrOpts.cancelLabel : opts?.cancelLabel;
+  const destructive = isObj ? (messageOrOpts.destructive ?? false) : (opts?.destructive ?? false);
+
   return new Promise<boolean>((resolve) => {
     const id = `confirm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     if (_pushConfirm) {
       _pushConfirm({
         id,
-        title: opts?.title || 'Confirmation',
+        title,
         message,
-        confirmLabel: opts?.confirmLabel,
-        cancelLabel: opts?.cancelLabel,
-        destructive: opts?.destructive ?? false,
+        confirmLabel,
+        cancelLabel,
+        destructive,
         resolve,
       });
     } else {

@@ -52,7 +52,7 @@ const BG_MAP: Record<ToastType, string> = {
 // ─── Single Toast ────────────────────────────────────────────────
 const ToastEntry: React.FC<{ item: ToastItem; onDismiss: (id: string) => void }> = ({ item, onDismiss }) => {
   const [exiting, setExiting] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     timerRef.current = setTimeout(() => {

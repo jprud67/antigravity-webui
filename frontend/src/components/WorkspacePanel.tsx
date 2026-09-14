@@ -14,7 +14,9 @@ import {
   Kanban as KanbanIcon,
   Edit3,
   Save,
-  Check
+  Check,
+  Eye,
+  Code
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -23,8 +25,9 @@ import { GitTab } from './GitTab';
 import { KanbanTab } from './KanbanTab';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
-import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent } from '../services/api';
+import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent, fetchGitStatus } from '../services/api';
 import { showToast } from './Toast';
+import { showConfirm } from './AppDialog';
 import type { ArtifactItem } from '../types';
 
 export type RightPanelTab = 'files' | 'artifacts' | 'terminal' | 'git' | 'kanban';
@@ -139,17 +142,57 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
     }
   }, [isOpen, activeTab, conversationId]);
 
+  // Git status & preview mode state
+  const [gitStatus, setGitStatus] = useState<any>(null);
+  const [showMarkdownPreview, setShowMarkdownPreview] = useState(true);
+
+  // Load git status
   useEffect(() => {
-    const handleArtifactsUpdated = () => {
-      if (isOpen && activeTab === 'artifacts') {
-        loadArtifactsList();
+    if (isOpen) {
+      fetchGitStatus(currentWorkspace)
+        .then(setGitStatus)
+        .catch(() => setGitStatus(null));
+    }
+  }, [isOpen, currentWorkspace]);
+
+  // Unsaved changes guard
+  const checkUnsavedChanges = async (): Promise<boolean> => {
+    if (isEditingFile && editedFileContent !== fileContent) {
+      return await showConfirm('Vous avez des modifications non enregistrées. Voulez-vous continuer sans sauvegarder ?', {
+        title: 'Modifications non enregistrées',
+        confirmLabel: 'Abandonner les modifications',
+        cancelLabel: 'Continuer l\'édition',
+        destructive: true
+      });
+    }
+    return true;
+  };
+
+  const handleClose = async () => {
+    if (await checkUnsavedChanges()) {
+      onClose();
+    }
+  };
+
+  const handleTabClick = async (tab: RightPanelTab) => {
+    if (await checkUnsavedChanges()) {
+      onTabChange(tab);
+    }
+  };
+
+  useEffect(() => {
+    const handleOpenFile = (e: any) => {
+      const path = e.detail?.path;
+      if (path) {
+        handleSelectFile(path);
       }
     };
-    window.addEventListener('antigravity:artifacts_updated', handleArtifactsUpdated);
-    return () => window.removeEventListener('antigravity:artifacts_updated', handleArtifactsUpdated);
-  }, [isOpen, activeTab, conversationId]);
+    window.addEventListener('open-workspace-file', handleOpenFile);
+    return () => window.removeEventListener('open-workspace-file', handleOpenFile);
+  }, [isEditingFile, editedFileContent, fileContent]);
 
   const handleSelectFile = async (path: string) => {
+    if (!(await checkUnsavedChanges())) return;
     setSelectedFilePath(path);
     setIsEditingFile(false);
     setSaveSuccess(false);
@@ -312,7 +355,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
           }}
         >
           <button
-            onClick={() => onTabChange('files')}
+            onClick={() => handleTabClick('files')}
             className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'files'
                 ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
@@ -324,7 +367,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
           </button>
 
           <button
-            onClick={() => onTabChange('artifacts')}
+            onClick={() => handleTabClick('artifacts')}
             className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'artifacts'
                 ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
@@ -336,7 +379,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
           </button>
 
           <button
-            onClick={() => onTabChange('terminal')}
+            onClick={() => handleTabClick('terminal')}
             className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'terminal'
                 ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
@@ -348,7 +391,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
           </button>
 
           <button
-            onClick={() => onTabChange('git')}
+            onClick={() => handleTabClick('git')}
             className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'git'
                 ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
@@ -360,7 +403,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
           </button>
 
           <button
-            onClick={() => onTabChange('kanban')}
+            onClick={() => handleTabClick('kanban')}
             className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'kanban'
                 ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
@@ -372,14 +415,36 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
           </button>
         </div>
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer shrink-0 ml-1"
-          title="Fermer le volet latéral"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        {/* Header Right Actions: Git Badge & Close */}
+        <div className="flex items-center gap-1.5 shrink-0 ml-1">
+          {gitStatus && (
+            <div
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono border select-none"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)'
+              }}
+              title={`Branche git active : ${gitStatus.branch}`}
+            >
+              <GitBranch className="w-3 h-3 text-emerald-500 shrink-0" />
+              <span className="font-semibold truncate max-w-[90px]">{gitStatus.branch}</span>
+              {!gitStatus.is_clean && (
+                <span className="text-amber-500 font-bold">
+                  ({(gitStatus.modified_count || 0) + (gitStatus.untracked_count || 0)})
+                </span>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={handleClose}
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            title="Fermer le volet latéral"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Panel Tab Body */}
@@ -453,8 +518,22 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                         color: 'var(--muted)',
                       }}
                     >
-                      <span className="font-mono truncate" style={{ color: 'var(--strong)' }}>{selectedFilePath.split('/').pop()}</span>
-                      <div className="flex items-center gap-1.5">
+                      {/* Clickable Breadcrumb */}
+                      <div className="flex items-center gap-1 font-mono text-[11px] truncate flex-1 mr-2" style={{ color: 'var(--muted)' }}>
+                        {selectedFilePath.split('/').filter(Boolean).map((part, idx, arr) => (
+                          <React.Fragment key={idx}>
+                            <span
+                              className={idx === arr.length - 1 ? 'font-semibold' : 'opacity-70'}
+                              style={{ color: idx === arr.length - 1 ? 'var(--strong)' : undefined }}
+                            >
+                              {part}
+                            </span>
+                            {idx < arr.length - 1 && <span className="opacity-40">/</span>}
+                          </React.Fragment>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {onInsertPath && (
                           <button
                             onClick={() => onInsertPath(selectedFilePath)}
@@ -462,6 +541,22 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                             title="Insérer le chemin"
                           >
                             + Insérer
+                          </button>
+                        )}
+                        {selectedFilePath.endsWith('.md') && !isEditingFile && (
+                          <button
+                            type="button"
+                            onClick={() => setShowMarkdownPreview(!showMarkdownPreview)}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border"
+                            style={{
+                              backgroundColor: showMarkdownPreview ? 'var(--accent-bg)' : 'var(--surface)',
+                              borderColor: showMarkdownPreview ? 'var(--accent)' : 'var(--border)',
+                              color: showMarkdownPreview ? 'var(--accent)' : 'var(--text)',
+                            }}
+                            title="Basculer aperçu Markdown"
+                          >
+                            {showMarkdownPreview ? <Code className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
+                            <span>{showMarkdownPreview ? 'Source' : 'Aperçu'}</span>
                           </button>
                         )}
                         <button
@@ -510,6 +605,21 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                           style={{ color: 'var(--code-text)' }}
                           spellCheck={false}
                         />
+                      ) : selectedFilePath.match(/\.(png|jpe?g|gif|svg|webp)$/i) ? (
+                        <div className="flex-1 flex items-center justify-center p-4">
+                          <img
+                            src={`/api/files/download?path=${encodeURIComponent(selectedFilePath)}`}
+                            alt={selectedFilePath.split('/').pop()}
+                            className="max-w-full max-h-full object-contain rounded-lg shadow-sm border"
+                            style={{ borderColor: 'var(--border)' }}
+                          />
+                        </div>
+                      ) : selectedFilePath.endsWith('.md') && showMarkdownPreview ? (
+                        <div className="p-3 prose dark:prose-invert max-w-none text-xs leading-relaxed overflow-y-auto">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {fileContent || ''}
+                          </ReactMarkdown>
+                        </div>
                       ) : (
                         <pre className="whitespace-pre-wrap">{fileContent}</pre>
                       )}

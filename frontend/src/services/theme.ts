@@ -132,8 +132,11 @@ export const AVAILABLE_SKINS: SkinOption[] = [
   }
 ];
 
+export type FontSizeOption = 'small' | 'default' | 'large' | 'xlarge';
+
 const THEME_KEY = 'antigravity_theme';
 const SKIN_KEY = 'antigravity_skin';
+const FONT_SIZE_KEY = 'antigravity_font_size';
 
 let systemMediaListener: ((e: MediaQueryListEvent) => void) | null = null;
 
@@ -154,14 +157,31 @@ export function getStoredSkin(): string {
   return 'default';
 }
 
-export function applyAppearance(themeMode?: ThemeMode, skinName?: string) {
+export function getStoredFontSize(): FontSizeOption {
+  const f = localStorage.getItem(FONT_SIZE_KEY) || localStorage.getItem('hermes-font-size');
+  if (f === 'small' || f === 'default' || f === 'large' || f === 'xlarge') {
+    return f as FontSizeOption;
+  }
+  return 'default';
+}
+
+export function setFontSize(size: FontSizeOption) {
+  localStorage.setItem(FONT_SIZE_KEY, size);
+  document.documentElement.setAttribute('data-font-size', size);
+  window.dispatchEvent(new CustomEvent('antigravity-font-size-change', { detail: { fontSize: size } }));
+}
+
+export function applyAppearance(themeMode?: ThemeMode, skinName?: string, fontSize?: FontSizeOption) {
   const targetTheme = themeMode || getStoredTheme();
   const targetSkin = skinName !== undefined ? skinName : getStoredSkin();
+  const targetFontSize = fontSize || getStoredFontSize();
 
   localStorage.setItem(THEME_KEY, targetTheme);
   localStorage.setItem(SKIN_KEY, targetSkin);
+  localStorage.setItem(FONT_SIZE_KEY, targetFontSize);
 
   const root = document.documentElement;
+  root.setAttribute('data-font-size', targetFontSize);
 
   // Resolve Dark vs Light
   let isDark = true;

@@ -841,3 +841,27 @@ body {
   color: #f43f5e;
 }
 
+/* ==========================================================================
+   Font Size Scaling (Small, Default, Large, XLarge)
+   ========================================================================== */
+:root[data-font-size="small"] {
+  font-size: 13px;
+  --message-body-font-size: 13px;
+}
+
+:root[data-font-size="default"] {
+  font-size: 14px;
+  --message-body-font-size: 14.5px;
+}
+
+:root[data-font-size="large"] {
+  font-size: 16px;
+  --message-body-font-size: 16px;
+}
+
+:root[data-font-size="xlarge"] {
+  font-size: 18px;
+  --message-body-font-size: 18px;
+}
+
+

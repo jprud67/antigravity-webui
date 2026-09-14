@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -11,6 +11,25 @@
     <meta name="description" content="Cockpit WebUI haute performance pour Antigravity & Hermes" />
     <link rel="manifest" href="/manifest.json" />
     <title>Antigravity WebUI</title>
+    <!-- Zero-Flash Pre-render: evaluate theme, skin and font size before paint -->
+    <script>
+      (function() {
+        try {
+          var t = localStorage.getItem('antigravity_theme') || localStorage.getItem('hermes-theme') || 'system';
+          var s = localStorage.getItem('antigravity_skin') || localStorage.getItem('hermes-skin') || 'default';
+          var f = localStorage.getItem('antigravity_font_size') || localStorage.getItem('hermes-font-size') || 'default';
+          var isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+          document.documentElement.setAttribute('data-skin', s);
+          document.documentElement.setAttribute('data-font-size', f);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
   <body class="antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

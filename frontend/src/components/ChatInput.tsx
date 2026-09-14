@@ -13,7 +13,8 @@ import {
   Folder,
   Paperclip,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  FileText
 } from 'lucide-react';
 import type { ModelOption } from '../types';
 import { ContextRing, type TokenUsageData } from './ContextRing';
@@ -109,6 +110,67 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isListening, setIsListening] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  // Attachment states
+  interface AttachmentItem {
+    id: string;
+    name: string;
+    size: number;
+    type: string;
+    content: string;
+    isImage: boolean;
+    previewUrl?: string;
+  }
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAddFiles = (files: File[]) => {
+    if (!files || files.length === 0) return;
+    for (const file of files) {
+      const isImg = file.type.startsWith('image/');
+      const reader = new FileReader();
+      const id = `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      if (isImg) {
+        reader.onload = (e) => {
+          const content = e.target?.result as string;
+          setAttachments((prev) => [
+            ...prev,
+            {
+              id,
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              content,
+              isImage: true,
+              previewUrl: content
+            }
+          ]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        reader.onload = (e) => {
+          const content = (e.target?.result as string) || '';
+          setAttachments((prev) => [
+            ...prev,
+            {
+              id,
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              content,
+              isImage: false
+            }
+          ]);
+        };
+        reader.readAsText(file);
+      }
+    }
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -543,7 +605,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       }
     }
 
-    if (e.key === 'Enter' && !e.shiftKey) {
+    const sendKeyPref = typeof window !== 'undefined' ? (localStorage.getItem('antigravity_send_key') || 'enter') : 'enter';
+    const shouldSend = sendKeyPref === 'ctrlEnter'
+      ? (e.key === 'Enter' && (e.ctrlKey || e.metaKey))
+      : (e.key === 'Enter' && !e.shiftKey);
+
+    if (shouldSend) {
       e.preventDefault();
       // Check if command is a local action
       if (prompt.trim().startsWith('/')) {
@@ -584,17 +651,29 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleSubmit = (mode: 'normal' | 'queue' | 'steer' = 'normal', overrideText?: string) => {
-    const textToSend = overrideText || prompt;
-    if (!textToSend.trim()) return;
+    let textToSend = overrideText !== undefined ? overrideText : prompt;
+    if (!textToSend.trim() && attachments.length === 0) return;
 
-    // Check if it's a direct local slash command
-    if (textToSend.trim().startsWith('/')) {
+    // Check if it's a direct local slash command (only when no attachments)
+    if (attachments.length === 0 && textToSend.trim().startsWith('/')) {
       const handled = executeSlashAction(textToSend.trim());
       if (handled) {
         setPrompt('');
         setShowSlashMenu(false);
         return;
       }
+    }
+
+    let finalText = textToSend.trim();
+    if (attachments.length > 0) {
+      for (const att of attachments) {
+        if (att.isImage) {
+          finalText += `\n\n[Image attachée : ${att.name}]\n${att.content}`;
+        } else {
+          finalText += `\n\n[Fichier attaché : ${att.name} (${Math.round(att.size / 1024)} ko)]\n\`\`\`\n${att.content.slice(0, 50000)}\n\`\`\``;
+        }
+      }
+      setAttachments([]);
     }
 
     // Resolve concrete model variant ID
@@ -611,7 +690,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         || (targetModelObj?.variants && Object.values(targetModelObj.variants)[0])
         || selectedModel;
 
-    onSendMessage(textToSend.trim(), {
+    onSendMessage(finalText, {
       model: concreteVariant,
       effort: resolvedEffort,
       autoApprove,
@@ -727,12 +806,73 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Floating Composer Box - Pure Hermes Design */}
         <div
-          className="hermes-composer-dock p-2.5 sm:p-3.5"
+          className={`hermes-composer-dock p-2.5 sm:p-3.5 relative transition-all ${
+            isDraggingOver ? 'ring-2 ring-sky-500/80 border-sky-500' : ''
+          }`}
           style={{
             backgroundColor: 'var(--surface)',
-            borderColor: 'var(--border2)'
+            borderColor: isDraggingOver ? 'var(--accent)' : 'var(--border2)'
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDraggingOver(true);
+          }}
+          onDragLeave={() => setIsDraggingOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDraggingOver(false);
+            if (e.dataTransfer.files) {
+              handleAddFiles(Array.from(e.dataTransfer.files));
+            }
           }}
         >
+          {/* Hidden File Input for Paperclip */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              if (e.target.files) {
+                handleAddFiles(Array.from(e.target.files));
+              }
+              e.target.value = '';
+            }}
+          />
+
+          {/* Attachment Tray */}
+          {attachments.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-1.5 scrollbar-none">
+              {attachments.map((att) => (
+                <div
+                  key={att.id}
+                  className="flex items-center gap-1.5 py-1 px-2 rounded-lg border text-xs font-mono shadow-xs shrink-0 group transition-all"
+                  style={{
+                    backgroundColor: 'var(--surface-subtle)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text)'
+                  }}
+                >
+                  {att.isImage && att.previewUrl ? (
+                    <img src={att.previewUrl} alt={att.name} className="w-5 h-5 object-cover rounded shrink-0 border" style={{ borderColor: 'var(--border)' }} />
+                  ) : (
+                    <FileText className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+                  )}
+                  <span className="truncate max-w-[130px] text-[11px] font-sans">{att.name}</span>
+                  <span className="text-[10px] opacity-60 font-mono">({Math.round(att.size / 1024)}k)</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttachment(att.id)}
+                    className="p-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-slate-400 hover:text-red-400 transition-colors cursor-pointer ml-0.5"
+                    title="Supprimer la pièce jointe"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <textarea
             ref={textareaRef}
             value={prompt}
@@ -751,25 +891,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           >
           {/* Left Controls */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            {/* Attachment / File Explorer Button */}
-            {(onOpenFileExplorer || onOpenSkills) && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (onOpenFileExplorer) onOpenFileExplorer();
-                  else if (onOpenSkills) onOpenSkills();
-                }}
-                className="p-2 sm:p-1.5 rounded-lg border transition-colors cursor-pointer flex items-center justify-center hover:opacity-100 opacity-80 shrink-0"
-                style={{
-                  backgroundColor: 'var(--surface-subtle)',
-                  borderColor: 'var(--border)',
-                  color: 'var(--text)'
-                }}
-                title={t('file_browser', 'Attacher des fichiers ou explorer le workspace (/files)')}
-              >
-                <Paperclip className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
-              </button>
-            )}
+            {/* Attachment Button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 sm:p-1.5 rounded-lg border transition-colors cursor-pointer flex items-center justify-center hover:opacity-100 opacity-80 shrink-0 relative"
+              style={{
+                backgroundColor: attachments.length > 0 ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                borderColor: attachments.length > 0 ? 'var(--accent)' : 'var(--border)',
+                color: attachments.length > 0 ? 'var(--accent)' : 'var(--text)'
+              }}
+              title="Attacher des fichiers (images, code, texte) ou glisser-déposer"
+            >
+              <Paperclip className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+              {attachments.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-sky-500 text-[9px] font-bold text-white flex items-center justify-center">
+                  {attachments.length}
+                </span>
+              )}
+            </button>
 
             {/* Voice Dictation (Dictée vocale) */}
             <button
@@ -920,7 +1060,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             )}
 
             {!isStreaming && (
-              <span className="hidden sm:inline text-[10px] font-mono opacity-50">Entrée ↵</span>
+              <span className="hidden sm:inline text-[10px] font-mono opacity-50">
+                {(typeof window !== 'undefined' && localStorage.getItem('antigravity_send_key') === 'ctrlEnter') ? 'Ctrl+↵' : 'Entrée ↵'}
+              </span>
             )}
 
             {isStreaming ? (

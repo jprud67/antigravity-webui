@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   Plus, 
   MessageSquare, 
@@ -23,16 +23,17 @@ import {
   Trash2,
   Tag,
   Folder,
-  Download,
-  Check,
-  Loader2
+  Download, 
+  Check, 
+  Loader2,
+  Upload
 } from 'lucide-react';
 import type { Conversation } from '../types';
 import { getStoredTheme, applyAppearance, type ThemeMode } from '../services/theme';
 import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 import type { GoogleAccountInfo } from '../services/api';
-import { bulkConversationAction, bulkConversationExport } from '../services/api';
+import { bulkConversationAction, bulkConversationExport, importConversation } from '../services/api';
 import { showToast } from './Toast';
 import { showConfirm } from './AppDialog';
 
@@ -110,6 +111,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showBulkProjectModal, setShowBulkProjectModal] = useState(false);
   const [bulkProjectInput, setBulkProjectInput] = useState('');
   const [bulkProjectColor, setBulkProjectColor] = useState('#3B82F6');
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportJSON = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const res = await importConversation(payload);
+      showToast(`Session importée : ${res.title}`, 'success');
+      if (onRefreshConversations) {
+        await onRefreshConversations();
+      }
+      onSelectConversation(res.conversation_id);
+    } catch (err: any) {
+      showToast(`Erreur lors de l'import : ${err.message}`, 'error');
+    } finally {
+      e.target.value = '';
+    }
+  };
 
   // Extract all unique tags
   const allTags = useMemo(() => {
@@ -153,6 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const last7Days: Conversation[] = [];
     const last30Days: Conversation[] = [];
     const older: Conversation[] = [];
+    const archived: Conversation[] = [];
 
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -164,6 +186,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     startOf30Days.setDate(startOf30Days.getDate() - 30);
 
     filtered.forEach((c) => {
+      if (c.archived) {
+        archived.push(c);
+        return;
+      }
       if (c.pinned) {
         pinned.push(c);
         return;
@@ -189,6 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { label: '📅 7 derniers jours', items: last7Days },
       { label: '📅 Ce mois-ci', items: last30Days },
       { label: '🗄️ Plus ancien', items: older },
+      { label: '📦 Archives', items: archived },
     ].filter((g) => g.items.length > 0);
   }, [filtered]);
 
@@ -404,6 +431,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
               title={isBulkMode ? "Quitter la sélection multiple" : "Sélection multiple & actions groupées"}
             >
               <CheckSquare className="w-4 h-4" />
+            </button>
+
+            {/* Import JSON button */}
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept=".json"
+              style={{ display: 'none' }}
+              onChange={handleImportJSON}
+            />
+            <button
+              type="button"
+              onClick={() => importFileInputRef.current?.click()}
+              className="p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center hover:opacity-100 opacity-80"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border)',
+                color: 'var(--muted)',
+              }}
+              title={t('import_session', 'Importer une session (JSON)')}
+            >
+              <Upload className="w-4 h-4" />
             </button>
 
             <a

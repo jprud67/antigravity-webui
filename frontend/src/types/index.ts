@@ -10,6 +10,7 @@ export interface Conversation {
   agent_name?: string;
   parent_conversation_id?: string | null;
   pinned?: boolean;
+  archived?: boolean;
   tags?: string[];
   project?: string;
   projectColor?: string;

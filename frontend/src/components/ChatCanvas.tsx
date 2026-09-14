@@ -37,7 +37,8 @@ import {
   User,
   Menu,
   Plus,
-  MoreHorizontal
+  MoreHorizontal,
+  RotateCcw
 } from 'lucide-react';
 import type { ChatMessage, ToolCallItem } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
@@ -78,6 +79,7 @@ interface ChatCanvasProps {
   onApprovalResolved?: () => void;
   onForkMessage?: (stepIndex: number) => void;
   onEditSessionMeta?: () => void;
+  onRetry?: () => void;
 }
 
 export const copyTextToClipboard = async (text: string): Promise<boolean> => {
@@ -196,8 +198,14 @@ const CalloutBlock = ({ children }: any) => {
  * Clickable Interactive File Link or External URL
  */
 const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: any) => {
-  if (href && href.startsWith('file:///')) {
-    const filePath = href.replace(/^file:\/\/\/?/, '/');
+  if (href && (href.startsWith('file://') || href.startsWith('workspace://'))) {
+    let cleanHref = href;
+    if (href.startsWith('workspace://')) {
+      cleanHref = href.replace(/^workspace:\/\//, '');
+      if (!cleanHref.startsWith('/')) cleanHref = '/' + cleanHref;
+      cleanHref = 'file://' + cleanHref;
+    }
+    const filePath = cleanHref.replace(/^file:\/\/\/?/, '/');
     const [cleanPath, anchor] = filePath.split('#');
     const filename = cleanPath.split('/').pop() || cleanPath;
     const isArtifact = cleanPath.includes('/brain/') && cleanPath.endsWith('.md');
@@ -272,6 +280,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          window.dispatchEvent(new CustomEvent('open-workspace-file', { detail: { path: cleanPath } }));
           if (onOpenFile) {
             onOpenFile();
           } else {
@@ -656,6 +665,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   onApprovalResolved,
   onForkMessage,
   onEditSessionMeta,
+  onRetry,
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -1567,6 +1577,19 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                       >
                         {isSpeaking ? <VolumeX className="w-3 h-3 text-rose-400 animate-pulse" /> : <Volume2 className="w-3 h-3" />}
                         <span className="hidden sm:inline">{isSpeaking ? 'Arrêter' : 'Écouter'}</span>
+                      </button>
+                    )}
+
+                    {onRetry && !isStreaming && (msgIdx === messages.length - 1 || msgIdx === messages.map(m => m.role).lastIndexOf('assistant')) && (
+                      <button
+                        type="button"
+                        onClick={onRetry}
+                        className="px-2.5 py-1 rounded-md border flex items-center gap-1 hover:text-strong hover:bg-surface-subtle transition-all cursor-pointer text-sky-500 hover:border-sky-500/40"
+                        style={{ borderColor: 'var(--border)' }}
+                        title="Relancer la dernière instruction (Retry)"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span className="hidden sm:inline">Réessayer</span>
                       </button>
                     )}
                   </div>

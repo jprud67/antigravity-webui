@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Tag, Folder, Palette, Pin, Check, Trash2 } from 'lucide-react';
+import { X, Tag, Folder, Palette, Pin, Check, Trash2, Archive, Download, FileText } from 'lucide-react';
 import type { Conversation } from '../types';
-import { updateConversationMetadata, deleteConversation } from '../services/api';
+import { updateConversationMetadata, deleteConversation, exportConversationMarkdown, exportConversationJSON } from '../services/api';
 import { showConfirm } from './AppDialog';
+import { showToast } from './Toast';
 
 interface SessionMetaModalProps {
   isOpen: boolean;
@@ -35,7 +36,9 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
   const [projectColor, setProjectColor] = useState(PALETTE[0]);
   const [tagsStr, setTagsStr] = useState('');
   const [pinned, setPinned] = useState(false);
+  const [archived, setArchived] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,11 +48,40 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
       setProjectColor(conversation.projectColor || PALETTE[0]);
       setTagsStr((conversation.tags || []).join(', '));
       setPinned(!!conversation.pinned);
+      setArchived(!!conversation.archived);
       setError(null);
     }
   }, [conversation]);
 
   if (!isOpen || !conversation) return null;
+
+  const handleExport = async (format: 'markdown' | 'json') => {
+    try {
+      setExporting(true);
+      if (format === 'markdown') {
+        const blob = await exportConversationMarkdown(conversation.conversation_id);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `session_${conversation.conversation_id.slice(0, 8)}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const blob = await exportConversationJSON(conversation.conversation_id);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `session_${conversation.conversation_id.slice(0, 8)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      showToast(`Export ${format.toUpperCase()} téléchargé`, 'success');
+    } catch (e: any) {
+      showToast(`Erreur export : ${e.message}`, 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleSave = async () => {
     setLoading(true);
@@ -65,7 +97,8 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
         project: project.trim(),
         projectColor,
         tags: parsedTags,
-        pinned
+        pinned,
+        archived
       });
       onUpdated();
       onClose();
@@ -216,7 +249,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
           </div>
 
           {/* Pin toggle */}
-          <div className="pt-2">
+          <div className="pt-2 space-y-2">
             <button
               type="button"
               onClick={() => setPinned(!pinned)}
@@ -233,6 +266,62 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
               </div>
               <span className="text-[10px] uppercase font-mono">{pinned ? 'Actif' : 'Inactif'}</span>
             </button>
+
+            {/* Archive toggle */}
+            <button
+              type="button"
+              onClick={() => setArchived(!archived)}
+              className="w-full p-2.5 rounded-xl border flex items-center justify-between text-xs transition-colors cursor-pointer"
+              style={{
+                backgroundColor: archived ? 'rgba(100, 116, 139, 0.15)' : 'var(--surface-subtle)',
+                borderColor: archived ? '#64748B' : 'var(--border)',
+                color: archived ? 'var(--strong)' : 'var(--text)'
+              }}
+            >
+              <div className="flex items-center gap-2 font-medium">
+                <Archive className="w-4 h-4 text-slate-400" />
+                <span>Archiver cette session</span>
+              </div>
+              <span className="text-[10px] uppercase font-mono">{archived ? 'Archivé' : 'Non archivé'}</span>
+            </button>
+          </div>
+
+          {/* Export options */}
+          <div className="pt-2 border-t mt-2" style={{ borderColor: 'var(--border-subtle)' }}>
+            <label className="text-[11px] font-semibold flex items-center gap-1.5 mb-2" style={{ color: 'var(--muted)' }}>
+              <Download className="w-3.5 h-3.5 text-sky-400" />
+              <span>Exporter cette discussion</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={exporting}
+                onClick={() => handleExport('markdown')}
+                className="flex-1 py-1.5 px-2.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text)'
+                }}
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Markdown (.md)</span>
+              </button>
+              <button
+                type="button"
+                disabled={exporting}
+                onClick={() => handleExport('json')}
+                className="flex-1 py-1.5 px-2.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text)'
+                }}
+              >
+                <Download className="w-3.5 h-3.5 text-sky-400" />
+                <span>JSON complet</span>
+              </button>
+            </div>
           </div>
         </div>
 

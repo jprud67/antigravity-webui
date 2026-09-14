@@ -15,6 +15,7 @@ from app.services.storage import (
     update_conversation_title,
     export_conversation_html,
     export_conversation_markdown,
+    import_conversation,
 )
 from app.services.session_metadata import (
     get_all_session_metadata,
@@ -250,3 +251,12 @@ def export_json(conversation_id: str, _ = Depends(require_auth)):
             "Content-Disposition": f'attachment; filename="antigravity_{conversation_id[:8]}.json"'
         }
     )
+
+@router.post("/import")
+def import_session(payload: Dict[str, Any], _ = Depends(require_auth)):
+    try:
+        res = import_conversation(payload)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Échec de l'import : {str(e)}")
+

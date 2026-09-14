@@ -1276,3 +1276,93 @@ def save_settings(new_settings: Dict[str, Any]) -> Dict[str, Any]:
     tmp_file.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
     tmp_file.replace(SETTINGS_FILE)
     return current
+
+def import_conversation(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Import a conversation from JSON payload.
+    Supports:
+    1. Antigravity JSON export format ({ conversation_id, metadata, steps })
+    2. Hermes WebUI session format ({ session_id, title, messages, ... })
+    """
+    import datetime
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    new_id = str(uuid.uuid4())
+
+    title = "Conversation importée"
+    steps = []
+
+    # Format 1: Antigravity export
+    if "steps" in payload and isinstance(payload["steps"], list):
+        steps = payload["steps"]
+        meta = payload.get("metadata") or {}
+        title = meta.get("customTitle") or meta.get("title") or title
+    # Format 2: Hermes session format
+    elif "messages" in payload and isinstance(payload["messages"], list):
+        title = payload.get("title") or title
+        for idx, m in enumerate(payload["messages"]):
+            role = m.get("role", "user")
+            content = m.get("content", "")
+            if role == "user":
+                steps.append({
+                    "step_index": idx,
+                    "source": "USER_EXPLICIT",
+                    "type": "USER_INPUT",
+                    "status": "DONE",
+                    "content": content,
+                    "created_at": m.get("timestamp") or now_iso
+                })
+            else:
+                steps.append({
+                    "step_index": idx,
+                    "source": "MODEL",
+                    "type": "PLANNER_RESPONSE",
+                    "status": "DONE",
+                    "content": content,
+                    "created_at": m.get("timestamp") or now_iso
+                })
+
+    if not steps:
+        # Fallback single step
+        steps = [{
+            "step_index": 0,
+            "source": "USER_EXPLICIT",
+            "type": "USER_INPUT",
+            "status": "DONE",
+            "content": payload.get("title") or "Session importée",
+            "created_at": now_iso
+        }]
+
+    new_conv_dir = BRAIN_DIR / new_id
+    new_logs_dir = new_conv_dir / ".system_generated" / "logs"
+    new_logs_dir.mkdir(parents=True, exist_ok=True)
+
+    transcript_path = new_logs_dir / "transcript.jsonl"
+    transcript_full_path = new_logs_dir / "transcript_full.jsonl"
+
+    with open(transcript_path, "w", encoding="utf-8") as f:
+        for s in steps:
+            cloned = dict(s)
+            cloned["conversation_id"] = new_id
+            f.write(json.dumps(cloned, ensure_ascii=False) + "\n")
+
+    with open(transcript_full_path, "w", encoding="utf-8") as f:
+        for s in steps:
+            cloned = dict(s)
+            cloned["conversation_id"] = new_id
+            f.write(json.dumps(cloned, ensure_ascii=False) + "\n")
+
+    from app.services.session_metadata import update_session_meta
+    update_session_meta(new_id, {
+        "customTitle": title,
+        "title": title,
+        "tags": payload.get("tags") or ["importé"],
+        "project": payload.get("project") or ""
+    })
+
+    return {
+        "success": True,
+        "conversation_id": new_id,
+        "title": title,
+        "steps_count": len(steps)
+    }
+

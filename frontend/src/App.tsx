@@ -99,6 +99,15 @@ export function App() {
     setIsRightPanelOpen(true);
   };
 
+  useEffect(() => {
+    const handleOpenFile = () => {
+      setIsRightPanelOpen(true);
+      setRightPanelTab('files');
+    };
+    window.addEventListener('open-workspace-file', handleOpenFile);
+    return () => window.removeEventListener('open-workspace-file', handleOpenFile);
+  }, []);
+
   // Authentication & Modals State
   const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -110,7 +119,7 @@ export function App() {
   const [isCronModalOpen, setIsCronModalOpen] = useState(false);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google'>('models');
+  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation'>('models');
   const [activeGoogleAccount, setActiveGoogleAccount] = useState<GoogleAccountInfo | null>(null);
 
   const handleOpenSkills = () => {
@@ -977,6 +986,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
           onApprovalResolved={() => setPendingApproval(null)}
           onForkMessage={handleForkMessage}
           onEditSessionMeta={() => handleEditSessionMeta(activeConv)}
+          onRetry={handleRetry}
         />
 
         <ChatInput
@@ -1073,6 +1083,17 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
         onModelSaved={handleModelSavedFromSettings}
         initialTab={settingsTab}
         onGoogleAccountChanged={(acc) => setActiveGoogleAccount(acc)}
+        activeConversation={activeConv}
+        onClearHistory={() => setMessages([])}
+        onDeleteConversation={(deletedId) => {
+          if (activeConversationId === deletedId) {
+            handleNewConversation();
+          }
+        }}
+        onConversationUpdated={async () => {
+          const convs = await fetchConversations(100);
+          setConversations(convs);
+        }}
       />
 
       <HelpModal

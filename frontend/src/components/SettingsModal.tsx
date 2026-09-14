@@ -23,9 +23,20 @@ import {
   UserCheck,
   AlertCircle,
   CheckCircle2,
-  Terminal
+  Terminal,
+  Type,
+  MessageSquare,
+  Download,
+  Upload,
+  Pin,
+  Archive,
+  Tag,
+  Folder,
+  FileText,
+  Keyboard,
+  RotateCcw
 } from 'lucide-react';
-import type { AppSettings, ModelOption } from '../types';
+import type { AppSettings, ModelOption, Conversation } from '../types';
 import { 
   fetchSettings, 
   saveSettings, 
@@ -38,12 +49,28 @@ import {
   startGoogleLogin,
   submitGoogleAuthCode,
   cancelGoogleLogin,
+  updateConversationMetadata,
+  deleteConversation,
+  exportConversationMarkdown,
+  exportConversationJSON,
+  importConversation,
   type GoogleAccountInfo,
   type GoogleAccountsResponse
 } from '../services/api';
-import { AVAILABLE_THEMES, AVAILABLE_SKINS, getStoredTheme, getStoredSkin, applyAppearance, type ThemeMode } from '../services/theme';
+import { 
+  AVAILABLE_THEMES, 
+  AVAILABLE_SKINS, 
+  getStoredTheme, 
+  getStoredSkin, 
+  applyAppearance, 
+  getStoredFontSize, 
+  setFontSize, 
+  type ThemeMode, 
+  type FontSizeOption 
+} from '../services/theme';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 import { showConfirm } from './AppDialog';
+import { showToast } from './Toast';
 
 export const GoogleIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24">
@@ -60,8 +87,12 @@ interface SettingsModalProps {
   models: ModelOption[];
   currentModel: string;
   onModelSaved: (modelId: string) => void;
-  initialTab?: 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google';
+  initialTab?: 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation';
   onGoogleAccountChanged?: (account: GoogleAccountInfo | null) => void;
+  activeConversation?: Conversation | null;
+  onClearHistory?: () => void;
+  onDeleteConversation?: (convId: string) => void;
+  onConversationUpdated?: () => void;
 }
 
 const MODEL_DESCRIPTIONS: Record<string, { desc: string; badge: string; iconColor: string }> = {
@@ -81,17 +112,178 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   currentModel,
   onModelSaved,
   initialTab,
-  onGoogleAccountChanged
+  onGoogleAccountChanged,
+  activeConversation,
+  onClearHistory,
+  onDeleteConversation,
+  onConversationUpdated
 }) => {
   const { lang, setLanguage } = useI18n();
-  const [activeTab, setActiveTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google'>(initialTab || 'models');
+  const [activeTab, setActiveTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation'>(initialTab || 'models');
   const [settings, setSettings] = useState<AppSettings>({});
   const [selectedModelId, setSelectedModelId] = useState(currentModel);
   const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
   const [currentTheme, setCurrentTheme] = useState<ThemeMode>(getStoredTheme());
   const [currentSkin, setCurrentSkin] = useState<string>(getStoredSkin());
+  const [currentFontSize, setCurrentFontSize] = useState<FontSizeOption>(getStoredFontSize());
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Conversation state
+  const CONV_PALETTE = ['#0ea5e9', '#10b981', '#f59e0b', '#f43f5e', '#6366f1', '#a855f7', '#ec4899', '#06b6d4'];
+  const [convTitle, setConvTitle] = useState('');
+  const [convProject, setConvProject] = useState('');
+  const [convProjectColor, setConvProjectColor] = useState(CONV_PALETTE[0]);
+  const [convTagsStr, setConvTagsStr] = useState('');
+  const [convPinned, setConvPinned] = useState(false);
+  const [convArchived, setConvArchived] = useState(false);
+  const [convSaving, setConvSaving] = useState(false);
+  const [convExporting, setConvExporting] = useState(false);
+  const convFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Send key mode
+  const [sendKeyMode, setSendKeyMode] = useState<'enter' | 'ctrlEnter'>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('antigravity_send_key') === 'ctrlEnter') ? 'ctrlEnter' : 'enter';
+  });
+
+  const handleSetSendKeyMode = (mode: 'enter' | 'ctrlEnter') => {
+    setSendKeyMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('antigravity_send_key', mode);
+    }
+    showToast(`Raccourci d'envoi réglé sur : ${mode === 'ctrlEnter' ? 'Ctrl/Cmd+Entrée' : 'Entrée'}`, 'info');
+  };
+
+  useEffect(() => {
+    if (activeConversation) {
+      setConvTitle(activeConversation.customTitle || activeConversation.title || '');
+      setConvProject(activeConversation.project || '');
+      setConvProjectColor(activeConversation.projectColor || CONV_PALETTE[0]);
+      setConvTagsStr((activeConversation.tags || []).join(', '));
+      setConvPinned(!!activeConversation.pinned);
+      setConvArchived(!!activeConversation.archived);
+    } else {
+      setConvTitle('');
+      setConvProject('');
+      setConvProjectColor(CONV_PALETTE[0]);
+      setConvTagsStr('');
+      setConvPinned(false);
+      setConvArchived(false);
+    }
+  }, [activeConversation, activeTab, isOpen]);
+
+  const handleSaveConvMeta = async () => {
+    if (!activeConversation) return;
+    setConvSaving(true);
+    try {
+      const parsedTags = convTagsStr
+        .split(',')
+        .map((t) => t.trim().replace(/^#/, ''))
+        .filter(Boolean);
+
+      await updateConversationMetadata(activeConversation.conversation_id, {
+        customTitle: convTitle.trim(),
+        project: convProject.trim(),
+        projectColor: convProjectColor,
+        tags: parsedTags,
+        pinned: convPinned,
+        archived: convArchived
+      });
+      if (onConversationUpdated) {
+        onConversationUpdated();
+      }
+      showToast('Métadonnées de la session enregistrées.', 'success');
+    } catch (e: any) {
+      showToast(`Erreur enregistrement : ${e.message}`, 'error');
+    } finally {
+      setConvSaving(false);
+    }
+  };
+
+  const handleExportConv = async (format: 'markdown' | 'json') => {
+    if (!activeConversation) return;
+    setConvExporting(true);
+    try {
+      if (format === 'markdown') {
+        const blob = await exportConversationMarkdown(activeConversation.conversation_id);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `session_${activeConversation.conversation_id.slice(0, 8)}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const blob = await exportConversationJSON(activeConversation.conversation_id);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `session_${activeConversation.conversation_id.slice(0, 8)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      showToast(`Export ${format.toUpperCase()} téléchargé`, 'success');
+    } catch (e: any) {
+      showToast(`Erreur export : ${e.message}`, 'error');
+    } finally {
+      setConvExporting(false);
+    }
+  };
+
+  const handleImportFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const res = await importConversation(payload);
+      showToast(`Session "${res.title}" importée avec succès !`, 'success');
+      if (onConversationUpdated) {
+        onConversationUpdated();
+      }
+    } catch (err: any) {
+      showToast(`Erreur lors de l'import : ${err.message}`, 'error');
+    } finally {
+      if (convFileInputRef.current) {
+        convFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleClearChatHistory = async () => {
+    if (!activeConversation) return;
+    const ok = await showConfirm({
+      title: 'Effacer l\'historique',
+      message: 'Voulez-vous vraiment effacer tous les messages de la conversation active ?',
+      confirmText: 'Effacer',
+      destructive: true
+    });
+    if (ok) {
+      if (onClearHistory) onClearHistory();
+      showToast('Historique des messages effacé.', 'success');
+      onClose();
+    }
+  };
+
+  const handleDeleteActiveConv = async () => {
+    if (!activeConversation) return;
+    const ok = await showConfirm({
+      title: 'Supprimer la session',
+      message: `Supprimer définitivement la session "${convTitle || activeConversation.title || activeConversation.conversation_id.slice(0, 8)}" ? Cette action est irréversible.`,
+      confirmText: 'Supprimer définitivement',
+      destructive: true
+    });
+    if (ok) {
+      try {
+        await deleteConversation(activeConversation.conversation_id);
+        showToast('Session supprimée.', 'success');
+        if (onDeleteConversation) onDeleteConversation(activeConversation.conversation_id);
+        if (onConversationUpdated) onConversationUpdated();
+        onClose();
+      } catch (e: any) {
+        showToast(`Erreur lors de la suppression : ${e.message}`, 'error');
+      }
+    }
+  };
 
   // Permission rules state
   const [allowRules, setAllowRules] = useState<string[]>([]);
@@ -467,6 +659,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             className="flex px-3 sm:px-6 gap-2 shrink-0 overflow-x-auto tabs-horizontal-scroll scroll-smooth w-full py-0.5"
           >
             <button
+              onClick={(e) => handleTabClick('conversation', e)}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'conversation'
+                  ? 'border-sky-500 text-sky-600 dark:text-sky-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Session & Export</span>
+              {activeConversation && (
+                <span className="text-[10px] bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30 px-1.5 py-0.2 rounded-full font-mono max-w-[100px] truncate">
+                  {activeConversation.customTitle || activeConversation.title || activeConversation.conversation_id.slice(0, 6)}
+                </span>
+              )}
+            </button>
+
+            <button
               onClick={(e) => handleTabClick('models', e)}
               className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
                 activeTab === 'models'
@@ -596,6 +805,349 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             color: 'var(--text)',
           }}
         >
+          {activeTab === 'conversation' && (
+            <div className="space-y-6">
+              {/* Tab Header */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
+                  <MessageSquare className="w-4 h-4 text-sky-500" />
+                  <span>Session Active & Données de Conversation</span>
+                </h3>
+                <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                  Gérez les métadonnées, exportez l'historique en Markdown ou JSON complet, ou importez des sessions externes.
+                </p>
+              </div>
+
+              {!activeConversation ? (
+                <div
+                  className="p-8 rounded-2xl border text-center space-y-2"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                  }}
+                >
+                  <MessageSquare className="w-8 h-8 mx-auto opacity-30 text-sky-500" />
+                  <p className="text-xs font-medium" style={{ color: 'var(--strong)' }}>
+                    Aucune session active sélectionnée
+                  </p>
+                  <p className="text-[11px] max-w-sm mx-auto" style={{ color: 'var(--muted)' }}>
+                    Sélectionnez une discussion dans la barre latérale ou créez-en une nouvelle pour configurer ses métadonnées et exporter ses données.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Session Overview Badge */}
+                  <div
+                    className="p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border)',
+                    }}
+                  >
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>
+                          {convTitle || activeConversation.title || 'Discussion sans titre'}
+                        </span>
+                        {convPinned && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 flex items-center gap-1 font-mono">
+                            <Pin className="w-2.5 h-2.5" /> Épinglée
+                          </span>
+                        )}
+                        {convArchived && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 flex items-center gap-1 font-mono">
+                            <Archive className="w-2.5 h-2.5" /> Archivée
+                          </span>
+                        )}
+                        {convProject && (
+                          <span
+                            className="text-[10px] px-2 py-0.5 rounded-full font-mono flex items-center gap-1 border"
+                            style={{
+                              backgroundColor: `${convProjectColor}18`,
+                              borderColor: `${convProjectColor}40`,
+                              color: convProjectColor,
+                            }}
+                          >
+                            <Folder className="w-2.5 h-2.5" />
+                            {convProject}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-mono" style={{ color: 'var(--muted)' }}>
+                        ID : {activeConversation.conversation_id} · {activeConversation.step_count || 0} messages
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleSaveConvMeta}
+                        disabled={convSaving}
+                        className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-xs hover:opacity-90 disabled:opacity-50"
+                        style={{ backgroundColor: 'var(--accent)' }}
+                      >
+                        {convSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        <span>Enregistrer</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Metadata Form */}
+                  <div
+                    className="p-4 sm:p-5 rounded-2xl border space-y-4 shadow-xs"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border)',
+                    }}
+                  >
+                    <h4 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>
+                      Propriétés de la Session
+                    </h4>
+
+                    {/* Title */}
+                    <div>
+                      <label className="text-[11px] font-medium block mb-1" style={{ color: 'var(--muted)' }}>
+                        Titre personnalisé
+                      </label>
+                      <input
+                        type="text"
+                        value={convTitle}
+                        onChange={(e) => setConvTitle(e.target.value)}
+                        placeholder="ex: Développement API REST LeadForge"
+                        className="w-full px-3 py-2 rounded-xl text-xs focus:outline-none transition-colors font-medium"
+                        style={{
+                          backgroundColor: 'var(--input-bg)',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text)',
+                        }}
+                      />
+                    </div>
+
+                    {/* Project & Color */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[11px] font-medium block mb-1 flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
+                          <Folder className="w-3 h-3 text-sky-500" />
+                          <span>Projet associé</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={convProject}
+                          onChange={(e) => setConvProject(e.target.value)}
+                          placeholder="ex: LeadForge, Client, Refactoring"
+                          className="w-full px-3 py-2 rounded-xl text-xs focus:outline-none transition-colors"
+                          style={{
+                            backgroundColor: 'var(--input-bg)',
+                            border: '1px solid var(--border)',
+                            color: 'var(--text)',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-medium block mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
+                          <Palette className="w-3 h-3 text-amber-500" />
+                          <span>Couleur du projet</span>
+                        </label>
+                        <div className="flex items-center gap-2 pt-0.5">
+                          {CONV_PALETTE.map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => setConvProjectColor(color)}
+                              className={`w-6 h-6 rounded-full transition-transform cursor-pointer flex items-center justify-center shadow-xs ${
+                                convProjectColor === color ? 'scale-125 ring-2 ring-offset-2 ring-sky-500' : 'hover:scale-110'
+                              }`}
+                              style={{ backgroundColor: color }}
+                            >
+                              {convProjectColor === color && <Check className="w-3 h-3 text-white" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tags */}
+                    <div>
+                      <label className="text-[11px] font-medium block mb-1 flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
+                        <Tag className="w-3 h-3 text-emerald-500" />
+                        <span>Tags (séparés par des virgules)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={convTagsStr}
+                        onChange={(e) => setConvTagsStr(e.target.value)}
+                        placeholder="backend, api, bugfix, urgent"
+                        className="w-full px-3 py-2 rounded-xl text-xs focus:outline-none transition-colors font-mono"
+                        style={{
+                          backgroundColor: 'var(--input-bg)',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text)',
+                        }}
+                      />
+                    </div>
+
+                    {/* Toggles */}
+                    <div className="pt-2 flex items-center gap-6 flex-wrap">
+                      <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={convPinned}
+                          onChange={(e) => setConvPinned(e.target.checked)}
+                          className="rounded border text-sky-500 focus:ring-sky-500"
+                        />
+                        <span className="font-medium" style={{ color: 'var(--text)' }}>
+                          📌 Épingler la session en tête de liste
+                        </span>
+                      </label>
+
+                      <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={convArchived}
+                          onChange={(e) => setConvArchived(e.target.checked)}
+                          className="rounded border text-purple-500 focus:ring-purple-500"
+                        />
+                        <span className="font-medium" style={{ color: 'var(--text)' }}>
+                          📦 Archiver la session
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Export / Import Section */}
+                  <div
+                    className="p-4 sm:p-5 rounded-2xl border space-y-3.5 shadow-xs"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border)',
+                    }}
+                  >
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>
+                        Export & Portabilité
+                      </h4>
+                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                        Téléchargez le transcript en Markdown lisible ou en JSON complet pour archivage ou partage.
+                      </p>
+                    </div>
+
+                    {/* Hidden JSON file input */}
+                    <input
+                      ref={convFileInputRef}
+                      type="file"
+                      accept=".json"
+                      onChange={handleImportFileSelected}
+                      className="hidden"
+                    />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handleExportConv('markdown')}
+                        disabled={convExporting}
+                        className="p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2.5 shadow-xs hover:border-sky-500/50"
+                        style={{
+                          backgroundColor: 'var(--surface-subtle)',
+                          borderColor: 'var(--border)',
+                        }}
+                      >
+                        <FileText className="w-4 h-4 text-sky-500 shrink-0" />
+                        <div>
+                          <span className="font-bold text-xs block" style={{ color: 'var(--strong)' }}>
+                            Export Markdown (.md)
+                          </span>
+                          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                            Transcript lisible & formaté
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleExportConv('json')}
+                        disabled={convExporting}
+                        className="p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2.5 shadow-xs hover:border-emerald-500/50"
+                        style={{
+                          backgroundColor: 'var(--surface-subtle)',
+                          borderColor: 'var(--border)',
+                        }}
+                      >
+                        <Download className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <div>
+                          <span className="font-bold text-xs block" style={{ color: 'var(--strong)' }}>
+                            Export JSON (.json)
+                          </span>
+                          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                            Données complètes & métas
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => convFileInputRef.current?.click()}
+                        className="p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2.5 shadow-xs hover:border-purple-500/50"
+                        style={{
+                          backgroundColor: 'var(--surface-subtle)',
+                          borderColor: 'var(--border)',
+                        }}
+                      >
+                        <Upload className="w-4 h-4 text-purple-500 shrink-0" />
+                        <div>
+                          <span className="font-bold text-xs block" style={{ color: 'var(--strong)' }}>
+                            Importer JSON (.json)
+                          </span>
+                          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                            Format Antigravity ou Hermes
+                          </span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Danger Zone */}
+                  <div
+                    className="p-4 sm:p-5 rounded-2xl border space-y-3 shadow-xs border-rose-500/20"
+                    style={{
+                      backgroundColor: 'rgba(244, 63, 94, 0.03)',
+                      borderColor: 'rgba(244, 63, 94, 0.25)',
+                    }}
+                  >
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-rose-500">
+                        Zone de Danger
+                      </h4>
+                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                        Actions irréversibles sur la conversation sélectionnée.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={handleClearChatHistory}
+                        className="px-3.5 py-2 rounded-xl text-xs font-medium border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Effacer l'historique des messages</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDeleteActiveConv}
+                        className="px-3.5 py-2 rounded-xl text-xs font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Supprimer définitivement la session</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {activeTab === 'models' && (
             <div className="space-y-6">
               {/* Models List */}
@@ -1099,6 +1651,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span>{pwdLoading ? 'Mise à jour...' : 'Mettre à jour le mot de passe'}</span>
                   </button>
                 </form>
+
+                {/* System Information Card */}
+                <div
+                  className="mt-6 p-4 rounded-2xl border space-y-3"
+                  style={{
+                    backgroundColor: 'var(--surface-subtle)',
+                    borderColor: 'var(--border2)',
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-sky-500" />
+                    <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>
+                      Informations Système & Environnement
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
+                    <div className="p-2.5 rounded-xl border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+                      <span className="block text-[10px] uppercase font-bold" style={{ color: 'var(--muted)' }}>Application</span>
+                      <span className="font-semibold" style={{ color: 'var(--strong)' }}>Antigravity WebUI v2.0</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+                      <span className="block text-[10px] uppercase font-bold" style={{ color: 'var(--muted)' }}>Serveur & API</span>
+                      <span className="font-semibold" style={{ color: 'var(--strong)' }}>FastAPI + Uvicorn (Port 8000)</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+                      <span className="block text-[10px] uppercase font-bold" style={{ color: 'var(--muted)' }}>Moteur d'Agent</span>
+                      <span className="font-semibold" style={{ color: 'var(--strong)' }}>Google Antigravity CLI (agy)</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+                      <span className="block text-[10px] uppercase font-bold" style={{ color: 'var(--muted)' }}>Temps Réel</span>
+                      <span className="font-semibold text-emerald-500">WebSocket + Heartbeat 5s</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1194,6 +1784,101 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </button>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Section 3: Échelle Typographique (Taille du texte S/M/L) */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
+                  <Type className="w-4 h-4 text-emerald-500" />
+                  <span>Échelle Typographique (Taille du texte)</span>
+                </h3>
+                <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>
+                  Ajuste la densité de lecture et la taille de la police dans toute l'interface.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { id: 'small', label: 'Compact', size: '13px', desc: 'Densité maximale pour écrans denses' },
+                    { id: 'default', label: 'Défaut', size: '14.5px', desc: 'Équilibre standard lecture & espace' },
+                    { id: 'large', label: 'Confort', size: '16px', desc: 'Lecture plus aérée et confortable' },
+                    { id: 'xlarge', label: 'Large', size: '18px', desc: 'Grand format haute lisibilité' },
+                  ].map((fs) => {
+                    const isSelected = currentFontSize === fs.id;
+                    return (
+                      <button
+                        key={fs.id}
+                        type="button"
+                        onClick={() => {
+                          setCurrentFontSize(fs.id as FontSizeOption);
+                          setFontSize(fs.id as FontSizeOption);
+                        }}
+                        className="p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between shadow-xs"
+                        style={{
+                          backgroundColor: isSelected ? 'var(--accent-bg)' : 'var(--surface)',
+                          borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                          boxShadow: isSelected ? '0 0 0 1px var(--accent)' : 'none',
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>{fs.label}</span>
+                          <span className="font-mono text-[10px] px-1 rounded border" style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}>{fs.size}</span>
+                        </div>
+                        <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{fs.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Section 4: Raccourci Clavier d'Envoi (Composer) */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
+                  <Keyboard className="w-4 h-4 text-sky-500" />
+                  <span>Raccourci Clavier d'Envoi (Composer)</span>
+                </h3>
+                <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>
+                  Configurez la combinaison de touches pour expédier votre message à l'agent depuis la boîte de saisie.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleSetSendKeyMode('enter')}
+                    className="p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between shadow-xs"
+                    style={{
+                      backgroundColor: sendKeyMode === 'enter' ? 'var(--accent-bg)' : 'var(--surface)',
+                      borderColor: sendKeyMode === 'enter' ? 'var(--accent)' : 'var(--border)',
+                      boxShadow: sendKeyMode === 'enter' ? '0 0 0 1px var(--accent)' : 'none',
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>Entrée ↵</span>
+                      {sendKeyMode === 'enter' && <Check className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />}
+                    </div>
+                    <p className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                      Touche ↵ Entrée pour envoyer le message, Maj+Entrée pour insérer un saut de ligne.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSetSendKeyMode('ctrlEnter')}
+                    className="p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between shadow-xs"
+                    style={{
+                      backgroundColor: sendKeyMode === 'ctrlEnter' ? 'var(--accent-bg)' : 'var(--surface)',
+                      borderColor: sendKeyMode === 'ctrlEnter' ? 'var(--accent)' : 'var(--border)',
+                      boxShadow: sendKeyMode === 'ctrlEnter' ? '0 0 0 1px var(--accent)' : 'none',
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>Ctrl / Cmd + Entrée ↵</span>
+                      {sendKeyMode === 'ctrlEnter' && <Check className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />}
+                    </div>
+                    <p className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                      Touche ↵ Entrée insère un saut de ligne, Ctrl+Entrée ou Cmd+Entrée pour expédier.
+                    </p>
+                  </button>
                 </div>
               </div>
             </div>

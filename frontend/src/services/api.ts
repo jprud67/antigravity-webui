@@ -143,6 +143,7 @@ export async function updateConversationMetadata(
     project?: string;
     projectColor?: string;
     customTitle?: string;
+    archived?: boolean;
   }
 ): Promise<any> {
   const res = await fetch(`${API_BASE}/conversations/${conversationId}/metadata`, {
@@ -761,3 +762,38 @@ export async function cancelGoogleLogin(sessionId: string): Promise<any> {
   });
   return res.json();
 }
+
+export async function importConversation(payload: any): Promise<{
+  success: boolean;
+  conversation_id: string;
+  title: string;
+  steps_count: number;
+}> {
+  const res = await fetch(`${API_BASE}/conversations/import`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'import" }));
+    throw new Error(err.detail || "Impossible d'importer la conversation");
+  }
+  return res.json();
+}
+
+export async function exportConversationMarkdown(conversationId: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}/export/markdown`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error("Échec du téléchargement de l'export Markdown");
+  return res.blob();
+}
+
+export async function exportConversationJSON(conversationId: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}/export/json`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error("Échec du téléchargement de l'export JSON");
+  return res.blob();
+}
+
