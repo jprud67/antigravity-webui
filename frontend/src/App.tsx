@@ -76,6 +76,11 @@ export function App() {
   const [queueCount, setQueueCount] = useState(0);
   const [pendingApproval, setPendingApproval] = useState<{ toolName: string; command?: string; path?: string } | null>(null);
 
+  // WebSocket connection status for reconnection banner
+  const [wsStatus, setWsStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>(
+    chatSocket.connectionStatus
+  );
+
   // Session Metadata Modal (Phase 3)
   const [isSessionMetaOpen, setIsSessionMetaOpen] = useState(false);
   const [metaTargetConversation, setMetaTargetConversation] = useState<Conversation | null>(null);
@@ -127,6 +132,11 @@ export function App() {
   useEffect(() => {
     applyAppearance(getStoredTheme(), getStoredSkin());
     loadInitialData();
+  }, []);
+
+  // Track WebSocket connection status for reconnection banner
+  useEffect(() => {
+    return chatSocket.onStatusChange(setWsStatus);
   }, []);
 
   // SSE real-time sync: CLI ↔ WebUI
@@ -910,6 +920,28 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
           color: 'var(--text)'
         }}
       >
+        {/* Reconnection Banner */}
+        {wsStatus !== 'connected' && (
+          <div
+            className="flex items-center justify-center gap-2 py-1.5 px-4 text-xs font-medium z-30 shrink-0"
+            style={{
+              backgroundColor: wsStatus === 'reconnecting' ? 'var(--accent-bg-strong)' : 'rgba(239,68,68,0.15)',
+              color: wsStatus === 'reconnecting' ? 'var(--accent-text)' : '#ef4444',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <span className={wsStatus === 'reconnecting' ? 'animate-pulse' : ''}>
+              {wsStatus === 'reconnecting' ? '⟳ Reconnexion en cours…' : '⚠ Connexion perdue'}
+            </span>
+            <button
+              onClick={() => chatSocket.reconnect()}
+              className="underline hover:opacity-80 transition-opacity"
+            >
+              Reconnecter
+            </button>
+          </div>
+        )}
+
         <ChatCanvas
           messages={messages}
           isStreaming={isStreaming}
