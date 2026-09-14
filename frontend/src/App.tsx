@@ -25,6 +25,7 @@ import {
   forkConversation,
   updateConversationMetadata,
   fetchGoogleAccounts,
+  saveSettings,
   type GoogleAccountInfo
 } from './services/api';
 import { chatSocket } from './services/ws';
@@ -133,6 +134,17 @@ export function App() {
               }
             });
             setMessages(chatMsgs);
+            if (data.usage && data.usage.total_tokens > 0) {
+              setTokenUsage({
+                inputTokens: data.usage.input_tokens || 0,
+                outputTokens: data.usage.output_tokens || 0,
+                thinkingTokens: data.usage.thinking_tokens || 0,
+                totalTokens: data.usage.total_tokens || 0,
+                isEstimated: data.usage.is_estimated ?? true
+              });
+            } else {
+              setTokenUsage(estimateUsageFromMessages(chatMsgs));
+            }
           }).catch(() => {});
         }
       }
@@ -487,7 +499,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
               ...prev.slice(0, -1),
               {
                 ...last,
-                content: (res?.response !== undefined && res.response !== null) ? res.response : last.content,
+                content: (res?.response && res.response.trim().length > 0) ? res.response : last.content,
                 isLive: false
               }
             ];
@@ -637,12 +649,33 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
     setQueueCount(0);
   };
 
-  const handleModelSavedFromSettings = (newModelId: string) => {
+  const handleSelectModel = (newModelId: string) => {
     setSelectedModel(newModelId);
     const found = models.find((m) => m.id === newModelId);
-    if (found?.default_effort) {
-      setSelectedEffort(found.default_effort as any);
+    if (found) {
+      if (found.supported_efforts && found.supported_efforts.length > 0) {
+        if (!found.supported_efforts.includes(selectedEffort)) {
+          setSelectedEffort((found.default_effort as any) || found.supported_efforts[0]);
+        }
+      }
+      fetchSettings().then((currentSettings) => {
+        saveSettings({ ...currentSettings, model: found.name }).catch(console.error);
+      }).catch(console.error);
     }
+  };
+
+  const handleSelectEffort = (newEffort: 'low' | 'medium' | 'high') => {
+    setSelectedEffort(newEffort);
+    const currentModelObj = models.find((m) => m.id === selectedModel);
+    if (currentModelObj) {
+      fetchSettings().then((currentSettings) => {
+        saveSettings({ ...currentSettings, model: currentModelObj.name }).catch(console.error);
+      }).catch(console.error);
+    }
+  };
+
+  const handleModelSavedFromSettings = (newModelId: string) => {
+    handleSelectModel(newModelId);
   };
 
   const handleInsertPath = (pathWithPrefix: string) => {
@@ -829,9 +862,9 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
           onStopStreaming={handleStopStreaming}
           models={models}
           selectedModel={selectedModel}
-          onSelectModel={setSelectedModel}
+          onSelectModel={handleSelectModel}
           selectedEffort={selectedEffort}
-          onSelectEffort={setSelectedEffort}
+          onSelectEffort={handleSelectEffort}
           initialPrompt={quickPrompt}
           usage={tokenUsage}
           queueCount={queueCount}

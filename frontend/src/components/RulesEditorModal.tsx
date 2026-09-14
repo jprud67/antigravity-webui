@@ -186,8 +186,8 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
                 }}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer border ${
                   isSelected
-                    ? 'bg-sky-500/20 text-sky-200 border-sky-500/40 shadow-inner'
-                    : 'bg-slate-800/60 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 border-slate-700/50'
+                    ? 'bg-sky-500/20 text-sky-700 dark:text-sky-200 border-sky-500/40 shadow-inner'
+                    : 'bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border-slate-300 dark:border-slate-700/50'
                 }`}
                 title={f.description}
               >

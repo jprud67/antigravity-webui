@@ -101,10 +101,10 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
         <div className="px-6 border-b border-slate-800 flex items-center gap-4 bg-[#070b16]">
           <button
             onClick={() => setActiveTab('tasks')}
-            className={`py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+            className={`py-3 px-2 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
               activeTab === 'tasks'
-                ? 'border-indigo-500 text-indigo-400 font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-semibold'
+                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
             }`}
           >
             <Terminal className="w-3.5 h-3.5" />
@@ -112,10 +112,10 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('subagents')}
-            className={`py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+            className={`py-3 px-2 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
               activeTab === 'subagents'
-                ? 'border-indigo-500 text-indigo-400 font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-semibold'
+                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
             }`}
           >
             <Bot className="w-3.5 h-3.5" />
@@ -123,10 +123,10 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('processes')}
-            className={`py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+            className={`py-3 px-2 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
               activeTab === 'processes'
-                ? 'border-indigo-500 text-indigo-400 font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-semibold'
+                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />

@@ -93,16 +93,23 @@ async def get_model_families() -> List[Dict[str, Any]]:
 def resolve_model_and_effort(model: Optional[str], effort: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
     """
     Safely reconciles model and effort parameters for agy CLI.
-    Prevents CLI errors like 'model conflicts with --effort' or '--effort is not supported for model'.
+    Prevents CLI errors like 'invalid model selection' or 'model conflicts with --effort'.
     """
     if not model:
         return None, effort
 
     model = model.strip()
 
-    # Claude does NOT accept --effort flag at all
+    # Claude models do NOT accept --effort flag and must not have -high/-medium/-low suffix
     if "claude" in model.lower():
+        for sfx in ["-high", "-medium", "-low"]:
+            if model.endswith(sfx):
+                model = model[:-len(sfx)]
         return model, None
+
+    # GPT-OSS only supports medium
+    if "gpt-oss" in model.lower():
+        return "gpt-oss-120b-medium", None
 
     # Detect base model and current suffix
     base_model = model
@@ -113,23 +120,20 @@ def resolve_model_and_effort(model: Optional[str], effort: Optional[str]) -> Tup
             base_model = model[:-len(sfx)]
             break
 
-    # If effort requested
-    if effort:
-        effort_clean = effort.lower().strip()
-        
-        # Gemini 3.1 Pro only supports high and low
-        if "gemini-3.1-pro" in base_model and effort_clean == "medium":
-            effort_clean = "high"
+    eff = (effort or model_suffix or "high").lower().strip()
 
-        # GPT-OSS only supports medium
-        if "gpt-oss" in base_model and effort_clean != "medium":
-            effort_clean = "medium"
+    # Gemini 3.1 Pro only supports high and low
+    if "gemini-3.1-pro" in base_model:
+        if eff not in ["high", "low"]:
+            eff = "high"
+        return f"gemini-3.1-pro-{eff}", None
 
-        # Resolve to clean concrete variant name to avoid passing contradictory --effort
-        target_model = f"{base_model}-{effort_clean}"
-        return target_model, None
+    # For Gemini 3.6, 3.7, 3.8: support high, medium, low
+    if eff not in ["high", "medium", "low"]:
+        eff = "high"
 
-    return model, None
+    target_model = f"{base_model}-{eff}"
+    return target_model, None
 
 async def stream_turn(
     prompt: str,
@@ -229,6 +233,12 @@ async def stream_turn(
             }
     except asyncio.CancelledError:
         logger.info(f"stream_turn cancelled: terminating process group {proc.pid}")
+        if stderr_task and not stderr_task.done():
+            stderr_task.cancel()
+            try:
+                await stderr_task
+            except (asyncio.CancelledError, Exception):
+                pass
         try:
             pgid = os.getpgid(proc.pid)
             os.killpg(pgid, signal.SIGTERM)
@@ -238,9 +248,12 @@ async def stream_turn(
             await asyncio.wait_for(proc.wait(), timeout=1.0)
         except Exception as e:
             logger.debug(f"Error terminating proc group: {e}")
-        yield {
-            "event": "interrupted",
-            "message": "Exécution interrompue par l'utilisateur."
-        }
         raise
+    finally:
+        if stderr_task and not stderr_task.done():
+            stderr_task.cancel()
+            try:
+                await stderr_task
+            except (asyncio.CancelledError, Exception):
+                pass
 

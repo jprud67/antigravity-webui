@@ -91,12 +91,22 @@ async def terminal_websocket(websocket: WebSocket, token: Optional[str] = None, 
         except Exception:
             pass
 
+    async def write_to_master(data: bytes):
+        offset = 0
+        total = len(data)
+        while offset < total:
+            try:
+                written = os.write(master_fd, data[offset:])
+                offset += written
+            except (BlockingIOError, InterruptedError):
+                await asyncio.sleep(0.01)
+
     async def ws_to_pty():
         try:
             while True:
                 message = await websocket.receive()
                 if "bytes" in message and message["bytes"]:
-                    os.write(master_fd, message["bytes"])
+                    await write_to_master(message["bytes"])
                 elif "text" in message and message["text"]:
                     text = message["text"]
                     if text.startswith("{"):
@@ -110,11 +120,11 @@ async def terminal_websocket(websocket: WebSocket, token: Optional[str] = None, 
                                 continue
                             elif action == "stdin":
                                 data = msg_obj.get("data", "")
-                                os.write(master_fd, data.encode("utf-8", errors="replace"))
+                                await write_to_master(data.encode("utf-8", errors="replace"))
                                 continue
                         except json.JSONDecodeError:
                             pass
-                    os.write(master_fd, text.encode("utf-8", errors="replace"))
+                    await write_to_master(text.encode("utf-8", errors="replace"))
         except (WebSocketDisconnect, ConnectionResetError):
             pass
         except Exception as e:

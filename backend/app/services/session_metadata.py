@@ -17,7 +17,9 @@ def get_all_session_metadata() -> Dict[str, Dict[str, Any]]:
 def save_all_session_metadata(metadata: Dict[str, Dict[str, Any]]) -> None:
     try:
         SESSION_METADATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-        SESSION_METADATA_FILE.write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp_file = SESSION_METADATA_FILE.with_suffix(".tmp")
+        tmp_file.write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp_file.replace(SESSION_METADATA_FILE)
     except Exception as e:
         logger.error(f"Failed to write session metadata: {e}")
 

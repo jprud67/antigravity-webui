@@ -100,7 +100,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onShowStatus,
   onOpenGoogleAccount
 }) => {
-  const { t } = useI18n();
+  const { lang, t } = useI18n();
+  const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
   const [prompt, setPrompt] = useState(initialPrompt);
   const [autoApprove, setAutoApprove] = useState(true);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
@@ -135,7 +136,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     try {
       const recognition = new SpeechRecognition();
-      recognition.lang = 'fr-FR';
+      recognition.lang = currentLangObj?.speech || 'fr-FR';
       recognition.continuous = true;
       recognition.interimResults = true;
 
@@ -192,13 +193,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const hasEffortSupport = supportedEfforts.length > 0;
 
   const handleModelChange = (newModelId: string) => {
-    onSelectModel(newModelId);
     const newModelObj = models.find((m) => m.id === newModelId);
-    if (newModelObj && newModelObj.supported_efforts.length > 0) {
+    if (newModelObj && newModelObj.supported_efforts && newModelObj.supported_efforts.length > 0) {
       if (!newModelObj.supported_efforts.includes(selectedEffort)) {
         onSelectEffort((newModelObj.default_effort as any) || (newModelObj.supported_efforts[0] as any) || 'high');
       }
     }
+    onSelectModel(newModelId);
+    showToast(`Modèle appliqué : ${newModelObj?.name || newModelId}`, 'success');
   };
 
   const filteredCommands = ALL_SLASH_COMMANDS.filter((c) =>
@@ -580,13 +582,22 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
 
     // Resolve concrete model variant ID
-    const concreteVariant = hasEffortSupport && currentModelObj?.variants?.[selectedEffort]
-      ? currentModelObj.variants[selectedEffort]
-      : currentModelObj?.variants?.['default'] || selectedModel;
+    const targetModelObj = models.find((m) => m.id === selectedModel) || models[0];
+    const targetEfforts = targetModelObj?.supported_efforts ?? [];
+    const hasEfforts = targetEfforts.length > 0;
+    const resolvedEffort = hasEfforts
+      ? (targetEfforts.includes(selectedEffort) ? selectedEffort : (targetModelObj?.default_effort as any) || targetEfforts[0] || 'high')
+      : undefined;
+
+    const concreteVariant = (hasEfforts && resolvedEffort && targetModelObj?.variants?.[resolvedEffort])
+      ? targetModelObj.variants[resolvedEffort]
+      : targetModelObj?.variants?.['default']
+        || (targetModelObj?.variants && Object.values(targetModelObj.variants)[0])
+        || selectedModel;
 
     onSendMessage(textToSend.trim(), {
       model: concreteVariant,
-      effort: hasEffortSupport ? selectedEffort : undefined,
+      effort: resolvedEffort,
       autoApprove,
       mode,
     });

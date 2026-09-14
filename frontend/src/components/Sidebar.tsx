@@ -24,6 +24,14 @@ import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 import type { GoogleAccountInfo } from '../services/api';
 
+function parseSafeDate(dateVal: any): Date {
+  if (!dateVal) return new Date();
+  if (typeof dateVal === 'string') {
+    return new Date(dateVal.replace(' ', 'T'));
+  }
+  return new Date(dateVal);
+}
+
 interface SidebarProps {
   conversations: Conversation[];
   activeConversationId: string | null;
@@ -131,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         pinned.push(c);
         return;
       }
-      const date = new Date(c.last_modified_time);
+      const date = parseSafeDate(c.last_modified_time);
       if (date >= startOfToday) {
         today.push(c);
       } else if (date >= startOfYesterday) {
@@ -431,7 +439,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="flex items-center gap-0.5">
                           <Clock className="w-2.5 h-2.5" />
-                          {new Date(conv.last_modified_time).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
+                          {parseSafeDate(conv.last_modified_time).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
                         </span>
                         <span>{conv.step_count}st</span>
                       </div>

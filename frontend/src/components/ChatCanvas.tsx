@@ -173,12 +173,29 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const userScrolledUpRef = useRef(false);
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
 
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    userScrolledUpRef.current = distanceFromBottom > 150;
+  };
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!bottomRef.current) return;
+    if (isStreaming) {
+      if (!userScrolledUpRef.current) {
+        bottomRef.current.scrollIntoView({ behavior: 'auto' });
+      }
+    } else {
+      userScrolledUpRef.current = false;
+      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, isStreaming]);
 
   const toggleThought = (id: string) => {
@@ -486,7 +503,11 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6"
+      >
         {messages.length === 0 ? (
           /* Empty / Welcome Hero - Hermes Caduceus Exact Style */
           <div className="h-full flex flex-col items-center justify-center max-w-2xl mx-auto text-center animate-fadeIn py-12">

@@ -287,8 +287,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
             onClick={() => onTabChange('files')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               activeTab === 'files'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
             }`}
           >
             <FolderTree className="w-3.5 h-3.5" />
@@ -299,8 +299,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
             onClick={() => onTabChange('artifacts')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               activeTab === 'artifacts'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
@@ -311,8 +311,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
             onClick={() => onTabChange('terminal')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               activeTab === 'terminal'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
             }`}
           >
             <TerminalIcon className="w-3.5 h-3.5" />
@@ -323,8 +323,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
             onClick={() => onTabChange('git')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               activeTab === 'git'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
             }`}
           >
             <GitBranch className="w-3.5 h-3.5" />
@@ -335,8 +335,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
             onClick={() => onTabChange('kanban')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               activeTab === 'kanban'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
             }`}
           >
             <KanbanIcon className="w-3.5 h-3.5" />

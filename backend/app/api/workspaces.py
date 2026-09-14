@@ -37,16 +37,27 @@ def explore_dir(path: str = Query(DEFAULT_WORKSPACE), _ = Depends(require_auth))
     
     entries = []
     try:
-        for item in sorted(p.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
-            # Ignore hidden dirs or huge node_modules/git by default
+        raw_entries = list(p.iterdir())
+        def _safe_sort_key(x: Path):
+            try:
+                return (not x.is_dir(), x.name.lower())
+            except OSError:
+                return (True, x.name.lower())
+
+        for item in sorted(raw_entries, key=_safe_sort_key):
             if item.name.startswith(".") and item.name not in [".gemini", ".hermes"]:
                 continue
-            entries.append({
-                "name": item.name,
-                "path": str(item),
-                "is_dir": item.is_dir(),
-                "size": item.stat().st_size if item.is_file() else None
-            })
+            try:
+                is_dir = item.is_dir()
+                size = item.stat().st_size if not is_dir else None
+                entries.append({
+                    "name": item.name,
+                    "path": str(item),
+                    "is_dir": is_dir,
+                    "size": size
+                })
+            except OSError:
+                continue
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
 

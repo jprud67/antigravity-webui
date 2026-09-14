@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api/skills", tags=["skills"])
 
 SKILL_DIRS = [
     {"type": "user", "dir": HOME / ".gemini" / "config" / "skills"},
+    {"type": "hermes", "dir": HOME / ".hermes" / "skills"},
     {"type": "builtin", "dir": GEMINI_DIR / "builtin" / "skills"},
 ]
 

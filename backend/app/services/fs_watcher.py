@@ -7,8 +7,9 @@ Publishes events to SSE subscribers so the WebUI updates without reload.
 import asyncio
 import logging
 import time
+import re
 from pathlib import Path
-from typing import Set, Dict, Any
+from typing import Set, Dict, Any, Optional
 
 logger = logging.getLogger("antigravity.fs_watcher")
 
@@ -34,6 +35,31 @@ async def _broadcast(event: Dict[str, Any]) -> None:
     for q in dead:
         _subscribers.discard(q)
 
+_UUID_PATTERN = re.compile(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    re.IGNORECASE
+)
+
+def extract_conv_id(transcript_path: Path, brain_dir: Optional[Path] = None) -> Optional[str]:
+    """Extract conversation UUID from transcript.jsonl path."""
+    p = transcript_path.resolve()
+    # Case 1: brain_dir/<conv_id>/.system_generated/logs/transcript.jsonl
+    if (
+        p.parent.name == "logs"
+        and p.parent.parent.name == ".system_generated"
+    ):
+        cand = p.parent.parent.parent.name
+        if _UUID_PATTERN.match(cand):
+            if brain_dir is None or p.parent.parent.parent.parent.resolve() == brain_dir.resolve():
+                return cand
+    # Case 2: brain_dir/<conv_id>/transcript.jsonl (legacy / fallback)
+    else:
+        cand = p.parent.name
+        if _UUID_PATTERN.match(cand):
+            if brain_dir is None or p.parent.parent.resolve() == brain_dir.resolve():
+                return cand
+    return None
+
 async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float = 1.5) -> None:
     """
     Async polling loop that detects changes in:
@@ -53,23 +79,27 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
         result = {}
         if not brain_dir.exists():
             return result
-        for transcript in brain_dir.rglob("transcript.jsonl"):
-            # Only pick up direct children: brain_dir/<conv_id>/transcript.jsonl
-            # conv_id must be a UUID (e.g. 22f8e40b-62a5-4ef7-be65-caa4946d6592)
-            conv_id = transcript.parent.name
-            if transcript.parent.parent != brain_dir:
-                continue  # skip nested paths (like .system_generated/logs/)
-            # UUID format validation: 8-4-4-4-12 hex with dashes
-            import re as _re
-            if not _re.match(
-                r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-                conv_id
-            ):
-                continue
-            try:
-                result[str(transcript)] = transcript.stat().st_mtime
-            except OSError:
-                pass
+        try:
+            for child in brain_dir.iterdir():
+                if not child.is_dir() or not _UUID_PATTERN.match(child.name):
+                    continue
+                # Primary Antigravity path: brain_dir/<conv_id>/.system_generated/logs/transcript.jsonl
+                t1 = child / ".system_generated" / "logs" / "transcript.jsonl"
+                try:
+                    if t1.exists():
+                        result[str(t1)] = t1.stat().st_mtime
+                        continue
+                except OSError:
+                    pass
+                # Fallback path: brain_dir/<conv_id>/transcript.jsonl
+                t2 = child / "transcript.jsonl"
+                try:
+                    if t2.exists():
+                        result[str(t2)] = t2.stat().st_mtime
+                except OSError:
+                    pass
+        except OSError:
+            pass
         return result
 
     # Initial scan
@@ -97,10 +127,10 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
             for path, mtime in cur_transcripts.items():
                 prev = transcript_mtimes.get(path, 0.0)
                 if mtime != prev:
-                    # Extract conversation_id from path
                     p = Path(path)
-                    # path structure: brain_dir/<conv_id>/transcript.jsonl
-                    conv_id = p.parent.name
+                    conv_id = extract_conv_id(p, brain_dir)
+                    if not conv_id:
+                        continue
                     logger.debug(f"Transcript changed for conv {conv_id} → broadcasting transcript_updated")
                     await _broadcast({
                         "type": "transcript_updated",

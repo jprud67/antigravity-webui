@@ -8,11 +8,12 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from app.api.auth import require_auth
+from app.config import HOME
 
 logger = logging.getLogger("antigravity.kanban")
 router = APIRouter(prefix="/api/kanban", tags=["kanban"])
 
-HERMES_ROOT = Path(os.environ.get("HERMES_HOME", "/root/.hermes"))
+HERMES_ROOT = Path(os.environ.get("HERMES_HOME", str(HOME / ".hermes")))
 KANBAN_DB_PATH = Path(os.environ.get("HERMES_KANBAN_DB", str(HERMES_ROOT / "kanban.db")))
 
 from contextlib import contextmanager

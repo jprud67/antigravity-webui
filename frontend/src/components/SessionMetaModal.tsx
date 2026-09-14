@@ -94,16 +94,30 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn">
-      <div className="bg-[#0b101f] border border-slate-700/80 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
+      <div
+        className="border rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{
+          backgroundColor: 'var(--surface)',
+          borderColor: 'var(--border2)',
+          color: 'var(--text)'
+        }}
+      >
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-[#080d1a]">
+        <div
+          className="p-4 border-b flex items-center justify-between"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)'
+          }}
+        >
           <div className="flex items-center gap-2">
             <Tag className="w-4 h-4 text-sky-400" />
-            <h3 className="text-sm font-semibold text-white">Gestion de Session & Métadonnées</h3>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--strong)' }}>Gestion de Session & Métadonnées</h3>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1 rounded-lg transition-colors cursor-pointer"
+            style={{ color: 'var(--muted)' }}
           >
             <X className="w-4 h-4" />
           </button>
@@ -119,19 +133,24 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
 
           {/* Title */}
           <div className="space-y-1.5">
-            <label className="text-slate-400 font-medium">Titre de la session</label>
+            <label className="font-medium" style={{ color: 'var(--muted)' }}>Titre de la session</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Refonte du backend API, Bug Auth..."
-              className="w-full px-3 py-2 bg-[#060a14] border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-500/60 font-medium text-xs"
+              className="w-full px-3 py-2 rounded-xl font-medium text-xs border focus:outline-none"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)'
+              }}
             />
           </div>
 
           {/* Project & Color */}
           <div className="space-y-1.5">
-            <label className="text-slate-400 font-medium flex items-center gap-1.5">
+            <label className="font-medium flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
               <Folder className="w-3.5 h-3.5 text-indigo-400" />
               <span>Projet / Catégorie</span>
             </label>
@@ -141,14 +160,19 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
                 value={project}
                 onChange={(e) => setProject(e.target.value)}
                 placeholder="Ex: Antigravity, LeadForge, Infra..."
-                className="flex-1 px-3 py-2 bg-[#060a14] border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-500/60 text-xs"
+                className="flex-1 px-3 py-2 rounded-xl text-xs border focus:outline-none"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text)'
+                }}
               />
             </div>
           </div>
 
           {/* Color Picker Palette */}
           <div className="space-y-1.5">
-            <label className="text-slate-400 font-medium flex items-center gap-1.5">
+            <label className="font-medium flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
               <Palette className="w-3.5 h-3.5 text-amber-400" />
               <span>Pastille de couleur du projet</span>
             </label>
@@ -171,7 +195,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
 
           {/* Tags */}
           <div className="space-y-1.5">
-            <label className="text-slate-400 font-medium flex items-center gap-1.5">
+            <label className="font-medium flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
               <Tag className="w-3.5 h-3.5 text-emerald-400" />
               <span>Tags (séparés par des virgules)</span>
             </label>
@@ -180,9 +204,14 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
               value={tagsStr}
               onChange={(e) => setTagsStr(e.target.value)}
               placeholder="Ex: backend, security, refactor, bug"
-              className="w-full px-3 py-2 bg-[#060a14] border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-500/60 font-mono text-xs"
+              className="w-full px-3 py-2 rounded-xl font-mono text-xs border focus:outline-none"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)'
+              }}
             />
-            <p className="text-[10px] text-slate-500">Ces tags vous permettront de filtrer vos sessions en un clic dans la barre latérale.</p>
+            <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Ces tags vous permettront de filtrer vos sessions en un clic dans la barre latérale.</p>
           </div>
 
           {/* Pin toggle */}
@@ -190,14 +219,15 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
             <button
               type="button"
               onClick={() => setPinned(!pinned)}
-              className={`w-full p-2.5 rounded-xl border flex items-center justify-between text-xs transition-colors cursor-pointer ${
-                pinned
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                  : 'bg-[#060a14] border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
+              className="w-full p-2.5 rounded-xl border flex items-center justify-between text-xs transition-colors cursor-pointer"
+              style={{
+                backgroundColor: pinned ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                borderColor: pinned ? 'var(--accent)' : 'var(--border)',
+                color: pinned ? 'var(--accent-text)' : 'var(--text)'
+              }}
             >
               <div className="flex items-center gap-2 font-medium">
-                <Pin className={`w-4 h-4 ${pinned ? 'fill-current text-amber-400' : 'text-slate-500'}`} />
+                <Pin className={`w-4 h-4 ${pinned ? 'fill-current text-amber-500' : ''}`} style={{ color: pinned ? undefined : 'var(--muted)' }} />
                 <span>Épingler cette session en haut de la liste</span>
               </div>
               <span className="text-[10px] uppercase font-mono">{pinned ? 'Actif' : 'Inactif'}</span>
@@ -206,7 +236,13 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-[#080d1a]">
+        <div
+          className="p-4 border-t flex items-center justify-between"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)'
+          }}
+        >
           <button
             type="button"
             onClick={handleDelete}
@@ -222,7 +258,8 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="py-1.5 px-3 rounded-lg text-slate-400 hover:text-white text-xs cursor-pointer"
+              className="py-1.5 px-3 rounded-lg text-xs cursor-pointer"
+              style={{ color: 'var(--muted)' }}
             >
               Annuler
             </button>

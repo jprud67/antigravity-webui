@@ -7,12 +7,12 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from app.api.auth import require_auth
+from app.config import HOME, SETTINGS_FILE
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
 
-HERMES_HOME = Path(os.environ.get("HERMES_HOME", "/root/.hermes"))
-SETTINGS_FILE = Path("/root/.gemini/antigravity-cli/settings.json")
-GLOBAL_AGENTS_FILE = Path("/root/AGENTS.md")
+HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(HOME / ".hermes")))
+GLOBAL_AGENTS_FILE = HOME / "AGENTS.md"
 ARCH_STATE_FILE = HERMES_HOME / "memories" / "ARCHITECTURE_STATE.md"
 
 def _get_current_journal_path() -> Path:

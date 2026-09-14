@@ -12,11 +12,10 @@ import logging
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse, parse_qs
 from pathlib import Path
-from app.config import AGY_BIN, HOME
+from app.config import AGY_BIN, HOME, GEMINI_DIR
 
 logger = logging.getLogger("antigravity.google_auth")
 
-GEMINI_DIR = Path("/root/.gemini/antigravity-cli")
 TOKEN_FILE = GEMINI_DIR / "antigravity-oauth-token"
 ACCOUNTS_DIR = GEMINI_DIR / "accounts"
 

@@ -95,10 +95,25 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
     }
   };
 
-  const copyPath = (path: string) => {
-    navigator.clipboard.writeText(path);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyPath = async (path: string) => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(path);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = path;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Ignore copy error
+    }
   };
 
   const insertAndClose = (path: string) => {
@@ -146,8 +161,8 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
             style={{ paddingLeft: `${depth * 14 + 10}px` }}
             className={`py-1.5 pr-2.5 rounded-lg flex items-center justify-between text-xs cursor-pointer transition-colors group ${
               isSelected
-                ? 'bg-sky-500/20 text-sky-200 border border-sky-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                ? 'bg-sky-500/20 text-sky-600 dark:text-sky-200 border border-sky-500/30'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/60'
             }`}
           >
             <div className="flex items-center gap-2 truncate">
@@ -191,30 +206,45 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-fadeIn">
-      <div className="w-[1050px] max-w-full h-[85vh] bg-[#090e1c] border border-slate-800 rounded-3xl flex flex-col shadow-2xl overflow-hidden">
+      <div
+        className="w-[1050px] max-w-full h-[85vh] border rounded-3xl flex flex-col shadow-2xl overflow-hidden"
+        style={{
+          backgroundColor: 'var(--surface)',
+          borderColor: 'var(--border2)',
+          color: 'var(--text)'
+        }}
+      >
         {/* Header */}
-        <div className="h-14 px-6 border-b border-slate-800/80 flex items-center justify-between shrink-0 bg-[#0d1428]/80">
+        <div
+          className="h-14 px-6 border-b flex items-center justify-between shrink-0"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)'
+          }}
+        >
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
               <HardDrive className="w-4 h-4 text-sky-400" />
             </div>
             <div>
-              <h2 className="text-xs font-semibold text-slate-100">Explorateur du Workspace</h2>
-              <p className="text-[10px] font-mono text-slate-400 truncate max-w-md">{currentWorkspace}</p>
+              <h2 className="text-xs font-semibold" style={{ color: 'var(--strong)' }}>Explorateur du Workspace</h2>
+              <p className="text-[10px] font-mono truncate max-w-md" style={{ color: 'var(--muted)' }}>{currentWorkspace}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={loadTree}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg transition-colors cursor-pointer"
+              style={{ color: 'var(--muted)' }}
               title="Rafraîchir l'arborescence"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-sky-400' : ''}`} />
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg transition-colors cursor-pointer"
+              style={{ color: 'var(--muted)' }}
             >
               <X className="w-4 h-4" />
             </button>
@@ -224,9 +254,15 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
         {/* Layout */}
         <div className="flex-1 flex overflow-hidden">
           {/* File Tree Left Pane */}
-          <div className="w-80 border-r border-slate-800 flex flex-col shrink-0 bg-[#060a14]">
+          <div
+            className="w-80 border-r flex flex-col shrink-0"
+            style={{
+              backgroundColor: 'var(--surface-subtle)',
+              borderColor: 'var(--border)'
+            }}
+          >
             {/* Search Input */}
-            <div className="p-3 border-b border-slate-800">
+            <div className="p-3 border-b" style={{ borderColor: 'var(--border)' }}>
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
                 <input
@@ -234,7 +270,12 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
                   placeholder="Rechercher un fichier..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8.5 pr-3 py-1.5 bg-[#0a0f20] border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500/50 font-mono"
+                  className="w-full pl-8.5 pr-3 py-1.5 rounded-xl text-xs font-mono border focus:outline-none"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text)'
+                  }}
                 />
               </div>
             </div>
@@ -242,7 +283,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
             {/* Tree nodes */}
             <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
               {filteredTree.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-500">
+                <div className="p-6 text-center text-xs" style={{ color: 'var(--muted)' }}>
                   {loading ? 'Chargement...' : 'Aucun fichier trouvé.'}
                 </div>
               ) : (
@@ -252,19 +293,33 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
           </div>
 
           {/* File Preview Right Pane */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-[#080c16]">
+          <div
+            className="flex-1 flex flex-col overflow-hidden"
+            style={{ backgroundColor: 'var(--main-bg, var(--surface))' }}
+          >
             {selectedFile ? (
               <>
-                <div className="px-5 py-2.5 bg-[#0b101f] border-b border-slate-800 flex items-center justify-between shrink-0 text-xs">
-                  <span className="font-mono text-slate-200 truncate max-w-md font-semibold text-[11px]">
+                <div
+                  className="px-5 py-2.5 border-b flex items-center justify-between shrink-0 text-xs"
+                  style={{
+                    backgroundColor: 'var(--surface-subtle)',
+                    borderColor: 'var(--border)'
+                  }}
+                >
+                  <span className="font-mono truncate max-w-md font-semibold text-[11px]" style={{ color: 'var(--strong)' }}>
                     {selectedFile}
                   </span>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => copyPath(selectedFile)}
-                      className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1.5 transition-colors cursor-pointer font-mono"
+                      className="py-1 px-2.5 rounded-lg border text-[10px] flex items-center gap-1.5 transition-colors cursor-pointer font-mono"
+                      style={{
+                        backgroundColor: 'var(--surface)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--text)'
+                      }}
                     >
-                      {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                       <span>{copied ? 'Copié' : 'Chemin'}</span>
                     </button>
                     <button
@@ -277,23 +332,29 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-auto p-4 bg-[#050811]">
+                <div
+                  className="flex-1 overflow-auto p-4"
+                  style={{
+                    backgroundColor: 'var(--main-bg, var(--surface))',
+                    color: 'var(--text)'
+                  }}
+                >
                   {contentLoading ? (
-                    <div className="flex items-center justify-center h-full text-slate-500 text-xs font-mono">
+                    <div className="flex items-center justify-center h-full text-xs font-mono" style={{ color: 'var(--muted)' }}>
                       Chargement du contenu...
                     </div>
                   ) : (
-                    <pre className="font-mono text-[11px] leading-relaxed text-slate-300 whitespace-pre">
+                    <pre className="font-mono text-[11px] leading-relaxed whitespace-pre" style={{ color: 'var(--text)' }}>
                       {fileContent}
                     </pre>
                   )}
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-500 text-xs space-y-2 p-6">
-                <FileCode className="w-10 h-10 text-slate-700" />
+              <div className="flex-1 flex flex-col items-center justify-center text-xs space-y-2 p-6" style={{ color: 'var(--muted)' }}>
+                <FileCode className="w-10 h-10" style={{ color: 'var(--muted)' }} />
                 <p>Cliquez sur un fichier dans l'arborescence pour l'inspecter</p>
-                <p className="text-[11px] text-slate-600">Vous pourrez aussi l'insérer directement dans votre prompt avec le préfixe @</p>
+                <p className="text-[11px]" style={{ color: 'var(--muted)' }}>Vous pourrez aussi l'insérer directement dans votre prompt avec le préfixe @</p>
               </div>
             )}
           </div>

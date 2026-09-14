@@ -400,20 +400,22 @@ def search_conversations(query: str, limit: int = 50) -> List[Dict[str, Any]]:
 
             steps = get_conversation_transcript(cid)
             for s in steps:
-                content = (s.get("content") or "").lower()
-                thinking = (s.get("thinking") or "").lower()
-                if q_lower in content or q_lower in thinking:
+                raw_content = s.get("content") or ""
+                raw_thinking = s.get("thinking") or ""
+                content_lower = raw_content.lower()
+                thinking_lower = raw_thinking.lower()
+                if q_lower in content_lower or q_lower in thinking_lower:
                     snippet = ""
-                    if q_lower in content:
-                        idx = content.find(q_lower)
+                    if q_lower in content_lower:
+                        idx = content_lower.find(q_lower)
                         start = max(0, idx - 40)
-                        end = min(len(content), idx + 80)
-                        snippet = ("..." if start > 0 else "") + content[start:end] + ("..." if end < len(content) else "")
+                        end = min(len(raw_content), idx + 80)
+                        snippet = ("..." if start > 0 else "") + raw_content[start:end] + ("..." if end < len(raw_content) else "")
                     else:
-                        idx = thinking.find(q_lower)
+                        idx = thinking_lower.find(q_lower)
                         start = max(0, idx - 40)
-                        end = min(len(thinking), idx + 80)
-                        snippet = "[Raisonnement] " + ("..." if start > 0 else "") + thinking[start:end] + ("..." if end < len(thinking) else "")
+                        end = min(len(raw_thinking), idx + 80)
+                        snippet = "[Raisonnement] " + ("..." if start > 0 else "") + raw_thinking[start:end] + ("..." if end < len(raw_thinking) else "")
                     
                     c_copy = dict(c)
                     c_copy["match_type"] = "transcript"
@@ -743,9 +745,12 @@ def list_artifacts(conversation_id: Optional[str] = None) -> List[Dict[str, Any]
 def read_artifact_content(conversation_id: str, filename: str) -> str:
     # Strictly confine path to BRAIN_DIR / conversation_id
     base_dir = (BRAIN_DIR / conversation_id).resolve()
-    target_path = (base_dir / filename).resolve()
-    if not str(target_path).startswith(str(base_dir)):
-        raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
+    try:
+        if not target_path.is_relative_to(base_dir):
+            raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
+    except AttributeError:
+        if base_dir not in target_path.parents and target_path != base_dir:
+            raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
     if not target_path.exists() or not target_path.is_file():
         raise FileNotFoundError(f"Artifact introuvable : {filename}")
     try:

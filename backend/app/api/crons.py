@@ -9,12 +9,13 @@ from typing import Optional, List, Dict, Any, Union
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.api.auth import require_auth
+from app.config import HOME
 from croniter import croniter
 
 logger = logging.getLogger("antigravity.crons")
 router = APIRouter(prefix="/api/crons", tags=["crons"])
 
-HERMES_HOME = Path(os.environ.get("HERMES_HOME", "/root/.hermes"))
+HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(HOME / ".hermes")))
 CRON_DIR = HERMES_HOME / "cron"
 JOBS_FILE = CRON_DIR / "jobs.json"
 HEARTBEAT_FILE = CRON_DIR / "ticker_heartbeat"
@@ -149,6 +150,11 @@ def create_cron_job(req: CreateCronJobRequest, _ = Depends(require_auth)):
 
     sched_raw = req.schedule.strip()
     next_run = _compute_next_run(sched_raw)
+    if next_run is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Expression de planification invalide : '{sched_raw}'. Utilisez un format cron (ex: '*/15 * * * *') ou un intervalle (ex: 'every 30m')."
+        )
 
     schedule_dict = {
         "kind": "cron" if croniter.is_valid(sched_raw) else "interval",
@@ -213,6 +219,7 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
             target["enabled"] = False
             target["state"] = "paused"
             target["paused_at"] = datetime.now(timezone.utc).isoformat()
+            target["next_run_at"] = None
         else:
             target["enabled"] = True
             target["state"] = "scheduled"
