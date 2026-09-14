@@ -524,25 +524,25 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                 {
                   icon: Compass,
                   title: "/plan",
-                  desc: "Établir un plan d'architecture par étapes",
+                  desc: t('plan_card_desc', "Établir un plan d'architecture par étapes"),
                   prompt: "/plan "
                 },
                 {
                   icon: Zap,
                   title: "/goal",
-                  desc: "Assigner un objectif autonome approfondi",
+                  desc: t('goal_card_desc', "Assigner un objectif autonome approfondi"),
                   prompt: "/goal "
                 },
                 {
                   icon: Code2,
-                  title: "Inspecter le Code",
-                  desc: "Analyser la structure et détecter les bugs",
+                  title: t('inspect_code_title', "Inspecter le Code"),
+                  desc: t('inspect_code_desc', "Analyser la structure et détecter les bugs"),
                   prompt: "Analyse le projet dans le workspace actif et dresse la liste des axes d'amélioration."
                 },
                 {
                   icon: FileCheck,
                   title: "/status",
-                  desc: "Vérifier les services et la santé du système",
+                  desc: t('status_card_desc', "Vérifier les services et la santé du système"),
                   prompt: "/status"
                 }
               ].map((card, idx) => {

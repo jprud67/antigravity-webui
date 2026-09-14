@@ -606,7 +606,211 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     pl: 'Eksportuj',
     cs: 'Exportovat',
     vi: 'Xuất',
-  }
+  },
+  how_can_i_help: {
+    en: 'How can I help you today?',
+    fr: 'Que puis-je faire pour vous ?',
+    es: '¿Cómo puedo ayudarte hoy?',
+    de: 'Wie kann ich Ihnen heute helfen?',
+    it: 'Come posso aiutarti oggi?',
+    pt: 'Como posso ajudar você hoje?',
+    zh: '今天有什么我可以帮您的？',
+    'zh-Hant': '今天有什麼我可以幫您的？',
+    ja: 'どのようなお手伝いができますか？',
+    ko: '무엇을 도와드릴까요?',
+    ru: 'Чем я могу вам помочь?',
+    tr: 'Bugün size nasıl yardımcı olabilirim?',
+    pl: 'W czym mogę Ci dzisiaj pomóc?',
+    cs: 'Jak vám mohu dnes pomoci?',
+    vi: 'Tôi có thể giúp gì cho bạn hôm nay?',
+  },
+  welcome_subtitle: {
+    en: 'Ask a question, run commands, explore files, or schedule autonomous tasks without opening a terminal.',
+    fr: 'Posez une question, lancez des commandes, explorez vos fichiers ou planifiez des tâches autonomes sans ouvrir de terminal.',
+    es: 'Haga una pregunta, ejecute comandos, explore archivos o programe tareas autónomas sin abrir una terminal.',
+    de: 'Stellen Sie eine Frage, führen Sie Befehle aus, erkunden Sie Dateien oder planen Sie autonome Aufgaben ohne Terminal.',
+    it: 'Fai una domanda, esegui comandi, esplora file o pianifica attività autonome senza aprire un terminale.',
+    pt: 'Faça uma pergunta, execute comandos, explore arquivos ou agende tarefas autônomas sem abrir um terminal.',
+    zh: '无需打开终端即可提问、运行命令、浏览文件或编排自主任务。',
+    'zh-Hant': '無需打開終端機即可提問、執行命令、瀏覽檔案或排程自主任務。',
+    ja: 'ターミナルを開かずに、質問、コマンド実行、ファイル探索、自律タスクのスケジュールが可能です。',
+    ko: '터미널을 열지 않고도 질문하고, 명령을 실행하고, 파일을 탐색하거나 자율 작업을 예약하세요.',
+    ru: 'Задавайте вопросы, выполняйте команды, исследуйте файлы или планируйте автономные задачи без терминала.',
+    tr: 'Terminal açmadan soru sorun, komutlar çalıştırın, dosyaları keşfedin veya özerk görevler planlayın.',
+    pl: 'Zadawaj pytania, wykonuj polecenia, przeglądaj pliki lub planuj autonomiczne zadania bez otwierania terminala.',
+    cs: 'Ptejte se, spouštějte příkazy, procházejte soubory nebo plánujte autonomní úlohy bez otevření terminálu.',
+    vi: 'Đặt câu hỏi, chạy lệnh, khám phá tệp hoặc lên lịch các tác vụ tự động mà không cần mở terminal.',
+  },
+  search_sessions: {
+    en: 'Search sessions & content...',
+    fr: 'Rechercher sessions & contenu...',
+    es: 'Buscar sesiones y contenido...',
+    de: 'Sitzungen & Inhalt durchsuchen...',
+    it: 'Cerca sessioni e contenuti...',
+    pt: 'Pesquisar sessões e conteúdo...',
+    zh: '搜索会话与内容...',
+    'zh-Hant': '搜尋對話與內容...',
+    ja: 'セッションと内容を検索...',
+    ko: '세션 및 내용 검색...',
+    ru: 'Поиск сессий и контента...',
+    tr: 'Oturumları ve içeriği ara...',
+    pl: 'Szukaj sesji i zawartości...',
+    cs: 'Hledat relace a obsah...',
+    vi: 'Tìm kiếm phiên & nội dung...',
+  },
+  file_browser: {
+    en: 'Attach files or explore workspace (/files)',
+    fr: 'Attacher des fichiers ou explorer le workspace (/files)',
+    es: 'Adjuntar archivos o explorar espacio de trabajo (/files)',
+    de: 'Dateien anhängen oder Arbeitsbereich erkunden (/files)',
+    it: 'Allega file o esplora lo spazio di lavoro (/files)',
+    pt: 'Anexar arquivos ou explorar espaço de trabalho (/files)',
+    zh: '附加文件或浏览工作区 (/files)',
+    'zh-Hant': '附加檔案或瀏覽工作區 (/files)',
+    ja: 'ファイルを添付またはワークスペースを探索 (/files)',
+    ko: '파일 첨부 또는 워크스페이스 탐색 (/files)',
+    ru: 'Прикрепить файлы или исследовать рабочую область (/files)',
+    tr: 'Dosya ekle veya çalışma alanını keşfet (/files)',
+    pl: 'Załącz pliki lub przeglądaj obszar roboczy (/files)',
+    cs: 'Připojit soubory nebo prozkoumat pracovní prostor (/files)',
+    vi: 'Đính kèm tệp hoặc khám phá không gian làm việc (/files)',
+  },
+  voice_dictation: {
+    en: 'Enable voice dictation (Microphone)',
+    fr: 'Activer la dictée vocale (Microphone)',
+    es: 'Activar dictado por voz (Micrófono)',
+    de: 'Sprachdiktat aktivieren (Mikrofon)',
+    it: 'Attiva dettatura vocale (Microfono)',
+    pt: 'Ativar ditado de voz (Microfone)',
+    zh: '启用语音听写（麦克风）',
+    'zh-Hant': '啟用語音聽寫（麥克風）',
+    ja: '音声入力を有効にする（マイク）',
+    ko: '음성 받아쓰기 활성화 (마이크)',
+    ru: 'Включить голосовой ввод (Микрофон)',
+    tr: 'Sesli dikteyi etkinleştir (Mikrofon)',
+    pl: 'Włącz dyktowanie głosowe (Mikrofon)',
+    cs: 'Aktivovat hlasové diktování (Mikrofon)',
+    vi: 'Bật đọc chính tả bằng giọng nói (Micrô)',
+  },
+  stop_voice: {
+    en: 'Stop voice dictation',
+    fr: 'Arrêter la dictée vocale',
+    es: 'Detener dictado por voz',
+    de: 'Sprachdiktat beenden',
+    it: 'Interrompi dettatura vocale',
+    pt: 'Parar ditado de voz',
+    zh: '停止语音听写',
+    'zh-Hant': '停止語音聽寫',
+    ja: '音声入力を停止',
+    ko: '음성 받아쓰기 중지',
+    ru: 'Остановить голосовой ввод',
+    tr: 'Sesli dikteyi durdur',
+    pl: 'Zatrzymaj dyktowanie głosowe',
+    cs: 'Zastavit hlasové diktování',
+    vi: 'Dừng đọc chính tả bằng giọng nói',
+  },
+  workspace_explorer: {
+    en: 'Workspace Explorer',
+    fr: 'Explorateur Workspace',
+    es: 'Explorador de espacio de trabajo',
+    de: 'Arbeitsbereich-Explorer',
+    it: 'Esploratore dello spazio di lavoro',
+    pt: 'Explorador do espaço de trabalho',
+    zh: '工作区资源管理器',
+    'zh-Hant': '工作區檔案總管',
+    ja: 'ワークスペースエクスプローラー',
+    ko: '워크스페이스 탐색기',
+    ru: 'Проводник рабочей области',
+    tr: 'Çalışma Alanı Gezgini',
+    pl: 'Eksplorator obszaru roboczego',
+    cs: 'Průzkumník pracovního prostoru',
+    vi: 'Trình khám phá không gian làm việc',
+  },
+  plan_card_desc: {
+    en: 'Establish a step-by-step architecture plan',
+    fr: "Établir un plan d'architecture par étapes",
+    es: 'Establecer un plan de arquitectura paso a paso',
+    de: 'Einen schrittweisen Architekturplan erstellen',
+    it: 'Stabilire un piano di architettura passo dopo passo',
+    pt: 'Estabelecer um plano de arquitetura passo a passo',
+    zh: '建立分步架构计划',
+    'zh-Hant': '建立逐步架構計劃',
+    ja: '段階的なアーキテクチャ計画を策定',
+    ko: '단계별 아키텍처 계획 수립',
+    ru: 'Составить пошаговый архитектурный план',
+    tr: 'Adım adım mimari plan oluşturun',
+    pl: 'Ustal krok po kroku plan architektury',
+    cs: 'Sestavte postupný plán architektury',
+    vi: 'Thiết lập kế hoạch kiến trúc từng bước',
+  },
+  goal_card_desc: {
+    en: 'Assign a deep autonomous objective',
+    fr: 'Assigner un objectif autonome approfondi',
+    es: 'Asignar un objetivo autónomo profundo',
+    de: 'Ein tiefgehendes autonomes Ziel zuweisen',
+    it: 'Assegna un obiettivo autonomo approfondito',
+    pt: 'Atribuir um objetivo autônomo profundo',
+    zh: '分配深度自主目标',
+    'zh-Hant': '分配深度自主任務',
+    ja: '深層的な自律目標を割り当てる',
+    ko: '심층 자율 목표 할당',
+    ru: 'Назначить глубокую автономную цель',
+    tr: 'Derinlemesine özerk bir hedef atayın',
+    pl: 'Przypisz głęboki cel autonomiczny',
+    cs: 'Přiřaďte hluboký autonomní cíl',
+    vi: 'Giao mục tiêu tự trị chuyên sâu',
+  },
+  inspect_code_title: {
+    en: 'Inspect Code',
+    fr: 'Inspecter le Code',
+    es: 'Inspeccionar código',
+    de: 'Code untersuchen',
+    it: 'Ispeziona codice',
+    pt: 'Inspecionar código',
+    zh: '检查代码',
+    'zh-Hant': '檢查程式碼',
+    ja: 'コードを検査',
+    ko: '코드 검사',
+    ru: 'Инспектировать код',
+    tr: 'Kodu incele',
+    pl: 'Zbadaj kod',
+    cs: 'Zkontrolovat kód',
+    vi: 'Kiểm tra mã nguồn',
+  },
+  inspect_code_desc: {
+    en: 'Analyze structure and detect bugs',
+    fr: 'Analyser la structure et détecter les bugs',
+    es: 'Analizar la estructura y detectar errores',
+    de: 'Struktur analysieren und Fehler erkennen',
+    it: 'Analizza la struttura e rileva bug',
+    pt: 'Analisar estrutura e detectar bugs',
+    zh: '分析结构并检测错误',
+    'zh-Hant': '分析結構並檢測錯誤',
+    ja: '構造を分析しバグを検出',
+    ko: '구조를 분석하고 버그를 감지합니다',
+    ru: 'Анализ структуры и выявление ошибок',
+    tr: 'Yapıyı analiz edin ve hataları tespit edin',
+    pl: 'Analizuj strukturę i wykrywaj błędy',
+    cs: 'Analyzovat strukturu a detekovat chyby',
+    vi: 'Phân tích cấu trúc và phát hiện lỗi',
+  },
+  status_card_desc: {
+    en: 'Check services and system health',
+    fr: 'Vérifier les services et la santé du système',
+    es: 'Verificar servicios y salud del sistema',
+    de: 'Dienste und Systemzustand prüfen',
+    it: 'Verifica servizi e stato del sistema',
+    pt: 'Verificar serviços e integridade do sistema',
+    zh: '检查服务和系统运行状况',
+    'zh-Hant': '檢查服務與系統運行狀況',
+    ja: 'サービスとシステムの正常性を確認',
+    ko: '서비스 및 시스템 상태 확인',
+    ru: 'Проверить службы и состояние системы',
+    tr: 'Hizmetleri ve sistem durumunu kontrol edin',
+    pl: 'Sprawdź usługi i stan systemu',
+    cs: 'Zkontrolovat služby a stav systému',
+    vi: 'Kiểm tra dịch vụ và tình trạng hệ thống',
+  },
 };
 
 const STORAGE_KEY = 'antigravity-lang';
@@ -655,17 +859,19 @@ export function getCurrentLanguage(): string {
  * Translate a key.
  * 1. Checks UI_TRANSLATIONS dictionary.
  * 2. Checks LOCALES (Hermes 1700+ bundle).
- * 3. Falls back to English, then defaultVal or key itself.
+ * 3. Falls back to default string (if provided) or English, then key itself.
  */
-export function t(key: string, ...args: (string | number)[]): string {
+export function t(key: string, defaultValOrArg?: string | number, ...args: (string | number)[]): string {
+  const allArgs = defaultValOrArg !== undefined ? [defaultValOrArg, ...args] : [];
+
   // 1. Direct UI translation
   if (UI_TRANSLATIONS[key]) {
     const directVal = UI_TRANSLATIONS[key][currentLanguage] ?? UI_TRANSLATIONS[key]['en'];
     if (directVal) {
-      if (args.length > 0) {
+      if (allArgs.length > 0 && /\{\d+\}/.test(directVal)) {
         return String(directVal).replace(/\{(\d+)\}/g, (match, idx) => {
           const i = parseInt(idx, 10);
-          return i < args.length ? String(args[i]) : match;
+          return i < allArgs.length ? String(allArgs[i]) : match;
         });
       }
       return directVal;
@@ -678,13 +884,18 @@ export function t(key: string, ...args: (string | number)[]): string {
   const val = dict[key] ?? enDict[key];
 
   if (val !== undefined && val !== null) {
-    if (args.length > 0) {
+    if (allArgs.length > 0 && /\{\d+\}/.test(val)) {
       return String(val).replace(/\{(\d+)\}/g, (match, idx) => {
         const i = parseInt(idx, 10);
-        return i < args.length ? String(args[i]) : match;
+        return i < allArgs.length ? String(allArgs[i]) : match;
       });
     }
     return String(val);
+  }
+
+  // 3. Fallback: if caller provided a fallback text string (e.g. t('some_key', 'Fallback text'))
+  if (typeof defaultValOrArg === 'string' && defaultValOrArg.trim().length > 0) {
+    return defaultValOrArg;
   }
 
   return key;

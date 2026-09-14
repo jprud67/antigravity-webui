@@ -457,7 +457,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="w-5 h-5 rounded-md bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
                 <HardDrive className="w-3 h-3 text-sky-500" />
               </div>
-              <span className="font-medium text-[11px]">Explorateur Workspace</span>
+              <span className="font-medium text-[11px]">{t('workspace_explorer', 'Explorateur Workspace')}</span>
             </div>
             <span className="text-[10px] text-sky-500 group-hover:translate-x-0.5 transition-transform">→</span>
           </button>
@@ -473,7 +473,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="w-5 h-5 rounded-md bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
                 <Activity className="w-3 h-3 text-indigo-500" />
               </div>
-              <span className="font-medium text-[11px]">Tâches & Sous-agents</span>
+              <span className="font-medium text-[11px]">{t('tasks_and_subagents', 'Tâches & Sous-agents')}</span>
             </div>
             <span className="text-[10px] text-indigo-500 group-hover:translate-x-0.5 transition-transform">→</span>
           </button>
@@ -488,7 +488,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="w-5 h-5 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
               <FileText className="w-3 h-3 text-emerald-500" />
             </div>
-            <span className="font-medium text-[11px]">Documents & Artifacts</span>
+            <span className="font-medium text-[11px]">{t('documents_and_artifacts', 'Documents & Artifacts')}</span>
           </div>
           <span className="text-[10px] text-emerald-500 group-hover:translate-x-0.5 transition-transform">→</span>
         </button>
@@ -571,7 +571,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onLogout}
                 className="p-1.5 rounded-lg transition-colors cursor-pointer hover:text-rose-500 hover:bg-rose-500/10"
                 style={{ color: 'var(--muted)' }}
-                title="Déconnexion"
+                title={t('logout', 'Déconnexion')}
               >
                 <LogOut className="w-4 h-4" />
               </button>
