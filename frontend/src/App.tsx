@@ -23,7 +23,9 @@ import {
   checkAuthStatus,
   clearAuthToken,
   forkConversation,
-  updateConversationMetadata
+  updateConversationMetadata,
+  fetchGoogleAccounts,
+  type GoogleAccountInfo
 } from './services/api';
 import { chatSocket } from './services/ws';
 import { getStoredTheme, getStoredSkin, applyAppearance } from './services/theme';
@@ -69,7 +71,8 @@ export function App() {
   const [isCronModalOpen, setIsCronModalOpen] = useState(false);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages'>('models');
+  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google'>('models');
+  const [activeGoogleAccount, setActiveGoogleAccount] = useState<GoogleAccountInfo | null>(null);
 
   const handleOpenSkills = () => {
     setSettingsTab('skills');
@@ -78,6 +81,11 @@ export function App() {
 
   const handleOpenLanguages = () => {
     setSettingsTab('languages');
+    setIsSettingsOpen(true);
+  };
+
+  const handleOpenGoogleAccount = () => {
+    setSettingsTab('google');
     setIsSettingsOpen(true);
   };
 
@@ -98,13 +106,17 @@ export function App() {
       setIsAuthenticated(true);
       setIsAuthModalOpen(false);
 
-      const [convs, mods, settings] = await Promise.all([
+      const [convs, mods, settings, googleRes] = await Promise.all([
         fetchConversations(50),
         fetchModels(),
-        fetchSettings()
+        fetchSettings(),
+        fetchGoogleAccounts().catch(() => ({ active_account: null, accounts: [] }))
       ]);
       setConversations(convs);
       setModels(mods);
+      if (googleRes?.active_account) {
+        setActiveGoogleAccount(googleRes.active_account);
+      }
 
       // Harmonize model selection from settings
       if (settings.model && mods.length > 0) {
@@ -714,6 +726,8 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
         currentWorkspace={currentWorkspace}
         activeModel={displayModelName}
         activeEffort={displayEffort}
+        activeGoogleAccount={activeGoogleAccount}
+        onOpenGoogleAccount={handleOpenGoogleAccount}
       />
 
       {/* Main Chat Area */}
@@ -798,6 +812,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
           onRetry={handleRetry}
           onUndo={handleUndo}
           onShowStatus={handleShowStatusCard}
+          onOpenGoogleAccount={handleOpenGoogleAccount}
         />
       </main>
 
@@ -845,6 +860,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
         currentModel={selectedModel}
         onModelSaved={handleModelSavedFromSettings}
         initialTab={settingsTab}
+        onGoogleAccountChanged={(acc) => setActiveGoogleAccount(acc)}
       />
 
       <HelpModal

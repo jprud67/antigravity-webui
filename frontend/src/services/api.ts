@@ -609,3 +609,87 @@ export async function saveRuleContent(
   }
   return res.json();
 }
+
+// Google Accounts Multi-Account Management
+export interface GoogleAccountInfo {
+  email: string;
+  email_verified?: boolean;
+  sub?: string;
+  expiry?: string;
+  auth_method?: string;
+  is_active?: boolean;
+  last_modified?: number;
+}
+
+export interface GoogleAccountsResponse {
+  active_account: GoogleAccountInfo | null;
+  accounts: GoogleAccountInfo[];
+  total: number;
+}
+
+export async function fetchGoogleAccounts(): Promise<GoogleAccountsResponse> {
+  const res = await fetch(`${API_BASE}/google/accounts`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error('Erreur lors de la récupération des comptes Google');
+  return res.json();
+}
+
+export async function switchGoogleAccount(email: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/google/accounts/switch`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ email })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du basculement' }));
+    throw new Error(err.detail || 'Impossible de changer de compte Google');
+  }
+  return res.json();
+}
+
+export async function deleteGoogleAccount(email: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/google/accounts?email=${encodeURIComponent(email)}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec suppression' }));
+    throw new Error(err.detail || 'Impossible de supprimer le compte Google');
+  }
+  return res.json();
+}
+
+export async function startGoogleLogin(): Promise<{ session_id: string; auth_url: string; timeout_seconds: number }> {
+  const res = await fetch(`${API_BASE}/google/accounts/login/start`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec initialisation' }));
+    throw new Error(err.detail || 'Impossible de démarrer la connexion Google');
+  }
+  return res.json();
+}
+
+export async function submitGoogleAuthCode(sessionId: string, code: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/google/accounts/login/submit`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ session_id: sessionId, code })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Code invalide' }));
+    throw new Error(err.detail || 'Code de validation Google incorrect ou expiré');
+  }
+  return res.json();
+}
+
+export async function cancelGoogleLogin(sessionId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/google/accounts/login/cancel`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ session_id: sessionId })
+  });
+  return res.json();
+}

@@ -35,7 +35,9 @@ import {
   GraduationCap,
   Paperclip,
   Languages,
-  ListTodo
+  ListTodo,
+  KeyRound,
+  UserCheck
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -222,6 +224,22 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
   },
 
   // Configuration & Models
+  {
+    cmd: '/account',
+    desc: 'Afficher et changer le compte Google actif Antigravity',
+    category: 'system',
+    icon: UserCheck,
+    color: 'text-blue-400',
+    isAction: true
+  },
+  {
+    cmd: '/google',
+    desc: 'Alias de /account pour gérer et basculer de compte Google',
+    category: 'system',
+    icon: KeyRound,
+    color: 'text-blue-400',
+    isAction: true
+  },
   {
     cmd: '/model',
     desc: 'Changer de modèle d\'intelligence artificielle actif',

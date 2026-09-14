@@ -19,6 +19,7 @@ from app.api.terminal import router as terminal_router
 from app.api.kanban import router as kanban_router
 from app.api.crons import router as crons_router
 from app.api.rules import router as rules_router
+from app.api.google_accounts import router as google_router
 
 app = FastAPI(
     title="Antigravity WebUI",
@@ -49,6 +50,7 @@ app.include_router(terminal_router)
 app.include_router(kanban_router)
 app.include_router(crons_router)
 app.include_router(rules_router)
+app.include_router(google_router)
 
 @app.get("/api/health")
 def health_check():

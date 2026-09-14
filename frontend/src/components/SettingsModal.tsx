@@ -16,12 +16,41 @@ import {
   ChevronRight, 
   BookOpen,
   Palette,
-  Globe
+  Globe,
+  ExternalLink,
+  RefreshCw,
+  UserCheck,
+  AlertCircle,
+  CheckCircle2,
+  Terminal
 } from 'lucide-react';
 import type { AppSettings, ModelOption } from '../types';
-import { fetchSettings, saveSettings, fetchSkills, fetchSkillDetail, updatePassword } from '../services/api';
+import { 
+  fetchSettings, 
+  saveSettings, 
+  fetchSkills, 
+  fetchSkillDetail, 
+  updatePassword,
+  fetchGoogleAccounts,
+  switchGoogleAccount,
+  deleteGoogleAccount,
+  startGoogleLogin,
+  submitGoogleAuthCode,
+  cancelGoogleLogin,
+  type GoogleAccountInfo,
+  type GoogleAccountsResponse
+} from '../services/api';
 import { AVAILABLE_THEMES, AVAILABLE_SKINS, getStoredTheme, getStoredSkin, applyAppearance, type ThemeMode } from '../services/theme';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
+
+export const GoogleIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24">
+    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
+    <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+  </svg>
+);
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -29,7 +58,8 @@ interface SettingsModalProps {
   models: ModelOption[];
   currentModel: string;
   onModelSaved: (modelId: string) => void;
-  initialTab?: 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages';
+  initialTab?: 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google';
+  onGoogleAccountChanged?: (account: GoogleAccountInfo | null) => void;
 }
 
 const MODEL_DESCRIPTIONS: Record<string, { desc: string; badge: string; iconColor: string }> = {
@@ -49,9 +79,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   currentModel,
   onModelSaved,
   initialTab,
+  onGoogleAccountChanged
 }) => {
   const { lang, setLanguage } = useI18n();
-  const [activeTab, setActiveTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages'>(initialTab || 'models');
+  const [activeTab, setActiveTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google'>(initialTab || 'models');
   const [settings, setSettings] = useState<AppSettings>({});
   const [selectedModelId, setSelectedModelId] = useState(currentModel);
   const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
@@ -77,6 +108,103 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [pwdLoading, setPwdLoading] = useState(false);
   const [pwdError, setPwdError] = useState<string | null>(null);
   const [pwdSuccess, setPwdSuccess] = useState(false);
+
+  // Google accounts state
+  const [googleData, setGoogleData] = useState<GoogleAccountsResponse | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleSwitching, setGoogleSwitching] = useState<string | null>(null);
+  const [googleLoginSession, setGoogleLoginSession] = useState<{ sessionId: string; authUrl: string } | null>(null);
+  const [googleAuthCode, setGoogleAuthCode] = useState('');
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+  const [googleSuccess, setGoogleSuccess] = useState<string | null>(null);
+
+  const loadGoogleAccounts = async () => {
+    setGoogleLoading(true);
+    try {
+      const data = await fetchGoogleAccounts();
+      setGoogleData(data);
+      if (onGoogleAccountChanged) {
+        onGoogleAccountChanged(data.active_account);
+      }
+    } catch (e: any) {
+      console.error('Failed to load Google accounts:', e);
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleSwitchGoogleAccount = async (email: string) => {
+    setGoogleSwitching(email);
+    setGoogleError(null);
+    try {
+      const res = await switchGoogleAccount(email);
+      setGoogleSuccess(`Compte Google basculé sur ${email}`);
+      await loadGoogleAccounts();
+      if (onGoogleAccountChanged) {
+        onGoogleAccountChanged(res.active_account);
+      }
+      setTimeout(() => setGoogleSuccess(null), 3000);
+    } catch (e: any) {
+      setGoogleError(e.message || 'Erreur lors du changement de compte');
+    } finally {
+      setGoogleSwitching(null);
+    }
+  };
+
+  const handleDeleteGoogleAccount = async (email: string) => {
+    if (!confirm(`Supprimer le compte ${email} des comptes enregistrés ?`)) return;
+    try {
+      await deleteGoogleAccount(email);
+      await loadGoogleAccounts();
+    } catch (e: any) {
+      setGoogleError(e.message || 'Erreur suppression compte');
+    }
+  };
+
+  const handleStartGoogleLogin = async () => {
+    setGoogleLoading(true);
+    setGoogleError(null);
+    try {
+      const res = await startGoogleLogin();
+      setGoogleLoginSession({ sessionId: res.session_id, authUrl: res.auth_url });
+    } catch (e: any) {
+      setGoogleError(e.message || 'Impossible de démarrer la session de connexion');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleSubmitGoogleCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!googleLoginSession || !googleAuthCode.trim()) return;
+    setGoogleSubmitting(true);
+    setGoogleError(null);
+    try {
+      const res = await submitGoogleAuthCode(googleLoginSession.sessionId, googleAuthCode.trim());
+      setGoogleSuccess(res.message || 'Nouveau compte Google connecté avec succès !');
+      setGoogleLoginSession(null);
+      setGoogleAuthCode('');
+      await loadGoogleAccounts();
+      if (onGoogleAccountChanged) {
+        onGoogleAccountChanged(res.active_account);
+      }
+      setTimeout(() => setGoogleSuccess(null), 4000);
+    } catch (e: any) {
+      setGoogleError(e.message || 'Code invalide ou expiré');
+    } finally {
+      setGoogleSubmitting(false);
+    }
+  };
+
+  const handleCancelGoogleLogin = async () => {
+    if (googleLoginSession) {
+      await cancelGoogleLogin(googleLoginSession.sessionId).catch(() => {});
+      setGoogleLoginSession(null);
+      setGoogleAuthCode('');
+      loadGoogleAccounts();
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -112,6 +240,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         .then((items) => setSkills(items))
         .catch((err) => console.error('Error loading skills:', err))
         .finally(() => setSkillsLoading(false));
+
+      // Load Google accounts
+      loadGoogleAccounts();
     }
   }, [isOpen, currentModel, models]);
 
@@ -274,6 +405,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <Cpu className="w-4 h-4" />
             <span>Modèles & Raisonnement</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('google');
+              loadGoogleAccounts();
+            }}
+            className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'google'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <GoogleIcon className="w-4 h-4" />
+            <span>Compte Google</span>
+            {googleData?.active_account && (
+              <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/30 px-1.5 py-0.2 rounded-full font-mono max-w-[120px] truncate">
+                {googleData.active_account.email.split('@')[0]}
+              </span>
+            )}
           </button>
 
           <button
@@ -1003,6 +1154,324 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'google' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
+                  <GoogleIcon className="w-4 h-4" />
+                  <span>Gestion des Comptes Google (Antigravity & Gemini)</span>
+                </h3>
+                <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                  Visualisez le compte actif, basculez instantanément entre vos comptes enregistrés ou connectez un nouveau compte Google.
+                </p>
+              </div>
+
+              {/* Status alerts */}
+              {googleSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 animate-fadeIn">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{googleSuccess}</span>
+                </div>
+              )}
+              {googleError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2 animate-fadeIn">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{googleError}</span>
+                </div>
+              )}
+
+              {/* Active Account Card */}
+              <div
+                className="p-4 rounded-2xl border shadow-sm"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border2)'
+                }}
+              >
+                <div className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>
+                  Compte Google Principal Actif
+                </div>
+
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 p-2 flex items-center justify-center border shadow-xs">
+                      <GoogleIcon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm" style={{ color: 'var(--strong)' }}>
+                          {googleData?.active_account?.email || 'Aucun compte connecté'}
+                        </span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Connecté
+                        </span>
+                      </div>
+                      <div className="text-[11px] flex items-center gap-3 mt-1" style={{ color: 'var(--muted)' }}>
+                        <span>Auth : OAuth 2.0 PKCE</span>
+                        <span>&bull;</span>
+                        <span>Renouvellement automatique : Actif</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={loadGoogleAccounts}
+                    disabled={googleLoading}
+                    className="px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--text)'
+                    }}
+                    title="Actualiser les informations du compte"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${googleLoading ? 'animate-spin' : ''}`} />
+                    <span>Actualiser</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Saved Accounts Multi-Switcher */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>
+                    Comptes enregistrés ({googleData?.accounts.length || 0})
+                  </h4>
+                  <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                    Basculez en 1 clic sans avoir à vous reconnecter
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {(!googleData?.accounts || googleData.accounts.length === 0) ? (
+                    <div className="p-4 rounded-xl border text-center text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}>
+                      Aucun autre compte enregistré.
+                    </div>
+                  ) : (
+                    googleData.accounts.map((acc) => {
+                      const isActive = acc.is_active;
+                      const isSwitching = googleSwitching === acc.email;
+                      return (
+                        <div
+                          key={acc.email}
+                          className="p-3 rounded-xl border flex items-center justify-between transition-all"
+                          style={{
+                            backgroundColor: isActive ? 'var(--surface-subtle)' : 'var(--surface)',
+                            borderColor: isActive ? 'var(--accent)' : 'var(--border)',
+                            boxShadow: isActive ? '0 0 0 1px var(--accent)' : 'none'
+                          }}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-white/5 border flex items-center justify-center shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
+                              <GoogleIcon className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-xs truncate" style={{ color: 'var(--strong)' }}>
+                                  {acc.email}
+                                </span>
+                                {isActive && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                    ACTIF
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                                {isActive ? 'Compte utilisé pour les requêtes Antigravity' : 'Compte sauvegardé disponible'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {!isActive ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSwitchGoogleAccount(acc.email)}
+                                  disabled={isSwitching}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transition-all shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                >
+                                  {isSwitching ? (
+                                    <>
+                                      <RefreshCw className="w-3 h-3 animate-spin" />
+                                      <span>Basculement...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserCheck className="w-3.5 h-3.5" />
+                                      <span>Basculer sur ce compte</span>
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteGoogleAccount(acc.email)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                  title="Supprimer ce compte de la liste"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-[11px] font-medium text-emerald-400 flex items-center gap-1">
+                                <Check className="w-3.5 h-3.5" /> Compte actif
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Add / Connect New Google Account */}
+              <div
+                className="p-4 rounded-2xl border space-y-3"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)'
+                }}
+              >
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>
+                      Connecter un nouveau compte Google
+                    </h4>
+                    <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                      Associez une autre adresse Gmail ou Google Workspace pour y accéder à tout moment.
+                    </p>
+                  </div>
+
+                  {!googleLoginSession && (
+                    <button
+                      type="button"
+                      onClick={handleStartGoogleLogin}
+                      disabled={googleLoading}
+                      className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-md shadow-blue-600/20 cursor-pointer flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{googleLoading ? 'Démarrage...' : 'Connecter un compte'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Interactive OAuth Wizard if login started */}
+                {googleLoginSession && (
+                  <div
+                    className="p-4 rounded-xl border mt-3 space-y-4 animate-fadeIn"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border2)'
+                    }}
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                      <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>
+                        Connexion Google OAuth 2.0 en cours
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCancelGoogleLogin}
+                        className="text-[11px] text-rose-400 hover:underline cursor-pointer"
+                      >
+                        Annuler la connexion
+                      </button>
+                    </div>
+
+                    {/* Step 1 */}
+                    <div className="space-y-1.5">
+                      <div className="font-semibold text-xs flex items-center gap-2" style={{ color: 'var(--strong)' }}>
+                        <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-[10px] font-bold">1</span>
+                        <span>Ouvrez la page d'authentification Google :</span>
+                      </div>
+                      <a
+                        href={googleLoginSession.authUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all shadow-md shadow-blue-600/20 cursor-pointer"
+                      >
+                        <GoogleIcon className="w-4 h-4" />
+                        <span>Se connecter avec Google (Nouvelle fenêtre)</span>
+                        <ExternalLink className="w-3.5 h-3.5 ml-1" />
+                      </a>
+                    </div>
+
+                    {/* Step 2 */}
+                    <div className="space-y-1.5">
+                      <div className="font-semibold text-xs flex items-center gap-2" style={{ color: 'var(--strong)' }}>
+                        <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-[10px] font-bold">2</span>
+                        <span>Choisissez votre compte Google et validez l'accès Antigravity.</span>
+                      </div>
+                      <p className="text-[11px] pl-7" style={{ color: 'var(--muted)' }}>
+                        Sur la page finale, copiez le code d'autorisation affiché ou copiez l'URL complète de redirection.
+                      </p>
+                    </div>
+
+                    {/* Step 3 */}
+                    <form onSubmit={handleSubmitGoogleCode} className="space-y-2.5 pt-1">
+                      <div className="font-semibold text-xs flex items-center gap-2" style={{ color: 'var(--strong)' }}>
+                        <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-[10px] font-bold">3</span>
+                        <span>Collez le code obtenu ou l'URL retournée :</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={googleAuthCode}
+                          onChange={(e) => setGoogleAuthCode(e.target.value)}
+                          placeholder="ex: 4/0AbCdEf... ou https://antigravity.google/oauth-callback?code=..."
+                          className="flex-1 px-3 py-2 rounded-xl border text-xs outline-none font-mono transition-colors"
+                          style={{
+                            backgroundColor: 'var(--surface-subtle)',
+                            borderColor: 'var(--border)',
+                            color: 'var(--text)'
+                          }}
+                        />
+                        <button
+                          type="submit"
+                          disabled={!googleAuthCode.trim() || googleSubmitting}
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                        >
+                          {googleSubmitting ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Vérification...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Valider & Activer</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+
+              {/* Terminal Tip */}
+              <div
+                className="p-3.5 rounded-xl border flex items-start gap-2.5 text-[11px] leading-relaxed"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border-subtle)',
+                  color: 'var(--muted)'
+                }}
+              >
+                <Terminal className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-amber-300">Astuce ligne de commande : </span>
+                  Vous pouvez également gérer vos comptes Google directement depuis le terminal intégré avec la commande{' '}
+                  <code className="px-1.5 py-0.5 rounded font-mono bg-black/20 text-amber-200 border border-amber-500/20">
+                    antigravity-account
+                  </code>
+                  {' '}(ex: <code className="font-mono text-amber-200">antigravity-account switch email@gmail.com</code> ou <code className="font-mono text-amber-200">antigravity-account login</code>).
+                </div>
               </div>
             </div>
           )}

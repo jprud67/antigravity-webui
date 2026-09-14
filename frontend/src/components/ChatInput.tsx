@@ -62,6 +62,7 @@ interface ChatInputProps {
   onRetry?: () => void;
   onUndo?: () => void;
   onShowStatus?: () => void;
+  onOpenGoogleAccount?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -96,7 +97,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onRenameTitle,
   onRetry,
   onUndo,
-  onShowStatus
+  onShowStatus,
+  onOpenGoogleAccount
 }) => {
   const { t } = useI18n();
   const [prompt, setPrompt] = useState(initialPrompt);
@@ -240,6 +242,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           showToast(`Thème / Skin mis à jour : ${res.value}`, 'success');
         } else {
           showToast('Usage: /theme <dark|light|system|sienna|catppuccin|ares|zeus...>', 'info');
+        }
+        return true;
+
+      case '/account':
+      case '/google':
+        if (onOpenGoogleAccount) {
+          onOpenGoogleAccount();
+        } else {
+          showToast('Ouvrez les Paramètres > Compte Google pour gérer votre compte.', 'info');
         }
         return true;
 
