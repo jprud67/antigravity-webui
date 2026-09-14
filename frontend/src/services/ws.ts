@@ -83,6 +83,7 @@ export class ChatWebSocketClient {
     model?: string;
     effort?: string;
     autoApprove?: boolean;
+    mode?: 'normal' | 'queue' | 'steer';
   }) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       this.connect();
@@ -97,9 +98,28 @@ export class ChatWebSocketClient {
       model: params.model,
       effort: params.effort,
       auto_approve: params.autoApprove ?? true,
+      mode: params.mode || 'normal',
     };
 
     this.ws.send(JSON.stringify(payload));
+  }
+
+  public sendInterrupt() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ action: 'interrupt' }));
+    }
+  }
+
+  public sendClearQueue() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ action: 'clear_queue' }));
+    }
+  }
+
+  public sendApproval(decision: 'allow-once' | 'allow-session' | 'always-allow' | 'deny', rule?: string) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ action: 'approval', decision, rule }));
+    }
   }
 }
 

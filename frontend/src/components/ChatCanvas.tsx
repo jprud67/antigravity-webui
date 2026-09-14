@@ -26,6 +26,7 @@ import type { ChatMessage } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
+import { ApprovalCard } from './ApprovalCard';
 
 interface ChatCanvasProps {
   messages: ChatMessage[];
@@ -43,6 +44,8 @@ interface ChatCanvasProps {
   isRightPanelOpen?: boolean;
   activeRightPanelTab?: string;
   onToggleRightPanel?: () => void;
+  pendingApproval?: { toolName: string; command?: string; path?: string } | null;
+  onApprovalResolved?: () => void;
 }
 
 const CodeBlock = ({ inline, className, children, ...props }: any) => {
@@ -114,6 +117,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   isRightPanelOpen,
   activeRightPanelTab,
   onToggleRightPanel,
+  pendingApproval,
+  onApprovalResolved,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
@@ -379,6 +384,18 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                           );
                         }
 
+                        // Interactive ask_permission / ask_custom_permission
+                        if (tool.name === 'ask_permission' || tool.name === 'ask_custom_permission') {
+                          return (
+                            <ApprovalCard
+                              key={idx}
+                              toolName={tool.args?.tool_name || tool.args?.permission || tool.name}
+                              command={tool.args?.command || tool.args?.CommandLine}
+                              path={tool.args?.path || tool.args?.TargetFile}
+                            />
+                          );
+                        }
+
                         // Diff Viewer for replace_file_content
                         if (tool.name === 'replace_file_content' && tool.args) {
                           const diffSnippet = `--- ${tool.args.TargetFile || 'original'}\n+++ ${tool.args.TargetFile || 'modifié'}\n@@ -${tool.args.StartLine || 1} +${tool.args.StartLine || 1} @@\n${(tool.args.TargetContent || '').split('\n').map((l: string) => '-' + l).join('\n')}\n${(tool.args.ReplacementContent || '').split('\n').map((l: string) => '+' + l).join('\n')}`;
@@ -448,6 +465,16 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               </div>
             );
           })
+        )}
+        {pendingApproval && (
+          <div className="max-w-4xl mx-auto">
+            <ApprovalCard
+              toolName={pendingApproval.toolName}
+              command={pendingApproval.command}
+              path={pendingApproval.path}
+              onResolved={onApprovalResolved}
+            />
+          </div>
         )}
         <div ref={bottomRef} />
       </div>

@@ -137,11 +137,16 @@ async def stream_turn(
     workspace_path: Optional[str] = None,
     model: Optional[str] = None,
     effort: Optional[str] = None,
-    auto_approve: bool = True
+    auto_approve: bool = True,
+    proc_callback: Optional[Any] = None
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Executes a turn using `agy --output-format stream-json` and yields parsed NDJSON events.
+    Supports cancellation, process group termination, and proc_callback.
     """
+    import os
+    import signal
+
     cwd = workspace_path if workspace_path and Path(workspace_path).is_dir() else DEFAULT_WORKSPACE
     
     resolved_model, resolved_effort = resolve_model_and_effort(model, effort)
@@ -171,9 +176,14 @@ async def stream_turn(
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         cwd=cwd,
+        stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+        stderr=asyncio.subprocess.PIPE,
+        preexec_fn=os.setsid
     )
+
+    if proc_callback:
+        proc_callback(proc)
 
     async def read_stderr():
         err_lines = []
@@ -189,30 +199,47 @@ async def stream_turn(
 
     stderr_task = asyncio.create_task(read_stderr())
 
-    while True:
-        line = await proc.stdout.readline()
-        if not line:
-            break
-        raw_str = line.decode(errors="replace").strip()
-        if not raw_str:
-            continue
-        
-        try:
-            event_data = json.loads(raw_str)
-            yield event_data
-        except json.JSONDecodeError:
+    try:
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            raw_str = line.decode(errors="replace").strip()
+            if not raw_str:
+                continue
+            
+            try:
+                event_data = json.loads(raw_str)
+                yield event_data
+            except json.JSONDecodeError:
+                yield {
+                    "event": "raw_output",
+                    "text": raw_str
+                }
+
+        returncode = await proc.wait()
+        stderr_output = await stderr_task
+
+        if returncode != 0:
+            logger.error(f"agy process exited with code {returncode}. Stderr: {stderr_output}")
             yield {
-                "event": "raw_output",
-                "text": raw_str
+                "event": "error",
+                "code": returncode,
+                "message": stderr_output or f"agy failed with exit code {returncode}"
             }
-
-    returncode = await proc.wait()
-    stderr_output = await stderr_task
-
-    if returncode != 0:
-        logger.error(f"agy process exited with code {returncode}. Stderr: {stderr_output}")
+    except asyncio.CancelledError:
+        logger.info(f"stream_turn cancelled: terminating process group {proc.pid}")
+        try:
+            pgid = os.getpgid(proc.pid)
+            os.killpg(pgid, signal.SIGTERM)
+            await asyncio.sleep(0.1)
+            if proc.returncode is None:
+                os.killpg(pgid, signal.SIGKILL)
+        except Exception as e:
+            logger.debug(f"Error terminating proc group: {e}")
         yield {
-            "event": "error",
-            "code": returncode,
-            "message": stderr_output or f"agy failed with exit code {returncode}"
+            "event": "interrupted",
+            "message": "Exécution interrompue par l'utilisateur."
         }
+        raise
+

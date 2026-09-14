@@ -12,12 +12,23 @@ import {
   Globe,
   MessageSquareCode,
   SlidersHorizontal,
-  Cpu
+  Cpu,
+  Layers,
+  X
 } from 'lucide-react';
 import type { ModelOption } from '../types';
+import { ContextRing, type TokenUsageData } from './ContextRing';
 
 interface ChatInputProps {
-  onSendMessage: (prompt: string, options: { model?: string; effort?: string; autoApprove?: boolean }) => void;
+  onSendMessage: (
+    prompt: string,
+    options: {
+      model?: string;
+      effort?: string;
+      autoApprove?: boolean;
+      mode?: 'normal' | 'queue' | 'steer';
+    }
+  ) => void;
   isStreaming: boolean;
   onStopStreaming?: () => void;
   models: ModelOption[];
@@ -26,6 +37,9 @@ interface ChatInputProps {
   selectedEffort: 'low' | 'medium' | 'high';
   onSelectEffort: (e: 'low' | 'medium' | 'high') => void;
   initialPrompt?: string;
+  usage?: TokenUsageData;
+  queueCount?: number;
+  onClearQueue?: () => void;
 }
 
 const SLASH_COMMANDS = [
@@ -46,7 +60,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onSelectModel,
   selectedEffort,
   onSelectEffort,
-  initialPrompt = ''
+  initialPrompt = '',
+  usage,
+  queueCount = 0,
+  onClearQueue
 }) => {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [autoApprove, setAutoApprove] = useState(true);
@@ -87,7 +104,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      handleSubmit(isStreaming ? 'steer' : 'normal');
     } else if (e.key === 'Escape') {
       setShowSlashMenu(false);
     }
@@ -111,8 +128,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     textareaRef.current?.focus();
   };
 
-  const handleSubmit = () => {
-    if (!prompt.trim() || isStreaming) return;
+  const handleSubmit = (mode: 'normal' | 'queue' | 'steer' = 'normal') => {
+    if (!prompt.trim()) return;
     
     // Resolve concrete model variant ID
     const concreteVariant = hasEffortSupport && currentModelObj?.variants?.[selectedEffort]
@@ -123,6 +140,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       model: concreteVariant,
       effort: hasEffortSupport ? selectedEffort : undefined,
       autoApprove,
+      mode,
     });
     setPrompt('');
     setShowSlashMenu(false);
@@ -249,22 +267,77 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               {autoApprove ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldAlert className="w-3.5 h-3.5" />}
               <span>Auto-Run</span>
             </button>
+
+            {/* Circular Context & Token Ring */}
+            <ContextRing usage={usage} modelId={selectedModel} />
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="hidden sm:inline text-[10px] text-slate-500 font-mono">Entrée ↵</span>
+            {/* Queue Counter Badge */}
+            {queueCount > 0 && (
+              <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-lg text-[11px] font-mono shadow-sm animate-fadeIn">
+                <Layers className="w-3.5 h-3.5 text-amber-400" />
+                <span>{queueCount} en attente</span>
+                {onClearQueue && (
+                  <button
+                    type="button"
+                    onClick={onClearQueue}
+                    className="hover:text-white transition-colors cursor-pointer ml-0.5 p-0.5"
+                    title="Vider la file d'attente"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {!isStreaming && (
+              <span className="hidden sm:inline text-[10px] text-slate-500 font-mono">Entrée ↵</span>
+            )}
 
             {isStreaming ? (
-              <button
-                onClick={onStopStreaming}
-                className="py-1.5 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-md shadow-rose-600/20 cursor-pointer"
-              >
-                <Square className="w-3.5 h-3.5 fill-current" />
-                <span>Arrêter</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {prompt.trim().length > 0 && (
+                  <>
+                    {/* Steer Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleSubmit('steer')}
+                      className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-amber-500/20 active:scale-95 cursor-pointer"
+                      title="Interrompre l'étape en cours et réorienter immédiatement"
+                    >
+                      <Zap className="w-3.5 h-3.5 fill-current" />
+                      <span>Orienter</span>
+                    </button>
+
+                    {/* Queue Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleSubmit('queue')}
+                      className="py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-sky-500/30 text-sky-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Placer dans la file d'attente pour le prochain tour"
+                    >
+                      <Layers className="w-3.5 h-3.5 text-sky-400" />
+                      <span>En attente</span>
+                    </button>
+                  </>
+                )}
+
+                {/* Stop / Interrupt Button */}
+                <button
+                  type="button"
+                  onClick={onStopStreaming}
+                  className="py-1.5 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-md shadow-rose-600/20 cursor-pointer"
+                  title="Interrompre l'exécution"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                  <span>Arrêter</span>
+                </button>
+              </div>
             ) : (
               <button
-                onClick={handleSubmit}
+                type="button"
+                onClick={() => handleSubmit('normal')}
                 disabled={!prompt.trim()}
                 className="py-1.5 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-sky-500/20 active:scale-95 cursor-pointer"
               >

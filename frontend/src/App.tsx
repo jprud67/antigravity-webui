@@ -9,6 +9,7 @@ import { LoginModal } from './components/LoginModal';
 import { FileExplorerModal } from './components/FileExplorerModal';
 import { TaskDashboardModal } from './components/TaskDashboardModal';
 import { WorkspacePanel, type RightPanelTab } from './components/WorkspacePanel';
+import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption } from './types';
 import { 
   fetchConversations, 
@@ -26,6 +27,11 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentWorkspace, setCurrentWorkspace] = useState('/root');
+
+  // Telemetry, Queue & Approval States (Phase 2)
+  const [tokenUsage, setTokenUsage] = useState<TokenUsageData | undefined>(undefined);
+  const [queueCount, setQueueCount] = useState(0);
+  const [pendingApproval, setPendingApproval] = useState<{ toolName: string; command?: string; path?: string } | null>(null);
 
   const [models, setModels] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash-high');
@@ -160,6 +166,9 @@ export function App() {
   const handleNewConversation = () => {
     setActiveConversationId(null);
     setMessages([]);
+    setTokenUsage(undefined);
+    setQueueCount(0);
+    setPendingApproval(null);
   };
 
   // WebSocket event handler
@@ -175,6 +184,25 @@ export function App() {
 
         if (update.conversation_id && !activeConversationId) {
           setActiveConversationId(update.conversation_id);
+        }
+
+        // Live Context & Token Telemetry
+        if (update.usage) {
+          setTokenUsage({
+            inputTokens: update.usage.input_tokens || 0,
+            outputTokens: update.usage.output_tokens || 0,
+            thinkingTokens: update.usage.thinking_tokens || 0,
+            totalTokens: update.usage.total_tokens || 0,
+          });
+        }
+
+        // Approval requested via tool step
+        if (update.step_type === 'permission_request' || update.step_type === 'ask_permission') {
+          setPendingApproval({
+            toolName: update.tool_name || 'Action Requise',
+            command: update.command,
+            path: update.path,
+          });
         }
 
         if (update.step_type === 'agent_response' && update.text_delta) {
@@ -199,6 +227,14 @@ export function App() {
         }
       } else if (event.event === 'result') {
         const res = event.result;
+        if (res?.usage) {
+          setTokenUsage({
+            inputTokens: res.usage.input_tokens || 0,
+            outputTokens: res.usage.output_tokens || 0,
+            thinkingTokens: res.usage.thinking_tokens || 0,
+            totalTokens: res.usage.total_tokens || 0,
+          });
+        }
         if (res?.response) {
           setMessages((prev) => {
             const last = prev[prev.length - 1];
@@ -213,6 +249,24 @@ export function App() {
         }
         // Refresh conversations in sidebar
         fetchConversations(50).then((c) => setConversations(c));
+      } else if (event.event === 'approval_request') {
+        setPendingApproval({
+          toolName: event.tool_name || 'Action système',
+          command: event.command,
+          path: event.path,
+        });
+      } else if (event.event === 'queued') {
+        if (typeof event.queue_size === 'number') {
+          setQueueCount(event.queue_size);
+        }
+      } else if (event.event === 'steered') {
+        setIsStreaming(true);
+      } else if (event.event === 'interrupted') {
+        setIsStreaming(false);
+        setQueueCount(0);
+        setPendingApproval(null);
+      } else if (event.event === 'queue_cleared') {
+        setQueueCount(0);
       } else if (event.event === 'error') {
         setMessages((prev) => [
           ...prev,
@@ -224,7 +278,15 @@ export function App() {
         ]);
         setIsStreaming(false);
       } else if (event.event === 'done') {
-        setIsStreaming(false);
+        if (typeof event.queue_size === 'number') {
+          setQueueCount(event.queue_size);
+          if (event.queue_size === 0) {
+            setIsStreaming(false);
+          }
+        } else {
+          setIsStreaming(false);
+        }
+        setPendingApproval(null);
       }
     });
 
@@ -234,16 +296,30 @@ export function App() {
   // Send message
   const handleSendMessage = (
     prompt: string,
-    options: { model?: string; effort?: string; autoApprove?: boolean }
+    options: {
+      model?: string;
+      effort?: string;
+      autoApprove?: boolean;
+      mode?: 'normal' | 'queue' | 'steer';
+    }
   ) => {
+    const mode = options.mode || 'normal';
+    const displayPrefix =
+      mode === 'steer' ? '⚡ [Guidage] ' : mode === 'queue' ? '📥 [En attente] ' : '';
+
     const userMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
       role: 'user',
-      content: prompt,
+      content: `${displayPrefix}${prompt}`,
       timestamp: new Date().toISOString()
     };
     setMessages((prev) => [...prev, userMsg]);
-    setIsStreaming(true);
+
+    if (mode === 'queue') {
+      setQueueCount((prev) => prev + 1);
+    } else {
+      setIsStreaming(true);
+    }
 
     chatSocket.sendPrompt({
       prompt,
@@ -251,8 +327,21 @@ export function App() {
       workspacePath: currentWorkspace,
       model: options.model,
       effort: options.effort,
-      autoApprove: options.autoApprove
+      autoApprove: options.autoApprove,
+      mode: options.mode
     });
+  };
+
+  const handleStopStreaming = () => {
+    chatSocket.sendInterrupt();
+    setIsStreaming(false);
+    setQueueCount(0);
+    setPendingApproval(null);
+  };
+
+  const handleClearQueue = () => {
+    chatSocket.sendClearQueue();
+    setQueueCount(0);
   };
 
   const handleModelSavedFromSettings = (newModelId: string) => {
@@ -314,18 +403,23 @@ export function App() {
           isRightPanelOpen={isRightPanelOpen}
           activeRightPanelTab={rightPanelTab}
           onToggleRightPanel={() => setIsRightPanelOpen(!isRightPanelOpen)}
+          pendingApproval={pendingApproval}
+          onApprovalResolved={() => setPendingApproval(null)}
         />
 
         <ChatInput
           onSendMessage={handleSendMessage}
           isStreaming={isStreaming}
-          onStopStreaming={() => setIsStreaming(false)}
+          onStopStreaming={handleStopStreaming}
           models={models}
           selectedModel={selectedModel}
           onSelectModel={setSelectedModel}
           selectedEffort={selectedEffort}
           onSelectEffort={setSelectedEffort}
           initialPrompt={quickPrompt}
+          usage={tokenUsage}
+          queueCount={queueCount}
+          onClearQueue={handleClearQueue}
         />
       </main>
 
