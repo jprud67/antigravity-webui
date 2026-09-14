@@ -221,29 +221,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md animate-fadeIn p-4">
-      <div className="w-[780px] max-w-full max-h-[90vh] bg-[#0b101f] border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md animate-fadeIn p-4">
+      <div
+        className="w-[780px] max-w-full max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col border"
+        style={{
+          backgroundColor: 'var(--surface)',
+          borderColor: 'var(--border)',
+          color: 'var(--text)',
+        }}
+      >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800/80 flex items-center justify-between bg-[#0e1426] shrink-0">
+        <div
+          className="px-6 py-4 border-b flex items-center justify-between shrink-0"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)',
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+            <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-500">
               <SettingsIcon className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white tracking-tight">Configuration Antigravity</h2>
-              <p className="text-[11px] text-slate-400">Modèles d'intelligence, permissions, skills et sécurité</p>
+              <h2 className="text-sm font-bold tracking-tight" style={{ color: 'var(--strong)' }}>Configuration Antigravity</h2>
+              <p className="text-[11px]" style={{ color: 'var(--muted)' }}>Modèles d'intelligence, permissions, skills et sécurité</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--muted)' }}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-800 bg-[#090d1a] px-6 gap-2 shrink-0 overflow-x-auto">
+        <div
+          className="flex border-b px-6 gap-2 shrink-0 overflow-x-auto"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)',
+          }}
+        >
           <button
             onClick={() => setActiveTab('models')}
             className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
@@ -321,16 +341,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Tab Content (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs bg-[#080c16]">
+        <div
+          className="flex-1 overflow-y-auto p-6 space-y-6 text-xs transition-colors"
+          style={{
+            backgroundColor: 'var(--bg)',
+            color: 'var(--text)',
+          }}
+        >
           {activeTab === 'models' && (
             <div className="space-y-6">
               {/* Models List */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
                     Modèle d'Intelligence Artificielle
                   </label>
-                  <span className="text-[10px] text-slate-500">Sélectionnez la famille de modèle par défaut</span>
+                  <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Sélectionnez la famille de modèle par défaut</span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2.5">
@@ -339,18 +365,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     const meta = MODEL_DESCRIPTIONS[m.id] || {
                       desc: 'Modèle supporté par Antigravity CLI.',
                       badge: 'Standard',
-                      iconColor: 'text-slate-400 bg-slate-800 border-slate-700'
+                      iconColor: 'text-sky-500 bg-sky-500/10 border-sky-500/30'
                     };
 
                     return (
                       <div
                         key={m.id}
                         onClick={() => handleSelectModel(m.id)}
-                        className={`p-3.5 rounded-2xl border transition-all flex items-start justify-between cursor-pointer ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-sky-950/40 via-[#0d1629] to-[#0d1629] border-sky-500 shadow-md ring-1 ring-sky-500/30'
-                            : 'bg-[#0a0f1d] border-slate-800/80 hover:border-slate-700 hover:bg-[#0d1424]'
-                        }`}
+                        className="p-3.5 rounded-2xl border transition-all flex items-start justify-between cursor-pointer shadow-xs hover:border-sky-500/40"
+                        style={{
+                          backgroundColor: 'var(--surface)',
+                          borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                          boxShadow: isSelected ? '0 0 0 1px var(--accent)' : 'none',
+                        }}
                       >
                         <div className="flex items-start gap-3">
                           <div className={`w-8 h-8 rounded-xl flex items-center justify-center border shrink-0 mt-0.5 ${meta.iconColor}`}>
@@ -358,12 +385,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold text-white text-xs">{m.name}</span>
+                              <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>{m.name}</span>
                               <span className={`text-[9px] px-1.5 py-0.2 rounded border font-mono font-bold ${meta.iconColor}`}>
                                 {meta.badge}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-400 mt-1 leading-snug">{meta.desc}</p>
+                            <p className="text-[11px] mt-1 leading-snug" style={{ color: 'var(--muted)' }}>{meta.desc}</p>
                           </div>
                         </div>
 
@@ -382,23 +409,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Effort & Mode settings */}
               {supportedEfforts.length > 0 && (
-                <div className="p-4 rounded-2xl bg-[#0a0f1e] border border-slate-800/80 space-y-3">
+                <div
+                  className="p-4 rounded-2xl border space-y-3"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                  }}
+                >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-semibold text-slate-200">Niveau d'Effort de Raisonnement</span>
-                      <p className="text-[10px] text-slate-400">Profondeur de réflexion allouée au modèle sélectionné</p>
+                      <span className="font-semibold" style={{ color: 'var(--strong)' }}>Niveau d'Effort de Raisonnement</span>
+                      <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Profondeur de réflexion allouée au modèle sélectionné</p>
                     </div>
-                    <div className="flex items-center gap-1.5 bg-[#060a14] p-1 rounded-xl border border-slate-800">
+                    <div
+                      className="flex items-center gap-1.5 p-1 rounded-xl border"
+                      style={{
+                        backgroundColor: 'var(--surface-subtle)',
+                        borderColor: 'var(--border)',
+                      }}
+                    >
                       {supportedEfforts.map((eff) => (
                         <button
                           key={eff}
                           type="button"
                           onClick={() => setSelectedEffort(eff as any)}
-                          className={`px-3 py-1 rounded-lg text-xs font-mono font-medium transition-all cursor-pointer ${
-                            selectedEffort === eff
-                              ? 'bg-sky-500 text-white shadow-sm'
-                              : 'text-slate-400 hover:text-white'
-                          }`}
+                          className="px-3 py-1 rounded-lg text-xs font-mono font-medium transition-all cursor-pointer"
+                          style={{
+                            backgroundColor: selectedEffort === eff ? 'var(--accent)' : 'transparent',
+                            color: selectedEffort === eff ? '#FFFFFF' : 'var(--muted)',
+                          }}
                         >
                           {eff.toUpperCase()}
                         </button>
@@ -414,51 +453,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="space-y-6">
               {/* 1-Click Profiles */}
               <div className="space-y-2.5">
-                <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
                   Profils Rapides en 1 Clic
                 </label>
                 <div className="grid grid-cols-3 gap-2.5">
                   <button
                     type="button"
                     onClick={() => applyProfile('full')}
-                    className="p-3 rounded-2xl bg-[#0a0f1d] hover:bg-[#0f172c] border border-slate-800 hover:border-sky-500/50 text-left transition-all cursor-pointer group"
+                    className="p-3 rounded-2xl border text-left transition-all cursor-pointer group shadow-xs hover:border-sky-500/50"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border)',
+                    }}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <Unlock className="w-3.5 h-3.5 text-sky-400" />
-                      <span className="font-semibold text-xs text-slate-200 group-hover:text-white">Full Développeur</span>
+                      <Unlock className="w-3.5 h-3.5 text-sky-500" />
+                      <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>Full Développeur</span>
                     </div>
-                    <p className="text-[10px] text-slate-400">Accès total : commandes, écriture & lecture partout</p>
+                    <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Accès total : commandes, écriture & lecture partout</p>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => applyProfile('standard')}
-                    className="p-3 rounded-2xl bg-[#0a0f1d] hover:bg-[#0f172c] border border-slate-800 hover:border-emerald-500/50 text-left transition-all cursor-pointer group"
+                    className="p-3 rounded-2xl border text-left transition-all cursor-pointer group shadow-xs hover:border-emerald-500/50"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border)',
+                    }}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="font-semibold text-xs text-slate-200 group-hover:text-white">Standard Workspace</span>
+                      <Shield className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>Standard Workspace</span>
                     </div>
-                    <p className="text-[10px] text-slate-400">Commandes courantes et écriture dans les workspaces</p>
+                    <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Commandes courantes et écriture dans les workspaces</p>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => applyProfile('strict')}
-                    className="p-3 rounded-2xl bg-[#0a0f1d] hover:bg-[#0f172c] border border-slate-800 hover:border-amber-500/50 text-left transition-all cursor-pointer group"
+                    className="p-3 rounded-2xl border text-left transition-all cursor-pointer group shadow-xs hover:border-amber-500/50"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border)',
+                    }}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <Lock className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="font-semibold text-xs text-slate-200 group-hover:text-white">Strict (Lecture Seule)</span>
+                      <Lock className="w-3.5 h-3.5 text-amber-500" />
+                      <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>Strict (Lecture Seule)</span>
                     </div>
-                    <p className="text-[10px] text-slate-400">Aucune commande terminal, analyse & lecture seule</p>
+                    <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Aucune commande terminal, analyse & lecture seule</p>
                   </button>
                 </div>
               </div>
 
               {/* Direct Toggles */}
               <div className="space-y-2.5">
-                <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
                   Accès Directs
                 </label>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -473,22 +524,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div
                         key={item.rule}
                         onClick={() => toggleDirectRule(item.rule)}
-                        className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                          active
-                            ? 'bg-emerald-950/20 border-emerald-500/40 text-slate-200'
-                            : 'bg-[#0a0f1d] border-slate-800 text-slate-400'
-                        }`}
+                        className="p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all shadow-xs"
+                        style={{
+                          backgroundColor: active ? 'var(--accent-bg)' : 'var(--surface)',
+                          borderColor: active ? 'var(--accent)' : 'var(--border)',
+                        }}
                       >
                         <div className="pr-2">
-                          <span className={`text-xs font-semibold block ${active ? 'text-emerald-300' : 'text-slate-300'}`}>
+                          <span className="text-xs font-semibold block" style={{ color: active ? 'var(--accent)' : 'var(--strong)' }}>
                             {item.label}
                           </span>
-                          <span className="text-[10px] text-slate-500">{item.desc}</span>
+                          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>{item.desc}</span>
                         </div>
                         <div
                           className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
-                            active ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-slate-700 bg-slate-800'
+                            active ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-slate-300 dark:border-slate-700'
                           }`}
+                          style={{
+                            backgroundColor: active ? '#10B981' : 'var(--surface-subtle)',
+                          }}
                         >
                           {active && <Check className="w-3 h-3 stroke-[3]" />}
                         </div>
@@ -499,19 +553,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* Granular Rules Manager */}
-              <div className="p-4 rounded-2xl bg-[#0a0f1e] border border-slate-800/80 space-y-3">
-                <span className="font-semibold text-slate-200 block text-xs">Règles Autorisées Actives ({allowRules.length})</span>
+              <div
+                className="p-4 rounded-2xl border space-y-3"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                }}
+              >
+                <span className="font-semibold block text-xs" style={{ color: 'var(--strong)' }}>
+                  Règles Autorisées Actives ({allowRules.length})
+                </span>
                 <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
                   {allowRules.map((r) => (
                     <span
                       key={r}
-                      className="font-mono text-[11px] bg-slate-900 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg flex items-center gap-2 shadow-sm"
+                      className="font-mono text-[11px] border px-2.5 py-1 rounded-lg flex items-center gap-2 shadow-xs"
+                      style={{
+                        backgroundColor: 'var(--surface-subtle)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--text)',
+                      }}
                     >
                       <span>{r}</span>
                       <button
                         type="button"
                         onClick={() => removeRule(r)}
-                        className="text-slate-500 hover:text-rose-400 cursor-pointer"
+                        className="hover:text-rose-500 cursor-pointer transition-colors"
+                        style={{ color: 'var(--muted)' }}
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -520,11 +588,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Add rule input */}
-                <div className="pt-2 flex items-center gap-2 border-t border-slate-800/80">
+                <div className="pt-2 flex items-center gap-2 border-t" style={{ borderColor: 'var(--border)' }}>
                   <select
                     value={newRuleType}
                     onChange={(e) => setNewRuleType(e.target.value)}
-                    className="bg-[#0d1322] border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs font-mono outline-none"
+                    className="border rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none"
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--text)',
+                    }}
                   >
                     <option value="command">command</option>
                     <option value="write_file">write_file</option>
@@ -537,13 +610,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     value={newRuleValue}
                     onChange={(e) => setNewRuleValue(e.target.value)}
                     placeholder="* ou chemin"
-                    className="flex-1 bg-[#0d1322] border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-mono outline-none"
+                    className="flex-1 border rounded-lg px-3 py-1.5 text-xs font-mono outline-none"
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--text)',
+                    }}
                   />
 
                   <button
                     type="button"
                     onClick={addCustomRule}
-                    className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 cursor-pointer"
+                    className="py-1.5 px-3 rounded-lg font-semibold text-xs flex items-center gap-1.5 cursor-pointer border hover:bg-black/5 dark:hover:bg-white/5"
+                    style={{
+                      backgroundColor: 'var(--surface-subtle)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--text)',
+                    }}
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Ajouter</span>
@@ -557,39 +640,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                  <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>
                     Skills Installés & Écosystème
                   </h3>
-                  <p className="text-[10px] text-slate-400">Capacités modulaires découvertes automatiquement par Antigravity</p>
+                  <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Capacités modulaires découvertes automatiquement par Antigravity</p>
                 </div>
-                <span className="text-[10px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-mono bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 px-2 py-0.5 rounded-full">
                   {skills.length} skills disponibles
                 </span>
               </div>
 
               {selectedSkill ? (
-                <div className="space-y-3 bg-[#070b16] p-4 rounded-2xl border border-slate-800">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div
+                  className="space-y-3 p-4 rounded-2xl border"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                  }}
+                >
+                  <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: 'var(--border)' }}>
                     <div className="flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-indigo-400" />
-                      <span className="font-bold text-slate-100 text-xs">{selectedSkill.name}</span>
-                      <span className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.2 rounded font-mono">
+                      <BookOpen className="w-4 h-4 text-indigo-500" />
+                      <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>{selectedSkill.name}</span>
+                      <span
+                        className="text-[9px] px-1.5 py-0.2 rounded font-mono border"
+                        style={{
+                          backgroundColor: 'var(--surface-subtle)',
+                          borderColor: 'var(--border)',
+                          color: 'var(--muted)',
+                        }}
+                      >
                         {selectedSkill.type}
                       </span>
                     </div>
                     <button
                       onClick={() => setSelectedSkill(null)}
-                      className="text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer"
+                      className="text-xs cursor-pointer hover:underline"
+                      style={{ color: 'var(--accent)' }}
                     >
                       ← Revenir à la liste
                     </button>
                   </div>
-                  <pre className="p-4 bg-[#050811] rounded-xl text-[11px] font-mono text-slate-300 max-h-[350px] overflow-y-auto whitespace-pre-wrap">
+                  <pre
+                    className="p-4 rounded-xl text-[11px] font-mono max-h-[350px] overflow-y-auto whitespace-pre-wrap border"
+                    style={{
+                      backgroundColor: 'var(--code-bg)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--code-text)',
+                    }}
+                  >
                     {selectedSkill.content}
                   </pre>
                 </div>
               ) : skillsLoading ? (
-                <div className="p-8 text-center text-slate-500 text-xs">
+                <div className="p-8 text-center text-xs" style={{ color: 'var(--muted)' }}>
                   Chargement des skills installés...
                 </div>
               ) : (
@@ -598,37 +702,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div
                       key={skill.id}
                       onClick={() => viewSkillDetail(skill)}
-                      className="p-3.5 rounded-2xl bg-[#0a0f1d] border border-slate-800 hover:border-slate-700 hover:bg-[#0e162c] transition-all cursor-pointer flex items-start justify-between group"
+                      className="p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start justify-between group shadow-xs hover:border-sky-500/50"
+                      style={{
+                        backgroundColor: 'var(--surface)',
+                        borderColor: 'var(--border)',
+                      }}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-500 shrink-0 mt-0.5">
                           <Boxes className="w-4 h-4" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-white text-xs">{skill.name}</span>
+                            <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>{skill.name}</span>
                             <span
                               className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${
                                 skill.type === 'builtin'
-                                  ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
-                                  : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                  ? 'bg-sky-500/15 text-sky-500 border border-sky-500/30'
+                                  : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
                               }`}
                             >
                               {skill.type === 'builtin' ? 'Built-in' : 'User Config'}
                             </span>
                             {skill.has_scripts && (
-                              <span className="text-[9px] bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded font-mono">
+                              <span className="text-[9px] bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded font-mono">
                                 Scripts
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-400 mt-1 leading-snug">{skill.description}</p>
-                          <p className="text-[10px] text-slate-600 font-mono mt-1">{skill.path}</p>
+                          <p className="text-[11px] mt-1 leading-snug" style={{ color: 'var(--muted)' }}>{skill.description}</p>
+                          <p className="text-[10px] font-mono mt-1" style={{ color: 'var(--muted)' }}>{skill.path}</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-slate-500 group-hover:text-indigo-400 transition-colors flex items-center gap-1">
+                        <span className="text-[10px] group-hover:text-indigo-500 transition-colors flex items-center gap-1" style={{ color: 'var(--muted)' }}>
                           <span>Voir doc</span>
                           <ChevronRight className="w-3 h-3" />
                         </span>
@@ -643,26 +751,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeTab === 'security' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>
                   Sécurité & Mot de Passe d'Accès
                 </h3>
-                <p className="text-[10px] text-slate-400">
+                <p className="text-[10px]" style={{ color: 'var(--muted)' }}>
                   Protégez l'accès au cockpit web Antigravity pour sécuriser votre serveur
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-[#0a0f1e] border border-slate-800/80 space-y-4">
-                <div className="flex items-center gap-3 text-xs text-emerald-400 bg-emerald-950/20 border border-emerald-500/30 p-3 rounded-xl">
+              <div
+                className="p-4 rounded-2xl border space-y-4"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                }}
+              >
+                <div className="flex items-center gap-3 text-xs text-emerald-500 bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-xl">
                   <ShieldCheck className="w-5 h-5 shrink-0" />
                   <div>
-                    <span className="font-semibold block">Protection Active</span>
-                    <span className="text-[11px] text-slate-400">L'authentification par mot de passe et signature HMAC est activée.</span>
+                    <span className="font-semibold block" style={{ color: 'var(--strong)' }}>Protection Active</span>
+                    <span className="text-[11px]" style={{ color: 'var(--muted)' }}>L'authentification par mot de passe et signature HMAC est activée.</span>
                   </div>
                 </div>
 
                 <form onSubmit={handlePasswordChange} className="space-y-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                    <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--muted)' }}>
                       Mot de passe actuel
                     </label>
                     <input
@@ -670,12 +784,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={oldPassword}
                       onChange={(e) => setOldPassword(e.target.value)}
                       placeholder="Mot de passe actuel (par défaut : antigravity2026)"
-                      className="w-full px-3 py-2 bg-[#060a14] border border-slate-800 rounded-xl text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500/60"
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-mono focus:outline-none"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--text)',
+                      }}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                    <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--muted)' }}>
                       Nouveau mot de passe
                     </label>
                     <input
@@ -683,12 +802,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Saisissez un nouveau mot de passe fort"
-                      className="w-full px-3 py-2 bg-[#060a14] border border-slate-800 rounded-xl text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500/60"
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-mono focus:outline-none"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--text)',
+                      }}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                    <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--muted)' }}>
                       Confirmer le nouveau mot de passe
                     </label>
                     <input
@@ -696,18 +820,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirmez le nouveau mot de passe"
-                      className="w-full px-3 py-2 bg-[#060a14] border border-slate-800 rounded-xl text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500/60"
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-mono focus:outline-none"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--text)',
+                      }}
                     />
                   </div>
 
                   {pwdError && (
-                    <div className="text-xs text-rose-400 bg-rose-950/20 border border-rose-500/30 p-2.5 rounded-xl">
+                    <div className="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/30 p-2.5 rounded-xl">
                       {pwdError}
                     </div>
                   )}
 
                   {pwdSuccess && (
-                    <div className="text-xs text-emerald-400 bg-emerald-950/20 border border-emerald-500/30 p-2.5 rounded-xl flex items-center gap-1.5">
+                    <div className="text-xs text-emerald-500 bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-xl flex items-center gap-1.5">
                       <Check className="w-3.5 h-3.5" />
                       <span>Mot de passe mis à jour avec succès ! Vos sessions ont été renouvelées.</span>
                     </div>
@@ -716,7 +845,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <button
                     type="submit"
                     disabled={pwdLoading || !oldPassword || !newPassword}
-                    className="py-2 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-medium text-xs flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
+                    className="py-2 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-medium text-xs flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all shadow-xs"
                   >
                     <KeyRound className="w-3.5 h-3.5" />
                     <span>{pwdLoading ? 'Mise à jour...' : 'Mettre à jour le mot de passe'}</span>
@@ -731,11 +860,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="p-6 space-y-6">
               {/* Section 1: Mode Thème */}
               <div>
-                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-amber-400" />
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
+                  <Palette className="w-4 h-4 text-amber-500" />
                   <span>Mode d'Affichage (Thème)</span>
                 </h3>
-                <p className="text-[11px] text-slate-400 mb-3">
+                <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>
                   Détermine le fond, les surfaces et le contraste général. Le mode Système s'adapte en temps réel aux réglages de votre OS.
                 </p>
 
@@ -750,17 +879,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           setCurrentTheme(th.id);
                           applyAppearance(th.id, currentSkin);
                         }}
-                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                          isSelected
-                            ? 'border-amber-400 bg-amber-500/10 shadow-md shadow-amber-500/10'
-                            : 'border-slate-800 bg-[#0c1222] hover:border-slate-700'
-                        }`}
+                        className="p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between shadow-xs"
+                        style={{
+                          backgroundColor: isSelected ? 'var(--accent-bg)' : 'var(--surface)',
+                          borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                          boxShadow: isSelected ? '0 0 0 1px var(--accent)' : 'none',
+                        }}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-xs text-white">{th.name}</span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                          <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>{th.name}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />}
                         </div>
-                        <p className="text-[10px] text-slate-400 leading-snug">{th.desc}</p>
+                        <p className="text-[10px] leading-snug" style={{ color: 'var(--muted)' }}>{th.desc}</p>
                       </button>
                     );
                   })}
@@ -769,11 +899,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Section 2: Nuances & Accents (Skins Hermes) */}
               <div>
-                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-2">
-                  <Boxes className="w-4 h-4 text-sky-400" />
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
+                  <Boxes className="w-4 h-4 text-sky-500" />
                   <span>Nuances & Accents Visuels (Skins Hermes)</span>
                 </h3>
-                <p className="text-[11px] text-slate-400 mb-3">
+                <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>
                   Sélectionnez la palette d'accent et les surfaces spécifiques. Se combine avec le mode clair ou sombre sélectionné ci-dessus.
                 </p>
 
@@ -788,11 +918,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           setCurrentSkin(sk.id);
                           applyAppearance(currentTheme, sk.id);
                         }}
-                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                          isSelected
-                            ? 'border-amber-400 bg-amber-500/10 shadow-sm'
-                            : 'border-slate-800 bg-[#0b101f] hover:border-slate-700'
-                        }`}
+                        className="p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between shadow-xs"
+                        style={{
+                          backgroundColor: isSelected ? 'var(--accent-bg)' : 'var(--surface)',
+                          borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                          boxShadow: isSelected ? '0 0 0 1px var(--accent)' : 'none',
+                        }}
                       >
                         <div>
                           {/* Color dots preview */}
@@ -800,16 +931,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             {sk.colors.map((c, i) => (
                               <span
                                 key={i}
-                                className="w-2.5 h-2.5 rounded-full shadow-sm border border-black/20"
+                                className="w-2.5 h-2.5 rounded-full shadow-xs border border-black/20"
                                 style={{ backgroundColor: c }}
                               />
                             ))}
                           </div>
-                          <span className="font-bold text-[11px] text-slate-200 block truncate">
+                          <span className="font-bold text-[11px] block truncate" style={{ color: 'var(--strong)' }}>
                             {sk.name}
                           </span>
                         </div>
-                        <p className="text-[9px] text-slate-500 leading-tight mt-1 line-clamp-2">
+                        <p className="text-[9px] leading-tight mt-1 line-clamp-2" style={{ color: 'var(--muted)' }}>
                           {sk.desc}
                         </p>
                       </button>
@@ -823,11 +954,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeTab === 'languages' && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
+                  <Globe className="w-4 h-4 text-cyan-500" />
                   <span>Langues de l'interface (15 langues Hermes WebUI)</span>
                 </h3>
-                <p className="text-[11px] text-slate-400 mb-3">
+                <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>
                   Sélectionnez la langue d'affichage et de synthèse vocale. L'ensemble de la console et des messages est mis à jour instantanément.
                 </p>
               </div>
@@ -840,27 +971,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       key={item.code}
                       type="button"
                       onClick={() => setLanguage(item.code)}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
-                        isSelected
-                          ? 'border-cyan-500 bg-cyan-500/10 shadow-md shadow-cyan-500/10'
-                          : 'border-slate-800 bg-[#0c1222] hover:border-slate-700 hover:bg-[#111a33]'
-                      }`}
+                      className="p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between shadow-xs"
+                      style={{
+                        backgroundColor: isSelected ? 'var(--accent-bg)' : 'var(--surface)',
+                        borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                        boxShadow: isSelected ? '0 0 0 1px var(--accent)' : 'none',
+                      }}
                     >
                       <div className="flex items-center gap-2.5">
                         <span className="text-xl leading-none">{item.flag || '🌐'}</span>
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-xs text-white">{item.label}</span>
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                            <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>{item.label}</span>
+                            <span
+                              className="text-[9px] font-mono px-1.5 py-0.2 rounded border"
+                              style={{
+                                backgroundColor: 'var(--surface-subtle)',
+                                borderColor: 'var(--border)',
+                                color: 'var(--muted)',
+                              }}
+                            >
                               {item.code}
                             </span>
                           </div>
-                          <span className="text-[10px] text-slate-500 font-mono">
+                          <span className="text-[10px] font-mono" style={{ color: 'var(--muted)' }}>
                             {item.speech}
                           </span>
                         </div>
                       </div>
-                      {isSelected && <Check className="w-4 h-4 text-cyan-400 shrink-0" />}
+                      {isSelected && <Check className="w-4 h-4 text-cyan-500 shrink-0" />}
                     </button>
                   );
                 })}
@@ -870,10 +1009,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-[#0e1426] border-t border-slate-800 flex items-center justify-between shrink-0">
+        <div
+          className="px-6 py-4 border-t flex items-center justify-between shrink-0"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)',
+          }}
+        >
           <div className="text-xs">
             {savedSuccess && (
-              <span className="text-emerald-400 flex items-center gap-1.5 font-medium">
+              <span className="text-emerald-500 flex items-center gap-1.5 font-medium">
                 <Check className="w-4 h-4" /> Paramètres enregistrés avec succès !
               </span>
             )}
@@ -881,7 +1026,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="flex items-center gap-2.5">
             <button
               onClick={onClose}
-              className="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+              className="py-2 px-4 rounded-xl text-xs font-medium transition-colors cursor-pointer border hover:bg-black/5 dark:hover:bg-white/5"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)',
+              }}
             >
               Fermer
             </button>

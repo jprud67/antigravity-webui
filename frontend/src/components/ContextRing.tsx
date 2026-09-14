@@ -140,18 +140,23 @@ export const ContextRing: React.FC<ContextRingProps> = ({
         <div
           onMouseEnter={() => setShowPopover(true)}
           onMouseLeave={() => setShowPopover(false)}
-          className="absolute bottom-full mb-2 right-0 w-72 p-3.5 bg-[#0c1222] border border-slate-700/80 rounded-2xl shadow-2xl shadow-black/80 text-xs z-50 animate-fadeIn space-y-3 backdrop-blur-xl"
+          className="absolute bottom-full mb-2 right-0 w-72 p-3.5 rounded-2xl shadow-2xl text-xs z-50 animate-fadeIn space-y-3 backdrop-blur-xl border"
+          style={{
+            backgroundColor: 'var(--surface)',
+            borderColor: 'var(--border)',
+            color: 'var(--text)',
+          }}
         >
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <div className="flex items-center gap-1.5 font-semibold text-slate-200">
-              <Gauge className="w-3.5 h-3.5 text-sky-400" />
+          <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex items-center gap-1.5 font-semibold" style={{ color: 'var(--strong)' }}>
+              <Gauge className="w-3.5 h-3.5 text-sky-500" />
               <span>Contexte Consommé</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${isEstimated ? 'bg-sky-500/10 text-sky-300 border border-sky-500/20' : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'}`}>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${isEstimated ? 'bg-sky-500/10 text-sky-500 border border-sky-500/20' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'}`}>
                 {isEstimated ? 'Estimé' : 'API Live'}
               </span>
-              <span className="font-mono text-[10px] text-slate-400">
+              <span className="font-mono text-[10px]" style={{ color: 'var(--muted)' }}>
                 {displayPercent}
               </span>
             </div>
@@ -159,32 +164,39 @@ export const ContextRing: React.FC<ContextRingProps> = ({
 
           {/* Progress bar */}
           <div className="space-y-1">
-            <div className="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+            <div className="w-full rounded-full h-1.5 overflow-hidden" style={{ backgroundColor: 'var(--border)' }}>
               <div
                 style={{ width: `${Math.max(2, percent)}%`, backgroundColor: ringColor }}
                 className="h-full rounded-full transition-all duration-300"
               />
             </div>
-            <div className="flex justify-between text-[10px] font-mono text-slate-500">
+            <div className="flex justify-between text-[10px] font-mono" style={{ color: 'var(--muted)' }}>
               <span>{formatNum(total)} utilisés</span>
               <span>Max : {formatNum(contextLimit)}</span>
             </div>
           </div>
 
           {/* Token Breakdown - Exact Mathematical Consistency */}
-          <div className="space-y-1.5 text-[11px] font-mono bg-[#070b14] p-2.5 rounded-xl border border-slate-800/60">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="flex items-center gap-1 text-slate-400">
-                <ArrowDownRight className="w-3 h-3 text-sky-400" />
+          <div
+            className="space-y-1.5 text-[11px] font-mono p-2.5 rounded-xl border"
+            style={{
+              backgroundColor: 'var(--surface-subtle)',
+              borderColor: 'var(--border)',
+              color: 'var(--text)',
+            }}
+          >
+            <div className="flex items-center justify-between" style={{ color: 'var(--muted)' }}>
+              <span className="flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                <ArrowDownRight className="w-3 h-3 text-sky-500" />
                 Prompt (Base + Historique) :
               </span>
-              <span className="text-slate-200 font-medium">{formatNum(baseInput)}</span>
+              <span className="font-medium" style={{ color: 'var(--strong)' }}>{formatNum(baseInput)}</span>
             </div>
 
             {promptTokens > 0 && (
-              <div className="flex items-center justify-between text-sky-300">
+              <div className="flex items-center justify-between text-sky-500">
                 <span className="flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-sky-400" />
+                  <Sparkles className="w-3 h-3 text-sky-500" />
                   + Saisie en cours :
                 </span>
                 <span className="font-semibold">+{formatNum(promptTokens)}</span>
@@ -192,30 +204,33 @@ export const ContextRing: React.FC<ContextRingProps> = ({
             )}
 
             {thinking > 0 && (
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="flex items-center gap-1 text-amber-400/90">
-                  <BrainCircuit className="w-3 h-3 text-amber-400" />
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1 text-amber-500">
+                  <BrainCircuit className="w-3 h-3 text-amber-500" />
                   Réflexion (Thinking) :
                 </span>
-                <span className="text-amber-300">{formatNum(thinking)}</span>
+                <span className="text-amber-500 font-medium">{formatNum(thinking)}</span>
               </div>
             )}
 
             {rawOutput > 0 && (
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="flex items-center gap-1 text-emerald-400/90">
-                  <ArrowUpRight className="w-3 h-3 text-emerald-400" />
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1 text-emerald-500">
+                  <ArrowUpRight className="w-3 h-3 text-emerald-500" />
                   Réponse (Génération) :
                 </span>
-                <span className="text-slate-200 font-medium">
+                <span className="font-medium" style={{ color: 'var(--strong)' }}>
                   {formatNum(responseTextTokens > 0 ? responseTextTokens : rawOutput)}
                 </span>
               </div>
             )}
 
-            <div className="pt-1.5 mt-1 border-t border-slate-800 flex items-center justify-between font-semibold text-slate-200">
-              <span className="text-slate-300">Total Contexte Actif :</span>
-              <span className="text-white">{formatNum(total)}</span>
+            <div
+              className="pt-1.5 mt-1 border-t flex items-center justify-between font-semibold"
+              style={{ borderColor: 'var(--border)', color: 'var(--strong)' }}
+            >
+              <span style={{ color: 'var(--text)' }}>Total Contexte Actif :</span>
+              <span style={{ color: 'var(--strong)' }}>{formatNum(total)}</span>
             </div>
           </div>
 

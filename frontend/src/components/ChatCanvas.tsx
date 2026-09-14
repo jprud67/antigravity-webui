@@ -500,7 +500,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               >
                 <div
                   className="w-full h-full rounded-[23px] flex items-center justify-center p-3"
-                  style={{ backgroundColor: 'var(--surface, #1A1A2E)' }}
+                  style={{ backgroundColor: 'var(--surface)' }}
                 >
                   <AntigravityIcon size={46} />
                 </div>
@@ -511,10 +511,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               />
             </div>
 
-            <h2 className="text-xl font-bold tracking-tight mb-2" style={{ color: 'var(--strong, #ffffff)' }}>
+            <h2 className="text-xl font-bold tracking-tight mb-2" style={{ color: 'var(--strong)' }}>
               {t('how_can_i_help', 'Que puis-je faire pour vous ?')}
             </h2>
-            <p className="text-xs max-w-md leading-relaxed mb-8" style={{ color: 'var(--muted, #C0C0C0)' }}>
+            <p className="text-xs max-w-md leading-relaxed mb-8" style={{ color: 'var(--muted)' }}>
               {t('welcome_subtitle', 'Posez une question, lancez des commandes, explorez vos fichiers ou planifiez des tâches autonomes sans ouvrir de terminal.')}
             </p>
 
@@ -577,11 +577,11 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                       >
                         <IconComp className="w-3.5 h-3.5" />
                       </div>
-                      <span className="font-semibold text-xs transition-colors" style={{ color: 'var(--strong, #ffffff)' }}>
+                      <span className="font-semibold text-xs transition-colors" style={{ color: 'var(--strong)' }}>
                         {card.title}
                       </span>
                     </div>
-                    <p className="text-[11px] leading-snug" style={{ color: 'var(--muted, #C0C0C0)' }}>
+                    <p className="text-[11px] leading-snug" style={{ color: 'var(--muted)' }}>
                       {card.desc}
                     </p>
                   </button>
@@ -634,7 +634,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                   >
                     <AntigravityIcon size={14} />
                   </div>
-                  <span className="font-semibold text-xs" style={{ color: 'var(--strong, #ffffff)' }}>
+                  <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>
                     Antigravity
                   </span>
                   {activeModel && (

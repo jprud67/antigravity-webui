@@ -201,8 +201,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                 style={{ paddingLeft: `${level * 14 + 10}px` }}
                 className={`flex items-center justify-between py-1 pr-2 rounded-lg text-xs cursor-pointer group transition-colors ${
                   isSelected
-                    ? 'bg-sky-500/20 text-sky-200 border-l-2 border-sky-400 font-medium'
-                    : 'text-slate-300 hover:bg-slate-800/60'
+                    ? 'bg-sky-500/15 text-sky-600 dark:text-sky-300 font-medium border-l-2 border-sky-500'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
                 }`}
               >
                 <div className="flex items-center gap-1.5 truncate">
@@ -251,21 +251,38 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
 
   return (
     <aside
-      style={{ width: `${panelWidth}px` }}
-      className="fixed top-0 right-0 bottom-0 z-40 bg-[#070b14] border-l border-slate-800 shadow-2xl flex flex-col transition-all duration-75 select-none"
+      style={{
+        width: `${panelWidth}px`,
+        backgroundColor: 'var(--surface)',
+        borderColor: 'var(--border)',
+        color: 'var(--text)',
+      }}
+      className="fixed top-0 right-0 bottom-0 z-40 border-l shadow-2xl flex flex-col transition-all duration-75 select-none"
     >
       {/* Left Resize Drag Bar */}
       <div
         onMouseDown={handleMouseDown}
         className="absolute top-0 left-0 bottom-0 w-1.5 hover:w-2 hover:bg-sky-500/60 transition-all cursor-col-resize z-50 group flex items-center justify-center"
       >
-        <div className="h-8 w-0.5 bg-slate-600 group-hover:bg-sky-400 rounded-full" />
+        <div className="h-8 w-0.5 bg-slate-400 dark:bg-slate-600 group-hover:bg-sky-400 rounded-full" />
       </div>
 
       {/* Panel Master Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 bg-[#0a101f] border-b border-slate-800 shrink-0">
+      <div
+        className="flex items-center justify-between px-3 py-2.5 border-b shrink-0 transition-colors"
+        style={{
+          backgroundColor: 'var(--surface-subtle)',
+          borderColor: 'var(--border)',
+        }}
+      >
         {/* Tab Buttons */}
-        <div className="flex items-center gap-1 bg-[#050810] p-0.5 rounded-xl border border-slate-800/80">
+        <div
+          className="flex items-center gap-1 p-0.5 rounded-xl border"
+          style={{
+            backgroundColor: 'var(--surface)',
+            borderColor: 'var(--border)',
+          }}
+        >
           <button
             onClick={() => onTabChange('files')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
@@ -356,15 +373,22 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
         {/* FILES TAB */}
         {activeTab === 'files' && (
           <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between px-3 py-2 bg-[#090e1a] border-b border-slate-800 text-xs">
-              <div className="flex items-center gap-2 truncate text-slate-400 font-mono text-[11px]">
+            <div
+              className="flex items-center justify-between px-3 py-2 border-b text-xs shrink-0"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                borderColor: 'var(--border)',
+              }}
+            >
+              <div className="flex items-center gap-2 truncate font-mono text-[11px]" style={{ color: 'var(--muted)' }}>
                 <span>Racine :</span>
-                <strong className="text-slate-200 truncate">{currentWorkspace}</strong>
+                <strong className="truncate" style={{ color: 'var(--strong)' }}>{currentWorkspace}</strong>
               </div>
               <button
                 onClick={loadTree}
                 disabled={loadingTree}
-                className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                className="p-1 rounded transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                style={{ color: 'var(--muted)' }}
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${loadingTree ? 'animate-spin' : ''}`} />
               </button>
@@ -372,27 +396,40 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
 
             <div className="flex-1 flex min-h-0">
               {/* File Tree Column */}
-              <div className="w-1/2 border-r border-slate-800/80 overflow-y-auto p-2 bg-[#060a12]">
+              <div
+                className="w-1/2 border-r overflow-y-auto p-2"
+                style={{
+                  backgroundColor: 'var(--sidebar)',
+                  borderColor: 'var(--border)',
+                }}
+              >
                 {loadingTree && !fileTree ? (
-                  <div className="p-4 text-center text-slate-500 text-xs">Chargement...</div>
+                  <div className="p-4 text-center text-xs" style={{ color: 'var(--muted)' }}>Chargement...</div>
                 ) : fileTree && fileTree.items ? (
                   renderTreeItems(fileTree.items)
                 ) : (
-                  <div className="p-4 text-center text-slate-500 text-xs italic">Aucun fichier</div>
+                  <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>Aucun fichier</div>
                 )}
               </div>
 
               {/* File Content Preview / Editor Column */}
-              <div className="w-1/2 flex flex-col min-h-0 bg-[#070b14]">
+              <div className="w-1/2 flex flex-col min-h-0" style={{ backgroundColor: 'var(--surface)' }}>
                 {selectedFilePath ? (
                   <>
-                    <div className="flex items-center justify-between px-3 py-1.5 bg-[#0a101f] border-b border-slate-800 text-[11px] text-slate-400 shrink-0">
-                      <span className="font-mono truncate">{selectedFilePath.split('/').pop()}</span>
+                    <div
+                      className="flex items-center justify-between px-3 py-1.5 border-b text-[11px] shrink-0"
+                      style={{
+                        backgroundColor: 'var(--surface-subtle)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--muted)',
+                      }}
+                    >
+                      <span className="font-mono truncate" style={{ color: 'var(--strong)' }}>{selectedFilePath.split('/').pop()}</span>
                       <div className="flex items-center gap-1.5">
                         {onInsertPath && (
                           <button
                             onClick={() => onInsertPath(selectedFilePath)}
-                            className="text-[10px] text-sky-400 hover:text-sky-300 font-medium cursor-pointer mr-1"
+                            className="text-[10px] text-sky-500 hover:text-sky-400 font-medium cursor-pointer mr-1"
                             title="Insérer le chemin"
                           >
                             + Insérer
@@ -405,11 +442,12 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                             }
                             setIsEditingFile(!isEditingFile);
                           }}
-                          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
-                            isEditingFile 
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
-                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                          }`}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border"
+                          style={{
+                            backgroundColor: isEditingFile ? 'var(--accent-bg)' : 'var(--surface)',
+                            borderColor: isEditingFile ? 'var(--accent)' : 'var(--border)',
+                            color: isEditingFile ? 'var(--accent)' : 'var(--text)',
+                          }}
                         >
                           <Edit3 className="w-2.5 h-2.5" />
                           <span>{isEditingFile ? 'Lecture' : 'Éditer'}</span>
@@ -418,11 +456,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                           <button
                             onClick={handleSaveFile}
                             disabled={savingFile}
-                            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
-                              saveSuccess
-                                ? 'bg-emerald-500 text-white'
-                                : 'bg-sky-600 hover:bg-sky-500 text-white'
-                            }`}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer bg-sky-600 hover:bg-sky-500 text-white"
                           >
                             {saveSuccess ? <Check className="w-2.5 h-2.5" /> : <Save className="w-2.5 h-2.5" />}
                             <span>{saveSuccess ? 'Enregistré' : savingFile ? '...' : 'Sauvegarder'}</span>
@@ -430,14 +464,21 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                         )}
                       </div>
                     </div>
-                    <div className="flex-1 overflow-auto p-3 font-mono text-xs text-slate-300 bg-[#050810] flex flex-col">
+                    <div
+                      className="flex-1 overflow-auto p-3 font-mono text-xs flex flex-col"
+                      style={{
+                        backgroundColor: 'var(--code-bg)',
+                        color: 'var(--code-text)',
+                      }}
+                    >
                       {loadingContent ? (
-                        <div className="text-slate-500">Chargement du contenu...</div>
+                        <div style={{ color: 'var(--muted)' }}>Chargement du contenu...</div>
                       ) : isEditingFile ? (
                         <textarea
                           value={editedFileContent}
                           onChange={(e) => setEditedFileContent(e.target.value)}
-                          className="w-full h-full bg-transparent resize-none outline-none font-mono text-xs text-slate-200 leading-relaxed"
+                          className="w-full h-full bg-transparent resize-none outline-none font-mono text-xs leading-relaxed"
+                          style={{ color: 'var(--code-text)' }}
                           spellCheck={false}
                         />
                       ) : (
@@ -446,7 +487,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                     </div>
                   </>
                 ) : (
-                  <div className="flex-1 flex items-center justify-center text-slate-500 text-xs p-4 text-center">
+                  <div className="flex-1 flex items-center justify-center text-xs p-4 text-center" style={{ color: 'var(--muted)' }}>
                     Sélectionnez un fichier pour prévisualiser ou éditer son contenu.
                   </div>
                 )}
@@ -458,12 +499,20 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
         {/* ARTIFACTS TAB */}
         {activeTab === 'artifacts' && (
           <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between px-3 py-2 bg-[#090e1a] border-b border-slate-800 text-xs">
-              <span className="text-slate-400">Artifacts ({artifacts.length})</span>
+            <div
+              className="flex items-center justify-between px-3 py-2 border-b text-xs shrink-0"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                borderColor: 'var(--border)',
+                color: 'var(--muted)',
+              }}
+            >
+              <span>Artifacts ({artifacts.length})</span>
               <button
                 onClick={loadArtifactsList}
                 disabled={loadingArtifacts}
-                className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                className="p-1 rounded transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                style={{ color: 'var(--muted)' }}
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${loadingArtifacts ? 'animate-spin' : ''}`} />
               </button>
@@ -471,9 +520,15 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
 
             <div className="flex-1 flex min-h-0">
               {/* Artifacts List */}
-              <div className="w-48 border-r border-slate-800/80 overflow-y-auto p-2 bg-[#060a12] space-y-1">
+              <div
+                className="w-48 border-r overflow-y-auto p-2 space-y-1"
+                style={{
+                  backgroundColor: 'var(--sidebar)',
+                  borderColor: 'var(--border)',
+                }}
+              >
                 {artifacts.length === 0 ? (
-                  <div className="p-4 text-center text-slate-500 text-xs italic">Aucun artifact</div>
+                  <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>Aucun artifact</div>
                 ) : (
                   artifacts.map((art) => {
                     const isSelected = selectedArtifact?.filename === art.filename;
@@ -481,14 +536,19 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                       <button
                         key={art.filename}
                         onClick={() => handleSelectArtifact(art)}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer truncate ${
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer truncate border ${
                           isSelected
-                            ? 'bg-sky-500/20 text-sky-200 border border-sky-500/30'
-                            : 'text-slate-300 hover:bg-slate-800/50'
+                            ? 'font-medium shadow-xs'
+                            : 'border-transparent hover:bg-black/5 dark:hover:bg-white/5'
                         }`}
+                        style={{
+                          backgroundColor: isSelected ? 'var(--accent-bg)' : 'transparent',
+                          borderColor: isSelected ? 'var(--accent)' : 'transparent',
+                          color: isSelected ? 'var(--strong)' : 'var(--text)',
+                        }}
                       >
                         <div className="font-medium truncate">{art.filename}</div>
-                        <div className="text-[10px] text-slate-500 truncate">{(art.size / 1024).toFixed(1)} KB</div>
+                        <div className="text-[10px] truncate" style={{ color: 'var(--muted)' }}>{(art.size / 1024).toFixed(1)} KB</div>
                       </button>
                     );
                   })
@@ -496,12 +556,18 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
               </div>
 
               {/* Artifact Markdown / Mermaid Viewer */}
-              <div className="flex-1 overflow-y-auto p-4 bg-[#070b14] prose prose-invert prose-sky max-w-none text-xs">
+              <div
+                className="flex-1 overflow-y-auto p-4 max-w-none text-xs"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  color: 'var(--text)',
+                }}
+              >
                 {selectedArtifact ? (
                   <div className="space-y-4">
-                    <div className="border-b border-slate-800 pb-3">
-                      <h2 className="text-base font-bold text-white mb-1">{selectedArtifact.filename}</h2>
-                      <p className="text-xs text-slate-400 font-mono">{selectedArtifact.relative_path}</p>
+                    <div className="border-b pb-3" style={{ borderColor: 'var(--border)' }}>
+                      <h2 className="text-base font-bold mb-1" style={{ color: 'var(--strong)' }}>{selectedArtifact.filename}</h2>
+                      <p className="text-xs font-mono" style={{ color: 'var(--muted)' }}>{selectedArtifact.relative_path}</p>
                     </div>
                     {/* Render Mermaid if code block or raw markdown */}
                     {artifactMarkdown.includes('```mermaid') ? (
@@ -524,13 +590,13 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                         })}
                       </div>
                     ) : (
-                      <pre className="whitespace-pre-wrap font-sans text-slate-300">
+                      <pre className="whitespace-pre-wrap font-sans" style={{ color: 'var(--text)' }}>
                         {artifactMarkdown}
                       </pre>
                     )}
                   </div>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-slate-500 text-xs">
+                  <div className="h-full flex items-center justify-center text-xs" style={{ color: 'var(--muted)' }}>
                     Sélectionnez un document à afficher.
                   </div>
                 )}

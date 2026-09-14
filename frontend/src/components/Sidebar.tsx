@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import type { Conversation } from '../types';
 import { getStoredTheme, applyAppearance, type ThemeMode } from '../services/theme';
-import { AntigravityIcon, AntigravityLogo } from './AntigravityLogo';
+import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 
 interface SidebarProps {
@@ -151,22 +151,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [filtered]);
 
   return (
-    <aside className="w-80 h-screen bg-[#070b14] border-r border-slate-800/80 flex flex-col shrink-0 select-none">
+    <aside
+      className="w-80 h-screen border-r flex flex-col shrink-0 select-none transition-colors"
+      style={{
+        backgroundColor: 'var(--sidebar)',
+        borderColor: 'var(--border)',
+        color: 'var(--text)',
+      }}
+    >
       {/* Brand Header */}
-      <div className="h-14 px-4 border-b border-slate-800/60 flex items-center justify-between bg-[#0a0f1e]/60">
+      <div
+        className="h-14 px-4 border-b flex items-center justify-between transition-colors shrink-0"
+        style={{
+          borderColor: 'var(--border)',
+          backgroundColor: 'var(--surface-subtle)',
+        }}
+      >
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shadow-md p-1 shrink-0">
-            <AntigravityIcon size={24} />
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center shadow-xs p-1 shrink-0 transition-colors"
+            style={{
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <AntigravityIcon size={22} />
           </div>
           <div className="flex items-center gap-1.5 min-w-0">
-            <AntigravityLogo height={18} className="text-white shrink-0" />
-            <span className="text-[9px] bg-sky-500/20 text-sky-400 px-1.5 py-0.2 rounded font-sans font-semibold">WebUI</span>
+            <span
+              className="font-bold text-sm tracking-tight truncate font-sans"
+              style={{ color: 'var(--strong)' }}
+            >
+              Antigravity
+            </span>
+            <span
+              className="text-[9px] px-1.5 py-0.5 rounded font-sans font-semibold"
+              style={{
+                backgroundColor: 'var(--accent-bg)',
+                color: 'var(--accent)',
+              }}
+            >
+              WebUI
+            </span>
           </div>
         </div>
 
         <button
           onClick={onNewConversation}
-          className="p-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 hover:text-sky-300 transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center"
+          style={{
+            backgroundColor: 'var(--accent-bg)',
+            borderColor: 'var(--accent)',
+            color: 'var(--accent)',
+          }}
           title={t('new_session', 'Nouvelle session')}
         >
           <Plus className="w-4 h-4" />
@@ -174,37 +211,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Workspace Selector Bar */}
-      <div className="p-3 border-b border-slate-800/50">
+      <div className="p-3 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
         <button
           onClick={onOpenWorkspaces}
-          className="w-full p-2 rounded-xl bg-[#0d1324] hover:bg-[#111a33] border border-slate-800 hover:border-slate-700 transition-all text-left flex items-center justify-between cursor-pointer group"
+          className="w-full p-2.5 rounded-xl transition-all text-left flex items-center justify-between cursor-pointer group shadow-xs hover:border-sky-500/50"
+          style={{
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--border)',
+          }}
         >
-          <div className="flex items-center gap-2 min-w-0">
-            <FolderGit2 className="w-4 h-4 text-sky-400 shrink-0" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <FolderGit2 className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
             <div className="min-w-0">
-              <span className="text-[10px] text-slate-500 block uppercase tracking-wider font-semibold">Workspace actif</span>
-              <p className="text-xs text-slate-200 truncate font-mono font-medium">{currentWorkspace}</p>
+              <span className="text-[10px] block uppercase tracking-wider font-semibold" style={{ color: 'var(--muted)' }}>
+                Workspace actif
+              </span>
+              <p className="text-xs truncate font-mono font-medium" style={{ color: 'var(--strong)' }}>
+                {currentWorkspace}
+              </p>
             </div>
           </div>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all shrink-0" />
+          <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform shrink-0" style={{ color: 'var(--muted)' }} />
         </button>
       </div>
 
       {/* Search Input */}
-      <div className="px-3 py-2 border-b border-slate-800/40 space-y-2">
+      <div className="px-3 py-2 border-b space-y-2 shrink-0" style={{ borderColor: 'var(--border)' }}>
         <div className="relative">
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5" style={{ color: 'var(--muted)' }} />
           <input
             type="text"
-            placeholder="Rechercher sessions & contenu..."
+            placeholder={t('search_sessions', 'Rechercher sessions & contenu...')}
             value={searchFilter}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full pl-8 pr-7 py-1.5 bg-[#0a0f20] border border-slate-800/80 rounded-lg text-xs text-slate-300 placeholder-slate-500 focus:outline-none focus:border-sky-500/50"
+            className="w-full pl-8 pr-7 py-1.5 rounded-lg text-xs placeholder-slate-400 focus:outline-none transition-colors"
+            style={{
+              backgroundColor: 'var(--input-bg)',
+              border: '1px solid var(--border)',
+              color: 'var(--text)',
+            }}
           />
           {searchFilter && (
             <button
               onClick={() => handleSearchChange('')}
-              className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300"
+              className="absolute right-2.5 top-2.5 hover:opacity-100 transition-opacity cursor-pointer"
+              style={{ color: 'var(--muted)' }}
             >
               <X className="w-3 h-3" />
             </button>
@@ -216,11 +267,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[10px] font-mono">
             <button
               onClick={() => setSelectedTag(null)}
-              className={`px-2 py-0.5 rounded-full whitespace-nowrap transition-colors cursor-pointer border ${
-                selectedTag === null
-                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 font-semibold'
-                  : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200'
-              }`}
+              className="px-2 py-0.5 rounded-full whitespace-nowrap transition-colors cursor-pointer border font-semibold"
+              style={{
+                backgroundColor: selectedTag === null ? 'var(--accent-bg)' : 'var(--surface)',
+                color: selectedTag === null ? 'var(--accent)' : 'var(--muted)',
+                borderColor: selectedTag === null ? 'var(--accent)' : 'var(--border)',
+              }}
             >
               #tous
             </button>
@@ -228,11 +280,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={tag}
                 onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                className={`px-2 py-0.5 rounded-full whitespace-nowrap transition-colors cursor-pointer border ${
-                  selectedTag === tag
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-semibold'
-                    : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200'
-                }`}
+                className="px-2 py-0.5 rounded-full whitespace-nowrap transition-colors cursor-pointer border"
+                style={{
+                  backgroundColor: selectedTag === tag ? 'rgba(16, 185, 129, 0.12)' : 'var(--surface)',
+                  color: selectedTag === tag ? '#10B981' : 'var(--muted)',
+                  borderColor: selectedTag === tag ? '#10B981' : 'var(--border)',
+                  fontWeight: selectedTag === tag ? 600 : 400,
+                }}
               >
                 #{tag}
               </button>
@@ -262,11 +316,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 return (
                   <div
                     key={conv.conversation_id}
-                    className={`group relative w-full text-left p-2 rounded-xl text-xs transition-all flex flex-col gap-1 border cursor-pointer ${
-                      isSelected
-                        ? 'bg-gradient-to-r from-sky-950/40 via-slate-900 to-slate-900 border-sky-500/50 text-white shadow-sm'
-                        : 'border-transparent text-slate-400 hover:bg-slate-900/60 hover:text-slate-200'
-                    }`}
+                    className="group relative w-full text-left p-2.5 rounded-xl text-xs transition-all flex flex-col gap-1.5 border cursor-pointer"
+                    style={{
+                      backgroundColor: isSelected ? 'var(--surface)' : 'transparent',
+                      borderColor: isSelected ? 'var(--accent)' : 'transparent',
+                      color: isSelected ? 'var(--strong)' : 'var(--text)',
+                      boxShadow: isSelected ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+                    }}
                     onClick={() => onSelectConversation(conv.conversation_id)}
                   >
                     {/* Header line: Project color, icon, title, pin & more */}
@@ -274,7 +330,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
                         {conv.projectColor ? (
                           <span
-                            className="w-2 h-2 rounded-full shrink-0 shadow-sm"
+                            className="w-2 h-2 rounded-full shrink-0 shadow-xs"
                             style={{ backgroundColor: conv.projectColor }}
                             title={`Projet: ${conv.project || 'Sans nom'}`}
                           />
@@ -282,13 +338,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                         {isBranch ? (
                           <span title="Session issue d'une bifurcation (branche)">
-                            <GitBranch className="w-3 h-3 text-fuchsia-400 shrink-0" />
+                            <GitBranch className="w-3 h-3 text-fuchsia-500 shrink-0" />
                           </span>
                         ) : (
-                          <MessageSquare className={`w-3 h-3 shrink-0 ${isSelected ? 'text-sky-400' : 'text-slate-500'}`} />
+                          <MessageSquare
+                            className="w-3.5 h-3.5 shrink-0"
+                            style={{ color: isSelected ? 'var(--accent)' : 'var(--muted)' }}
+                          />
                         )}
 
-                        <span className="truncate font-medium text-xs">
+                        <span className="truncate font-medium text-xs" style={{ color: isSelected ? 'var(--strong)' : 'var(--text)' }}>
                           {conv.title || `Session ${conv.conversation_id.substring(0, 8)}`}
                         </span>
                       </div>
@@ -302,9 +361,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               e.stopPropagation();
                               onTogglePin(conv.conversation_id, isPinned);
                             }}
-                            className={`p-1 rounded hover:bg-slate-800 transition-colors ${
-                              isPinned ? 'text-amber-400' : 'text-slate-600 hover:text-slate-300 opacity-0 group-hover:opacity-100'
+                            className={`p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer ${
+                              isPinned ? 'text-amber-500' : 'opacity-0 group-hover:opacity-100'
                             }`}
+                            style={{ color: isPinned ? '#F59E0B' : 'var(--muted)' }}
                             title={isPinned ? 'Désépingler' : 'Épingler en haut'}
                           >
                             <Pin className={`w-3 h-3 ${isPinned ? 'fill-current' : ''}`} />
@@ -318,7 +378,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               e.stopPropagation();
                               onEditSessionMeta(conv);
                             }}
-                            className="p-1 rounded text-slate-600 hover:text-slate-300 hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100"
+                            className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                            style={{ color: 'var(--muted)' }}
                             title="Gérer les tags, projet et titre"
                           >
                             <MoreVertical className="w-3 h-3" />
@@ -329,21 +390,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                     {/* Search match snippet if any */}
                     {conv.match_snippet && (
-                      <p className="text-[10px] text-sky-400/90 italic font-mono truncate pl-4.5 bg-sky-950/20 rounded px-1 py-0.5">
+                      <p
+                        className="text-[10px] italic font-mono truncate pl-4.5 rounded px-1.5 py-0.5"
+                        style={{
+                          backgroundColor: 'var(--accent-bg)',
+                          color: 'var(--accent)',
+                        }}
+                      >
                         {conv.match_snippet}
                       </p>
                     )}
 
                     {/* Metadata Sub-row: tags, step count, date */}
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 pl-4.5 font-mono">
+                    <div className="flex items-center justify-between text-[10px] pl-4.5 font-mono" style={{ color: 'var(--muted)' }}>
                       <div className="flex items-center gap-1 truncate max-w-[60%]">
                         {conv.project && (
-                          <span className="px-1.5 py-0.2 rounded bg-slate-800/80 text-slate-300 text-[9px] font-sans">
+                          <span
+                            className="px-1.5 py-0.2 rounded text-[9px] font-sans font-medium"
+                            style={{
+                              backgroundColor: 'var(--surface-subtle)',
+                              border: '1px solid var(--border)',
+                              color: 'var(--text)',
+                            }}
+                          >
                             {conv.project}
                           </span>
                         )}
                         {(conv.tags || []).slice(0, 2).map((t) => (
-                          <span key={t} className="text-[9px] text-emerald-400/80">
+                          <span key={t} className="text-[9px] text-emerald-500 font-medium">
                             #{t}
                           </span>
                         ))}
@@ -366,68 +440,90 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Footer Navigation */}
-      <div className="p-3 border-t border-slate-800/70 space-y-1 bg-[#080c16]/90">
+      <div
+        className="p-3 border-t space-y-1 transition-colors shrink-0"
+        style={{
+          backgroundColor: 'var(--surface-subtle)',
+          borderColor: 'var(--border)',
+        }}
+      >
         {onOpenFiles && (
           <button
             onClick={onOpenFiles}
-            className="w-full py-1.5 px-2.5 rounded-lg text-slate-300 hover:text-slate-100 hover:bg-slate-800/70 text-xs flex items-center justify-between transition-colors cursor-pointer group"
+            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--text)' }}
           >
             <div className="flex items-center gap-2">
               <div className="w-5 h-5 rounded-md bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
-                <HardDrive className="w-3 h-3 text-sky-400" />
+                <HardDrive className="w-3 h-3 text-sky-500" />
               </div>
               <span className="font-medium text-[11px]">Explorateur Workspace</span>
             </div>
-            <span className="text-[10px] text-sky-400 group-hover:translate-x-0.5 transition-transform">→</span>
+            <span className="text-[10px] text-sky-500 group-hover:translate-x-0.5 transition-transform">→</span>
           </button>
         )}
 
         {onOpenTasks && (
           <button
             onClick={onOpenTasks}
-            className="w-full py-1.5 px-2.5 rounded-lg text-slate-300 hover:text-slate-100 hover:bg-slate-800/70 text-xs flex items-center justify-between transition-colors cursor-pointer group"
+            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--text)' }}
           >
             <div className="flex items-center gap-2">
               <div className="w-5 h-5 rounded-md bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-                <Activity className="w-3 h-3 text-indigo-400" />
+                <Activity className="w-3 h-3 text-indigo-500" />
               </div>
               <span className="font-medium text-[11px]">Tâches & Sous-agents</span>
             </div>
-            <span className="text-[10px] text-indigo-400 group-hover:translate-x-0.5 transition-transform">→</span>
+            <span className="text-[10px] text-indigo-500 group-hover:translate-x-0.5 transition-transform">→</span>
           </button>
         )}
 
         <button
           onClick={onOpenArtifacts}
-          className="w-full py-1.5 px-2.5 rounded-lg text-slate-300 hover:text-slate-100 hover:bg-slate-800/70 text-xs flex items-center justify-between transition-colors cursor-pointer group"
+          className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
+          style={{ color: 'var(--text)' }}
         >
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <FileText className="w-3 h-3 text-emerald-400" />
+              <FileText className="w-3 h-3 text-emerald-500" />
             </div>
             <span className="font-medium text-[11px]">Documents & Artifacts</span>
           </div>
-          <span className="text-[10px] text-emerald-400 group-hover:translate-x-0.5 transition-transform">→</span>
+          <span className="text-[10px] text-emerald-500 group-hover:translate-x-0.5 transition-transform">→</span>
         </button>
 
         {/* Active Model Indicator */}
-        <div className="pt-2 border-t border-slate-800/60 mt-2 flex items-center justify-between text-[10px] text-slate-400 font-mono px-1">
+        <div
+          className="pt-2 border-t mt-2 flex items-center justify-between text-[10px] font-mono px-1 shrink-0"
+          style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+        >
           <span className="truncate">{activeModel}</span>
           {activeEffort && (
-            <span className="text-[9px] bg-sky-500/10 text-sky-400 px-1.5 py-0.2 rounded border border-sky-500/20 font-bold uppercase">
+            <span
+              className="text-[9px] px-1.5 py-0.2 rounded border font-bold uppercase"
+              style={{
+                backgroundColor: 'var(--accent-bg)',
+                borderColor: 'var(--accent)',
+                color: 'var(--accent)',
+              }}
+            >
               {activeEffort}
             </span>
           )}
         </div>
 
-        <div className="pt-1.5 flex items-center justify-between text-xs">
+        <div className="pt-1.5 flex items-center justify-between text-xs shrink-0">
           <button
             onClick={onOpenSettings}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="p-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--muted)' }}
             title={t('settings', 'Paramètres Antigravity')}
           >
             <SettingsIcon className="w-4 h-4" />
-            <span className="text-[11px]">{t('settings', 'Paramètres')}</span>
+            <span className="text-[11px] font-medium" style={{ color: 'var(--text)' }}>
+              {t('settings', 'Paramètres')}
+            </span>
           </button>
 
           <div className="flex items-center gap-1">
@@ -435,7 +531,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {onOpenLanguages && (
               <button
                 onClick={onOpenLanguages}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors cursor-pointer flex items-center gap-1"
+                className="p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 hover:bg-black/5 dark:hover:bg-white/5"
+                style={{ color: 'var(--muted)' }}
                 title={`Langue: ${currentLangObj?.label || 'Français'} (15 langues disponibles)`}
               >
                 <span className="text-xs">{currentLangObj?.flag || '🌐'}</span>
@@ -447,7 +544,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {onOpenHelp && (
               <button
                 onClick={onOpenHelp}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                style={{ color: 'var(--muted)' }}
                 title="Aide & Raccourcis (/help)"
               >
                 <HelpCircle className="w-4 h-4" />
@@ -461,7 +559,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 const nextIdx = (modes.indexOf(current) + 1) % modes.length;
                 applyAppearance(modes[nextIdx], undefined);
               }}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+              style={{ color: 'var(--muted)' }}
               title="Changer rapidement de thème visuel"
             >
               <Palette className="w-4 h-4" />
@@ -470,7 +569,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {onLogout && (
               <button
                 onClick={onLogout}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg transition-colors cursor-pointer hover:text-rose-500 hover:bg-rose-500/10"
+                style={{ color: 'var(--muted)' }}
                 title="Déconnexion"
               >
                 <LogOut className="w-4 h-4" />
