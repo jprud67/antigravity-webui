@@ -15,6 +15,7 @@ import { RulesEditorModal } from './components/RulesEditorModal';
 import { HelpModal } from './components/HelpModal';
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption } from './types';
+import { parseStepsToMessages } from './utils/transcriptParser';
 import { 
   fetchConversations, 
   fetchConversationTranscript, 
@@ -142,30 +143,7 @@ export function App() {
         // Only reload transcript if it's the active conversation AND we're not streaming
         if (convId === activeConversationIdRef.current && !isStreamingRef.current) {
           fetchConversationTranscript(convId).then((data) => {
-            const steps = data.steps || [];
-            const chatMsgs: import('./types').ChatMessage[] = [];
-            steps.forEach((s: any, idx: number) => {
-              const role = s.source === 'USER_EXPLICIT' || s.type === 'USER_INPUT' ? 'user' : 'assistant';
-              const content = s.content || '';
-              const thought = s.thinking || '';
-              const isStepRunning = s.status === 'RUNNING' || s.status === 'IN_PROGRESS';
-              const toolCalls = (s.tool_calls || []).map((t: any) => ({
-                name: t.name || 'tool',
-                args: t.args,
-                status: (t.status === 'running' || isStepRunning) ? ('running' as const) : ('done' as const)
-              }));
-              if (content || thought || toolCalls.length > 0) {
-                chatMsgs.push({
-                  id: `step-${idx}`,
-                  role,
-                  content,
-                  thought,
-                  toolCalls,
-                  stepIndex: s.step_index,
-                  isLive: isStepRunning
-                });
-              }
-            });
+            const chatMsgs = parseStepsToMessages(data.steps || []);
             setMessages(chatMsgs);
             if (data.usage && data.usage.total_tokens > 0) {
               setTokenUsage({
@@ -349,31 +327,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
     setActiveConversationId(convId);
     try {
       const data = await fetchConversationTranscript(convId);
-      const steps = data.steps || [];
-      const chatMsgs: ChatMessage[] = [];
-
-      steps.forEach((s: any, idx: number) => {
-        const role = s.source === 'USER_EXPLICIT' || s.type === 'USER_INPUT' ? 'user' : 'assistant';
-        const content = s.content || '';
-        const thought = s.thinking || '';
-        const toolCalls = (s.tool_calls || []).map((t: any) => ({
-          name: t.name || 'tool',
-          args: t.args,
-          status: 'done'
-        }));
-
-        if (content || thought || toolCalls.length > 0) {
-          chatMsgs.push({
-            id: `step-${idx}`,
-            role,
-            content,
-            thought,
-            toolCalls,
-            stepIndex: s.step_index
-          });
-        }
-      });
-
+      const chatMsgs = parseStepsToMessages(data.steps || []);
       setMessages(chatMsgs);
 
       // Instantly set accurate token usage for selected conversation
@@ -867,30 +821,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
 
     try {
       const data = await undoConversationTurn(activeConversationId);
-      const steps = data.steps || [];
-      const chatMsgs: ChatMessage[] = [];
-      steps.forEach((s: any, idx: number) => {
-        const role = s.source === 'USER_EXPLICIT' || s.type === 'USER_INPUT' ? 'user' : 'assistant';
-        const content = s.content || '';
-        const thought = s.thinking || '';
-        const isStepRunning = s.status === 'RUNNING' || s.status === 'IN_PROGRESS';
-        const toolCalls = (s.tool_calls || []).map((t: any) => ({
-          name: t.name || 'tool',
-          args: t.args,
-          status: (t.status === 'running' || isStepRunning) ? ('running' as const) : ('done' as const)
-        }));
-        if (content || thought || toolCalls.length > 0) {
-          chatMsgs.push({
-            id: `step-${idx}`,
-            role,
-            content,
-            thought,
-            toolCalls,
-            stepIndex: s.step_index,
-            isLive: isStepRunning
-          });
-        }
-      });
+      const chatMsgs = parseStepsToMessages(data.steps || []);
       setMessages(chatMsgs);
       if (data.usage && data.usage.total_tokens > 0) {
         setTokenUsage({

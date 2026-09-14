@@ -3,6 +3,7 @@ import sqlite3
 import shutil
 import uuid
 import html
+import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
@@ -516,41 +517,176 @@ def search_conversations(query: str, limit: int = 50) -> List[Dict[str, Any]]:
 
     return matched[:limit]
 
+def clean_user_prompt(raw: str) -> str:
+    if not raw:
+        return ""
+    text = raw
+    text = re.sub(r'</?USER_REQUEST>', '', text)
+    text = re.sub(r'<ADDITIONAL_METADATA>[\s\S]*?</ADDITIONAL_METADATA>', '', text)
+    text = re.sub(r'<USER_SETTINGS_CHANGE>[\s\S]*?</USER_SETTINGS_CHANGE>', '', text)
+    return text.strip()
+
+def aggregate_steps_into_turns(steps: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not steps:
+        return []
+
+    turns: List[Dict[str, Any]] = []
+    current_asst: Optional[Dict[str, Any]] = None
+
+    def flush_asst():
+        nonlocal current_asst
+        if current_asst:
+            turns.append(current_asst)
+            current_asst = None
+
+    for idx, s in enumerate(steps):
+        stype = s.get("type", "")
+        source = s.get("source", "")
+        content = s.get("content", "") or ""
+        thinking = s.get("thinking", "") or ""
+        step_index = s.get("step_index", idx)
+        ts = s.get("created_at", "")
+
+        # 1. Checkpoints
+        if stype == "CHECKPOINT":
+            flush_asst()
+            turns.append({
+                "role": "checkpoint",
+                "step_index": step_index,
+                "timestamp": ts,
+                "content": content,
+            })
+            continue
+
+        # 2. User input
+        if source == "USER_EXPLICIT" or stype == "USER_INPUT":
+            flush_asst()
+            turns.append({
+                "role": "user",
+                "step_index": step_index,
+                "timestamp": ts,
+                "content": clean_user_prompt(content) or content,
+            })
+            continue
+
+        # 3. Tool outputs (GENERIC / SYSTEM steps following a tool call)
+        tool_calls = s.get("tool_calls") or []
+        is_tool_output = (
+            stype in ["GENERIC", "SYSTEM", "TOOL_RESULT"]
+            and not tool_calls
+            and not thinking
+        )
+
+        if is_tool_output and current_asst:
+            activities = current_asst.get("tool_activities", [])
+            pending = None
+            for act in reversed(activities):
+                if not act.get("result"):
+                    pending = act
+                    break
+            if pending:
+                pending["result"] = content
+                pending["status"] = "done"
+            else:
+                if content:
+                    existing = current_asst.get("content", "")
+                    current_asst["content"] = f"{existing}\n\n{content}".strip() if existing else content
+            continue
+
+        # 4. Assistant actions
+        mapped_tools = []
+        for tc in tool_calls:
+            mapped_tools.append({
+                "name": tc.get("name", "tool"),
+                "args": tc.get("args", {}),
+                "result": "",
+                "status": "done" if s.get("status") == "DONE" else "running"
+            })
+
+        if current_asst:
+            if thinking:
+                existing_t = current_asst.get("thinking", "")
+                current_asst["thinking"] = f"{existing_t}\n\n{thinking}".strip() if existing_t else thinking
+            if content:
+                existing_c = current_asst.get("content", "")
+                current_asst["content"] = f"{existing_c}\n\n{content}".strip() if existing_c else content
+            if mapped_tools:
+                current_asst["tool_activities"].extend(mapped_tools)
+        else:
+            current_asst = {
+                "role": "assistant",
+                "step_index": step_index,
+                "timestamp": ts,
+                "content": content,
+                "thinking": thinking,
+                "tool_activities": mapped_tools,
+            }
+
+    flush_asst()
+    return turns
+
 def export_conversation_markdown(conversation_id: str) -> str:
     steps = get_conversation_transcript(conversation_id)
     all_convs = [c for c in list_conversations(limit=200) if c["conversation_id"] == conversation_id]
     title = all_convs[0]["title"] if all_convs else "Conversation Antigravity"
+    turns = aggregate_steps_into_turns(steps)
 
     md_lines = [
         f"# {title}",
         f"**ID de Session :** `{conversation_id}`  ",
         f"**Date d'export :** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}  ",
-        f"**Nombre d'étapes :** {len(steps)}  ",
+        f"**Statistiques :** {len(turns)} échanges ({len(steps)} étapes brutes)",
         "---",
         ""
     ]
 
-    for s in steps:
-        role = "User" if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT" else "Antigravity Assistant"
-        content = s.get("content", "").strip()
-        thinking = s.get("thinking", "").strip()
-        tool_calls = s.get("tool_calls", [])
+    for turn in turns:
+        role = turn["role"]
+        idx = turn["step_index"]
 
-        md_lines.append(f"## {role}")
+        if role == "checkpoint":
+            md_lines.append(f"> 📌 **Point de Restauration (Étape #{idx})**")
+            if turn.get("content"):
+                md_lines.append(f"> {turn['content']}")
+            md_lines.append("\n---\n")
+            continue
+
+        if role == "user":
+            md_lines.append(f"## 👤 Utilisateur (Étape #{idx})")
+            md_lines.append("")
+            md_lines.append(turn.get("content", "").strip() or "*(Message vide)*")
+            md_lines.append("")
+            md_lines.append("---")
+            md_lines.append("")
+            continue
+
+        # Assistant turn
+        md_lines.append(f"## ⚡ Assistant Antigravity (Étape #{idx})")
+        md_lines.append("")
+
+        thinking = turn.get("thinking", "").strip()
         if thinking:
             md_lines.append("> [!NOTE] Raisonnement Interne")
             for t_line in thinking.splitlines():
                 md_lines.append(f"> {t_line}")
             md_lines.append("")
 
-        if tool_calls:
-            for tc in tool_calls:
-                tname = tc.get("name", "tool")
-                targs = json.dumps(tc.get("args", {}), indent=2)
-                md_lines.append(f"**Appel d'outil :** `{tname}`")
+        tool_activities = turn.get("tool_activities", [])
+        if tool_activities:
+            md_lines.append(f"<details><summary>⚡ Activité de l'agent ({len(tool_activities)} actions)</summary>\n")
+            for act in tool_activities:
+                tname = act.get("name", "tool")
+                targs = json.dumps(act.get("args", {}), indent=2, ensure_ascii=False)
+                res = act.get("result", "")
+                md_lines.append(f"### Outil : `{tname}`")
                 md_lines.append(f"```json\n{targs}\n```")
+                if res:
+                    md_lines.append("**Résultat :**")
+                    md_lines.append(f"```\n{res[:2000]}{'...' if len(res) > 2000 else ''}\n```")
                 md_lines.append("")
+            md_lines.append("</details>\n")
 
+        content = turn.get("content", "").strip()
         if content:
             md_lines.append(content)
             md_lines.append("")
@@ -565,13 +701,25 @@ def export_conversation_html(conversation_id: str) -> str:
     all_convs = [c for c in list_conversations(limit=200) if c["conversation_id"] == conversation_id]
     title = all_convs[0]["title"] if all_convs else "Conversation Antigravity"
     date_str = datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M:%S UTC')
+    turns = aggregate_steps_into_turns(steps)
 
     messages_html = []
-    for idx, s in enumerate(steps):
-        is_user = s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT"
-        content = s.get("content", "")
-        thinking = s.get("thinking", "")
-        tool_calls = s.get("tool_calls", [])
+    for turn in turns:
+        role = turn["role"]
+        idx = turn.get("step_index", 0)
+
+        if role == "checkpoint":
+            messages_html.append(f"""
+            <div class="checkpoint-divider">
+                <span>📌 Point de restauration — Étape #{idx}</span>
+            </div>
+            """)
+            continue
+
+        is_user = (role == "user")
+        content = turn.get("content", "")
+        thinking = turn.get("thinking", "")
+        tool_activities = turn.get("tool_activities", [])
 
         bubble_class = "user-bubble" if is_user else "assistant-bubble"
         sender_label = "Utilisateur" if is_user else "Antigravity Agent"
@@ -588,18 +736,33 @@ def export_conversation_html(conversation_id: str) -> str:
             """
 
         tools_html = ""
-        if tool_calls:
+        if tool_activities:
             tools_rendered = []
-            for tc in tool_calls:
-                tname = html.escape(tc.get("name", "tool"))
-                targs = html.escape(json.dumps(tc.get("args", {}), indent=2))
+            for act in tool_activities:
+                tname = html.escape(act.get("name", "tool"))
+                targs = html.escape(json.dumps(act.get("args", {}), indent=2, ensure_ascii=False))
+                res = act.get("result", "")
+                res_html = ""
+                if res:
+                    escaped_res = html.escape(res[:2000] + ("..." if len(res) > 2000 else ""))
+                    res_html = f'<div class="tool-result-header">Résultat :</div><pre class="tool-result">{escaped_res}</pre>'
+
                 tools_rendered.append(f"""
                 <div class="tool-card">
                     <div class="tool-header">⚙️ <strong>{tname}</strong></div>
                     <pre class="tool-args">{targs}</pre>
+                    {res_html}
                 </div>
                 """)
-            tools_html = "".join(tools_rendered)
+            tools_content = "".join(tools_rendered)
+            tools_html = f"""
+            <details class="tools-accordion">
+                <summary>⚡ Activité de l'agent ({len(tool_activities)} actions)</summary>
+                <div class="tools-list">
+                    {tools_content}
+                </div>
+            </details>
+            """
 
         escaped_content = html.escape(content).replace("\n", "<br>")
 
@@ -609,7 +772,7 @@ def export_conversation_html(conversation_id: str) -> str:
             <div class="bubble {bubble_class}">
                 <div class="bubble-header">
                     <span class="sender">{sender_label}</span>
-                    <span class="step-badge">Étape #{s.get('step_index', idx)}</span>
+                    <span class="step-badge">Étape #{idx}</span>
                 </div>
                 {thought_html}
                 {tools_html}
@@ -683,6 +846,31 @@ def export_conversation_html(conversation_id: str) -> str:
             font-weight: 600;
         }}
         .print-btn:hover {{ background: #0369a1; }}
+        .checkpoint-divider {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 24px 0;
+            position: relative;
+        }}
+        .checkpoint-divider::before {{
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #1e293b;
+        }}
+        .checkpoint-divider span {{
+            position: relative;
+            background: var(--bg-body);
+            padding: 4px 16px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            border-radius: 9999px;
+            border: 1px solid #1e293b;
+        }}
         .message-row {{
             display: flex;
             gap: 12px;
@@ -727,19 +915,25 @@ def export_conversation_html(conversation_id: str) -> str:
             padding-bottom: 4px;
         }}
         .step-badge {{ font-family: monospace; }}
-        .thought-block {{
+        .thought-block, .tools-accordion {{
             background: #090e1c;
             border: 1px solid #1e1b4b;
             border-radius: 8px;
             margin-bottom: 12px;
             overflow: hidden;
         }}
-        .thought-block summary {{
+        .thought-block summary, .tools-accordion summary {{
             padding: 8px 12px;
             font-size: 11px;
             cursor: pointer;
             color: #a5b4fc;
             font-weight: 600;
+        }}
+        .tools-accordion {{
+            border-color: #1e293b;
+        }}
+        .tools-accordion summary {{
+            color: #38bdf8;
         }}
         .thought-content {{
             padding: 12px;
@@ -752,11 +946,16 @@ def export_conversation_html(conversation_id: str) -> str:
             max-height: 300px;
             overflow-y: auto;
         }}
+        .tools-list {{
+            padding: 12px;
+            background: #060a14;
+            border-top: 1px solid #1e293b;
+        }}
         .tool-card {{
-            background: #090e1c;
+            background: #0d1322;
             border: 1px solid #1e293b;
             border-radius: 8px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             padding: 10px;
             font-size: 11px;
         }}
@@ -768,10 +967,30 @@ def export_conversation_html(conversation_id: str) -> str:
             font-family: monospace;
             overflow-x: auto;
             color: #cbd5e1;
+            max-height: 200px;
+        }}
+        .tool-result-header {{
+            font-size: 10px;
+            color: #94a3b8;
+            margin-top: 8px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }}
+        .tool-result {{
+            background: #02040a;
+            padding: 8px;
+            border-radius: 6px;
+            font-family: monospace;
+            overflow-x: auto;
+            color: #94a3b8;
+            max-height: 200px;
+            white-space: pre-wrap;
         }}
         .content {{
             white-space: pre-wrap;
             word-break: break-word;
+            line-height: 1.7;
         }}
         @media print {{
             body {{ background: white; color: black; }}
@@ -787,7 +1006,7 @@ def export_conversation_html(conversation_id: str) -> str:
         <div class="header">
             <div>
                 <h1>{html.escape(title)}</h1>
-                <div class="meta">Session ID: {conversation_id} • Exporté le {date_str} • {len(steps)} étapes</div>
+                <div class="meta">Session ID: {conversation_id} • Exporté le {date_str} • {len(turns)} échanges ({len(steps)} étapes)</div>
             </div>
             <button class="print-btn" onclick="window.print()">Imprimer / PDF</button>
         </div>
