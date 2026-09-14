@@ -5,7 +5,6 @@ import {
   FolderGit2, 
   Settings as SettingsIcon, 
   FileText, 
-  Sparkles,
   ChevronRight,
   Clock,
   Search,
@@ -16,10 +15,13 @@ import {
   MoreVertical,
   GitBranch,
   X,
-  Palette
+  Palette,
+  HelpCircle
 } from 'lucide-react';
 import type { Conversation } from '../types';
-import { getStoredTheme, applyTheme, type AppTheme } from '../services/theme';
+import { getStoredTheme, applyAppearance, type ThemeMode } from '../services/theme';
+import { AntigravityIcon, AntigravityLogo } from './AntigravityLogo';
+import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 
 interface SidebarProps {
   conversations: Conversation[];
@@ -31,6 +33,8 @@ interface SidebarProps {
   onOpenArtifacts: () => void;
   onOpenFiles?: () => void;
   onOpenTasks?: () => void;
+  onOpenLanguages?: () => void;
+  onOpenHelp?: () => void;
   onLogout?: () => void;
   onTogglePin?: (id: string, currentPin: boolean) => void;
   onEditSessionMeta?: (conv: Conversation) => void;
@@ -50,6 +54,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenArtifacts,
   onOpenFiles,
   onOpenTasks,
+  onOpenLanguages,
+  onOpenHelp,
   onLogout,
   onTogglePin,
   onEditSessionMeta,
@@ -58,6 +64,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeEffort,
   onSearchQuery
 }) => {
+  const { lang, t } = useI18n();
+  const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
@@ -146,21 +154,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className="w-80 h-screen bg-[#070b14] border-r border-slate-800/80 flex flex-col shrink-0 select-none">
       {/* Brand Header */}
       <div className="h-14 px-4 border-b border-slate-800/60 flex items-center justify-between bg-[#0a0f1e]/60">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/20">
-            <Sparkles className="w-4 h-4 text-white" />
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shadow-md p-1 shrink-0">
+            <AntigravityIcon size={24} />
           </div>
-          <div>
-            <h1 className="font-bold text-xs tracking-wide text-white uppercase flex items-center gap-1.5 font-mono">
-              Antigravity <span className="text-[9px] bg-sky-500/20 text-sky-400 px-1.5 py-0.2 rounded font-sans font-semibold">WebUI</span>
-            </h1>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <AntigravityLogo height={18} className="text-white shrink-0" />
+            <span className="text-[9px] bg-sky-500/20 text-sky-400 px-1.5 py-0.2 rounded font-sans font-semibold">WebUI</span>
           </div>
         </div>
 
         <button
           onClick={onNewConversation}
           className="p-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 hover:text-sky-300 transition-colors cursor-pointer"
-          title="Nouvelle session"
+          title={t('new_session', 'Nouvelle session')}
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -417,19 +424,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onOpenSettings}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 transition-colors flex items-center gap-1.5 cursor-pointer"
-            title="Paramètres Antigravity"
+            title={t('settings', 'Paramètres Antigravity')}
           >
             <SettingsIcon className="w-4 h-4" />
-            <span className="text-[11px]">Paramètres</span>
+            <span className="text-[11px]">{t('settings', 'Paramètres')}</span>
           </button>
 
           <div className="flex items-center gap-1">
+            {/* 15-Language Selector Button */}
+            {onOpenLanguages && (
+              <button
+                onClick={onOpenLanguages}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors cursor-pointer flex items-center gap-1"
+                title={`Langue: ${currentLangObj?.label || 'Français'} (15 langues disponibles)`}
+              >
+                <span className="text-xs">{currentLangObj?.flag || '🌐'}</span>
+                <span className="text-[10px] font-mono uppercase">{lang}</span>
+              </button>
+            )}
+
+            {/* Help & Shortcuts Button */}
+            {onOpenHelp && (
+              <button
+                onClick={onOpenHelp}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                title="Aide & Raccourcis (/help)"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </button>
+            )}
+
             <button
               onClick={() => {
-                const themes: AppTheme[] = ['dark', 'oled', 'slate', 'cyberpunk', 'light'];
+                const modes: ThemeMode[] = ['dark', 'light', 'system'];
                 const current = getStoredTheme();
-                const nextIdx = (themes.indexOf(current) + 1) % themes.length;
-                applyTheme(themes[nextIdx]);
+                const nextIdx = (modes.indexOf(current) + 1) % modes.length;
+                applyAppearance(modes[nextIdx], undefined);
               }}
               className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors cursor-pointer"
               title="Changer rapidement de thème visuel"

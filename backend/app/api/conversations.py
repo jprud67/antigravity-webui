@@ -5,6 +5,7 @@ from app.services.storage import (
     list_conversations,
     get_conversation_by_id,
     get_conversation_transcript,
+    calculate_conversation_tokens,
     fork_conversation,
     delete_conversation,
     search_conversations,
@@ -52,10 +53,12 @@ def get_all_metadata():
 def get_conversation(conversation_id: str):
     transcript = get_conversation_transcript(conversation_id)
     meta = get_conversation_by_id(conversation_id) or get_session_meta(conversation_id)
+    usage = calculate_conversation_tokens(transcript)
     return {
         "conversation_id": conversation_id,
         "meta": meta,
-        "steps": transcript
+        "steps": transcript,
+        "usage": usage
     }
 
 @router.post("/{conversation_id}/fork")

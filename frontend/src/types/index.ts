@@ -33,6 +33,7 @@ export interface ChatMessage {
   toolCalls?: ToolCallItem[];
   timestamp?: string;
   stepIndex?: number;
+  isLive?: boolean;
 }
 
 export interface ArtifactItem {

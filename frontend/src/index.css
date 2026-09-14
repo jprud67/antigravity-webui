@@ -1,44 +1,387 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* ==========================================================================
+   Hermes Web UI Theme & Skin System - Replicated for Antigravity WebUI
+   ========================================================================== */
+
+/* ── Light mode (default) — warm gold-tinted palette from Hermes brand ── */
 :root {
+  --bg: #FEFCF7;
+  --sidebar: #FAF7F0;
+  --border: #E0D8C8;
+  --border2: rgba(0, 0, 0, 0.15);
+  --text: #1A1610;
+  --muted: #5C5344;
+  --accent: #B8860B;
+  --blue: #0288A8;
+  --gold: #8B6508;
+  --code-bg: #F5F0E5;
+  --surface: #F3EEE3;
+  --topbar-bg: rgba(250, 247, 240, 0.98);
+  --main-bg: rgba(254, 252, 247, 0.5);
+  --focus-ring: rgba(184, 134, 11, 0.35);
+  --focus-glow: rgba(184, 134, 11, 0.1);
+  --input-bg: rgba(0, 0, 0, 0.03);
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  --strong: #0F0D08;
+  --em: #5C5344;
+  --code-text: #8b4513;
+  --code-inline-bg: rgba(0, 0, 0, 0.06);
+  --pre-text: #1A1610;
+  --accent-hover: #996F08;
+  --accent-bg: rgba(184, 134, 11, 0.08);
+  --accent-bg-strong: rgba(184, 134, 11, 0.15);
+  --accent-text: #8B6508;
+  --error: #C62828;
+  --success: #3D8B40;
+  --warning: #E68A00;
+  --info: #0288A8;
+  --surface-subtle: rgba(0, 0, 0, 0.025);
+  --surface-subtle-hover: rgba(0, 0, 0, 0.045);
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-muted: rgba(0, 0, 0, 0.12);
+  --user-bubble-bg: #EAE3D2;
+  --user-bubble-border: #D8CEB8;
+  --user-bubble-text: #1A1610;
+  --user-selection-bg: rgba(184, 134, 11, 0.2);
+  --user-selection-text: #1A1610;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+  color-scheme: light;
+}
+
+/* ── Dark mode — navy-black + gold accent matching Hermes terminal ── */
+:root.dark {
+  --bg: #0D0D1A;
+  --sidebar: #141425;
+  --border: #2A2A45;
+  --border2: rgba(255, 255, 255, 0.14);
+  --text: #FFF8DC;
+  --muted: #C0C0C0;
+  --accent: #FFD700;
+  --blue: #4DD0E1;
+  --gold: #FFBF00;
+  --code-bg: #1A1A2E;
+  --surface: #1A1A2E;
+  --topbar-bg: rgba(20, 20, 37, 0.98);
+  --main-bg: rgba(13, 13, 26, 0.5);
+  --focus-ring: rgba(255, 215, 0, 0.35);
+  --focus-glow: rgba(255, 215, 0, 0.08);
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --hover-bg: rgba(255, 255, 255, 0.06);
+  --strong: #ffffff;
+  --em: #C0C0C0;
+  --code-text: #f0c27f;
+  --code-inline-bg: rgba(0, 0, 0, 0.35);
+  --pre-text: #e2e8f0;
+  --accent-hover: #FFBF00;
+  --accent-bg: rgba(255, 215, 0, 0.08);
+  --accent-bg-strong: rgba(255, 215, 0, 0.15);
+  --accent-text: #FFD700;
+  --error: #EF5350;
+  --success: #4CAF50;
+  --warning: #FFA726;
+  --info: #4DD0E1;
+  --surface-subtle: rgba(255, 255, 255, 0.025);
+  --surface-subtle-hover: rgba(255, 255, 255, 0.045);
+  --border-subtle: rgba(255, 255, 255, 0.075);
+  --border-muted: rgba(255, 255, 255, 0.12);
+  --user-bubble-bg: #22223b;
+  --user-bubble-border: #38385e;
+  --user-bubble-text: #FFF8DC;
+  --user-selection-bg: rgba(255, 215, 0, 0.2);
+  --user-selection-text: #ffffff;
   color-scheme: dark;
 }
 
+/* ── Skin: Ares (red) ── */
+:root[data-skin="ares"] { --accent: #C0392B; --accent-hover: #A93226; --accent-bg: rgba(192,57,43,0.08); --accent-bg-strong: rgba(192,57,43,0.15); --accent-text: #922B21; }
+:root.dark[data-skin="ares"] { --accent: #FF4444; --accent-hover: #CC3333; --accent-bg: rgba(255,68,68,0.08); --accent-bg-strong: rgba(255,68,68,0.15); --accent-text: #FF4444; }
+
+/* ── Skin: Mono (gray) ── */
+:root[data-skin="mono"] { --accent: #666666; --accent-hover: #555555; --accent-bg: rgba(102,102,102,0.08); --accent-bg-strong: rgba(102,102,102,0.15); --accent-text: #555555; }
+:root.dark[data-skin="mono"] { --accent: #CCCCCC; --accent-hover: #999999; --accent-bg: rgba(204,204,204,0.08); --accent-bg-strong: rgba(204,204,204,0.15); --accent-text: #CCCCCC; }
+
+/* ── Skin: Graphite ── */
+:root[data-skin="graphite"] {
+  --bg: #FFFFFF; --sidebar: #F3F3F3; --surface: #FFFFFF; --surface-subtle: #F7F7F7; --surface-subtle-hover: #EFEFEF;
+  --border: #E2E2E2; --border2: #CFCFCF; --border-subtle: #E8E8E8; --border-muted: #D6D6D6;
+  --text: #242424; --strong: #111111; --muted: #707070; --em: #4F4F4F;
+  --accent: #303030; --accent-hover: #171717; --accent-bg: rgba(0,0,0,0.07); --accent-bg-strong: rgba(0,0,0,0.13); --accent-text: #303030;
+  --user-bubble-bg: #EAEAEA; --user-bubble-border: #D8D8D8; --user-bubble-text: #242424;
+}
+:root.dark[data-skin="graphite"] {
+  --bg: #151614; --sidebar: #242624; --surface: #1B1C1A; --surface-subtle: #20211F; --surface-subtle-hover: #292B28;
+  --border: #343631; --border2: #4B4D47; --border-subtle: #2A2C28; --border-muted: #3D3F3A;
+  --text: #ECEBE4; --strong: #FAF9F3; --muted: #A7A79D; --em: #D7D6CE;
+  --accent: #A0A0A0; --accent-hover: #B8B8B8; --accent-bg: rgba(255,255,255,0.08); --accent-bg-strong: rgba(255,255,255,0.15); --accent-text: #ECEBE4;
+  --user-bubble-bg: #272826; --user-bubble-border: #3E403C; --user-bubble-text: #FAF9F3;
+}
+
+/* ── Skin: GitHub ── */
+:root[data-skin="github"] {
+  --bg: #FFFFFF; --sidebar: #F6F8FA; --surface: #FFFFFF; --surface-subtle: #F6F8FA;
+  --border: #D0D7DE; --border2: #AFB8C1; --text: #1F2328; --muted: #656D76;
+  --accent: #0969DA; --accent-hover: #0860CA; --accent-bg: rgba(9,105,218,0.08); --accent-bg-strong: rgba(9,105,218,0.15); --accent-text: #0969DA;
+  --user-bubble-bg: #F3F4F6; --user-bubble-border: #D0D7DE; --user-bubble-text: #1F2328;
+}
+:root.dark[data-skin="github"] {
+  --bg: #0D1117; --sidebar: #161B22; --surface: #161B22; --surface-subtle: #21262D;
+  --border: #30363D; --border2: #484F58; --text: #E6EDF3; --muted: #848D97;
+  --accent: #2F81F7; --accent-hover: #58A6FF; --accent-bg: rgba(56,139,253,0.1); --accent-bg-strong: rgba(56,139,253,0.2); --accent-text: #58A6FF;
+  --user-bubble-bg: #1F242C; --user-bubble-border: #30363D; --user-bubble-text: #E6EDF3;
+}
+
+/* ── Skin: Codex (OpenAI) ── */
+:root[data-skin="codex"] {
+  --bg: #FFFFFF; --sidebar: #F3F3F3; --surface: #FFFFFF; --surface-subtle: #F1F1F1;
+  --border: #E0E0E0; --border2: #C8C8C8; --text: #252523; --muted: #6A6A68;
+  --accent: #2E7A60; --accent-hover: #1D6850; --accent-bg: rgba(46,122,96,0.08); --accent-bg-strong: rgba(46,122,96,0.16); --accent-text: #1D6850;
+  --user-bubble-bg: #EBEBEB; --user-bubble-border: #D9D9D9; --user-bubble-text: #252523;
+}
+:root.dark[data-skin="codex"] {
+  --bg: #151614; --sidebar: #242624; --surface: #1B1C1A; --surface-subtle: #20211F;
+  --border: #343631; --border2: #4B4D47; --text: #ECEBE4; --muted: #A7A79D;
+  --accent: #72B39A; --accent-hover: #84BEA8; --accent-bg: rgba(114,179,154,0.10); --accent-bg-strong: rgba(114,179,154,0.18); --accent-text: #84BEA8;
+  --user-bubble-bg: #2E302D; --user-bubble-border: #454741; --user-bubble-text: #F4F3EC;
+}
+
+/* ── Skin: Terracotta (Claude) ── */
+:root[data-skin="terracotta"] {
+  --bg: #FAF9F5; --sidebar: #F0EEE6; --surface: #FFFEFA; --surface-subtle: #F7F4EC;
+  --border: #E8E6DC; --border2: #D7D2C4; --text: #30302E; --muted: #87867F;
+  --accent: #D97757; --accent-hover: #C76345; --accent-bg: rgba(217,119,87,0.10); --accent-bg-strong: rgba(217,119,87,0.18); --accent-text: #A94F35;
+  --user-bubble-bg: #F0EEE6; --user-bubble-border: #E2DED2; --user-bubble-text: #30302E;
+}
+:root.dark[data-skin="terracotta"] {
+  --bg: #141413; --sidebar: #1E1D1A; --surface: #191917; --surface-subtle: #20201D;
+  --border: #34332E; --border2: #4A473F; --text: #EDEAE0; --muted: #B0AEA5;
+  --accent: #D97757; --accent-hover: #E69072; --accent-bg: rgba(217,119,87,0.11); --accent-bg-strong: rgba(217,119,87,0.20); --accent-text: #E69072;
+  --user-bubble-bg: #282620; --user-bubble-border: #464238; --user-bubble-text: #FAF9F5;
+}
+
+/* ── Skin: Slate ── */
+:root[data-skin="slate"] { --accent: #475569; --accent-hover: #334155; --accent-bg: rgba(71,85,105,0.08); --accent-bg-strong: rgba(71,85,105,0.15); --accent-text: #334155; }
+:root.dark[data-skin="slate"] { --accent: #94A3B8; --accent-hover: #64748B; --accent-bg: rgba(148,163,184,0.08); --accent-bg-strong: rgba(148,163,184,0.15); --accent-text: #94A3B8; }
+
+/* ── Skin: Poseidon (ocean blue) ── */
+:root[data-skin="poseidon"] { --accent: #0369A1; --accent-hover: #025080; --accent-bg: rgba(3,105,161,0.08); --accent-bg-strong: rgba(3,105,161,0.15); --accent-text: #025080; }
+:root.dark[data-skin="poseidon"] { --accent: #0EA5E9; --accent-hover: #0284C7; --accent-bg: rgba(14,165,233,0.08); --accent-bg-strong: rgba(14,165,233,0.15); --accent-text: #0EA5E9; }
+
+/* ── Skin: Sisyphus (purple) ── */
+:root[data-skin="sisyphus"] { --accent: #7C3AED; --accent-hover: #6D28D9; --accent-bg: rgba(124,58,237,0.08); --accent-bg-strong: rgba(124,58,237,0.15); --accent-text: #6D28D9; }
+:root.dark[data-skin="sisyphus"] { --accent: #A78BFA; --accent-hover: #8B5CF6; --accent-bg: rgba(167,139,250,0.08); --accent-bg-strong: rgba(167,139,250,0.15); --accent-text: #A78BFA; }
+
+/* ── Skin: Charizard (orange) ── */
+:root[data-skin="charizard"] { --accent: #EA580C; --accent-hover: #C2410C; --accent-bg: rgba(234,88,12,0.08); --accent-bg-strong: rgba(234,88,12,0.15); --accent-text: #C2410C; }
+:root.dark[data-skin="charizard"] { --accent: #FB923C; --accent-hover: #F97316; --accent-bg: rgba(251,146,60,0.08); --accent-bg-strong: rgba(251,146,60,0.15); --accent-text: #FB923C; }
+
+/* ── Skin: Sienna (clay & sand) ── */
+:root[data-skin="sienna"] {
+  --bg: #FAF9F5; --sidebar: #F0EEE6; --surface: #FFFFFF; --border: #E7E4DB; --border2: #D7D3C7;
+  --text: #1F1E1C; --muted: #6B6A63; --strong: #141311; --em: #3E3D39;
+  --accent: #D97757; --accent-hover: #BF6545; --accent-text: #A55237;
+  --accent-bg: rgba(217,119,87,0.09); --accent-bg-strong: rgba(217,119,87,0.18);
+  --code-bg: #F5F3EC; --topbar-bg: rgba(250,249,245,0.96);
+  --user-bubble-bg: #ECE9DF; --user-bubble-border: #DED9CC; --user-bubble-text: #1F1E1C;
+}
+:root.dark[data-skin="sienna"] {
+  --bg: #1F1E1C; --sidebar: #262522; --surface: #2C2B28; --border: #3A3935; --border2: #4A4843;
+  --text: #EDEBE3; --muted: #A3A197; --strong: #F7F5ED; --em: #C9C6BC;
+  --accent: #E0896D; --accent-hover: #D97757; --accent-text: #E6A88A;
+  --accent-bg: rgba(224,137,109,0.12); --accent-bg-strong: rgba(224,137,109,0.22);
+  --code-bg: #2A2926; --topbar-bg: rgba(38,37,34,0.96);
+  --user-bubble-bg: #34322E; --user-bubble-border: #42403B; --user-bubble-text: #EDEBE3;
+}
+
+/* ── Skin: Catppuccin (Latte light / Mocha dark) ── */
+:root[data-skin="catppuccin"] {
+  --bg: #EFF1F5; --sidebar: #E6E9EF; --surface: #FFFFFF; --border: #CCD0DA; --border2: #BCC0CC;
+  --text: #4C4F69; --muted: #7C7F93; --strong: #1E1E2E; --em: #5C5F77;
+  --accent: #8839EF; --accent-hover: #6C26D6; --accent-text: #8839EF;
+  --accent-bg: rgba(136,57,239,0.09); --accent-bg-strong: rgba(136,57,239,0.18);
+  --code-bg: #E6E9EF; --topbar-bg: rgba(239,241,245,0.96);
+  --user-bubble-bg: #E6E9EF; --user-bubble-border: #CCD0DA; --user-bubble-text: #4C4F69;
+}
+:root.dark[data-skin="catppuccin"] {
+  --bg: #1E1E2E; --sidebar: #181825; --surface: #313244; --border: #45475A; --border2: #585B70;
+  --text: #CDD6F4; --muted: #A6ADC8; --strong: #F5F5F5; --em: #BAC2DE;
+  --accent: #CBA6F7; --accent-hover: #B4BEFE; --accent-text: #CBA6F7;
+  --accent-bg: rgba(203,166,247,0.12); --accent-bg-strong: rgba(203,166,247,0.22);
+  --code-bg: #181825; --topbar-bg: rgba(30,30,46,0.96);
+  --user-bubble-bg: #313244; --user-bubble-border: #45475A; --user-bubble-text: #CDD6F4;
+}
+
+/* ── Skin: Nous ── */
+:root[data-skin="nous"] {
+  --accent: #4682B4; --accent-hover: #3A6E9A; --accent-bg: rgba(70,130,180,0.08); --accent-bg-strong: rgba(70,130,180,0.15); --accent-text: #3A6E9A;
+}
+:root.dark[data-skin="nous"] {
+  --accent: #7EB6E0; --accent-hover: #4682B4; --accent-bg: rgba(126,182,224,0.08); --accent-bg-strong: rgba(126,182,224,0.15); --accent-text: #7EB6E0;
+}
+
+/* ── Skin: Geist Contrast ── */
+:root[data-skin="geist-contrast"] {
+  --bg: #FFFFFF; --sidebar: #FAFAFA; --surface: #FFFFFF; --border: #EAEAEA; --border2: #D4D4D4;
+  --text: #111111; --strong: #000000; --muted: #666666;
+  --accent: #0070F3; --accent-hover: #005BD1; --accent-bg: rgba(0,112,243,0.08); --accent-bg-strong: rgba(0,112,243,0.16); --accent-text: #005BD1;
+  --user-bubble-bg: #EAEAEA; --user-bubble-border: #D4D4D4; --user-bubble-text: #111111;
+}
+:root.dark[data-skin="geist-contrast"] {
+  --bg: #000000; --sidebar: #050505; --surface: #0A0A0A; --border: #262626; --border2: #3F3F3F;
+  --text: #EDEDED; --strong: #FFFFFF; --muted: #A1A1A1;
+  --accent: #FFF175; --accent-hover: #FFF7A8; --accent-bg: rgba(255,241,117,0.08); --accent-bg-strong: rgba(255,241,117,0.15); --accent-text: #F5E65F;
+  --user-bubble-bg: #171717; --user-bubble-border: #2A2A2A; --user-bubble-text: #EDEDED;
+}
+
+/* ── Skin: Zeus (OLED pitch black + gold) ── */
+:root.dark[data-skin="zeus"] {
+  --bg: #000000; --sidebar: #080808; --surface: #101010; --code-bg: #101010;
+  --topbar-bg: rgba(8, 8, 8, 0.98); --border: #262618; --border2: rgba(255,215,0,0.2);
+  --accent: #FFD700; --accent-hover: #FFBF00; --accent-text: #FFD700;
+  --user-bubble-bg: #141300; --user-bubble-border: rgba(255,215,0,0.25); --user-bubble-text: #FFF8DC;
+}
+
+/* ── Skin: Neon ── */
+:root[data-skin="neon"] {
+  --bg: #F8F7FC; --sidebar: #F0EEF8; --border: #D8D4EC; --border2: rgba(0,0,0,0.12);
+  --text: #1E1B2E; --muted: #6E6888; --accent: #9333EA;
+  --user-bubble-bg: #EAE6F8; --user-bubble-border: #D8D4EC; --user-bubble-text: #1E1B2E;
+}
+:root.dark[data-skin="neon"] {
+  --bg: #090614; --sidebar: #100B22; --surface: #160F30; --border: #2E1F5C; --border2: rgba(179,71,255,0.25);
+  --text: #F3E8FF; --muted: #B3A4D6; --accent: #00DDFF; --accent-hover: #38E5FF; --accent-text: #00DDFF;
+  --user-bubble-bg: #221544; --user-bubble-border: #432A78; --user-bubble-text: #F3E8FF;
+}
+
+/* ==========================================================================
+   Base App Typography & Layout Defaults
+   ========================================================================== */
 body {
   margin: 0;
-  background-color: #080c14;
-  color: #f1f5f9;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", Helvetica, Arial, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom scrollbars */
+/* Scrollbars adapting to active theme */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: var(--border2);
   border-radius: 9999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: var(--accent);
 }
 
-/* Markdown Enhancements */
+/* App Surfaces & Semantic Containers */
+.app-bg-main {
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+.app-bg-sidebar {
+  background-color: var(--sidebar) !important;
+  border-color: var(--border) !important;
+}
+
+.app-bg-topbar {
+  background-color: var(--topbar-bg) !important;
+  border-color: var(--border) !important;
+  backdrop-filter: blur(12px);
+}
+
+.app-bg-surface {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+/* User Bubble in Chat Canvas - Pure Hermes Style */
+.hermes-user-bubble {
+  background-color: var(--user-bubble-bg) !important;
+  border: 1px solid var(--user-bubble-border) !important;
+  color: var(--user-bubble-text) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.hermes-user-bubble code {
+  background-color: var(--code-inline-bg) !important;
+  color: var(--user-bubble-text) !important;
+}
+
+/* Assistant Message Body in Chat Canvas */
+.hermes-assistant-body {
+  color: var(--text) !important;
+}
+
+/* Hermes Tool Card */
+.hermes-tool-card {
+  background-color: var(--surface-subtle) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-left: 3px solid var(--accent) !important;
+  border-radius: 10px !important;
+}
+
+.hermes-tool-card:hover {
+  background-color: var(--surface-subtle-hover) !important;
+  border-color: var(--border2) !important;
+  border-left-color: var(--accent) !important;
+}
+
+/* Hermes Thinking Card */
+.hermes-thinking-card {
+  background-color: var(--surface-subtle) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: 12px !important;
+}
+
+/* Hermes Streaming Blinking Cursor */
+@keyframes hermes-cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.hermes-streaming-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 1.15em;
+  background-color: var(--accent, #FFD700);
+  border-radius: 1.5px;
+  margin-left: 4px;
+  vertical-align: -0.16em;
+  animation: hermes-cursor-blink 0.95s steps(2, start) infinite;
+}
+
+/* Hermes Composer Dock */
+.hermes-composer-dock {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border2) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  border-radius: 16px !important;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.hermes-composer-dock:focus-within {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--focus-ring), 0 8px 30px rgba(0, 0, 0, 0.16) !important;
+}
+
+/* Markdown Content Styling */
 .markdown-content h1,
 .markdown-content h2,
 .markdown-content h3 {
-  color: #f8fafc;
-  font-weight: 600;
+  color: var(--strong);
+  font-weight: 650;
   letter-spacing: -0.015em;
   margin-top: 1.25rem;
   margin-bottom: 0.5rem;
@@ -49,16 +392,16 @@ body {
 .markdown-content h3 { font-size: 0.95rem; }
 
 .markdown-content p {
-  line-height: 1.65;
+  line-height: 1.68;
   margin-bottom: 0.75rem;
-  color: #cbd5e1;
+  color: var(--text);
 }
 
 .markdown-content ul,
 .markdown-content ol {
   margin-left: 1.25rem;
   margin-bottom: 0.75rem;
-  color: #cbd5e1;
+  color: var(--text);
 }
 
 .markdown-content li {
@@ -66,142 +409,41 @@ body {
 }
 
 .markdown-content a {
-  color: #38bdf8;
+  color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .markdown-content blockquote {
-  border-left: 3px solid #38bdf8;
+  border-left: 3px solid var(--accent);
   padding-left: 0.75rem;
   margin: 0.75rem 0;
-  color: #94a3b8;
+  color: var(--muted);
   font-style: italic;
-  background: rgba(56, 189, 248, 0.05);
-  border-radius: 0 4px 4px 0;
+  background: var(--accent-bg);
+  border-radius: 0 6px 6px 0;
 }
 
 .markdown-content table {
   width: 100%;
   border-collapse: collapse;
   margin: 1rem 0;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
 }
 
 .markdown-content th,
 .markdown-content td {
-  border: 1px solid #1e293b;
+  border: 1px solid var(--border);
   padding: 0.5rem 0.75rem;
   text-align: left;
 }
 
 .markdown-content th {
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--surface-subtle);
+  color: var(--strong);
   font-weight: 600;
 }
 
 .markdown-content tr:nth-child(even) {
-  background: rgba(15, 23, 42, 0.4);
+  background: var(--surface-subtle);
 }
-
-/* ==========================================================================
-   Multi-Theme Overrides
-   ========================================================================== */
-
-/* 1. OLED Pitch Black (#000000) */
-[data-theme="oled"] body {
-  background-color: #000000 !important;
-}
-[data-theme="oled"] .bg-\[\#080c14\],
-[data-theme="oled"] .bg-\[\#080c16\],
-[data-theme="oled"] .bg-\[\#070b14\],
-[data-theme="oled"] .bg-\[\#060a14\] {
-  background-color: #000000 !important;
-}
-[data-theme="oled"] .bg-\[\#0b101f\],
-[data-theme="oled"] .bg-\[\#0a101f\],
-[data-theme="oled"] .bg-\[\#0c1222\],
-[data-theme="oled"] .bg-\[\#0f172a\],
-[data-theme="oled"] .bg-\[\#0e1424\] {
-  background-color: #050505 !important;
-}
-[data-theme="oled"] .border-slate-800,
-[data-theme="oled"] .border-slate-700\/80 {
-  border-color: #1a1a1a !important;
-}
-
-/* 2. Minimalist Slate */
-[data-theme="slate"] body {
-  background-color: #0b0f19 !important;
-}
-[data-theme="slate"] .bg-\[\#080c14\],
-[data-theme="slate"] .bg-\[\#080c16\],
-[data-theme="slate"] .bg-\[\#070b14\] {
-  background-color: #0b0f19 !important;
-}
-[data-theme="slate"] .bg-\[\#0b101f\],
-[data-theme="slate"] .bg-\[\#0c1222\],
-[data-theme="slate"] .bg-\[\#0f172a\] {
-  background-color: #111726 !important;
-}
-
-/* 3. Cyberpunk Neon */
-[data-theme="cyberpunk"] body {
-  background-color: #030511 !important;
-}
-[data-theme="cyberpunk"] .bg-\[\#080c14\],
-[data-theme="cyberpunk"] .bg-\[\#080c16\] {
-  background-color: #030511 !important;
-}
-[data-theme="cyberpunk"] .text-sky-400 {
-  color: #00f0ff !important;
-}
-[data-theme="cyberpunk"] .border-sky-500\/30,
-[data-theme="cyberpunk"] .border-sky-500\/40 {
-  border-color: rgba(0, 240, 255, 0.4) !important;
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.15);
-}
-
-/* 4. Studio Light */
-[data-theme="light"] {
-  color-scheme: light;
-}
-[data-theme="light"] body {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
-}
-[data-theme="light"] .bg-\[\#080c14\],
-[data-theme="light"] .bg-\[\#080c16\],
-[data-theme="light"] .bg-\[\#070b14\],
-[data-theme="light"] .bg-\[\#060a14\],
-[data-theme="light"] .bg-\[\#050810\] {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
-}
-[data-theme="light"] .bg-\[\#0b101f\],
-[data-theme="light"] .bg-\[\#0a101f\],
-[data-theme="light"] .bg-\[\#0c1222\],
-[data-theme="light"] .bg-\[\#0f172a\],
-[data-theme="light"] .bg-\[\#0e1424\],
-[data-theme="light"] .bg-\[\#0d1424\],
-[data-theme="light"] .bg-\[\#0e1529\]\/80 {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-}
-[data-theme="light"] .text-white,
-[data-theme="light"] .text-slate-100,
-[data-theme="light"] .text-slate-200 {
-  color: #0f172a !important;
-}
-[data-theme="light"] .text-slate-300,
-[data-theme="light"] .text-slate-400 {
-  color: #475569 !important;
-}
-[data-theme="light"] .border-slate-800,
-[data-theme="light"] .border-slate-800\/80,
-[data-theme="light"] .border-slate-700\/80,
-[data-theme="light"] .border-slate-700\/60 {
-  border-color: #e2e8f0 !important;
-}
-

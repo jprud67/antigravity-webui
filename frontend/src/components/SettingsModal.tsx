@@ -15,11 +15,13 @@ import {
   ShieldCheck, 
   ChevronRight, 
   BookOpen,
-  Palette
+  Palette,
+  Globe
 } from 'lucide-react';
 import type { AppSettings, ModelOption } from '../types';
 import { fetchSettings, saveSettings, fetchSkills, fetchSkillDetail, updatePassword } from '../services/api';
-import { AVAILABLE_THEMES, getStoredTheme, applyTheme, type AppTheme } from '../services/theme';
+import { AVAILABLE_THEMES, AVAILABLE_SKINS, getStoredTheme, getStoredSkin, applyAppearance, type ThemeMode } from '../services/theme';
+import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -27,6 +29,7 @@ interface SettingsModalProps {
   models: ModelOption[];
   currentModel: string;
   onModelSaved: (modelId: string) => void;
+  initialTab?: 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages';
 }
 
 const MODEL_DESCRIPTIONS: Record<string, { desc: string; badge: string; iconColor: string }> = {
@@ -45,12 +48,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   models,
   currentModel,
   onModelSaved,
+  initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance'>('models');
+  const { lang, setLanguage } = useI18n();
+  const [activeTab, setActiveTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages'>(initialTab || 'models');
   const [settings, setSettings] = useState<AppSettings>({});
   const [selectedModelId, setSelectedModelId] = useState(currentModel);
   const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
-  const [currentTheme, setCurrentTheme] = useState<AppTheme>(getStoredTheme());
+  const [currentTheme, setCurrentTheme] = useState<ThemeMode>(getStoredTheme());
+  const [currentSkin, setCurrentSkin] = useState<string>(getStoredSkin());
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -74,6 +80,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
       setSelectedModelId(currentModel);
       fetchSettings().then((s) => {
         setSettings(s);
@@ -296,6 +305,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <Palette className="w-4 h-4" />
             <span>Apparence & Thèmes</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('languages')}
+            className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'languages'
+                ? 'border-cyan-500 text-cyan-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Globe className="w-4 h-4" />
+            <span>Langues ({SUPPORTED_LANGUAGES.find(l => l.code === lang)?.flag || '🌐'})</span>
           </button>
         </div>
 
@@ -705,70 +726,141 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 5: APPEARANCE & THEMES */}
+          {/* TAB 5: APPEARANCE & THEMES (HERMES SYSTEM) */}
           {activeTab === 'appearance' && (
             <div className="p-6 space-y-6">
+              {/* Section 1: Mode Thème */}
               <div>
                 <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-indigo-400" />
-                  <span>Thèmes d'interface personnalisés</span>
+                  <Palette className="w-4 h-4 text-amber-400" />
+                  <span>Mode d'Affichage (Thème)</span>
                 </h3>
-                <p className="text-[11px] text-slate-400">
-                  Personnalisez l'ambiance visuelle du cockpit Antigravity. Le thème choisi est appliqué immédiatement et mémorisé dans votre navigateur.
+                <p className="text-[11px] text-slate-400 mb-3">
+                  Détermine le fond, les surfaces et le contraste général. Le mode Système s'adapte en temps réel aux réglages de votre OS.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {AVAILABLE_THEMES.map((th) => {
+                    const isSelected = currentTheme === th.id;
+                    return (
+                      <button
+                        key={th.id}
+                        type="button"
+                        onClick={() => {
+                          setCurrentTheme(th.id);
+                          applyAppearance(th.id, currentSkin);
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-amber-400 bg-amber-500/10 shadow-md shadow-amber-500/10'
+                            : 'border-slate-800 bg-[#0c1222] hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-xs text-white">{th.name}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                        </div>
+                        <p className="text-[10px] text-slate-400 leading-snug">{th.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Section 2: Nuances & Accents (Skins Hermes) */}
+              <div>
+                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-2">
+                  <Boxes className="w-4 h-4 text-sky-400" />
+                  <span>Nuances & Accents Visuels (Skins Hermes)</span>
+                </h3>
+                <p className="text-[11px] text-slate-400 mb-3">
+                  Sélectionnez la palette d'accent et les surfaces spécifiques. Se combine avec le mode clair ou sombre sélectionné ci-dessus.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-96 overflow-y-auto pr-1">
+                  {AVAILABLE_SKINS.map((sk) => {
+                    const isSelected = currentSkin === sk.id;
+                    return (
+                      <button
+                        key={sk.id}
+                        type="button"
+                        onClick={() => {
+                          setCurrentSkin(sk.id);
+                          applyAppearance(currentTheme, sk.id);
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-amber-400 bg-amber-500/10 shadow-sm'
+                            : 'border-slate-800 bg-[#0b101f] hover:border-slate-700'
+                        }`}
+                      >
+                        <div>
+                          {/* Color dots preview */}
+                          <div className="flex items-center gap-1.5 mb-2">
+                            {sk.colors.map((c, i) => (
+                              <span
+                                key={i}
+                                className="w-2.5 h-2.5 rounded-full shadow-sm border border-black/20"
+                                style={{ backgroundColor: c }}
+                              />
+                            ))}
+                          </div>
+                          <span className="font-bold text-[11px] text-slate-200 block truncate">
+                            {sk.name}
+                          </span>
+                        </div>
+                        <p className="text-[9px] text-slate-500 leading-tight mt-1 line-clamp-2">
+                          {sk.desc}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'languages' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-cyan-400" />
+                  <span>Langues de l'interface (15 langues Hermes WebUI)</span>
+                </h3>
+                <p className="text-[11px] text-slate-400 mb-3">
+                  Sélectionnez la langue d'affichage et de synthèse vocale. L'ensemble de la console et des messages est mis à jour instantanément.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {AVAILABLE_THEMES.map((th) => {
-                  const isSelected = currentTheme === th.id;
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[420px] overflow-y-auto pr-1">
+                {SUPPORTED_LANGUAGES.map((item) => {
+                  const isSelected = lang === item.code;
                   return (
                     <button
-                      key={th.id}
+                      key={item.code}
                       type="button"
-                      onClick={() => {
-                        setCurrentTheme(th.id);
-                        applyTheme(th.id);
-                      }}
-                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                      onClick={() => setLanguage(item.code)}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
                         isSelected
-                          ? 'border-sky-500 bg-sky-500/10 shadow-lg shadow-sky-500/10'
-                          : 'border-slate-800 bg-[#080d1a] hover:border-slate-700 hover:bg-[#0c1326]'
+                          ? 'border-cyan-500 bg-cyan-500/10 shadow-md shadow-cyan-500/10'
+                          : 'border-slate-800 bg-[#0c1222] hover:border-slate-700 hover:bg-[#111a33]'
                       }`}
                     >
-                      <div>
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-5 h-5 rounded-lg border shadow-sm flex items-center justify-center"
-                              style={{ backgroundColor: th.previewBg, borderColor: th.previewBorder }}
-                            >
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: th.previewAccent }} />
-                            </div>
-                            <span className="font-bold text-xs text-white">{th.name}</span>
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl leading-none">{item.flag || '🌐'}</span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs text-white">{item.label}</span>
+                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                              {item.code}
+                            </span>
                           </div>
-                          <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/60">
-                            {th.badge}
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {item.speech}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-                          {th.desc}
-                        </p>
                       </div>
-
-                      <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/60 text-[10px]">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-3 h-3 rounded-full border border-slate-700" style={{ backgroundColor: th.previewBg }} />
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: th.previewAccent }} />
-                        </div>
-                        {isSelected ? (
-                          <span className="text-sky-400 font-semibold flex items-center gap-1">
-                            <Check className="w-3.5 h-3.5" />
-                            Actif
-                          </span>
-                        ) : (
-                          <span className="text-slate-500 hover:text-slate-300">Sélectionner</span>
-                        )}
-                      </div>
+                      {isSelected && <Check className="w-4 h-4 text-cyan-400 shrink-0" />}
                     </button>
                   );
                 })}

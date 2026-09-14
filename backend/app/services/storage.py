@@ -162,6 +162,65 @@ def get_conversation_transcript(conversation_id: str) -> List[Dict[str, Any]]:
         pass
     return steps
 
+def calculate_conversation_tokens(steps: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if not steps:
+        return {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "thinking_tokens": 0,
+            "total_tokens": 0,
+            "is_estimated": True
+        }
+
+    # Check if any recent step has exact usage metadata from agy
+    for s in reversed(steps):
+        if "usage" in s and isinstance(s["usage"], dict) and s["usage"].get("total_tokens", 0) > 0:
+            u = s["usage"]
+            return {
+                "input_tokens": u.get("input_tokens", 0),
+                "output_tokens": u.get("output_tokens", 0),
+                "thinking_tokens": u.get("thinking_tokens", 0),
+                "total_tokens": u.get("total_tokens", 0),
+                "is_estimated": False
+            }
+
+    # Antigravity base system context (system prompt + 30+ tool definitions + schemas)
+    base_sys_tokens = 13370
+    
+    prompt_chars = 0
+    response_chars = 0
+    thinking_chars = 0
+    
+    for s in steps:
+        content = s.get("content") or ""
+        thinking = s.get("thinking") or ""
+        tool_calls = json.dumps(s.get("tool_calls") or []) if s.get("tool_calls") else ""
+        
+        src = s.get("source") or ""
+        stype = s.get("type") or ""
+        
+        if src == "USER_EXPLICIT" or stype == "USER_INPUT":
+            prompt_chars += len(content)
+        else:
+            response_chars += len(content) + len(tool_calls)
+            thinking_chars += len(thinking)
+
+    p_tokens = max(1, int(prompt_chars / 3.8)) if prompt_chars > 0 else 0
+    r_tokens = max(1, int(response_chars / 3.8)) if response_chars > 0 else 0
+    t_tokens = max(0, int(thinking_chars / 3.8)) if thinking_chars > 0 else 0
+    
+    input_tokens = base_sys_tokens + p_tokens + r_tokens + t_tokens
+    output_tokens = max(0, r_tokens + t_tokens)
+    total_tokens = input_tokens
+
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "thinking_tokens": t_tokens,
+        "total_tokens": total_tokens,
+        "is_estimated": True
+    }
+
 def fork_conversation(
     source_conversation_id: str,
     up_to_step_index: int,

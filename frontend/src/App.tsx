@@ -12,6 +12,7 @@ import { WorkspacePanel, type RightPanelTab } from './components/WorkspacePanel'
 import { SessionMetaModal } from './components/SessionMetaModal';
 import { CronSchedulerModal } from './components/CronSchedulerModal';
 import { RulesEditorModal } from './components/RulesEditorModal';
+import { HelpModal } from './components/HelpModal';
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption } from './types';
 import { 
@@ -25,7 +26,7 @@ import {
   updateConversationMetadata
 } from './services/api';
 import { chatSocket } from './services/ws';
-import { getStoredTheme, applyTheme } from './services/theme';
+import { getStoredTheme, getStoredSkin, applyAppearance } from './services/theme';
 
 export function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -67,10 +68,22 @@ export function App() {
   const [isTaskDashboardOpen, setIsTaskDashboardOpen] = useState(false);
   const [isCronModalOpen, setIsCronModalOpen] = useState(false);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages'>('models');
+
+  const handleOpenSkills = () => {
+    setSettingsTab('skills');
+    setIsSettingsOpen(true);
+  };
+
+  const handleOpenLanguages = () => {
+    setSettingsTab('languages');
+    setIsSettingsOpen(true);
+  };
 
   // Initialize
   useEffect(() => {
-    applyTheme(getStoredTheme());
+    applyAppearance(getStoredTheme(), getStoredSkin());
     loadInitialData();
   }, []);
 
@@ -140,6 +153,52 @@ export function App() {
     setIsAuthModalOpen(true);
   };
 
+const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
+  if (!msgs || msgs.length === 0) {
+    return {
+      inputTokens: 0,
+      outputTokens: 0,
+      thinkingTokens: 0,
+      totalTokens: 0,
+      isEstimated: true
+    };
+  }
+
+  // Antigravity base system context (system prompt, tools schemas, skills)
+  const BASE_SYSTEM_TOKENS = 13370;
+  let promptChars = 0;
+  let responseChars = 0;
+  let thinkingChars = 0;
+
+  for (const m of msgs) {
+    if (m.role === 'user') {
+      promptChars += (m.content || '').length;
+    } else {
+      responseChars += (m.content || '').length;
+      if (m.thought) thinkingChars += m.thought.length;
+      if (m.toolCalls && m.toolCalls.length > 0) {
+        responseChars += JSON.stringify(m.toolCalls).length;
+      }
+    }
+  }
+
+  const pTokens = Math.max(1, Math.ceil(promptChars / 3.8));
+  const rTokens = Math.max(0, Math.ceil(responseChars / 3.8));
+  const tTokens = Math.max(0, Math.ceil(thinkingChars / 3.8));
+
+  const inputTokens = BASE_SYSTEM_TOKENS + pTokens + rTokens;
+  const outputTokens = rTokens + tTokens;
+  const totalTokens = inputTokens;
+
+  return {
+    inputTokens,
+    outputTokens,
+    thinkingTokens: tTokens,
+    totalTokens,
+    isEstimated: true
+  };
+};
+
   // Switch Conversation
   const handleSelectConversation = async (convId: string) => {
     setActiveConversationId(convId);
@@ -171,6 +230,19 @@ export function App() {
       });
 
       setMessages(chatMsgs);
+
+      // Instantly set accurate token usage for selected conversation
+      if (data.usage && data.usage.total_tokens > 0) {
+        setTokenUsage({
+          inputTokens: data.usage.input_tokens || 0,
+          outputTokens: data.usage.output_tokens || 0,
+          thinkingTokens: data.usage.thinking_tokens || 0,
+          totalTokens: data.usage.total_tokens || 0,
+          isEstimated: data.usage.is_estimated ?? true
+        });
+      } else {
+        setTokenUsage(estimateUsageFromMessages(chatMsgs));
+      }
     } catch (err) {
       console.error('Failed to load transcript:', err);
     }
@@ -201,11 +273,14 @@ export function App() {
 
         // Live Context & Token Telemetry
         if (update.usage) {
+          const inTokens = update.usage.input_tokens || 0;
+          const outTokens = update.usage.output_tokens || 0;
           setTokenUsage({
-            inputTokens: update.usage.input_tokens || 0,
-            outputTokens: update.usage.output_tokens || 0,
+            inputTokens: inTokens,
+            outputTokens: outTokens,
             thinkingTokens: update.usage.thinking_tokens || 0,
-            totalTokens: update.usage.total_tokens || 0,
+            totalTokens: update.usage.total_tokens || (inTokens + outTokens),
+            isEstimated: false
           });
         }
 
@@ -218,13 +293,101 @@ export function App() {
           });
         }
 
+        // 1. Tool Call real-time updates (ACTIVE / DONE)
+        if (update.step_type === 'tool') {
+          const toolName = update.tool_name || update.tool_info?.name || 'tool';
+          const toolArgs = update.tool_info?.parameters || update.parameters;
+          const toolOutput = update.tool_info?.output;
+          const isDone = update.state === 'DONE';
+
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (!last || last.role !== 'assistant') {
+              return [
+                ...prev,
+                {
+                  id: `live-assistant-${Date.now()}`,
+                  role: 'assistant',
+                  content: '',
+                  thought: '',
+                  toolCalls: [{
+                    name: toolName,
+                    args: toolArgs,
+                    result: toolOutput,
+                    status: isDone ? 'done' : 'running'
+                  }],
+                  isLive: true,
+                  timestamp: new Date().toISOString()
+                }
+              ];
+            }
+
+            const currentTools = [...(last.toolCalls || [])];
+            const runningIdx = currentTools.findIndex(
+              (t) => t.name === toolName && t.status === 'running'
+            );
+
+            if (isDone) {
+              if (runningIdx >= 0) {
+                currentTools[runningIdx] = {
+                  ...currentTools[runningIdx],
+                  status: 'done',
+                  result: toolOutput
+                };
+              } else {
+                currentTools.push({
+                  name: toolName,
+                  args: toolArgs,
+                  result: toolOutput,
+                  status: 'done'
+                });
+              }
+            } else {
+              // ACTIVE tool
+              if (runningIdx === -1) {
+                currentTools.push({
+                  name: toolName,
+                  args: toolArgs,
+                  status: 'running'
+                });
+              }
+            }
+
+            return [
+              ...prev.slice(0, -1),
+              {
+                ...last,
+                toolCalls: currentTools,
+                isLive: true
+              }
+            ];
+          });
+        }
+
+        // 2. Thinking / Planner real-time updates
+        if (update.thinking) {
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (!last || last.role !== 'assistant') return prev;
+            return [
+              ...prev.slice(0, -1),
+              {
+                ...last,
+                thought: (last.thought || '') + update.thinking,
+                isLive: true
+              }
+            ];
+          });
+        }
+
+        // 3. Agent response real-time text streaming
         if (update.step_type === 'agent_response' && update.text_delta) {
           setMessages((prev) => {
             const last = prev[prev.length - 1];
             if (last && last.role === 'assistant') {
               return [
                 ...prev.slice(0, -1),
-                { ...last, content: last.content + update.text_delta }
+                { ...last, content: last.content + update.text_delta, isLive: true }
               ];
             } else {
               return [
@@ -232,7 +395,11 @@ export function App() {
                 {
                   id: `stream-${Date.now()}`,
                   role: 'assistant',
-                  content: update.text_delta
+                  content: update.text_delta,
+                  thought: '',
+                  toolCalls: [],
+                  isLive: true,
+                  timestamp: new Date().toISOString()
                 }
               ];
             }
@@ -241,25 +408,30 @@ export function App() {
       } else if (event.event === 'result') {
         const res = event.result;
         if (res?.usage) {
+          const inTokens = res.usage.input_tokens || 0;
+          const outTokens = res.usage.output_tokens || 0;
           setTokenUsage({
-            inputTokens: res.usage.input_tokens || 0,
-            outputTokens: res.usage.output_tokens || 0,
+            inputTokens: inTokens,
+            outputTokens: outTokens,
             thinkingTokens: res.usage.thinking_tokens || 0,
-            totalTokens: res.usage.total_tokens || 0,
+            totalTokens: res.usage.total_tokens || (inTokens + outTokens),
+            isEstimated: false
           });
         }
-        if (res?.response) {
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === 'assistant') {
-              return [
-                ...prev.slice(0, -1),
-                { ...last, content: res.response }
-              ];
-            }
-            return prev;
-          });
-        }
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant') {
+            return [
+              ...prev.slice(0, -1),
+              {
+                ...last,
+                content: (res?.response !== undefined && res.response !== null) ? res.response : last.content,
+                isLive: false
+              }
+            ];
+          }
+          return prev;
+        });
         // Refresh conversations in sidebar
         fetchConversations(50).then((c) => setConversations(c));
       } else if (event.event === 'approval_request') {
@@ -278,18 +450,44 @@ export function App() {
         setIsStreaming(false);
         setQueueCount(0);
         setPendingApproval(null);
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant' && last.isLive) {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, isLive: false }
+            ];
+          }
+          return prev;
+        });
       } else if (event.event === 'queue_cleared') {
         setQueueCount(0);
       } else if (event.event === 'error') {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `err-${Date.now()}`,
-            role: 'assistant',
-            content: `⚠️ **Erreur :** ${event.message || 'Une erreur est survenue lors de l\'exécution.'}`
-          }
-        ]);
         setIsStreaming(false);
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant') {
+            return [
+              ...prev.slice(0, -1),
+              {
+                ...last,
+                content: last.content
+                  ? `${last.content}\n\n⚠️ **Erreur :** ${event.message || 'Une erreur est survenue.'}`
+                  : `⚠️ **Erreur :** ${event.message || 'Une erreur est survenue.'}`,
+                isLive: false
+              }
+            ];
+          }
+          return [
+            ...prev,
+            {
+              id: `err-${Date.now()}`,
+              role: 'assistant',
+              content: `⚠️ **Erreur :** ${event.message || 'Une erreur est survenue.'}`,
+              isLive: false
+            }
+          ];
+        });
       } else if (event.event === 'done') {
         if (typeof event.queue_size === 'number') {
           setQueueCount(event.queue_size);
@@ -300,6 +498,16 @@ export function App() {
           setIsStreaming(false);
         }
         setPendingApproval(null);
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant' && last.isLive) {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, isLive: false }
+            ];
+          }
+          return prev;
+        });
       }
     });
 
@@ -326,11 +534,21 @@ export function App() {
       content: `${displayPrefix}${prompt}`,
       timestamp: new Date().toISOString()
     };
-    setMessages((prev) => [...prev, userMsg]);
 
     if (mode === 'queue') {
+      setMessages((prev) => [...prev, userMsg]);
       setQueueCount((prev) => prev + 1);
     } else {
+      const liveAssistantMsg: ChatMessage = {
+        id: `live-assistant-${Date.now()}`,
+        role: 'assistant',
+        content: '',
+        thought: '',
+        toolCalls: [],
+        isLive: true,
+        timestamp: new Date().toISOString()
+      };
+      setMessages((prev) => [...prev, userMsg, liveAssistantMsg]);
       setIsStreaming(true);
     }
 
@@ -425,7 +643,12 @@ export function App() {
         activeConversationId={activeConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={() => {
+          setSettingsTab('models');
+          setIsSettingsOpen(true);
+        }}
+        onOpenLanguages={handleOpenLanguages}
+        onOpenHelp={() => setIsHelpOpen(true)}
         onOpenWorkspaces={() => setIsWorkspacesOpen(true)}
         onOpenArtifacts={() => openRightPanel('artifacts')}
         onOpenFiles={() => openRightPanel('files')}
@@ -489,6 +712,27 @@ export function App() {
           usage={tokenUsage}
           queueCount={queueCount}
           onClearQueue={handleClearQueue}
+          currentWorkspace={currentWorkspace}
+          onClearChat={() => setMessages([])}
+          onNewChat={handleNewConversation}
+          onOpenTerminal={() => openRightPanel('terminal')}
+          onOpenGit={() => openRightPanel('git')}
+          onOpenKanban={() => openRightPanel('kanban')}
+          onOpenCrons={() => setIsCronModalOpen(true)}
+          onOpenRules={() => setIsRulesModalOpen(true)}
+          onOpenSkills={handleOpenSkills}
+          onOpenFileExplorer={() => setIsFileExplorerOpen(true)}
+          onOpenWorkspace={() => setIsWorkspacesOpen(true)}
+          onOpenExport={() => setIsArtifactsOpen(true)}
+          onOpenHelp={() => setIsHelpOpen(true)}
+          onForkMessage={() => handleForkMessage(messages.length > 0 ? messages.length - 1 : 0)}
+          onRenameTitle={(newTitle) => {
+            if (activeConversationId) {
+              updateConversationMetadata(activeConversationId, { customTitle: newTitle }).then(() => {
+                fetchConversations(100).then(setConversations);
+              });
+            }
+          }}
         />
       </main>
 
@@ -535,6 +779,13 @@ export function App() {
         models={models}
         currentModel={selectedModel}
         onModelSaved={handleModelSavedFromSettings}
+        initialTab={settingsTab}
+      />
+
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        onExecuteCommand={(cmd) => setQuickPrompt(cmd)}
       />
 
       <WorkspaceModal
