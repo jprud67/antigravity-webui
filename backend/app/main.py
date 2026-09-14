@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,11 +21,37 @@ from app.api.kanban import router as kanban_router
 from app.api.crons import router as crons_router
 from app.api.rules import router as rules_router
 from app.api.google_accounts import router as google_router
+from app.api.events import router as events_router
+from app.services.fs_watcher import watch_filesystem
+from app.config import BRAIN_DIR, CONVERSATION_DB
+import asyncio
+import logging
+
+logger = logging.getLogger("antigravity.main")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start the filesystem watcher background task on startup."""
+    watcher_task = asyncio.create_task(
+        watch_filesystem(BRAIN_DIR, CONVERSATION_DB, poll_interval=1.5),
+        name="fs_watcher"
+    )
+    logger.info("Filesystem watcher started")
+    yield
+    watcher_task.cancel()
+    try:
+        await watcher_task
+    except asyncio.CancelledError:
+        pass
+    logger.info("Filesystem watcher stopped")
+
 
 app = FastAPI(
     title="Antigravity WebUI",
     description="Web Interface to orchestrate Antigravity CLI without touching the terminal",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -35,7 +62,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API routes
 app.include_router(auth_router)
 app.include_router(conv_router)
 app.include_router(art_router)
@@ -51,6 +77,8 @@ app.include_router(kanban_router)
 app.include_router(crons_router)
 app.include_router(rules_router)
 app.include_router(google_router)
+app.include_router(events_router)  # SSE real-time sync CLI ↔ WebUI
+
 
 @app.get("/api/health")
 def health_check():

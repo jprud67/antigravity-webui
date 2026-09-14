@@ -28,6 +28,7 @@ import {
   type GoogleAccountInfo
 } from './services/api';
 import { chatSocket } from './services/ws';
+import { syncClient } from './services/sync';
 import { getStoredTheme, getStoredSkin, applyAppearance } from './services/theme';
 
 export function App() {
@@ -36,6 +37,13 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentWorkspace, setCurrentWorkspace] = useState('/root');
+
+  // Stable refs — used in effects with empty deps to avoid stale closures
+  const activeConversationIdRef = React.useRef<string | null>(null);
+  const isStreamingRef = React.useRef<boolean>(false);
+  activeConversationIdRef.current = activeConversationId;
+  isStreamingRef.current = isStreaming;
+
 
   // Telemetry, Queue & Approval States (Phase 2)
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | undefined>(undefined);
@@ -94,6 +102,48 @@ export function App() {
     applyAppearance(getStoredTheme(), getStoredSkin());
     loadInitialData();
   }, []);
+
+  // SSE real-time sync: CLI ↔ WebUI
+  // Subscribes to filesystem change events pushed by the backend watcher.
+  useEffect(() => {
+    syncClient.connect();
+
+    const unsubscribe = syncClient.subscribe((event) => {
+      if (event.type === 'conversations_updated') {
+        // Refresh sidebar without disrupting active chat
+        fetchConversations(50).then((c) => setConversations(c)).catch(() => {});
+      } else if (event.type === 'transcript_updated' && event.conversation_id) {
+        const convId = event.conversation_id;
+        // Only reload transcript if it's the active conversation AND we're not streaming
+        if (convId === activeConversationIdRef.current && !isStreamingRef.current) {
+          fetchConversationTranscript(convId).then((data) => {
+            const steps = data.steps || [];
+            const chatMsgs: import('./types').ChatMessage[] = [];
+            steps.forEach((s: any, idx: number) => {
+              const role = s.source === 'USER_EXPLICIT' || s.type === 'USER_INPUT' ? 'user' : 'assistant';
+              const content = s.content || '';
+              const thought = s.thinking || '';
+              const toolCalls = (s.tool_calls || []).map((t: any) => ({
+                name: t.name || 'tool',
+                args: t.args,
+                status: 'done' as const
+              }));
+              if (content || thought || toolCalls.length > 0) {
+                chatMsgs.push({ id: `step-${idx}`, role, content, thought, toolCalls, stepIndex: s.step_index });
+              }
+            });
+            setMessages(chatMsgs);
+          }).catch(() => {});
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      syncClient.disconnect();
+    };
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
 
   const loadInitialData = async () => {
     try {
@@ -267,10 +317,6 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
     setQueueCount(0);
     setPendingApproval(null);
   };
-
-  // Stable ref for activeConversationId to avoid re-subscribing on every change
-  const activeConversationIdRef = React.useRef<string | null>(null);
-  activeConversationIdRef.current = activeConversationId;
 
   // WebSocket event handler — subscribe once, use ref for conversation id
   useEffect(() => {
