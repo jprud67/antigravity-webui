@@ -100,14 +100,41 @@ def list_active_tasks(conversation_id: Optional[str] = None, _ = Depends(require
 
 @router.post("/kill")
 def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
-    if req.pid:
+    if not req.pid:
+        return {"success": False, "message": "Aucun PID spécifié"}
+
+    target_pid = req.pid
+    current_pid = os.getpid()
+    parent_pid = os.getppid()
+
+    # Block killing system critical PIDs and backend server itself
+    if target_pid <= 100 or target_pid == current_pid or target_pid == parent_pid:
+        raise HTTPException(status_code=403, detail=f"Arrêt non autorisé pour le PID système critique {target_pid}")
+
+    try:
+        proc = psutil.Process(target_pid)
+        proc_name = proc.name().lower()
+        cmdline = " ".join(proc.cmdline()).lower()
+
+        # Disallow killing systemd or uvicorn backend
+        if "systemd" in proc_name or "uvicorn" in cmdline and "backend" in cmdline:
+            raise HTTPException(status_code=403, detail="Arrêt non autorisé pour les services principaux du serveur")
+
+        # Terminate cleanly
+        proc.terminate()
         try:
-            os.kill(req.pid, signal.SIGTERM)
-            logger.info(f"Terminated process PID {req.pid}")
-            return {"success": True, "message": f"Processus {req.pid} arrêté avec succès"}
-        except ProcessLookupError:
-            raise HTTPException(status_code=404, detail="Processus introuvable")
-        except PermissionError:
-            raise HTTPException(status_code=403, detail="Permission refusée pour arrêter ce processus")
-    
-    return {"success": False, "message": "Aucun PID spécifié"}
+            proc.wait(timeout=1.5)
+        except psutil.TimeoutExpired:
+            proc.kill()
+
+        logger.info(f"Terminated process PID {target_pid} ({proc_name})")
+        return {"success": True, "message": f"Processus {target_pid} ({proc_name}) arrêté avec succès"}
+    except psutil.NoSuchProcess:
+        raise HTTPException(status_code=404, detail="Processus introuvable")
+    except psutil.AccessDenied:
+        raise HTTPException(status_code=403, detail="Permission refusée pour arrêter ce processus")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error terminating PID {target_pid}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'arrêt du processus: {str(e)}")

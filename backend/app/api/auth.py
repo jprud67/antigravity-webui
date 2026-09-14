@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, HTTPException, Header, Depends, status
+from fastapi import APIRouter, HTTPException, Header, Query, Depends, status
 from pydantic import BaseModel
 from typing import Optional
 from app.services.auth import (
@@ -24,12 +24,17 @@ class PasswordChangeRequest(BaseModel):
 class AuthToggleRequest(BaseModel):
     enabled: bool
 
-def get_current_token(authorization: Optional[str] = Header(None)) -> Optional[str]:
-    if not authorization:
-        return None
-    if authorization.startswith("Bearer "):
-        return authorization[7:].strip()
-    return authorization.strip()
+def get_current_token(
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None)
+) -> Optional[str]:
+    if authorization:
+        if authorization.startswith("Bearer "):
+            return authorization[7:].strip()
+        return authorization.strip()
+    if token:
+        return token.strip()
+    return None
 
 def require_auth(token: Optional[str] = Depends(get_current_token)):
     config = get_auth_config()

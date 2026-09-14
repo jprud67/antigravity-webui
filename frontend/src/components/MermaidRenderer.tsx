@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Maximize2, Minimize2, Copy, Check, Eye } from 'lucide-react';
 
 interface MermaidRendererProps {
@@ -31,7 +32,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
             secondaryColor: '#3b82f6',
             tertiaryColor: '#1e293b',
           },
-          securityLevel: 'loose',
+          securityLevel: 'strict',
           fontFamily: 'ui-sans-serif, system-ui, sans-serif',
         });
 
@@ -81,10 +82,12 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
     );
   }
 
-  return (
+  const renderContent = (fullscreen: boolean) => (
     <div
-      className={`my-3 bg-[#070b16] border border-sky-500/20 rounded-2xl overflow-hidden transition-all shadow-lg ${
-        isExpanded ? 'fixed inset-4 z-50 flex flex-col bg-[#070b16]/98 backdrop-blur-xl border-sky-500/50' : ''
+      className={`bg-[#070b16] border border-sky-500/20 rounded-2xl overflow-hidden transition-all shadow-lg ${
+        fullscreen
+          ? 'fixed inset-4 z-[9999] flex flex-col bg-[#070b16]/95 backdrop-blur-xl border-sky-500/50 shadow-2xl'
+          : 'my-3'
       }`}
     >
       {/* Header toolbar */}
@@ -104,9 +107,9 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded cursor-pointer transition-colors"
-            title={isExpanded ? 'Réduire' : 'Plein écran'}
+            title={fullscreen ? 'Réduire' : 'Plein écran'}
           >
-            {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            {fullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>
@@ -115,10 +118,17 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
       <div
         ref={containerRef}
         className={`p-6 flex items-center justify-center overflow-auto ${
-          isExpanded ? 'flex-1' : 'max-h-[500px]'
+          fullscreen ? 'flex-1' : 'max-h-[500px]'
         }`}
         dangerouslySetInnerHTML={{ __html: svgContent }}
       />
     </div>
+  );
+
+  return (
+    <>
+      {renderContent(false)}
+      {isExpanded && typeof document !== 'undefined' && createPortal(renderContent(true), document.body)}
+    </>
   );
 };

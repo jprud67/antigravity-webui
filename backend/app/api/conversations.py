@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response, Depends
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
+from app.api.auth import require_auth
 from app.services.storage import (
     list_conversations,
     get_conversation_by_id,
@@ -36,21 +37,21 @@ class MetadataUpdateRequest(BaseModel):
     customTitle: Optional[str] = None
 
 @router.get("", response_model=List[Dict[str, Any]])
-def get_conversations(limit: int = 100, q: Optional[str] = None):
+def get_conversations(limit: int = 100, q: Optional[str] = None, _ = Depends(require_auth)):
     if q and q.strip():
         return search_conversations(query=q.strip(), limit=limit)
     return list_conversations(limit=limit)
 
 @router.get("/search", response_model=List[Dict[str, Any]])
-def search(q: str = Query(..., min_length=1), limit: int = 50):
+def search(q: str = Query(..., min_length=1), limit: int = 50, _ = Depends(require_auth)):
     return search_conversations(query=q, limit=limit)
 
 @router.get("/metadata")
-def get_all_metadata():
+def get_all_metadata(_ = Depends(require_auth)):
     return get_all_session_metadata()
 
 @router.get("/{conversation_id}")
-def get_conversation(conversation_id: str):
+def get_conversation(conversation_id: str, _ = Depends(require_auth)):
     transcript = get_conversation_transcript(conversation_id)
     meta = get_conversation_by_id(conversation_id) or get_session_meta(conversation_id)
     usage = calculate_conversation_tokens(transcript)
@@ -62,7 +63,7 @@ def get_conversation(conversation_id: str):
     }
 
 @router.post("/{conversation_id}/fork")
-def fork(conversation_id: str, req: ForkRequest):
+def fork(conversation_id: str, req: ForkRequest, _ = Depends(require_auth)):
     try:
         result = fork_conversation(
             source_conversation_id=conversation_id,
@@ -74,25 +75,25 @@ def fork(conversation_id: str, req: ForkRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/{conversation_id}/title")
-def rename_conversation(conversation_id: str, req: TitleUpdateRequest):
+def rename_conversation(conversation_id: str, req: TitleUpdateRequest, _ = Depends(require_auth)):
     if not req.title.strip():
         raise HTTPException(status_code=400, detail="Le titre ne peut pas être vide")
     success = update_conversation_title(conversation_id, req.title.strip())
     return {"success": success, "conversation_id": conversation_id, "title": req.title.strip()}
 
 @router.put("/{conversation_id}/metadata")
-def update_metadata(conversation_id: str, req: MetadataUpdateRequest):
+def update_metadata(conversation_id: str, req: MetadataUpdateRequest, _ = Depends(require_auth)):
     updates = req.model_dump(exclude_unset=True)
     updated = update_session_meta(conversation_id, updates)
     return {"success": True, "conversation_id": conversation_id, "metadata": updated}
 
 @router.delete("/{conversation_id}")
-def remove_conversation(conversation_id: str):
+def remove_conversation(conversation_id: str, _ = Depends(require_auth)):
     success = delete_conversation(conversation_id)
     return {"success": success, "conversation_id": conversation_id}
 
 @router.get("/{conversation_id}/export/html")
-def export_html(conversation_id: str):
+def export_html(conversation_id: str, _ = Depends(require_auth)):
     html_content = export_conversation_html(conversation_id)
     return Response(
         content=html_content,
@@ -103,7 +104,7 @@ def export_html(conversation_id: str):
     )
 
 @router.get("/{conversation_id}/export/markdown")
-def export_markdown(conversation_id: str):
+def export_markdown(conversation_id: str, _ = Depends(require_auth)):
     md_content = export_conversation_markdown(conversation_id)
     return Response(
         content=md_content,
@@ -114,7 +115,7 @@ def export_markdown(conversation_id: str):
     )
 
 @router.get("/{conversation_id}/export/json")
-def export_json(conversation_id: str):
+def export_json(conversation_id: str, _ = Depends(require_auth)):
     steps = get_conversation_transcript(conversation_id)
     meta = get_conversation_by_id(conversation_id) or get_session_meta(conversation_id)
     export_payload = {

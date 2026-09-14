@@ -13,6 +13,12 @@ AUTH_CONFIG_FILE = GEMINI_DIR / "webui_auth.json"
 DEFAULT_SECRET = "antigravity-super-secret-webui-token-key-2026"
 DEFAULT_PASSWORD = os.environ.get("WEBUI_PASSWORD", "antigravity2026")
 
+def hash_password(password: str, salt: Optional[str] = None) -> str:
+    if not salt:
+        salt = secrets.token_hex(16)
+    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000)
+    return f"pbkdf2_sha256${salt}${key.hex()}"
+
 def get_auth_config() -> Dict[str, Any]:
     if AUTH_CONFIG_FILE.exists():
         try:
@@ -24,7 +30,7 @@ def get_auth_config() -> Dict[str, Any]:
     # Default config
     config = {
         "enabled": True,
-        "password": DEFAULT_PASSWORD,
+        "password": hash_password(DEFAULT_PASSWORD),
         "secret_key": secrets.token_hex(32)
     }
     save_auth_config(config)
@@ -32,15 +38,37 @@ def get_auth_config() -> Dict[str, Any]:
 
 def save_auth_config(config: Dict[str, Any]):
     AUTH_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(AUTH_CONFIG_FILE, "w", encoding="utf-8") as f:
+    temp_file = AUTH_CONFIG_FILE.with_suffix(".tmp")
+    with open(temp_file, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
+    temp_file.replace(AUTH_CONFIG_FILE)
+    try:
+        os.chmod(AUTH_CONFIG_FILE, 0o600)
+    except Exception:
+        pass
 
 def verify_password(input_password: str) -> bool:
     config = get_auth_config()
     if not config.get("enabled", True):
         return True
     configured_pwd = config.get("password", DEFAULT_PASSWORD)
-    return hmac.compare_digest(input_password.strip(), configured_pwd.strip())
+    if configured_pwd.startswith("pbkdf2_sha256$"):
+        parts = configured_pwd.split("$")
+        if len(parts) == 3:
+            salt = parts[1]
+            computed = hash_password(input_password.strip(), salt)
+            return hmac.compare_digest(computed, configured_pwd)
+    
+    # Fallback to direct comparison for legacy plaintext
+    matched = hmac.compare_digest(input_password.strip(), configured_pwd.strip())
+    if matched:
+        # Auto-upgrade stored plaintext to secure PBKDF2 hash
+        try:
+            config["password"] = hash_password(input_password.strip())
+            save_auth_config(config)
+        except Exception:
+            pass
+    return matched
 
 def create_access_token(expires_in_days: int = 7) -> str:
     config = get_auth_config()
@@ -76,6 +104,6 @@ def verify_access_token(token: Optional[str]) -> bool:
 
 def update_password(new_password: str):
     config = get_auth_config()
-    config["password"] = new_password.strip()
+    config["password"] = hash_password(new_password.strip())
     config["secret_key"] = secrets.token_hex(32)  # Invalidate previous tokens
     save_auth_config(config)

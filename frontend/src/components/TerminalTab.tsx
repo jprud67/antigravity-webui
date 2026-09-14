@@ -24,6 +24,9 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
     // Clean up previous
     if (wsRef.current) {
       try {
+        wsRef.current.onclose = null;
+        wsRef.current.onerror = null;
+        wsRef.current.onmessage = null;
         wsRef.current.close();
       } catch (e) {}
       wsRef.current = null;
@@ -90,29 +93,33 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
 
     ws.onopen = () => {
       setConnected(true);
-      term.writeln('\x1b[38;5;38m✔ Connecté au terminal Antigravity (' + currentWorkspace + ')\x1b[0m\r\n');
+      if (xtermRef.current) {
+        xtermRef.current.writeln('\x1b[38;5;38m✔ Connecté au terminal Antigravity (' + currentWorkspace + ')\x1b[0m\r\n');
+      }
       // Send initial size
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ action: 'resize', cols: term.cols, rows: term.rows }));
+      if (ws.readyState === WebSocket.OPEN && xtermRef.current) {
+        ws.send(JSON.stringify({ action: 'resize', cols: xtermRef.current.cols, rows: xtermRef.current.rows }));
       }
     };
 
     ws.onmessage = (e) => {
+      if (!xtermRef.current) return;
       if (typeof e.data === 'string') {
-        term.write(e.data);
+        xtermRef.current.write(e.data);
       } else if (e.data instanceof ArrayBuffer) {
         const text = new TextDecoder().decode(e.data);
-        term.write(text);
+        xtermRef.current.write(text);
       }
     };
 
     ws.onclose = (e) => {
       setConnected(false);
+      if (!xtermRef.current) return;
       if (e.code === 1008) {
         setError('Session non autorisée. Veuillez vous connecter.');
-        term.writeln('\r\n\x1b[31m✖ Erreur : Session non autorisée (403/1008).\x1b[0m\r\n');
+        xtermRef.current.writeln('\r\n\x1b[31m✖ Erreur : Session non autorisée (403/1008).\x1b[0m\r\n');
       } else {
-        term.writeln('\r\n\x1b[33m⚡ Session terminal terminée.\x1b[0m\r\n');
+        xtermRef.current.writeln('\r\n\x1b[33m⚡ Session terminal terminée.\x1b[0m\r\n');
       }
     };
 
@@ -153,13 +160,18 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
       window.removeEventListener('resize', handleResize);
       if (wsRef.current) {
         try {
+          wsRef.current.onclose = null;
+          wsRef.current.onerror = null;
+          wsRef.current.onmessage = null;
           wsRef.current.close();
         } catch (e) {}
+        wsRef.current = null;
       }
       if (xtermRef.current) {
         try {
           xtermRef.current.dispose();
         } catch (e) {}
+        xtermRef.current = null;
       }
     };
   }, [currentWorkspace]);

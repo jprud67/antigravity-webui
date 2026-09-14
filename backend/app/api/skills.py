@@ -89,13 +89,17 @@ def list_skills(_ = Depends(require_auth)):
 
 @router.get("/{skill_id}")
 def get_skill_detail(skill_id: str, _ = Depends(require_auth)):
+    safe_id = Path(skill_id).name
+    if not safe_id or safe_id != skill_id or ".." in skill_id:
+        raise HTTPException(status_code=400, detail="Identifiant de skill non valide")
+
     for s_info in SKILL_DIRS:
         base_dir = s_info["dir"]
-        target = base_dir / skill_id / "SKILL.md"
+        target = base_dir / safe_id / "SKILL.md"
         if target.exists():
             meta = parse_skill_md(target)
             return {
-                "id": skill_id,
+                "id": safe_id,
                 "name": meta["name"],
                 "description": meta["description"],
                 "content": meta["content"],

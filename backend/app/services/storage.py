@@ -79,8 +79,8 @@ def list_conversations(limit: int = 100) -> List[Dict[str, Any]]:
                 "customTitle": custom_title
             })
 
-        # Sort pinned conversations first, then by last_modified_time descending
-        result.sort(key=lambda x: (not x["pinned"], x["last_modified_time"] or ""), reverse=False)
+        # Sort pinned conversations first, then by last_modified_time descending (newest first)
+        result.sort(key=lambda x: (1 if x["pinned"] else 0, x["last_modified_time"] or ""), reverse=True)
         return result[:limit]
     finally:
         conn.close()
@@ -741,10 +741,18 @@ def list_artifacts(conversation_id: Optional[str] = None) -> List[Dict[str, Any]
     return artifacts
 
 def read_artifact_content(conversation_id: str, filename: str) -> str:
-    path = BRAIN_DIR / conversation_id / filename
-    if not path.exists():
-        raise FileNotFoundError(f"Artifact not found at {path}")
-    return path.read_text(encoding="utf-8")
+    # Strictly confine path to BRAIN_DIR / conversation_id
+    base_dir = (BRAIN_DIR / conversation_id).resolve()
+    target_path = (base_dir / filename).resolve()
+    if not str(target_path).startswith(str(base_dir)):
+        raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
+    if not target_path.exists() or not target_path.is_file():
+        raise FileNotFoundError(f"Artifact introuvable : {filename}")
+    try:
+        return target_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        raw = target_path.read_bytes()
+        return f"[Fichier binaire : {len(raw)} octets]"
 
 def get_settings() -> Dict[str, Any]:
     if not SETTINGS_FILE.exists():

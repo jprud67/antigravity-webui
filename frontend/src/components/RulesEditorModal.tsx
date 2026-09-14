@@ -133,6 +133,9 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
     return FileCheck2;
   };
 
+  const gutterRef = React.useRef<HTMLDivElement>(null);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
   // Line numbers calculation
   const linesCount = fileContent.split('\n').length;
   const lineNumbers = Array.from({ length: Math.max(linesCount, 1) }, (_, i) => i + 1);
@@ -247,20 +250,30 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
           {/* Code Area with Line Numbers */}
           <div className="flex-1 flex overflow-hidden">
             {/* Gutter */}
-            <div className="w-12 bg-[#090e1c] border-r border-slate-800/80 p-3 select-none text-right font-mono text-[11px] text-slate-600 overflow-hidden leading-relaxed">
+            <div 
+              ref={gutterRef}
+              className="w-14 bg-[#090e1c] border-r border-slate-800/80 py-3 px-2 select-none text-right font-mono text-[11px] text-slate-600 overflow-hidden leading-6"
+            >
               {lineNumbers.map(n => (
-                <div key={n}>{n}</div>
+                <div key={n} className="h-6">{n}</div>
               ))}
             </div>
 
             {/* Textarea */}
-            <div className="flex-1 relative overflow-auto p-3">
+            <div className="flex-1 relative overflow-hidden">
               <textarea
+                ref={textareaRef}
                 value={fileContent}
                 onChange={e => handleContentChange(e.target.value)}
+                onScroll={e => {
+                  if (gutterRef.current) {
+                    gutterRef.current.scrollTop = e.currentTarget.scrollTop;
+                  }
+                }}
                 disabled={loadingContent}
                 spellCheck={false}
-                className="w-full h-full bg-transparent font-mono text-xs text-slate-200 placeholder-slate-600 focus:outline-none resize-none leading-relaxed selection:bg-sky-500/30"
+                wrap="off"
+                className="w-full h-full bg-transparent font-mono text-[11px] text-slate-200 placeholder-slate-600 focus:outline-none resize-none leading-6 selection:bg-sky-500/30 py-3 px-4 overflow-auto whitespace-pre"
               />
             </div>
           </div>

@@ -177,13 +177,13 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
     );
   };
 
-  const filterTasks = (taskList: KanbanTask[]) => {
+  const filterTasks = React.useCallback((taskList: KanbanTask[]) => {
     if (!searchQuery.trim()) return taskList;
     const q = searchQuery.toLowerCase();
     return taskList.filter(
       t => t.title.toLowerCase().includes(q) || (t.body && t.body.toLowerCase().includes(q))
     );
-  };
+  }, [searchQuery]);
 
   return (
     <div className="flex flex-col h-full bg-[#070b14] text-slate-200">

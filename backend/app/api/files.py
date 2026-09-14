@@ -51,6 +51,34 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> List
 
     return items
 
+from app.services.storage import get_settings
+
+def _validate_path_access(file_path: Path) -> Path:
+    try:
+        resolved = file_path.resolve()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Chemin invalide : {e}")
+
+    resolved_str = str(resolved)
+    # Prohibit sensitive system directories and secrets
+    blocked_keywords = ["/.ssh", "/.gnupg", "/etc/shadow", "/etc/sudoers", "/proc", "/sys"]
+    if any(kw in resolved_str for kw in blocked_keywords):
+        raise HTTPException(status_code=403, detail="Accès refusé : fichier ou répertoire restreint.")
+
+    settings = get_settings()
+    workspaces = settings.get("trustedWorkspaces", [])
+    allowed_roots = [Path(DEFAULT_WORKSPACE).resolve()]
+    for ws in workspaces:
+        try:
+            allowed_roots.append(Path(ws).resolve())
+        except Exception:
+            pass
+
+    if not any(resolved == root or root in resolved.parents for root in allowed_roots):
+        raise HTTPException(status_code=403, detail="Accès refusé : chemin en dehors des répertoires de travail autorisés.")
+
+    return resolved
+
 @router.get("/tree")
 def get_file_tree(
     path: Optional[str] = Query(None),
@@ -58,33 +86,35 @@ def get_file_tree(
     _ = Depends(require_auth)
 ):
     target_path = Path(path) if path else Path(DEFAULT_WORKSPACE)
-    if not target_path.exists() or not target_path.is_dir():
+    resolved_path = _validate_path_access(target_path)
+    if not resolved_path.exists() or not resolved_path.is_dir():
         raise HTTPException(status_code=400, detail=f"Répertoire invalide : {target_path}")
 
     return {
-        "root": str(target_path.resolve()),
-        "name": target_path.name or str(target_path),
-        "items": scan_dir(target_path, current_depth=0, max_depth=depth)
+        "root": str(resolved_path),
+        "name": resolved_path.name or str(resolved_path),
+        "items": scan_dir(resolved_path, current_depth=0, max_depth=depth)
     }
 
 @router.get("/content")
 def get_file_content(path: str = Query(...), _ = Depends(require_auth)):
     file_path = Path(path)
-    if not file_path.exists() or not file_path.is_file():
+    resolved_path = _validate_path_access(file_path)
+    if not resolved_path.exists() or not resolved_path.is_file():
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
 
-    stat = file_path.stat()
+    stat = resolved_path.stat()
     if stat.st_size > 1024 * 1024 * 2: # 2MB limit
         raise HTTPException(status_code=400, detail="Fichier trop volumineux pour l'éditeur (max 2 Mo).")
 
     try:
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(resolved_path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
 
         return {
-            "path": str(file_path.resolve()),
-            "filename": file_path.name,
-            "extension": file_path.suffix.lstrip("."),
+            "path": str(resolved_path),
+            "filename": resolved_path.name,
+            "extension": resolved_path.suffix.lstrip("."),
             "size": stat.st_size,
             "last_modified": stat.st_mtime,
             "content": content
@@ -99,22 +129,23 @@ class SaveFileRequest(BaseModel):
 @router.post("/save")
 def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
     file_path = Path(req.path)
+    resolved_path = _validate_path_access(file_path)
     try:
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = file_path.with_suffix(file_path.suffix + ".tmp")
+        resolved_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = resolved_path.with_suffix(resolved_path.suffix + ".tmp")
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(req.content)
-        tmp_path.replace(file_path)
-        stat = file_path.stat()
+        tmp_path.replace(resolved_path)
+        stat = resolved_path.stat()
         return {
             "success": True,
-            "path": str(file_path.resolve()),
+            "path": str(resolved_path),
             "size": stat.st_size,
             "last_modified": stat.st_mtime
         }
     except Exception as e:
         if 'tmp_path' in locals() and tmp_path.exists():
             tmp_path.unlink()
-        logger.error(f"Error saving file {file_path}: {e}")
+        logger.error(f"Error saving file {resolved_path}: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement : {str(e)}")
 

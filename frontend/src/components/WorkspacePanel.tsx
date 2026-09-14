@@ -355,9 +355,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
 
       {/* Panel Tab Body */}
       <div className="flex-1 min-h-0 overflow-hidden relative select-text">
-        {activeTab === 'terminal' && (
+        <div className={`h-full ${activeTab === 'terminal' ? 'block' : 'hidden'}`}>
           <TerminalTab currentWorkspace={currentWorkspace} />
-        )}
+        </div>
 
         {activeTab === 'git' && (
           <GitTab currentWorkspace={currentWorkspace} />

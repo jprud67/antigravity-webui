@@ -57,16 +57,25 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     loadStatus();
   }, [currentWorkspace]);
 
+  const diffRequestIdRef = React.useRef(0);
+
   const handleSelectFile = async (filePath: string) => {
     setSelectedFile(filePath);
     setLoadingDiff(true);
+    const reqId = ++diffRequestIdRef.current;
     try {
       const res = await fetchGitDiff(currentWorkspace, filePath);
-      setActiveDiff(res.diff);
+      if (reqId === diffRequestIdRef.current) {
+        setActiveDiff(res.diff);
+      }
     } catch (err: any) {
-      setActiveDiff(null);
+      if (reqId === diffRequestIdRef.current) {
+        setActiveDiff(null);
+      }
     } finally {
-      setLoadingDiff(false);
+      if (reqId === diffRequestIdRef.current) {
+        setLoadingDiff(false);
+      }
     }
   };
 

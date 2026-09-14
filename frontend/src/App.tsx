@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatCanvas } from './components/ChatCanvas';
 import { ChatInput } from './components/ChatInput';
@@ -268,18 +268,22 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
     setPendingApproval(null);
   };
 
-  // WebSocket event handler
+  // Stable ref for activeConversationId to avoid re-subscribing on every change
+  const activeConversationIdRef = React.useRef<string | null>(null);
+  activeConversationIdRef.current = activeConversationId;
+
+  // WebSocket event handler — subscribe once, use ref for conversation id
   useEffect(() => {
     const unsubscribe = chatSocket.subscribe((event: any) => {
       if (event.event === 'init') {
-        if (event.conversation_id && !activeConversationId) {
+        if (event.conversation_id && !activeConversationIdRef.current) {
           setActiveConversationId(event.conversation_id);
         }
       } else if (event.event === 'step_update') {
         const update = event.step_update;
         if (!update) return;
 
-        if (update.conversation_id && !activeConversationId) {
+        if (update.conversation_id && !activeConversationIdRef.current) {
           setActiveConversationId(update.conversation_id);
         }
 
@@ -524,7 +528,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
     });
 
     return () => unsubscribe();
-  }, [activeConversationId]);
+  }, []);  // ← empty deps: subscribe once, use refs for mutable state
 
   // Send message
   const handleSendMessage = (

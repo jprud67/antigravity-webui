@@ -1,13 +1,14 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from pathlib import Path
 from typing import List, Dict, Any
+from app.api.auth import require_auth
 from app.services.storage import get_settings, save_settings
 from app.config import DEFAULT_WORKSPACE
 
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 
 @router.get("")
-def list_workspaces() -> List[str]:
+def list_workspaces(_ = Depends(require_auth)) -> List[str]:
     settings = get_settings()
     workspaces = settings.get("trustedWorkspaces", [])
     if DEFAULT_WORKSPACE not in workspaces:
@@ -15,7 +16,7 @@ def list_workspaces() -> List[str]:
     return workspaces
 
 @router.post("")
-def add_workspace(path: str = Query(...)):
+def add_workspace(path: str = Query(...), _ = Depends(require_auth)):
     p = Path(path).resolve()
     if not p.is_dir():
         raise HTTPException(status_code=400, detail=f"Directory '{path}' does not exist")
@@ -29,7 +30,7 @@ def add_workspace(path: str = Query(...)):
     return {"status": "ok", "workspaces": workspaces}
 
 @router.get("/explore")
-def explore_dir(path: str = Query(DEFAULT_WORKSPACE)) -> Dict[str, Any]:
+def explore_dir(path: str = Query(DEFAULT_WORKSPACE), _ = Depends(require_auth)) -> Dict[str, Any]:
     p = Path(path).resolve()
     if not p.exists() or not p.is_dir():
         raise HTTPException(status_code=404, detail="Path is not a valid directory")

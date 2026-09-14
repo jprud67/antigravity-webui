@@ -47,6 +47,8 @@ def _save_jobs_file(data: Dict[str, Any]):
         json.dump(data, f, indent=2)
     temp_path.replace(JOBS_FILE)
 
+import re
+
 def _compute_next_run(schedule: Union[str, Dict[str, Any]]) -> Optional[str]:
     now = datetime.now(timezone.utc)
     expr = ""
@@ -54,8 +56,11 @@ def _compute_next_run(schedule: Union[str, Dict[str, Any]]) -> Optional[str]:
         expr = schedule.strip()
     elif isinstance(schedule, dict):
         if schedule.get("kind") == "interval":
-            mins = int(schedule.get("minutes", 15))
-            return (now + timedelta(minutes=mins)).isoformat()
+            try:
+                mins = int(schedule.get("minutes", 15))
+                return (now + timedelta(minutes=mins)).isoformat()
+            except (ValueError, TypeError):
+                return (now + timedelta(minutes=15)).isoformat()
         elif schedule.get("kind") == "cron":
             expr = schedule.get("expr", "")
         else:
@@ -64,25 +69,30 @@ def _compute_next_run(schedule: Union[str, Dict[str, Any]]) -> Optional[str]:
     if not expr:
         return None
 
-    # Handle quick interval syntax like "every 10m" or "every 2h"
-    lower = expr.lower()
-    if lower.startswith("every ") or lower.startswith("toutes les "):
-        parts = lower.split()
-        val = parts[-1]
-        if val.endswith("m"):
-            mins = int(val[:-1])
-            return (now + timedelta(minutes=mins)).isoformat()
-        elif val.endswith("h"):
-            hours = int(val[:-1])
-            return (now + timedelta(hours=hours)).isoformat()
+    # Handle quick interval syntax like "every 10m", "every 2 hours", "toutes les 30 min"
+    lower = expr.lower().strip()
+    match = re.match(r"^(?:every|toutes les|chaque)\s+(\d+)\s*(m|min|minutes?|h|hours?|heures?|d|days?|jours?)?$", lower)
+    if match:
+        try:
+            val = int(match.group(1))
+            unit = match.group(2) or "m"
+            if unit.startswith("h"):
+                return (now + timedelta(hours=val)).isoformat()
+            elif unit.startswith("d") or unit.startswith("j"):
+                return (now + timedelta(days=val)).isoformat()
+            else:
+                return (now + timedelta(minutes=val)).isoformat()
+        except Exception:
+            pass
 
     try:
-        iter_cron = croniter(expr, now)
-        next_dt = iter_cron.get_next(datetime)
-        return next_dt.isoformat()
+        if croniter.is_valid(expr):
+            iter_cron = croniter(expr, now)
+            next_dt = iter_cron.get_next(datetime)
+            return next_dt.isoformat()
     except Exception as e:
         logger.warning(f"Could not compute next run for cron expr '{expr}': {e}")
-        return None
+    return None
 
 class CreateCronJobRequest(BaseModel):
     name: str

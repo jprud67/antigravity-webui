@@ -137,13 +137,14 @@ async def terminal_websocket(websocket: WebSocket, token: Optional[str] = None, 
     except Exception:
         pass
 
-    # Terminate process group cleanly
+    # Terminate process group cleanly and reap zombie process
     try:
         pgid = os.getpgid(proc.pid)
         os.killpg(pgid, signal.SIGTERM)
         await asyncio.sleep(0.1)
         if proc.returncode is None:
             os.killpg(pgid, signal.SIGKILL)
+        await asyncio.wait_for(proc.wait(), timeout=1.0)
     except Exception:
         pass
 

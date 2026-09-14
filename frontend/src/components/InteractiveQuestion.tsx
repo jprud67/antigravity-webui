@@ -29,6 +29,13 @@ export const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({
   const [submitted, setSubmitted] = useState(false);
   const [finalAnswer, setFinalAnswer] = useState<string>('');
 
+  React.useEffect(() => {
+    setSelectedAnswers({});
+    setCustomInputs({});
+    setSubmitted(false);
+    setFinalAnswer('');
+  }, [toolArgs]);
+
   if (questions.length === 0) return null;
 
   const handleOptionToggle = (qIdx: number, opt: string, isMulti: boolean) => {
@@ -112,7 +119,7 @@ export const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({
 
                 {/* Options List */}
                 <div className="grid grid-cols-1 gap-2">
-                  {q.options.map((opt, optIdx) => {
+                  {(q.options || []).map((opt, optIdx) => {
                     const isSelected = currentSelected.includes(opt);
                     const isRecommended = opt.toLowerCase().includes('(recommended)');
 

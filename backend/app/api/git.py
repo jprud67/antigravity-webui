@@ -11,7 +11,33 @@ from app.api.auth import require_auth
 logger = logging.getLogger("antigravity.git")
 router = APIRouter(prefix="/api/git", tags=["git"])
 
+from app.services.storage import get_settings
+
 GIT_TIMEOUT = 12
+
+def _validate_workspace(workspace: Optional[str]) -> Path:
+    target = Path(workspace) if workspace else Path(DEFAULT_WORKSPACE)
+    try:
+        resolved = target.resolve()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Chemin de workspace invalide.")
+    
+    if not resolved.exists() or not resolved.is_dir():
+        raise HTTPException(status_code=400, detail=f"Dossier introuvable : {resolved}")
+        
+    settings = get_settings()
+    workspaces = settings.get("trustedWorkspaces", [])
+    allowed_roots = [Path(DEFAULT_WORKSPACE).resolve()]
+    for ws in workspaces:
+        try:
+            allowed_roots.append(Path(ws).resolve())
+        except Exception:
+            pass
+
+    if not any(resolved == root or root in resolved.parents for root in allowed_roots):
+        raise HTTPException(status_code=403, detail="Accès refusé : workspace non autorisé.")
+
+    return resolved
 
 def run_git(args: List[str], cwd: Path, timeout: int = GIT_TIMEOUT) -> subprocess.CompletedProcess:
     # Always enforce strict author and committer for jprud67
@@ -34,9 +60,7 @@ def run_git(args: List[str], cwd: Path, timeout: int = GIT_TIMEOUT) -> subproces
 
 @router.get("/status")
 def get_git_status(workspace: Optional[str] = Query(None), _ = Depends(require_auth)):
-    target = Path(workspace) if workspace else Path(DEFAULT_WORKSPACE)
-    if not target.exists() or not target.is_dir():
-        raise HTTPException(status_code=400, detail=f"Dossier invalide : {target}")
+    target = _validate_workspace(workspace)
 
     # Check if git repo
     res_repo = run_git(["rev-parse", "--is-inside-work-tree"], target)
@@ -137,7 +161,7 @@ def get_git_diff(
     staged: bool = Query(False),
     _ = Depends(require_auth)
 ):
-    target = Path(workspace) if workspace else Path(DEFAULT_WORKSPACE)
+    target = _validate_workspace(workspace)
     args = ["diff"]
     if staged:
         args.append("--cached")
@@ -146,14 +170,14 @@ def get_git_diff(
 
     res = run_git(args, target)
     return {
-        "workspace": str(target.resolve()),
+        "workspace": str(target),
         "path": path,
         "diff": res.stdout
     }
 
 @router.get("/branches")
 def get_branches(workspace: Optional[str] = Query(None), _ = Depends(require_auth)):
-    target = Path(workspace) if workspace else Path(DEFAULT_WORKSPACE)
+    target = _validate_workspace(workspace)
     res = run_git(["branch", "-a"], target)
     if res.returncode != 0:
         raise HTTPException(status_code=400, detail="Impossible de récupérer les branches.")
@@ -182,7 +206,7 @@ class CommitRequest(BaseModel):
 
 @router.post("/commit")
 def git_commit(req: CommitRequest, _ = Depends(require_auth)):
-    target = Path(req.workspace) if req.workspace else Path(DEFAULT_WORKSPACE)
+    target = _validate_workspace(req.workspace)
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Le message de commit ne peut être vide.")
 
@@ -210,7 +234,7 @@ class PushRequest(BaseModel):
 
 @router.post("/push")
 def git_push(req: PushRequest, _ = Depends(require_auth)):
-    target = Path(req.workspace) if req.workspace else Path(DEFAULT_WORKSPACE)
+    target = _validate_workspace(req.workspace)
     branch = req.branch
     if not branch:
         res_br = run_git(["branch", "--show-current"], target)

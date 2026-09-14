@@ -235,6 +235,7 @@ async def stream_turn(
             await asyncio.sleep(0.1)
             if proc.returncode is None:
                 os.killpg(pgid, signal.SIGKILL)
+            await asyncio.wait_for(proc.wait(), timeout=1.0)
         except Exception as e:
             logger.debug(f"Error terminating proc group: {e}")
         yield {
