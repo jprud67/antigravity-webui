@@ -51,12 +51,17 @@ interface ChatInputProps {
   onOpenCrons?: () => void;
   onOpenRules?: () => void;
   onOpenSkills?: () => void;
+  onOpenTasks?: () => void;
+  onOpenLanguages?: () => void;
   onOpenFileExplorer?: () => void;
   onOpenWorkspace?: () => void;
   onOpenExport?: () => void;
   onOpenHelp?: () => void;
   onForkMessage?: () => void;
   onRenameTitle?: (newTitle: string) => void;
+  onRetry?: () => void;
+  onUndo?: () => void;
+  onShowStatus?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -81,12 +86,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onOpenCrons,
   onOpenRules,
   onOpenSkills,
+  onOpenTasks,
+  onOpenLanguages,
   onOpenFileExplorer,
   onOpenWorkspace,
   onOpenExport,
   onOpenHelp,
   onForkMessage,
-  onRenameTitle
+  onRenameTitle,
+  onRetry,
+  onUndo,
+  onShowStatus
 }) => {
   const { t } = useI18n();
   const [prompt, setPrompt] = useState(initialPrompt);
@@ -233,6 +243,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
         return true;
 
+      case '/lang':
+      case '/language':
+        if (args) {
+          const targetLang = args.trim().toLowerCase();
+          const match = SUPPORTED_LANGUAGES.find(
+            (l) => l.code.toLowerCase() === targetLang || l.label.toLowerCase() === targetLang
+          );
+          if (match) {
+            setLanguage(match.code);
+            showToast(`Langue définie sur : ${match.flag || ''} ${match.label} (${match.code})`, 'success');
+          } else {
+            showToast(`Langue inconnue "${args}". Codes: ${SUPPORTED_LANGUAGES.map((l) => l.code).join(', ')}`, 'error');
+          }
+        } else {
+          if (onOpenLanguages) onOpenLanguages();
+          else if (onOpenHelp) onOpenHelp();
+          else showToast(`Langue actuelle : ${getCurrentLanguage()}`, 'info');
+        }
+        return true;
+
       case '/yolo':
         setAutoApprove((prev) => {
           const next = !prev;
@@ -261,8 +291,30 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         if (onOpenRules) onOpenRules();
         return true;
 
+      case '/tasks':
+        if (onOpenTasks) onOpenTasks();
+        else showToast('Tableau de bord des tâches indisponible.', 'info');
+        return true;
+
       case '/skills':
         if (onOpenSkills) onOpenSkills();
+        else showToast('Compétences Antigravity installées.', 'info');
+        return true;
+
+      case '/use':
+        if (args) {
+          handleSubmit('normal', `[Directive de compétence : ${args}] Veuillez consulter et utiliser prioritairement les outils et compétences du skill "${args}".`);
+          showToast(`Skill activé : ${args}`, 'success');
+        } else {
+          if (onOpenSkills) onOpenSkills();
+          else showToast('Usage: /use <nom_du_skill>', 'info');
+        }
+        return true;
+
+      case '/files':
+      case '/attach':
+        if (onOpenFileExplorer) onOpenFileExplorer();
+        else showToast('Explorateur de fichiers non disponible.', 'info');
         return true;
 
       case '/export':
@@ -296,14 +348,116 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
         return true;
 
+      case '/retry':
+        if (onRetry) {
+          onRetry();
+          showToast('Relance de la dernière instruction...', 'info');
+        } else {
+          showToast('Aucun message précédent à relancer.', 'info');
+        }
+        return true;
+
+      case '/undo':
+        if (onUndo) {
+          onUndo();
+          showToast('Dernière étape annulée.', 'success');
+        } else {
+          showToast('Impossible d\'annuler l\'étape.', 'info');
+        }
+        return true;
+
+      case '/compress':
+      case '/compact':
+        handleSubmit(
+          'normal',
+          args
+            ? `[Compactage du contexte - Sujet : ${args}] Veuillez résumer et condenser l'historique de cette session de manière concise.`
+            : `[Compactage du contexte] Veuillez résumer et condenser l'historique de cette conversation de manière concise pour optimiser la fenêtre de contexte.`
+        );
+        showToast('🗜️ Demande de compression du contexte envoyée...', 'info');
+        return true;
+
+      case '/usage':
+        if (usage) {
+          showToast(
+            `📊 Tokens: ${usage.totalTokens.toLocaleString()} (Entrée: ${usage.inputTokens.toLocaleString()}, Sortie: ${usage.outputTokens.toLocaleString()})`,
+            'info'
+          );
+        } else {
+          showToast('Métriques de tokens non disponibles.', 'info');
+        }
+        return true;
+
+      case '/status':
+        if (onShowStatus) {
+          onShowStatus();
+        } else {
+          const statText = `🟢 Serveur actif | Modèle: ${currentModelObj?.name || selectedModel} | Workspace: ${currentWorkspace || '/root'}`;
+          showToast(statText, 'info');
+        }
+        return true;
+
+      case '/btw':
+        if (args) {
+          handleSubmit('normal', `[Aparté / Question rapide] ${args}`);
+          return true;
+        } else {
+          showToast('Usage: /btw <votre question en aparté>', 'info');
+          return true;
+        }
+
+      case '/background':
+        if (args) {
+          handleSubmit('normal', `/goal ${args}`);
+          showToast('Tâche autonome lancée en arrière-plan.', 'success');
+          return true;
+        } else {
+          showToast('Usage: /background <instruction de la tâche>', 'info');
+          return true;
+        }
+
+      case '/steer':
+        if (args) {
+          handleSubmit('steer', args);
+          return true;
+        } else {
+          showToast('Usage: /steer <nouvelle orientation>', 'info');
+          return true;
+        }
+
+      case '/interrupt':
+        if (args) {
+          handleSubmit('steer', args);
+          return true;
+        } else {
+          if (isStreaming && onStopStreaming) {
+            onStopStreaming();
+            showToast('Exécution interrompue.', 'info');
+          } else {
+            showToast('Usage: /interrupt <nouvelle orientation>', 'info');
+          }
+          return true;
+        }
+
+      case '/queue':
+        if (args) {
+          handleSubmit('queue', args);
+          return true;
+        } else {
+          showToast('Usage: /queue <instruction en attente>', 'info');
+          return true;
+        }
+
       case '/model':
         if (args) {
-          const found = models.find((m) => m.name.toLowerCase().includes(args.toLowerCase()) || m.id.toLowerCase().includes(args.toLowerCase()));
+          const found = models.find(
+            (m) => m.name.toLowerCase().includes(args.toLowerCase()) || m.id.toLowerCase().includes(args.toLowerCase())
+          );
           if (found) {
             handleModelChange(found.id);
             showToast(`Modèle sélectionné : ${found.name}`, 'success');
           } else {
-            showToast(`Modèle inconnu : ${args}. Modèles: ${models.map(m => m.name).join(', ')}`, 'error');
+            showToast(`Modèle inconnu : ${args}. Modèles: ${models.map((m) => m.name).join(', ')}`, 'error');
           }
         } else {
           showToast(`Modèle actif : ${currentModelObj?.name || selectedModel}`, 'info');
@@ -327,78 +481,33 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
         return true;
 
-      case '/files':
-      case '/attach':
-        if (onOpenFileExplorer) {
-          onOpenFileExplorer();
-        } else {
-          showToast('Explorateur de fichiers non disponible.', 'info');
-        }
-        return true;
-
-      case '/lang':
-      case '/language':
-        if (args) {
-          const targetLang = args.trim().toLowerCase();
-          const match = SUPPORTED_LANGUAGES.find(
-            (l) => l.code.toLowerCase() === targetLang || l.label.toLowerCase() === targetLang
-          );
-          if (match) {
-            setLanguage(match.code);
-            showToast(`Langue définie sur : ${match.flag || ''} ${match.label} (${match.code})`, 'success');
-          } else {
-            showToast(`Langue inconnue "${args}". Codes supportés: ${SUPPORTED_LANGUAGES.map((l) => l.code).join(', ')}`, 'error');
-          }
-        } else {
-          if (onOpenHelp) {
-            onOpenHelp();
-          } else {
-            showToast(`Langue actuelle : ${getCurrentLanguage()}`, 'info');
-          }
-        }
-        return true;
-
-      case '/steer':
-        if (args) {
-          handleSubmit('steer', args);
-          return true;
-        }
-        break;
-
-      case '/queue':
-        if (args) {
-          handleSubmit('queue', args);
-          return true;
-        }
-        break;
-
       default:
-        // Workflow commands like /plan, /goal, /boost, /browser, /grill-me continue to prompt send
+        // Workflow commands like /plan, /goal, /boost, /browser, /grill-me, /teamwork-preview, /learn, /schedule continue to prompt send
         return false;
     }
-    return false;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (showSlashMenu) {
+    if (showSlashMenu && filteredCommands.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1) % Math.max(1, filteredCommands.length));
+        setSelectedIndex((prev) => (prev + 1) % filteredCommands.length);
         return;
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 + filteredCommands.length) % Math.max(1, filteredCommands.length));
+        setSelectedIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
         return;
       }
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        if (filteredCommands[selectedIndex]) {
-          selectSlashCommand(filteredCommands[selectedIndex]);
-        }
+        selectSlashCommand(filteredCommands[selectedIndex]);
         return;
       }
-      if (e.key === 'Escape') {
+    }
+
+    if (e.key === 'Escape') {
+      if (showSlashMenu) {
         e.preventDefault();
         setShowSlashMenu(false);
         return;
@@ -424,24 +533,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const val = e.target.value;
     setPrompt(val);
 
-    if (val.startsWith('/')) {
-      setShowSlashMenu(true);
+    const isCommandTyping = val.startsWith('/') && !val.includes(' ') && !val.includes('\n');
+    setShowSlashMenu(isCommandTyping);
+    if (isCommandTyping) {
       setSlashFilter(val.slice(1).toLowerCase());
-    } else {
-      setShowSlashMenu(false);
     }
   };
 
   const selectSlashCommand = (c: SlashCommandDef) => {
     if (c.isAction && !c.arg) {
-      executeSlashAction(c.cmd);
-      setPrompt('');
-      setShowSlashMenu(false);
-    } else {
-      setPrompt(`${c.cmd} `);
-      setShowSlashMenu(false);
-      textareaRef.current?.focus();
+      const handled = executeSlashAction(c.cmd);
+      if (handled) {
+        setPrompt('');
+        setShowSlashMenu(false);
+        return;
+      }
     }
+    setPrompt(`${c.cmd} `);
+    setShowSlashMenu(false);
+    textareaRef.current?.focus();
   };
 
   const handleSubmit = (mode: 'normal' | 'queue' | 'steer' = 'normal', overrideText?: string) => {

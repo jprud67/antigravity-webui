@@ -32,7 +32,10 @@ import {
   CalendarClock,
   Flame,
   Users,
-  GraduationCap
+  GraduationCap,
+  Paperclip,
+  Languages,
+  ListTodo
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -112,14 +115,24 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     color: 'text-orange-400'
   },
 
-  // Execution & Steering
+  // Execution & Steering (Hermes Parity)
   {
     cmd: '/steer',
     desc: 'Interrompre l\'étape en cours et réorienter l\'agent',
     arg: '<instruction>',
     category: 'action',
     icon: Compass,
-    color: 'text-amber-400'
+    color: 'text-amber-400',
+    isAction: true
+  },
+  {
+    cmd: '/interrupt',
+    desc: 'Interrompre immédiatement l\'étape et réorienter l\'agent',
+    arg: '<instruction>',
+    category: 'action',
+    icon: Square,
+    color: 'text-rose-400',
+    isAction: true
   },
   {
     cmd: '/queue',
@@ -127,7 +140,8 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     arg: '<instruction>',
     category: 'action',
     icon: Layers,
-    color: 'text-sky-400'
+    color: 'text-sky-400',
+    isAction: true
   },
   {
     cmd: '/stop',
@@ -155,7 +169,7 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
   },
   {
     cmd: '/undo',
-    desc: 'Annuler la dernière étape de la conversation',
+    desc: 'Annuler le dernier tour d\'échange de la conversation',
     category: 'action',
     icon: Undo2,
     color: 'text-slate-400',
@@ -169,8 +183,16 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     icon: MessageSquareText,
     color: 'text-violet-400'
   },
+  {
+    cmd: '/background',
+    desc: 'Lancer une tâche autonome en arrière-plan',
+    arg: '<prompt>',
+    category: 'workflow',
+    icon: Zap,
+    color: 'text-emerald-400'
+  },
 
-  // Appearance & Themes (Hermes Compatible)
+  // Appearance & Languages
   {
     cmd: '/theme',
     desc: 'Changer de thème (dark, light, system) ou de skin (ares, sienna, catppuccin...)',
@@ -178,6 +200,24 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'system',
     icon: Palette,
     color: 'text-fuchsia-400',
+    isAction: true
+  },
+  {
+    cmd: '/lang',
+    desc: 'Changer la langue de l\'interface (fr, en, es, zh, ja, de, it...)',
+    arg: '<code>',
+    category: 'system',
+    icon: Languages,
+    color: 'text-cyan-400',
+    isAction: true
+  },
+  {
+    cmd: '/language',
+    desc: 'Alias de /lang pour changer la langue de l\'interface',
+    arg: '<code>',
+    category: 'system',
+    icon: Languages,
+    color: 'text-cyan-400',
     isAction: true
   },
 
@@ -246,6 +286,7 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
   {
     cmd: '/compress',
     desc: 'Compacter et résumer la fenêtre de contexte',
+    arg: '[sujet]',
     category: 'action',
     icon: Minimize2,
     color: 'text-cyan-400',
@@ -254,6 +295,7 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
   {
     cmd: '/compact',
     desc: 'Alias de /compress pour compacter le contexte',
+    arg: '[sujet]',
     category: 'action',
     icon: Minimize2,
     color: 'text-cyan-400',
@@ -286,7 +328,7 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
   },
   {
     cmd: '/status',
-    desc: 'Afficher l\'état de santé du serveur Antigravity',
+    desc: 'Afficher l\'état de santé du serveur et de la session',
     category: 'system',
     icon: Activity,
     color: 'text-emerald-400',
@@ -312,11 +354,36 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
   },
   {
     cmd: '/use',
-    desc: 'Utiliser un skill spécifique',
+    desc: 'Forcer l\'agent à consulter et utiliser une compétence spécifique',
     arg: '<nom_du_skill>',
-    category: 'workflow',
+    category: 'action',
     icon: Wrench,
-    color: 'text-sky-400'
+    color: 'text-sky-400',
+    isAction: true
+  },
+  {
+    cmd: '/tasks',
+    desc: 'Ouvrir le tableau de bord des tâches et sous-agents',
+    category: 'panel',
+    icon: ListTodo,
+    color: 'text-emerald-400',
+    isAction: true
+  },
+  {
+    cmd: '/files',
+    desc: 'Ouvrir l\'explorateur de fichiers du workspace',
+    category: 'panel',
+    icon: Paperclip,
+    color: 'text-teal-400',
+    isAction: true
+  },
+  {
+    cmd: '/attach',
+    desc: 'Alias de /files pour explorer et attacher des fichiers',
+    category: 'panel',
+    icon: Paperclip,
+    color: 'text-teal-400',
+    isAction: true
   },
   {
     cmd: '/git',
@@ -363,12 +430,12 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
 export function parseSlashCommand(input: string): { cmd: string; args: string } | null {
   const trimmed = input.trim();
   if (!trimmed.startsWith('/')) return null;
-  const spaceIdx = trimmed.indexOf(' ');
+  const spaceIdx = trimmed.search(/\s/);
   if (spaceIdx === -1) {
     return { cmd: trimmed.toLowerCase(), args: '' };
   }
   return {
     cmd: trimmed.slice(0, spaceIdx).toLowerCase(),
-    args: trimmed.slice(spaceIdx + 1).trim()
+    args: trimmed.slice(spaceIdx).trim()
   };
 }

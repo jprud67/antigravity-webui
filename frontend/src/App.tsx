@@ -630,6 +630,54 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
     }
   };
 
+  const handleShowStatusCard = () => {
+    const currentModelObj = models.find((m) => m.id === selectedModel);
+    const statusContent = [
+      '### 📊 État du Serveur Antigravity & Session',
+      `- **ID Session :** \`${activeConversationId || 'Session locale / Active'}\``,
+      `- **Modèle actif :** **${currentModelObj?.name || selectedModel}**`,
+      `- **Effort de réflexion :** \`${selectedEffort}\``,
+      `- **Workspace actif :** \`${currentWorkspace || '/root'}\``,
+      `- **Tokens estimés :** ${tokenUsage?.totalTokens ? tokenUsage.totalTokens.toLocaleString() : '0'} tokens (${tokenUsage?.inputTokens ? tokenUsage.inputTokens.toLocaleString() : 0} in / ${tokenUsage?.outputTokens ? tokenUsage.outputTokens.toLocaleString() : 0} out)`,
+      `- **Messages :** ${messages.length}`,
+      `- **Statut d'exécution :** ${isStreaming ? '⚡ **En cours de streaming**' : '🟢 **Prêt / En attente**'}`
+    ].join('\n');
+
+    const statusMsg: ChatMessage = {
+      id: `status-${Date.now()}`,
+      role: 'assistant',
+      content: statusContent,
+      timestamp: new Date().toISOString()
+    };
+    setMessages((prev) => [...prev, statusMsg]);
+  };
+
+  const handleRetry = () => {
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+    if (lastUserMsg && lastUserMsg.content) {
+      handleSendMessage(lastUserMsg.content, {
+        model: selectedModel,
+        effort: selectedEffort,
+        autoApprove: true,
+        mode: 'normal'
+      });
+    }
+  };
+
+  const handleUndo = () => {
+    setMessages((prev) => {
+      if (prev.length === 0) return prev;
+      const next = [...prev];
+      if (next[next.length - 1]?.role === 'assistant') {
+        next.pop();
+      }
+      if (next.length > 0 && next[next.length - 1]?.role === 'user') {
+        next.pop();
+      }
+      return next;
+    });
+  };
+
   const activeConv = conversations.find((c) => c.conversation_id === activeConversationId);
   const currentModelObj = models.find((m) => m.id === selectedModel);
   const displayModelName = currentModelObj ? currentModelObj.name : 'Gemini 3.8 Flash';
@@ -733,6 +781,8 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
           onOpenCrons={() => setIsCronModalOpen(true)}
           onOpenRules={() => setIsRulesModalOpen(true)}
           onOpenSkills={handleOpenSkills}
+          onOpenTasks={() => setIsTaskDashboardOpen(true)}
+          onOpenLanguages={handleOpenLanguages}
           onOpenFileExplorer={() => setIsFileExplorerOpen(true)}
           onOpenWorkspace={() => setIsWorkspacesOpen(true)}
           onOpenExport={() => setIsArtifactsOpen(true)}
@@ -745,6 +795,9 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
               });
             }
           }}
+          onRetry={handleRetry}
+          onUndo={handleUndo}
+          onShowStatus={handleShowStatusCard}
         />
       </main>
 
