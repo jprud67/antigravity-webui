@@ -1,4 +1,5 @@
 import os
+import uuid
 import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -132,7 +133,7 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
     resolved_path = _validate_path_access(file_path)
     try:
         resolved_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = resolved_path.with_suffix(resolved_path.suffix + ".tmp")
+        tmp_path = resolved_path.parent / f".{resolved_path.name}.tmp.{uuid.uuid4().hex[:8]}"
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(req.content)
         tmp_path.replace(resolved_path)

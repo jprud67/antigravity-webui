@@ -80,7 +80,7 @@ app.include_router(google_router)
 app.include_router(events_router)  # SSE real-time sync CLI ↔ WebUI
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health_check():
     return {"status": "ok", "service": "antigravity-webui"}
 
@@ -89,7 +89,7 @@ FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "di
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 
-    @app.get("/{full_path:path}")
+    @app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
     async def serve_frontend(full_path: str):
         if full_path in ("api", "ws") or full_path.startswith(("api/", "ws/")):
             raise HTTPException(status_code=404, detail="API route not found")

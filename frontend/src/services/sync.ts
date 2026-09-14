@@ -23,6 +23,7 @@ class SyncSSEClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectDelay = 2000;
   private maxReconnectDelay = 30000;
+  private hasConnectedOnce = false;
 
   connect() {
     if (this.es && (this.es.readyState === EventSource.OPEN || this.es.readyState === EventSource.CONNECTING)) {
@@ -36,6 +37,11 @@ class SyncSSEClient {
 
     this.es.onopen = () => {
       console.log('[SSE] Connected to sync stream');
+      if (this.hasConnectedOnce) {
+        // Reconnected after drop: notify listeners to immediately refresh conversations
+        this.listeners.forEach(cb => cb({ type: 'conversations_updated' }));
+      }
+      this.hasConnectedOnce = true;
       this.reconnectDelay = 2000; // reset backoff on success
     };
 

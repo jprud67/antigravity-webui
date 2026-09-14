@@ -114,7 +114,12 @@ def get_git_status(workspace: Optional[str] = Query(None), _ = Depends(require_a
 
         x = line[0]
         y = line[1]
-        path = line[3:].strip()
+        raw_path = line[3:].strip()
+        # Handle renames: 'old_path -> new_path'
+        if " -> " in raw_path:
+            path = raw_path.split(" -> ")[1].strip().strip('"')
+        else:
+            path = raw_path.strip('"')
 
         if x == "?" and y == "?":
             untracked.append(path)

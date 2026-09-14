@@ -209,9 +209,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={onNewConversation}
-          className="p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center"
+        <a
+          href="/"
+          onClick={(e) => {
+            if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+              e.preventDefault();
+              onNewConversation();
+            }
+          }}
+          className="p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center no-underline"
           style={{
             backgroundColor: 'var(--accent-bg)',
             borderColor: 'var(--accent)',
@@ -220,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title={t('new_session', 'Nouvelle session')}
         >
           <Plus className="w-4 h-4" />
-        </button>
+        </a>
       </div>
 
       {/* Workspace Selector Bar */}
@@ -327,16 +333,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 const isBranch = !!conv.parent_conversation_id;
 
                 return (
-                  <div
+                  <a
                     key={conv.conversation_id}
-                    className="group relative w-full text-left p-2.5 rounded-xl text-xs transition-all flex flex-col gap-1.5 border cursor-pointer"
+                    href={`/c/${conv.conversation_id}`}
+                    className="group relative w-full text-left p-2.5 rounded-xl text-xs transition-all flex flex-col gap-1.5 border cursor-pointer no-underline block"
                     style={{
                       backgroundColor: isSelected ? 'var(--surface)' : 'transparent',
                       borderColor: isSelected ? 'var(--accent)' : 'transparent',
                       color: isSelected ? 'var(--strong)' : 'var(--text)',
                       boxShadow: isSelected ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
                     }}
-                    onClick={() => onSelectConversation(conv.conversation_id)}
+                    onClick={(e) => {
+                      if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+                        e.preventDefault();
+                        onSelectConversation(conv.conversation_id);
+                      }
+                    }}
                   >
                     {/* Header line: Project color, icon, title, pin & more */}
                     <div className="flex items-center justify-between gap-1 min-w-0">
@@ -371,6 +383,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <button
                             type="button"
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
                               onTogglePin(conv.conversation_id, isPinned);
                             }}
@@ -388,6 +401,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <button
                             type="button"
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
                               onEditSessionMeta(conv);
                             }}
@@ -444,7 +458,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <span>{conv.step_count}st</span>
                       </div>
                     </div>
-                  </div>
+                  </a>
                 );
               })}
             </div>

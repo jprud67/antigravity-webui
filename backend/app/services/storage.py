@@ -240,10 +240,36 @@ def fork_conversation(
     new_logs_dir = new_conv_dir / ".system_generated" / "logs"
     new_logs_dir.mkdir(parents=True, exist_ok=True)
 
-    # Write new transcript.jsonl
+    # Write new transcript.jsonl and transcript_full.jsonl
     transcript_path = new_logs_dir / "transcript.jsonl"
+    transcript_full_path = new_logs_dir / "transcript_full.jsonl"
+
+    # Read full steps if available from source
+    source_full_file = BRAIN_DIR / source_conversation_id / ".system_generated" / "logs" / "transcript_full.jsonl"
+    source_full_steps = []
+    if source_full_file.exists():
+        try:
+            with open(source_full_file, "r", encoding="utf-8") as sf:
+                for line in sf:
+                    line = line.strip()
+                    if line:
+                        source_full_steps.append(json.loads(line))
+        except Exception:
+            source_full_steps = []
+
+    forked_full_steps = [s for s in source_full_steps if s.get("step_index", 0) <= up_to_step_index] if source_full_steps else forked_steps
+    if not forked_full_steps:
+        forked_full_steps = forked_steps
+
     with open(transcript_path, "w", encoding="utf-8") as f:
         for step in forked_steps:
+            cloned = dict(step)
+            if "conversation_id" in cloned:
+                cloned["conversation_id"] = new_id
+            f.write(json.dumps(cloned, ensure_ascii=False) + "\n")
+
+    with open(transcript_full_path, "w", encoding="utf-8") as f:
+        for step in forked_full_steps:
             cloned = dict(step)
             if "conversation_id" in cloned:
                 cloned["conversation_id"] = new_id
@@ -835,5 +861,7 @@ def save_settings(new_settings: Dict[str, Any]) -> Dict[str, Any]:
     current = get_settings()
     current.update(new_settings)
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS_FILE.write_text(json.dumps(current, indent=2), encoding="utf-8")
+    tmp_file = SETTINGS_FILE.parent / f".settings.json.tmp.{uuid.uuid4().hex[:8]}"
+    tmp_file.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp_file.replace(SETTINGS_FILE)
     return current

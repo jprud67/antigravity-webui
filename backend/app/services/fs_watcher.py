@@ -31,7 +31,16 @@ async def _broadcast(event: Dict[str, Any]) -> None:
         try:
             q.put_nowait(event)
         except asyncio.QueueFull:
-            dead.add(q)
+            # Drain oldest event to make room for newer state rather than evicting client
+            try:
+                q.get_nowait()
+                q.task_done()
+            except Exception:
+                pass
+            try:
+                q.put_nowait(event)
+            except Exception:
+                dead.add(q)
     for q in dead:
         _subscribers.discard(q)
 

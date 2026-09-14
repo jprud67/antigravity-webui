@@ -24,6 +24,7 @@ import {
   clearAuthToken,
   forkConversation,
   updateConversationMetadata,
+  updateConversationTitle,
   undoConversationTurn,
   fetchGoogleAccounts,
   saveSettings,
@@ -32,6 +33,25 @@ import {
 import { chatSocket } from './services/ws';
 import { syncClient } from './services/sync';
 import { getStoredTheme, getStoredSkin, applyAppearance } from './services/theme';
+
+export const getConvIdFromPath = (pathname: string): string | null => {
+  const match = pathname.match(/^\/(?:c|chat)\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1] && match[1] !== 'new') {
+    return match[1];
+  }
+  return null;
+};
+
+export const navigateToConversation = (convId: string | null, replace = false) => {
+  const targetPath = convId ? `/c/${convId}` : '/';
+  if (window.location.pathname !== targetPath) {
+    if (replace) {
+      window.history.replaceState({ convId }, '', targetPath);
+    } else {
+      window.history.pushState({ convId }, '', targetPath);
+    }
+  }
+};
 
 export function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -169,6 +189,35 @@ export function App() {
     };
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Browser History Back / Forward navigation (popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      const convId = getConvIdFromPath(window.location.pathname);
+      if (convId) {
+        handleSelectConversation(convId, false);
+      } else {
+        setActiveConversationId(null);
+        setMessages([]);
+        setTokenUsage(undefined);
+        setQueueCount(0);
+        setPendingApproval(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Synchronize browser tab title with active conversation
+  useEffect(() => {
+    const activeConv = conversations.find((c) => c.conversation_id === activeConversationId);
+    const title = activeConv?.customTitle || activeConv?.title;
+    if (title) {
+      document.title = `${title} · Antigravity`;
+    } else {
+      document.title = 'Antigravity WebUI';
+    }
+  }, [activeConversationId, conversations]);
+
 
   const loadInitialData = async () => {
     try {
@@ -222,6 +271,12 @@ export function App() {
 
       if (settings.trustedWorkspaces && settings.trustedWorkspaces.length > 0) {
         setCurrentWorkspace(settings.trustedWorkspaces[0]);
+      }
+
+      // Check if URL matches a conversation route (/c/:id or /chat/:id)
+      const routeConvId = getConvIdFromPath(window.location.pathname);
+      if (routeConvId) {
+        await handleSelectConversation(routeConvId, false);
       }
     } catch (e) {
       console.error('Error loading initial data:', e);
@@ -287,7 +342,10 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
 };
 
   // Switch Conversation
-  const handleSelectConversation = async (convId: string) => {
+  const handleSelectConversation = async (convId: string, updateUrl = true) => {
+    if (updateUrl) {
+      navigateToConversation(convId);
+    }
     setActiveConversationId(convId);
     try {
       const data = await fetchConversationTranscript(convId);
@@ -336,6 +394,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
   };
 
   const handleNewConversation = () => {
+    navigateToConversation(null);
     setActiveConversationId(null);
     setMessages([]);
     setTokenUsage(undefined);
@@ -349,6 +408,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
       if (event.event === 'init') {
         if (event.conversation_id && !activeConversationIdRef.current) {
           setActiveConversationId(event.conversation_id);
+          navigateToConversation(event.conversation_id, true);
         }
       } else if (event.event === 'step_update') {
         const update = event.step_update;
@@ -356,6 +416,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
 
         if (update.conversation_id && !activeConversationIdRef.current) {
           setActiveConversationId(update.conversation_id);
+          navigateToConversation(update.conversation_id, true);
         }
 
         // Live Context & Token Telemetry
@@ -973,7 +1034,13 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
           onForkMessage={() => handleForkMessage(messages.length > 0 ? messages.length - 1 : 0)}
           onRenameTitle={(newTitle) => {
             if (activeConversationId) {
-              updateConversationMetadata(activeConversationId, { customTitle: newTitle }).then(() => {
+              Promise.all([
+                updateConversationMetadata(activeConversationId, { customTitle: newTitle }),
+                updateConversationTitle(activeConversationId, newTitle)
+              ]).then(() => {
+                fetchConversations(100).then(setConversations);
+              }).catch((err) => {
+                console.error('Failed to sync title:', err);
                 fetchConversations(100).then(setConversations);
               });
             }

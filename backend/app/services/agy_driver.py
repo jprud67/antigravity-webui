@@ -155,7 +155,7 @@ async def stream_turn(
     
     resolved_model, resolved_effort = resolve_model_and_effort(model, effort)
 
-    cmd = [AGY_BIN, "--output-format", "stream-json"]
+    cmd = [AGY_BIN, "--output-format", "stream-json", "--print-timeout", "30m"]
 
     if auto_approve:
         cmd.append("--dangerously-skip-permissions")
