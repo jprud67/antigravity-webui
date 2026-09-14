@@ -5,12 +5,14 @@ import shutil
 import time
 import re
 import asyncio
+import pty
+import select
 import subprocess
 import logging
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse, parse_qs
 from pathlib import Path
-from app.config import AGY_BIN
+from app.config import AGY_BIN, HOME
 
 logger = logging.getLogger("antigravity.google_auth")
 
@@ -172,37 +174,62 @@ def start_google_login_flow() -> Dict[str, Any]:
     if TOKEN_FILE.exists():
         shutil.move(TOKEN_FILE, stash_path)
 
+    master_fd = None
     try:
+        master_fd, slave_fd = pty.openpty()
+        env = os.environ.copy()
+        env["HOME"] = str(HOME)
+
         proc = subprocess.Popen(
             [AGY_BIN, "-p", "auth_login_init"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            close_fds=True,
+            env=env,
+            cwd=str(HOME)
         )
+        os.close(slave_fd)
 
         auth_url = None
+        output = ""
         start_time = time.time()
 
-        # Read stderr to catch the auth URL
-        while time.time() - start_time < 10:
-            line = proc.stderr.readline()
-            if not line:
-                break
-            if "https://accounts.google.com/o/oauth2/auth" in line:
-                auth_url = line.strip()
-                break
+        # Read master_fd with select to catch the auth URL
+        while time.time() - start_time < 12:
+            r, _, _ = select.select([master_fd], [], [], 0.2)
+            if master_fd in r:
+                try:
+                    chunk = os.read(master_fd, 4096).decode("utf-8", errors="ignore")
+                except OSError:
+                    break
+                if not chunk:
+                    break
+                output += chunk
+                match = re.search(r"https://accounts\.google\.com/o/oauth2/auth[^\s\r\n]+", output)
+                if match:
+                    auth_url = match.group(0)
+                    break
 
         if not auth_url:
+            logger.error(f"Failed to capture Google auth URL. agy output: {output!r}")
+            if master_fd is not None:
+                try:
+                    os.close(master_fd)
+                except Exception:
+                    pass
             # Restore token on failure
             if stash_path.exists():
                 shutil.move(stash_path, TOKEN_FILE)
-            proc.kill()
+            try:
+                proc.kill()
+            except Exception:
+                pass
             raise RuntimeError("Impossible de récupérer l'URL de connexion Google depuis Antigravity.")
 
         _LOGIN_SESSIONS[session_id] = {
             "proc": proc,
+            "master_fd": master_fd,
             "started_at": time.time(),
             "stash_path": str(stash_path),
             "auth_url": auth_url
@@ -215,6 +242,11 @@ def start_google_login_flow() -> Dict[str, Any]:
             "timeout_seconds": 180
         }
     except Exception as e:
+        if master_fd is not None:
+            try:
+                os.close(master_fd)
+            except Exception:
+                pass
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
         raise e
@@ -226,6 +258,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
         raise ValueError("Session de connexion expirée ou invalide.")
 
     proc: subprocess.Popen = session["proc"]
+    master_fd = session.get("master_fd")
     stash_path = Path(session["stash_path"])
 
     code = raw_input.strip()
@@ -243,18 +276,27 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
         raise ValueError("Code d'autorisation vide.")
 
     try:
-        proc.stdin.write(f"{code}\n")
-        proc.stdin.flush()
+        if master_fd is not None:
+            os.write(master_fd, f"{code}\n".encode("utf-8"))
 
         # Wait for agy to complete token exchange
-        stdout, stderr = proc.communicate(timeout=15)
-        logger.info(f"agy auth response: {stdout} {stderr}")
+        start_wait = time.time()
+        while time.time() - start_wait < 20:
+            if proc.poll() is not None:
+                break
+            time.sleep(0.3)
+
+        if master_fd is not None:
+            try:
+                os.close(master_fd)
+            except Exception:
+                pass
 
         if not TOKEN_FILE.exists():
             # Auth failed, restore previous token
             if stash_path.exists():
                 shutil.move(stash_path, TOKEN_FILE)
-            raise RuntimeError(f"Échec de l'échange du jeton avec Google: {stderr or stdout}")
+            raise RuntimeError("Échec de l'échange du jeton avec Google: le token n'a pas été généré.")
 
         # Auth succeeded! Clean up stash
         if stash_path.exists():
@@ -271,15 +313,16 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
             "active_account": active_meta,
             "message": f"Nouveau compte Google connecté avec succès : {active_meta.get('email')}"
         }
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        if stash_path.exists():
-            shutil.move(stash_path, TOKEN_FILE)
-        if session_id in _LOGIN_SESSIONS:
-            del _LOGIN_SESSIONS[session_id]
-        raise TimeoutError("Le délai d'attente d'authentification a expiré.")
     except Exception as e:
-        proc.kill()
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        if master_fd is not None:
+            try:
+                os.close(master_fd)
+            except Exception:
+                pass
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
         if session_id in _LOGIN_SESSIONS:
@@ -290,6 +333,12 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
 def cancel_google_login_flow(session_id: str) -> Dict[str, Any]:
     session = _LOGIN_SESSIONS.pop(session_id, None)
     if session:
+        master_fd = session.get("master_fd")
+        if master_fd is not None:
+            try:
+                os.close(master_fd)
+            except Exception:
+                pass
         try:
             session["proc"].kill()
         except Exception:
