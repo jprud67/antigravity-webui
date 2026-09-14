@@ -7,28 +7,46 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   models: ModelOption[];
+  currentModel: string;
+  onModelSaved: (modelId: string) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   models,
+  currentModel,
+  onModelSaved,
 }) => {
   const [settings, setSettings] = useState<AppSettings>({});
+  const [selectedModelId, setSelectedModelId] = useState(currentModel);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      fetchSettings().then((s) => setSettings(s));
+      setSelectedModelId(currentModel);
+      fetchSettings().then((s) => {
+        setSettings(s);
+        if (s.model) {
+          const match = models.find((m) => m.name === s.model || m.id === s.model);
+          if (match) setSelectedModelId(match.id);
+        }
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, currentModel, models]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const updated = await saveSettings(settings);
+      const match = models.find((m) => m.id === selectedModelId);
+      const updatedSettings = {
+        ...settings,
+        model: match?.name || selectedModelId
+      };
+      const updated = await saveSettings(updatedSettings);
       setSettings(updated);
+      onModelSaved(selectedModelId);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 2500);
     } finally {
@@ -68,14 +86,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Cpu className="w-3.5 h-3.5 text-sky-400" />
               <span>Modèle d'IA Principal</span>
             </label>
-            <p className="text-[11px] text-slate-400">Sélectionnez le modèle Gemini ou compatible pour vos sessions autonomes.</p>
+            <p className="text-[11px] text-slate-400">Sélectionnez le modèle Gemini ou compatible par défaut pour vos sessions.</p>
             <select
-              value={settings.model || ''}
-              onChange={(e) => setSettings({ ...settings, model: e.target.value })}
-              className="w-full bg-[#0d1322] border border-slate-700/80 rounded-xl p-3 text-slate-200 font-mono text-xs focus:border-sky-500 outline-none transition-colors"
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              className="w-full bg-[#0d1322] border border-slate-700/80 rounded-xl p-3 text-slate-200 font-mono text-xs focus:border-sky-500 outline-none transition-colors cursor-pointer"
             >
               {models.map((m) => (
-                <option key={m.id} value={m.name}>
+                <option key={m.id} value={m.id}>
                   {m.name} ({m.id})
                 </option>
               ))}

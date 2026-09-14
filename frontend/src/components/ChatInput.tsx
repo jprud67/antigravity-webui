@@ -10,7 +10,8 @@ import {
   Clock,
   Sparkles,
   Globe,
-  MessageSquareCode
+  MessageSquareCode,
+  SlidersHorizontal
 } from 'lucide-react';
 import type { ModelOption } from '../types';
 
@@ -21,6 +22,8 @@ interface ChatInputProps {
   models: ModelOption[];
   selectedModel: string;
   onSelectModel: (m: string) => void;
+  selectedEffort: 'low' | 'medium' | 'high';
+  onSelectEffort: (e: 'low' | 'medium' | 'high') => void;
   initialPrompt?: string;
 }
 
@@ -40,10 +43,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   models,
   selectedModel,
   onSelectModel,
+  selectedEffort,
+  onSelectEffort,
   initialPrompt = ''
 }) => {
   const [prompt, setPrompt] = useState(initialPrompt);
-  const [effort, setEffort] = useState<'low' | 'medium' | 'high'>('high');
   const [autoApprove, setAutoApprove] = useState(true);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashFilter, setSlashFilter] = useState('');
@@ -62,6 +66,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   }, [prompt]);
+
+  const currentModelObj = models.find((m) => m.id === selectedModel);
+  const supportedEfforts = currentModelObj?.supported_efforts ?? ['high', 'medium', 'low'];
+  const hasEffortSupport = supportedEfforts.length > 0;
+
+  // Handle Model change
+  const handleModelChange = (newModelId: string) => {
+    onSelectModel(newModelId);
+    const newModelObj = models.find((m) => m.id === newModelId);
+    if (newModelObj?.effort) {
+      onSelectEffort(newModelObj.effort as any);
+    } else if (newModelObj?.supported_efforts && newModelObj.supported_efforts.length > 0) {
+      if (!newModelObj.supported_efforts.includes(selectedEffort)) {
+        onSelectEffort(newModelObj.supported_efforts[0] as any);
+      }
+    }
+  };
+
+  // Handle Effort change
+  const handleEffortChange = (newEffort: 'low' | 'medium' | 'high') => {
+    onSelectEffort(newEffort);
+    const familyId = currentModelObj?.family_id || selectedModel;
+    const matchingVariant = models.find(
+      (m) => m.family_id === familyId && m.effort === newEffort
+    );
+    if (matchingVariant) {
+      onSelectModel(matchingVariant.id);
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -94,7 +127,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     if (!prompt.trim() || isStreaming) return;
     onSendMessage(prompt.trim(), {
       model: selectedModel,
-      effort,
+      effort: hasEffortSupport ? selectedEffort : undefined,
       autoApprove,
     });
     setPrompt('');
@@ -162,7 +195,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             {/* Model Selector */}
             <select
               value={selectedModel}
-              onChange={(e) => onSelectModel(e.target.value)}
+              onChange={(e) => handleModelChange(e.target.value)}
               className="bg-[#080c16] text-slate-300 border border-slate-700/70 hover:border-slate-600 rounded-lg px-2.5 py-1 text-[11px] font-mono outline-none focus:border-sky-500 transition-colors cursor-pointer"
             >
               {models.map((m) => (
@@ -172,17 +205,38 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               ))}
             </select>
 
-            {/* Effort Selector */}
-            <select
-              value={effort}
-              onChange={(e) => setEffort(e.target.value as any)}
-              className="bg-[#080c16] text-slate-300 border border-slate-700/70 hover:border-slate-600 rounded-lg px-2.5 py-1 text-[11px] font-mono outline-none focus:border-sky-500 transition-colors cursor-pointer"
-              title="Niveau de réflexion / Thinking"
-            >
-              <option value="high">Effort: Haut (High)</option>
-              <option value="medium">Effort: Moyen (Med)</option>
-              <option value="low">Effort: Rapide (Low)</option>
-            </select>
+            {/* Effort Selector - Synchronized with Model */}
+            {hasEffortSupport ? (
+              <div className="flex items-center gap-1 bg-[#080c16] border border-slate-700/70 rounded-lg px-1.5 py-0.5">
+                <SlidersHorizontal className="w-3 h-3 text-slate-500" />
+                <select
+                  value={selectedEffort}
+                  onChange={(e) => handleEffortChange(e.target.value as any)}
+                  className="bg-transparent text-slate-300 text-[11px] font-mono outline-none cursor-pointer py-0.5"
+                  title="Niveau d'effort de raisonnement (synchronisé avec le modèle)"
+                >
+                  {supportedEfforts.includes('high') && (
+                    <option value="high" className="bg-slate-900 text-slate-200">
+                      Effort: Haut (High)
+                    </option>
+                  )}
+                  {supportedEfforts.includes('medium') && (
+                    <option value="medium" className="bg-slate-900 text-slate-200">
+                      Effort: Moyen (Med)
+                    </option>
+                  )}
+                  {supportedEfforts.includes('low') && (
+                    <option value="low" className="bg-slate-900 text-slate-200">
+                      Effort: Faible (Low)
+                    </option>
+                  )}
+                </select>
+              </div>
+            ) : (
+              <span className="text-[10px] bg-slate-900/80 border border-slate-800 text-slate-500 px-2 py-1 rounded-lg font-mono" title="Ce modèle ne requiert pas de réglage d'effort">
+                Effort: Natif
+              </span>
+            )}
 
             {/* Auto-Run Toggle */}
             <button

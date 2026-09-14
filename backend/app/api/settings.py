@@ -14,5 +14,5 @@ def update_settings(payload: Dict[str, Any]) -> Dict[str, Any]:
     return save_settings(payload)
 
 @router.get("/models")
-async def list_models() -> List[Dict[str, str]]:
+async def list_models() -> List[Dict[str, Any]]:
     return await get_available_models()

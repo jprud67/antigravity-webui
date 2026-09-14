@@ -23,6 +23,7 @@ export function App() {
 
   const [models, setModels] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash-high');
+  const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
   const [quickPrompt, setQuickPrompt] = useState('');
 
   // Modals
@@ -44,9 +45,26 @@ export function App() {
       ]);
       setConversations(convs);
       setModels(mods);
-      if (mods.length > 0) {
+
+      // Harmonize model selection from settings
+      if (settings.model && mods.length > 0) {
+        const found = mods.find(
+          (m) => m.name === settings.model || m.id === settings.model
+        );
+        if (found) {
+          setSelectedModel(found.id);
+          if (found.effort) {
+            setSelectedEffort(found.effort as any);
+          }
+        } else {
+          setSelectedModel(mods[0].id);
+          if (mods[0].effort) setSelectedEffort(mods[0].effort as any);
+        }
+      } else if (mods.length > 0) {
         setSelectedModel(mods[0].id);
+        if (mods[0].effort) setSelectedEffort(mods[0].effort as any);
       }
+
       if (settings.trustedWorkspaces && settings.trustedWorkspaces.length > 0) {
         setCurrentWorkspace(settings.trustedWorkspaces[0]);
       }
@@ -170,7 +188,6 @@ export function App() {
     prompt: string,
     options: { model?: string; effort?: string; autoApprove?: boolean }
   ) => {
-    // Append user message immediately
     const userMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
       role: 'user',
@@ -180,7 +197,6 @@ export function App() {
     setMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
 
-    // Send through WebSocket
     chatSocket.sendPrompt({
       prompt,
       conversationId: activeConversationId || undefined,
@@ -191,8 +207,17 @@ export function App() {
     });
   };
 
+  const handleModelSavedFromSettings = (newModelId: string) => {
+    setSelectedModel(newModelId);
+    const found = models.find((m) => m.id === newModelId);
+    if (found?.effort) {
+      setSelectedEffort(found.effort as any);
+    }
+  };
+
   const activeConv = conversations.find((c) => c.conversation_id === activeConversationId);
-  const currentModelName = models.find((m) => m.id === selectedModel)?.name || selectedModel;
+  const currentModelObj = models.find((m) => m.id === selectedModel);
+  const displayModelName = currentModelObj ? currentModelObj.name : selectedModel;
 
   return (
     <div className="flex h-screen w-screen bg-[#080c16] text-slate-100 font-sans overflow-hidden antialiased">
@@ -206,7 +231,7 @@ export function App() {
         onOpenWorkspaces={() => setIsWorkspacesOpen(true)}
         onOpenArtifacts={() => setIsArtifactsOpen(true)}
         currentWorkspace={currentWorkspace}
-        activeModel={currentModelName}
+        activeModel={displayModelName}
       />
 
       {/* Main Chat Area */}
@@ -215,7 +240,7 @@ export function App() {
           messages={messages}
           isStreaming={isStreaming}
           conversationTitle={activeConv?.title}
-          activeModel={currentModelName}
+          activeModel={displayModelName}
           onQuickPrompt={(p) => setQuickPrompt(p)}
         />
 
@@ -226,6 +251,8 @@ export function App() {
           models={models}
           selectedModel={selectedModel}
           onSelectModel={setSelectedModel}
+          selectedEffort={selectedEffort}
+          onSelectEffort={setSelectedEffort}
           initialPrompt={quickPrompt}
         />
       </main>
@@ -241,6 +268,8 @@ export function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         models={models}
+        currentModel={selectedModel}
+        onModelSaved={handleModelSavedFromSettings}
       />
 
       <WorkspaceModal

@@ -1,13 +1,46 @@
 import asyncio
 import json
 import logging
-from typing import AsyncGenerator, Dict, Any, Optional, List
+from typing import AsyncGenerator, Dict, Any, Optional, List, Tuple
 from pathlib import Path
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
 
 logger = logging.getLogger("antigravity.driver")
 
-async def get_available_models() -> List[Dict[str, str]]:
+def parse_model_metadata(m_id: str, m_name: str) -> Dict[str, Any]:
+    effort = None
+    family_id = m_id
+    for sfx in ['-high', '-medium', '-low']:
+        if m_id.endswith(sfx):
+            effort = sfx[1:]
+            family_id = m_id[:-len(sfx)]
+            break
+    
+    family_name = m_name
+    for sfx_label in [' (High)', ' (Medium)', ' (Low)']:
+        if family_name.endswith(sfx_label):
+            family_name = family_name[:-len(sfx_label)]
+            break
+
+    if 'claude' in m_id.lower():
+        supported_efforts = []
+    elif 'gemini-3.1-pro' in m_id.lower():
+        supported_efforts = ['high', 'low']
+    elif 'gpt-oss' in m_id.lower():
+        supported_efforts = ['medium']
+    else:
+        supported_efforts = ['high', 'medium', 'low']
+
+    return {
+        'id': m_id,
+        'name': m_name,
+        'family_id': family_id,
+        'family_name': family_name,
+        'effort': effort,
+        'supported_efforts': supported_efforts
+    }
+
+async def get_available_models() -> List[Dict[str, Any]]:
     cmd = [AGY_BIN, "models"]
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -27,10 +60,54 @@ async def get_available_models() -> List[Dict[str, str]]:
             continue
         parts = cleaned.split(None, 1)
         if len(parts) >= 2:
-            models.append({"id": parts[0].strip(), "name": parts[1].strip()})
+            m_id = parts[0].strip()
+            m_name = parts[1].strip()
+            models.append(parse_model_metadata(m_id, m_name))
         elif len(parts) == 1:
-            models.append({"id": parts[0].strip(), "name": parts[0].strip()})
+            m_id = parts[0].strip()
+            models.append(parse_model_metadata(m_id, m_id))
     return models
+
+def resolve_model_and_effort(model: Optional[str], effort: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Safely reconciles model and effort parameters for agy CLI.
+    Prevents CLI errors like 'model conflicts with --effort' or '--effort is not supported for model'.
+    """
+    if not model:
+        return None, effort
+
+    model = model.strip()
+
+    # Claude does NOT accept --effort flag at all
+    if "claude" in model.lower():
+        return model, None
+
+    # Detect base model and current suffix
+    base_model = model
+    model_suffix = None
+    for sfx in ["-high", "-medium", "-low"]:
+        if model.endswith(sfx):
+            model_suffix = sfx[1:]
+            base_model = model[:-len(sfx)]
+            break
+
+    # If effort requested
+    if effort:
+        effort_clean = effort.lower().strip()
+        
+        # Gemini 3.1 Pro only supports high and low
+        if "gemini-3.1-pro" in base_model and effort_clean == "medium":
+            effort_clean = "high"
+
+        # GPT-OSS only supports medium
+        if "gpt-oss" in base_model and effort_clean != "medium":
+            effort_clean = "medium"
+
+        # Resolve to clean concrete variant name to avoid passing contradictory --effort
+        target_model = f"{base_model}-{effort_clean}"
+        return target_model, None
+
+    return model, None
 
 async def stream_turn(
     prompt: str,
@@ -45,6 +122,8 @@ async def stream_turn(
     """
     cwd = workspace_path if workspace_path and Path(workspace_path).is_dir() else DEFAULT_WORKSPACE
     
+    resolved_model, resolved_effort = resolve_model_and_effort(model, effort)
+
     cmd = [AGY_BIN, "--output-format", "stream-json"]
 
     if auto_approve:
@@ -53,11 +132,11 @@ async def stream_turn(
     if conversation_id:
         cmd.extend(["--conversation", conversation_id])
 
-    if model:
-        cmd.extend(["--model", model])
+    if resolved_model:
+        cmd.extend(["--model", resolved_model])
 
-    if effort:
-        cmd.extend(["--effort", effort])
+    if resolved_effort:
+        cmd.extend(["--effort", resolved_effort])
 
     if workspace_path and workspace_path != "/root":
         cmd.extend(["--add-dir", workspace_path])
@@ -96,12 +175,10 @@ async def stream_turn(
         if not raw_str:
             continue
         
-        # Parse JSON event
         try:
             event_data = json.loads(raw_str)
             yield event_data
         except json.JSONDecodeError:
-            # Fallback if non-JSON log line leaks to stdout
             yield {
                 "event": "raw_output",
                 "text": raw_str

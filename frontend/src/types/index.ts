@@ -38,6 +38,10 @@ export interface ArtifactItem {
 export interface ModelOption {
   id: string;
   name: string;
+  family_id?: string;
+  family_name?: string;
+  effort?: string | null;
+  supported_efforts?: string[];
 }
 
 export interface AppSettings {
