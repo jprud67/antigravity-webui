@@ -9,15 +9,21 @@ import {
   BrainCircuit, 
   Check, 
   Copy, 
-  Terminal,
-  Sparkles,
-  Zap,
-  Code2,
-  Compass,
-  FileCheck,
-  Cpu
+  Terminal, 
+  Sparkles, 
+  Zap, 
+  Code2, 
+  Compass, 
+  FileCheck, 
+  Cpu,
+  HardDrive,
+  Activity,
+  FileText
 } from 'lucide-react';
 import type { ChatMessage } from '../types';
+import { InteractiveQuestion } from './InteractiveQuestion';
+import { MermaidRenderer } from './MermaidRenderer';
+import { DiffViewer } from './DiffViewer';
 
 interface ChatCanvasProps {
   messages: ChatMessage[];
@@ -26,6 +32,10 @@ interface ChatCanvasProps {
   activeModel?: string;
   activeEffort?: string;
   onQuickPrompt?: (prompt: string) => void;
+  onAnswerQuestion?: (answer: string) => void;
+  onOpenFiles?: () => void;
+  onOpenTasks?: () => void;
+  onOpenArtifacts?: () => void;
 }
 
 const CodeBlock = ({ inline, className, children, ...props }: any) => {
@@ -41,6 +51,13 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
   };
 
   if (!inline && match) {
+    if (language === 'mermaid') {
+      return <MermaidRenderer chart={codeContent} />;
+    }
+    if (language === 'diff') {
+      return <DiffViewer diffText={codeContent} />;
+    }
+
     return (
       <div className="relative my-4 rounded-xl overflow-hidden border border-slate-700/80 bg-[#050811] font-mono text-[11px] shadow-lg shadow-black/40">
         <div className="flex items-center justify-between px-3.5 py-2 bg-[#0d1322] border-b border-slate-800/80 text-slate-400">
@@ -80,7 +97,11 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   conversationTitle,
   activeModel,
   activeEffort,
-  onQuickPrompt
+  onQuickPrompt,
+  onAnswerQuestion,
+  onOpenFiles,
+  onOpenTasks,
+  onOpenArtifacts,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
@@ -99,7 +120,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       <div className="h-14 border-b border-slate-800/60 px-6 flex items-center justify-between bg-[#0a0f1e]/80 backdrop-blur-md shrink-0 z-10">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-100 truncate max-w-lg">
+            <span className="text-xs font-semibold text-slate-100 truncate max-w-sm">
               {conversationTitle || 'Nouvelle conversation'}
             </span>
           </div>
@@ -117,9 +138,44 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Right Tools & Status */}
+        <div className="flex items-center gap-2">
+          {/* Quick Action Badges */}
+          {onOpenFiles && (
+            <button
+              onClick={onOpenFiles}
+              className="py-1.5 px-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700/60"
+              title="Explorateur de fichiers du Workspace"
+            >
+              <HardDrive className="w-3.5 h-3.5 text-sky-400" />
+              <span className="text-[11px] font-medium hidden sm:inline">Workspace</span>
+            </button>
+          )}
+
+          {onOpenTasks && (
+            <button
+              onClick={onOpenTasks}
+              className="py-1.5 px-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700/60"
+              title="Supervision des Tâches et Sous-Agents"
+            >
+              <Activity className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="text-[11px] font-medium hidden sm:inline">Tâches</span>
+            </button>
+          )}
+
+          {onOpenArtifacts && (
+            <button
+              onClick={onOpenArtifacts}
+              className="py-1.5 px-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700/60"
+              title="Artifacts et Documents"
+            >
+              <FileText className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[11px] font-medium hidden sm:inline">Artifacts</span>
+            </button>
+          )}
+
           {isStreaming && (
-            <div className="flex items-center gap-2 text-[11px] text-amber-400 bg-amber-950/30 border border-amber-800/40 px-3 py-1 rounded-full animate-pulse shadow-sm">
+            <div className="flex items-center gap-2 text-[11px] text-amber-400 bg-amber-950/30 border border-amber-800/40 px-3 py-1 rounded-full animate-pulse shadow-sm ml-2">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
               <span className="font-medium">Antigravity réfléchit...</span>
             </div>
@@ -161,31 +217,31 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                 {
                   icon: Zap,
                   title: "/goal",
-                  desc: "Lancer une tâche autonome jusqu'au bout",
+                  desc: "Assigner un objectif autonome approfondi",
                   color: "text-amber-400 bg-amber-500/10 border-amber-500/20",
                   prompt: "/goal "
                 },
                 {
                   icon: Code2,
-                  title: "Inspecter le projet",
-                  desc: "Analyser les fichiers et proposer des optimisations",
+                  title: "Inspecter le Code",
+                  desc: "Analyser la structure et détecter les bugs",
                   color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-                  prompt: "Inspecte le projet actuel et donne-moi un résumé d'architecture."
+                  prompt: "Analyse le projet dans le workspace actif et dresse la liste des axes d'amélioration."
                 },
                 {
                   icon: FileCheck,
-                  title: "Vérifier le statut",
-                  desc: "Contrôler les services en arrière-plan et logs",
-                  color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
-                  prompt: "Vérifie les services en cours et résume l'état du serveur."
+                  title: "Vérifier le Statut",
+                  desc: "Vérifier les services et tests en cours",
+                  color: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+                  prompt: "Vérifie l'état des services et l'intégrité du code."
                 }
-              ].map((card, i) => {
+              ].map((card, idx) => {
                 const IconComp = card.icon;
                 return (
                   <button
-                    key={i}
+                    key={idx}
                     onClick={() => onQuickPrompt?.(card.prompt)}
-                    className="p-3.5 rounded-xl border border-slate-800 bg-[#0d1322]/60 hover:bg-[#121a30] hover:border-slate-700 transition-all text-left group cursor-pointer"
+                    className="p-4 rounded-2xl bg-[#0d1324]/60 hover:bg-[#111930] border border-slate-800/80 hover:border-slate-700 transition-all text-left group cursor-pointer shadow-sm"
                   >
                     <div className="flex items-center gap-2 mb-1.5">
                       <div className={`w-6 h-6 rounded-lg flex items-center justify-center border ${card.color}`}>
@@ -239,30 +295,62 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                     </div>
                   )}
 
-                  {/* Tool Execution Cards */}
+                  {/* Tool Execution Cards & Interactive Handlers */}
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
                     <div className="w-full space-y-2">
-                      {msg.toolCalls.map((tool, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-[#0b1120] border border-slate-800 rounded-xl p-3 text-xs flex flex-col gap-2 shadow-sm"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Terminal className="w-3.5 h-3.5 text-amber-400" />
-                              <span className="font-mono font-semibold text-slate-200">{tool.name}</span>
+                      {msg.toolCalls.map((tool, idx) => {
+                        // Interactive ask_question
+                        if (tool.name === 'ask_question') {
+                          return (
+                            <InteractiveQuestion
+                              key={idx}
+                              toolArgs={tool.args}
+                              onAnswer={(answer) => {
+                                if (onAnswerQuestion) {
+                                  onAnswerQuestion(answer);
+                                } else {
+                                  onQuickPrompt?.(answer);
+                                }
+                              }}
+                            />
+                          );
+                        }
+
+                        // Diff Viewer for replace_file_content
+                        if (tool.name === 'replace_file_content' && tool.args) {
+                          const diffSnippet = `--- ${tool.args.TargetFile || 'original'}\n+++ ${tool.args.TargetFile || 'modifié'}\n@@ -${tool.args.StartLine || 1} +${tool.args.StartLine || 1} @@\n${(tool.args.TargetContent || '').split('\n').map((l: string) => '-' + l).join('\n')}\n${(tool.args.ReplacementContent || '').split('\n').map((l: string) => '+' + l).join('\n')}`;
+                          return (
+                            <DiffViewer
+                              key={idx}
+                              filename={tool.args.TargetFile}
+                              title={`replace_file_content: ${tool.args.Instruction || tool.args.Description || ''}`}
+                              diffText={diffSnippet}
+                            />
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={idx}
+                            className="bg-[#0b1120] border border-slate-800 rounded-xl p-3 text-xs flex flex-col gap-2 shadow-sm"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Terminal className="w-3.5 h-3.5 text-amber-400" />
+                                <span className="font-mono font-semibold text-slate-200">{tool.name}</span>
+                              </div>
+                              <span className="text-[9px] uppercase tracking-wider font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded-full">
+                                {tool.status || 'succès'}
+                              </span>
                             </div>
-                            <span className="text-[9px] uppercase tracking-wider font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded-full">
-                              {tool.status || 'succès'}
-                            </span>
+                            {tool.args && (
+                              <pre className="text-[10px] font-mono bg-[#050811] p-2.5 rounded-lg border border-slate-800/80 text-slate-400 overflow-x-auto">
+                                {typeof tool.args === 'string' ? tool.args : JSON.stringify(tool.args, null, 2)}
+                              </pre>
+                            )}
                           </div>
-                          {tool.args && (
-                            <pre className="text-[10px] font-mono bg-[#050811] p-2.5 rounded-lg border border-slate-800/80 text-slate-400 overflow-x-auto">
-                              {typeof tool.args === 'string' ? tool.args : JSON.stringify(tool.args, null, 2)}
-                            </pre>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 

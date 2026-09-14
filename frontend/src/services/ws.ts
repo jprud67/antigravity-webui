@@ -3,15 +3,25 @@ type EventCallback = (event: any) => void;
 export class ChatWebSocketClient {
   private ws: WebSocket | null = null;
   private listeners: EventCallback[] = [];
+  private reconnectTimer: any = null;
 
   constructor() {
-    this.connect();
+    // Connect if token exists or will be connected on login
+    const token = localStorage.getItem('antigravity_token');
+    if (token) {
+      this.connect();
+    }
   }
 
-  private connect() {
+  public connect() {
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
-    const url = `${protocol}//${host}/ws/chat`;
+    const token = localStorage.getItem('antigravity_token');
+    const url = `${protocol}//${host}/ws/chat${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 
     try {
       this.ws = new WebSocket(url);
@@ -29,9 +39,14 @@ export class ChatWebSocketClient {
         }
       };
 
-      this.ws.onclose = () => {
-        console.log('[WS] Disconnected. Reconnecting in 2s...');
-        setTimeout(() => this.connect(), 2000);
+      this.ws.onclose = (event) => {
+        console.log(`[WS] Disconnected (${event.code}).`);
+        if (event.code === 1008) {
+          // Unauthorized - do not reconnect automatically
+          return;
+        }
+        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = setTimeout(() => this.connect(), 2000);
       };
 
       this.ws.onerror = (err) => {
@@ -39,8 +54,19 @@ export class ChatWebSocketClient {
       };
     } catch (e) {
       console.error('[WS] Connection exception:', e);
-      setTimeout(() => this.connect(), 3000);
+      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = setTimeout(() => this.connect(), 3000);
     }
+  }
+
+  public reconnect() {
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch (e) {}
+      this.ws = null;
+    }
+    this.connect();
   }
 
   public subscribe(cb: EventCallback) {
@@ -59,7 +85,8 @@ export class ChatWebSocketClient {
     autoApprove?: boolean;
   }) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket is not connected');
+      this.connect();
+      throw new Error('Connexion WebSocket en cours de rétablissement. Réessayez dans un instant.');
     }
 
     const payload = {

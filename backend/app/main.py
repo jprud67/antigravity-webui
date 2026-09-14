@@ -10,6 +10,10 @@ from app.api.artifacts import router as art_router
 from app.api.settings import router as set_router
 from app.api.workspaces import router as ws_router
 from app.api.chat import router as chat_router
+from app.api.auth import router as auth_router
+from app.api.files import router as files_router
+from app.api.tasks import router as tasks_router
+from app.api.skills import router as skills_router
 
 app = FastAPI(
     title="Antigravity WebUI",
@@ -25,12 +29,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API routes first
+# API routes
+app.include_router(auth_router)
 app.include_router(conv_router)
 app.include_router(art_router)
 app.include_router(set_router)
 app.include_router(ws_router)
 app.include_router(chat_router)
+app.include_router(files_router)
+app.include_router(tasks_router)
+app.include_router(skills_router)
 
 @app.get("/api/health")
 def health_check():

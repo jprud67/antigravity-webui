@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import type { ArtifactItem } from '../types';
 import { fetchArtifacts, fetchArtifactContent } from '../services/api';
+import { MermaidRenderer } from './MermaidRenderer';
+import { DiffViewer } from './DiffViewer';
 
 interface ArtifactViewerProps {
   isOpen: boolean;
@@ -183,7 +185,27 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
                     </div>
                   ) : selectedArtifact.filename.endsWith('.md') ? (
                     <div className="markdown-content max-w-none">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          code: ({ inline, className, children, ...props }: any) => {
+                            const match = /language-(\w+)/.exec(className || '');
+                            const language = match ? match[1] : '';
+                            const codeContent = String(children).replace(/\n$/, '');
+                            if (!inline && language === 'mermaid') {
+                              return <MermaidRenderer chart={codeContent} />;
+                            }
+                            if (!inline && language === 'diff') {
+                              return <DiffViewer diffText={codeContent} />;
+                            }
+                            return (
+                              <code className={className} {...props}>
+                                {children}
+                              </code>
+                            );
+                          }
+                        }}
+                      >
                         {content}
                       </ReactMarkdown>
                     </div>

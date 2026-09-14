@@ -5,12 +5,17 @@ import { ChatInput } from './components/ChatInput';
 import { ArtifactViewer } from './components/ArtifactViewer';
 import { SettingsModal } from './components/SettingsModal';
 import { WorkspaceModal } from './components/WorkspaceModal';
+import { LoginModal } from './components/LoginModal';
+import { FileExplorerModal } from './components/FileExplorerModal';
+import { TaskDashboardModal } from './components/TaskDashboardModal';
 import type { Conversation, ChatMessage, ModelOption } from './types';
 import { 
   fetchConversations, 
   fetchConversationTranscript, 
   fetchModels, 
-  fetchSettings 
+  fetchSettings,
+  checkAuthStatus,
+  clearAuthToken
 } from './services/api';
 import { chatSocket } from './services/ws';
 
@@ -26,10 +31,14 @@ export function App() {
   const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
   const [quickPrompt, setQuickPrompt] = useState('');
 
-  // Modals
+  // Authentication & Modals State
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isWorkspacesOpen, setIsWorkspacesOpen] = useState(false);
+  const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(false);
+  const [isTaskDashboardOpen, setIsTaskDashboardOpen] = useState(false);
 
   // Initialize
   useEffect(() => {
@@ -38,6 +47,15 @@ export function App() {
 
   const loadInitialData = async () => {
     try {
+      const auth = await checkAuthStatus();
+      if (auth.enabled && !auth.authenticated) {
+        setIsAuthenticated(false);
+        setIsAuthModalOpen(true);
+        return;
+      }
+      setIsAuthenticated(true);
+      setIsAuthModalOpen(false);
+
       const [convs, mods, settings] = await Promise.all([
         fetchConversations(50),
         fetchModels(),
@@ -79,6 +97,18 @@ export function App() {
     } catch (e) {
       console.error('Error loading initial data:', e);
     }
+  };
+
+  const handleLoginSuccess = () => {
+    setIsAuthenticated(true);
+    setIsAuthModalOpen(false);
+    loadInitialData();
+  };
+
+  const handleLogout = () => {
+    clearAuthToken();
+    setIsAuthenticated(false);
+    setIsAuthModalOpen(true);
   };
 
   // Switch Conversation
@@ -223,6 +253,10 @@ export function App() {
     }
   };
 
+  const handleInsertPath = (pathWithPrefix: string) => {
+    setQuickPrompt((prev) => (prev ? `${prev} ${pathWithPrefix}` : pathWithPrefix));
+  };
+
   const activeConv = conversations.find((c) => c.conversation_id === activeConversationId);
   const currentModelObj = models.find((m) => m.id === selectedModel);
   const displayModelName = currentModelObj ? currentModelObj.name : 'Gemini 3.8 Flash';
@@ -239,6 +273,9 @@ export function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenWorkspaces={() => setIsWorkspacesOpen(true)}
         onOpenArtifacts={() => setIsArtifactsOpen(true)}
+        onOpenFiles={() => setIsFileExplorerOpen(true)}
+        onOpenTasks={() => setIsTaskDashboardOpen(true)}
+        onLogout={handleLogout}
         currentWorkspace={currentWorkspace}
         activeModel={displayModelName}
         activeEffort={displayEffort}
@@ -253,6 +290,15 @@ export function App() {
           activeModel={displayModelName}
           activeEffort={displayEffort}
           onQuickPrompt={(p) => setQuickPrompt(p)}
+          onAnswerQuestion={(ans) =>
+            handleSendMessage(ans, {
+              model: selectedModel,
+              effort: selectedEffort,
+            })
+          }
+          onOpenFiles={() => setIsFileExplorerOpen(true)}
+          onOpenTasks={() => setIsTaskDashboardOpen(true)}
+          onOpenArtifacts={() => setIsArtifactsOpen(true)}
         />
 
         <ChatInput
@@ -269,6 +315,24 @@ export function App() {
       </main>
 
       {/* Modals & Panels */}
+      <LoginModal
+        isOpen={isAuthModalOpen || !isAuthenticated}
+        onSuccess={handleLoginSuccess}
+      />
+
+      <FileExplorerModal
+        isOpen={isFileExplorerOpen}
+        onClose={() => setIsFileExplorerOpen(false)}
+        currentWorkspace={currentWorkspace}
+        onInsertPath={handleInsertPath}
+      />
+
+      <TaskDashboardModal
+        isOpen={isTaskDashboardOpen}
+        onClose={() => setIsTaskDashboardOpen(false)}
+        conversationId={activeConversationId}
+      />
+
       <ArtifactViewer
         isOpen={isArtifactsOpen}
         onClose={() => setIsArtifactsOpen(false)}

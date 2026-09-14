@@ -15,8 +15,16 @@ class PromptRequest(BaseModel):
     effort: Optional[str] = None
     auto_approve: bool = True
 
+from app.services.auth import verify_access_token, get_auth_config
+
 @router.websocket("/ws/chat")
-async def chat_websocket(websocket: WebSocket):
+async def chat_websocket(websocket: WebSocket, token: Optional[str] = None):
+    config = get_auth_config()
+    if config.get("enabled", True) and not verify_access_token(token):
+        await websocket.close(code=1008, reason="Unauthorized")
+        logger.warning("Rejected unauthenticated WebSocket connection to /ws/chat")
+        return
+
     await websocket.accept()
     logger.info("WebSocket client connected to /ws/chat")
     try:
