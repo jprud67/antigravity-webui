@@ -23,7 +23,10 @@ import {
   PanelRight,
   Download,
   Globe,
-  Edit3
+  Edit3,
+  Kanban as KanbanIcon,
+  Clock,
+  ShieldCheck
 } from 'lucide-react';
 import type { ChatMessage } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
@@ -50,6 +53,9 @@ interface ChatCanvasProps {
   onOpenArtifacts?: () => void;
   onOpenTerminal?: () => void;
   onOpenGit?: () => void;
+  onOpenKanban?: () => void;
+  onOpenCrons?: () => void;
+  onOpenRules?: () => void;
   isRightPanelOpen?: boolean;
   activeRightPanelTab?: string;
   onToggleRightPanel?: () => void;
@@ -130,6 +136,9 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   onOpenArtifacts,
   onOpenTerminal,
   onOpenGit,
+  onOpenKanban,
+  onOpenCrons,
+  onOpenRules,
   isRightPanelOpen,
   activeRightPanelTab,
   onToggleRightPanel,
@@ -336,6 +345,43 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             >
               <GitBranch className="w-3.5 h-3.5 text-fuchsia-400" />
               <span className="text-[11px] font-medium hidden sm:inline">Git</span>
+            </button>
+          )}
+
+          {onOpenKanban && (
+            <button
+              onClick={onOpenKanban}
+              className={`py-1.5 px-2.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border ${
+                isRightPanelOpen && activeRightPanelTab === 'kanban'
+                  ? 'bg-sky-500/20 text-sky-200 border-sky-500/40 shadow-inner'
+                  : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border-slate-700/60'
+              }`}
+              title="Tableau Kanban intégré"
+            >
+              <KanbanIcon className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-[11px] font-medium hidden sm:inline">Kanban</span>
+            </button>
+          )}
+
+          {onOpenCrons && (
+            <button
+              onClick={onOpenCrons}
+              className="py-1.5 px-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700/60"
+              title="Planificateur de Tâches & Crons"
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-[11px] font-medium hidden lg:inline">Crons</span>
+            </button>
+          )}
+
+          {onOpenRules && (
+            <button
+              onClick={onOpenRules}
+              className="py-1.5 px-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700/60"
+              title="Éditeur de Règles & Mémoire Système"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[11px] font-medium hidden lg:inline">Règles</span>
             </button>
           )}
 

@@ -10,6 +10,8 @@ import { FileExplorerModal } from './components/FileExplorerModal';
 import { TaskDashboardModal } from './components/TaskDashboardModal';
 import { WorkspacePanel, type RightPanelTab } from './components/WorkspacePanel';
 import { SessionMetaModal } from './components/SessionMetaModal';
+import { CronSchedulerModal } from './components/CronSchedulerModal';
+import { RulesEditorModal } from './components/RulesEditorModal';
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption } from './types';
 import { 
@@ -62,6 +64,8 @@ export function App() {
   const [isWorkspacesOpen, setIsWorkspacesOpen] = useState(false);
   const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(false);
   const [isTaskDashboardOpen, setIsTaskDashboardOpen] = useState(false);
+  const [isCronModalOpen, setIsCronModalOpen] = useState(false);
+  const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
 
   // Initialize
   useEffect(() => {
@@ -457,6 +461,9 @@ export function App() {
           onOpenArtifacts={() => openRightPanel('artifacts')}
           onOpenTerminal={() => openRightPanel('terminal')}
           onOpenGit={() => openRightPanel('git')}
+          onOpenKanban={() => openRightPanel('kanban')}
+          onOpenCrons={() => setIsCronModalOpen(true)}
+          onOpenRules={() => setIsRulesModalOpen(true)}
           onOpenTasks={() => setIsTaskDashboardOpen(true)}
           isRightPanelOpen={isRightPanelOpen}
           activeRightPanelTab={rightPanelTab}
@@ -492,6 +499,7 @@ export function App() {
         currentWorkspace={currentWorkspace}
         conversationId={activeConversationId || undefined}
         onInsertPath={handleInsertPath}
+        onExecutePrompt={(p) => setQuickPrompt(p)}
       />
 
       {/* Modals & Panels */}
@@ -547,6 +555,21 @@ export function App() {
             handleNewConversation();
           }
         }}
+      />
+
+      <CronSchedulerModal
+        isOpen={isCronModalOpen}
+        onClose={() => setIsCronModalOpen(false)}
+        onExecutePrompt={(p) => {
+          setQuickPrompt(p);
+          setIsCronModalOpen(false);
+        }}
+      />
+
+      <RulesEditorModal
+        isOpen={isRulesModalOpen}
+        onClose={() => setIsRulesModalOpen(false)}
+        currentWorkspace={currentWorkspace}
       />
     </div>
   );

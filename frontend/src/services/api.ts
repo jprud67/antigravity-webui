@@ -361,3 +361,238 @@ export async function gitPush(workspace?: string, remote: string = 'origin', bra
   }
   return res.json();
 }
+
+// Kanban API
+export interface KanbanTask {
+  id: string;
+  title: string;
+  body?: string;
+  assignee?: string;
+  status: string;
+  priority: number;
+  created_by?: string;
+  created_at: number;
+  started_at?: number;
+  completed_at?: number;
+  workspace_kind?: string;
+  workspace_path?: string;
+  project_id?: string;
+  result?: string;
+}
+
+export interface KanbanBoardData {
+  tasks: KanbanTask[];
+  columns: {
+    todo: KanbanTask[];
+    running: KanbanTask[];
+    blocked: KanbanTask[];
+    done: KanbanTask[];
+  };
+  count: number;
+  db_path: string;
+}
+
+export async function fetchKanbanTasks(projectId?: string, status?: string): Promise<KanbanBoardData> {
+  const params = new URLSearchParams();
+  if (projectId) params.append('project_id', projectId);
+  if (status) params.append('status', status);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_BASE}/kanban/tasks${query}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(`Failed to fetch kanban tasks: ${res.statusText}`);
+  return res.json();
+}
+
+export async function createKanbanTask(task: {
+  title: string;
+  body?: string;
+  assignee?: string;
+  status?: string;
+  priority?: number;
+  workspace_path?: string;
+  project_id?: string;
+}): Promise<{ success: boolean; task: KanbanTask }> {
+  const res = await fetch(`${API_BASE}/kanban/tasks`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(task)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de création de la tâche' }));
+    throw new Error(err.detail || 'Erreur création tâche');
+  }
+  return res.json();
+}
+
+export async function updateKanbanTask(
+  taskId: string,
+  updates: Partial<KanbanTask>
+): Promise<{ success: boolean; task: KanbanTask }> {
+  const res = await fetch(`${API_BASE}/kanban/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'PATCH',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(updates)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec mise à jour tâche' }));
+    throw new Error(err.detail || 'Erreur mise à jour tâche');
+  }
+  return res.json();
+}
+
+export async function deleteKanbanTask(taskId: string): Promise<{ success: boolean; task_id: string }> {
+  const res = await fetch(`${API_BASE}/kanban/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec suppression tâche' }));
+    throw new Error(err.detail || 'Erreur suppression tâche');
+  }
+  return res.json();
+}
+
+// Cron Jobs API
+export interface CronJobItem {
+  id: string;
+  name: string;
+  prompt: string;
+  schedule: {
+    kind: string;
+    expr?: string;
+    display?: string;
+  };
+  schedule_display?: string;
+  skills?: string[];
+  enabled: boolean;
+  state: 'scheduled' | 'paused';
+  created_at: string;
+  next_run_at?: string | null;
+  last_run_at?: string | null;
+  last_status?: string | null;
+  deliver?: string;
+}
+
+export interface CronListResponse {
+  jobs: CronJobItem[];
+  ticker_status: 'active' | 'idle' | 'stale';
+  heartbeat_age_seconds?: number | null;
+  jobs_file: string;
+}
+
+export async function fetchCronJobs(): Promise<CronListResponse> {
+  const res = await fetch(`${API_BASE}/crons`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(`Failed to fetch cron jobs: ${res.statusText}`);
+  return res.json();
+}
+
+export async function createCronJob(job: {
+  name: string;
+  prompt: string;
+  schedule: string;
+  deliver?: string;
+  skills?: string[];
+}): Promise<{ success: boolean; job: CronJobItem }> {
+  const res = await fetch(`${API_BASE}/crons`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(job)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec création job cron' }));
+    throw new Error(err.detail || 'Erreur création cron');
+  }
+  return res.json();
+}
+
+export async function updateCronJob(
+  jobId: string,
+  updates: {
+    name?: string;
+    prompt?: string;
+    schedule?: string;
+    state?: string;
+    skills?: string[];
+  }
+): Promise<{ success: boolean; job: CronJobItem }> {
+  const res = await fetch(`${API_BASE}/crons/${encodeURIComponent(jobId)}`, {
+    method: 'PATCH',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(updates)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec mise à jour job cron' }));
+    throw new Error(err.detail || 'Erreur mise à jour cron');
+  }
+  return res.json();
+}
+
+export async function deleteCronJob(jobId: string): Promise<{ success: boolean; job_id: string }> {
+  const res = await fetch(`${API_BASE}/crons/${encodeURIComponent(jobId)}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec suppression job cron' }));
+    throw new Error(err.detail || 'Erreur suppression cron');
+  }
+  return res.json();
+}
+
+export async function triggerCronJob(jobId: string): Promise<{ success: boolean; message: string; prompt: string }> {
+  const res = await fetch(`${API_BASE}/crons/${encodeURIComponent(jobId)}/run`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec déclenchement job cron' }));
+    throw new Error(err.detail || 'Erreur déclenchement cron');
+  }
+  return res.json();
+}
+
+// Rules & Memory API
+export interface RuleFileItem {
+  id: string;
+  name: string;
+  description: string;
+  path: string;
+  syntax: 'markdown' | 'json';
+  exists: boolean;
+  size: number;
+  last_modified: number;
+}
+
+export async function fetchRulesFiles(workspacePath?: string): Promise<{ files: RuleFileItem[] }> {
+  const params = workspacePath ? `?workspace_path=${encodeURIComponent(workspacePath)}` : '';
+  const res = await fetch(`${API_BASE}/rules/files${params}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(`Failed to fetch rules files: ${res.statusText}`);
+  return res.json();
+}
+
+export async function fetchRuleContent(
+  fileId: string,
+  workspacePath?: string
+): Promise<{ file_id: string; path: string; content: string; exists: boolean; syntax: 'markdown' | 'json'; size?: number; last_modified?: number }> {
+  const params = new URLSearchParams({ file_id: fileId });
+  if (workspacePath) params.append('workspace_path', workspacePath);
+  const res = await fetch(`${API_BASE}/rules/content?${params.toString()}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(`Failed to fetch rule content: ${res.statusText}`);
+  return res.json();
+}
+
+export async function saveRuleContent(
+  fileId: string,
+  content: string,
+  workspacePath?: string
+): Promise<{ success: boolean; message: string; path: string; size: number }> {
+  const res = await fetch(`${API_BASE}/rules/content`, {
+    method: 'PUT',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ file_id: fileId, content, workspace_path: workspacePath })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec sauvegarde fichier' }));
+    throw new Error(err.detail || 'Erreur lors de la sauvegarde');
+  }
+  return res.json();
+}

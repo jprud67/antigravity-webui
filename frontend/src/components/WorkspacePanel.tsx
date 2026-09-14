@@ -10,15 +10,17 @@ import {
   Folder, 
   File, 
   RefreshCw, 
-  Plus
+  Plus,
+  Kanban as KanbanIcon
 } from 'lucide-react';
 import { TerminalTab } from './TerminalTab';
 import { GitTab } from './GitTab';
+import { KanbanTab } from './KanbanTab';
 import { MermaidRenderer } from './MermaidRenderer';
 import { fetchFileTree, fetchFileContent, fetchArtifacts, fetchArtifactContent } from '../services/api';
 import type { ArtifactItem } from '../types';
 
-export type RightPanelTab = 'files' | 'artifacts' | 'terminal' | 'git';
+export type RightPanelTab = 'files' | 'artifacts' | 'terminal' | 'git' | 'kanban';
 
 interface WorkspacePanelProps {
   isOpen: boolean;
@@ -28,6 +30,7 @@ interface WorkspacePanelProps {
   currentWorkspace: string;
   conversationId?: string;
   onInsertPath?: (path: string) => void;
+  onExecutePrompt?: (prompt: string) => void;
 }
 
 export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
@@ -38,6 +41,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
   currentWorkspace,
   conversationId,
   onInsertPath,
+  onExecutePrompt,
 }) => {
   const [panelWidth, setPanelWidth] = useState<number>(540);
   const isResizingRef = useRef(false);
@@ -283,6 +287,18 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
             <GitBranch className="w-3.5 h-3.5" />
             <span>Git</span>
           </button>
+
+          <button
+            onClick={() => onTabChange('kanban')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+              activeTab === 'kanban'
+                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <KanbanIcon className="w-3.5 h-3.5" />
+            <span>Kanban</span>
+          </button>
         </div>
 
         {/* Close Button */}
@@ -302,6 +318,13 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
 
         {activeTab === 'git' && (
           <GitTab currentWorkspace={currentWorkspace} />
+        )}
+
+        {activeTab === 'kanban' && (
+          <KanbanTab 
+            currentWorkspace={currentWorkspace} 
+            onExecutePrompt={onExecutePrompt}
+          />
         )}
 
         {/* FILES TAB */}

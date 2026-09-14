@@ -16,6 +16,9 @@ from app.api.tasks import router as tasks_router
 from app.api.skills import router as skills_router
 from app.api.git import router as git_router
 from app.api.terminal import router as terminal_router
+from app.api.kanban import router as kanban_router
+from app.api.crons import router as crons_router
+from app.api.rules import router as rules_router
 
 app = FastAPI(
     title="Antigravity WebUI",
@@ -43,6 +46,9 @@ app.include_router(tasks_router)
 app.include_router(skills_router)
 app.include_router(git_router)
 app.include_router(terminal_router)
+app.include_router(kanban_router)
+app.include_router(crons_router)
+app.include_router(rules_router)
 
 @app.get("/api/health")
 def health_check():
