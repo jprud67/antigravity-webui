@@ -34,6 +34,9 @@ export interface ChatMessage {
   timestamp?: string;
   stepIndex?: number;
   isLive?: boolean;
+  error?: string;
+  subtype?: 'checkpoint' | 'task' | 'error' | 'system';
+  taskId?: string;
 }
 
 export interface ArtifactItem {

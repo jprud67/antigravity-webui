@@ -291,11 +291,50 @@ const CalloutBlock = ({ children }: any) => {
 /**
  * Clickable Interactive File Link or External URL
  */
-const LinkBlock = ({ href, children, onOpenFile, ...props }: any) => {
+const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: any) => {
   if (href && href.startsWith('file:///')) {
     const filePath = href.replace(/^file:\/\/\/?/, '/');
     const [cleanPath, anchor] = filePath.split('#');
     const filename = cleanPath.split('/').pop() || cleanPath;
+    const isArtifact = cleanPath.includes('/brain/') && cleanPath.endsWith('.md');
+
+    if (isArtifact) {
+      return (
+        <span
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (onOpenArtifacts) onOpenArtifacts();
+            else if (onOpenFile) onOpenFile();
+            else copyTextToClipboard(cleanPath);
+          }}
+          className="my-2.5 p-3 rounded-xl border flex items-center justify-between gap-3 cursor-pointer shadow-xs transition-all group block text-left"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)',
+          }}
+          title={`Artefact Markdown : ${cleanPath} — Cliquer pour ouvrir`}
+        >
+          <span className="flex items-center gap-2.5 min-w-0">
+            <span className="w-8 h-8 rounded-lg bg-sky-500/15 border border-sky-500/25 flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4 text-sky-500" />
+            </span>
+            <span className="min-w-0">
+              <span className="text-[10px] uppercase font-mono font-bold tracking-wider text-sky-500 block">
+                Artefact généré
+              </span>
+              <span className="text-xs font-semibold truncate block group-hover:text-sky-500 transition-colors" style={{ color: 'var(--strong)' }}>
+                {children && typeof children === 'string' && children !== href ? children : filename}
+              </span>
+            </span>
+          </span>
+          <span className="flex items-center gap-1 text-[11px] font-medium text-sky-500 shrink-0">
+            <span>Ouvrir</span>
+            <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+          </span>
+        </span>
+      );
+    }
 
     return (
       <span
@@ -308,17 +347,19 @@ const LinkBlock = ({ href, children, onOpenFile, ...props }: any) => {
             copyTextToClipboard(cleanPath);
           }
         }}
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-mono text-[11px] cursor-pointer border transition-all my-0.5 shadow-xs hover:border-sky-500/50"
+        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono text-[11px] cursor-pointer border transition-all my-0.5 shadow-xs hover:border-sky-500/60"
         style={{
-          backgroundColor: 'var(--accent-bg)',
-          borderColor: 'var(--accent)',
-          color: 'var(--accent-text)',
+          backgroundColor: 'var(--surface-subtle)',
+          borderColor: 'var(--border)',
+          color: 'var(--accent)',
         }}
         title={`Fichier local : ${cleanPath}${anchor ? ' (' + anchor + ')' : ''} — Cliquer pour inspecter`}
       >
-        <FileCode className="w-3 h-3 shrink-0" />
-        <span className="font-semibold underline decoration-dotted">{filename}</span>
-        {anchor && <span className="opacity-75 text-[9.5px]">{anchor}</span>}
+        <FileCode className="w-3 h-3 shrink-0 text-sky-500" />
+        <span className="font-semibold underline decoration-dotted">
+          {children && typeof children === 'string' && children !== href ? children : filename}
+        </span>
+        {anchor && <span className="opacity-75 text-[9.5px] text-muted">#{anchor}</span>}
       </span>
     );
   }
@@ -458,6 +499,7 @@ const ToolActivityFeed: React.FC<{
   onAnswerQuestion?: (answer: string) => void;
   onQuickPrompt?: (prompt: string) => void;
 }> = ({ toolCalls, isExpanded, onToggle, onAnswerQuestion, onQuickPrompt }) => {
+  const [showAllTools, setShowAllTools] = useState(false);
   const interactiveTools = toolCalls.filter(
     (t) => t.name === 'ask_question' || t.name === 'ask_permission' || t.name === 'ask_custom_permission'
   );
@@ -479,6 +521,9 @@ const ToolActivityFeed: React.FC<{
     : `${actionTools.length} action${actionTools.length > 1 ? 's' : ''}`;
 
   const hasRunning = actionTools.some((t) => t.status === 'running');
+  const visibleTools = showAllTools || actionTools.length <= 8
+    ? actionTools
+    : actionTools.slice(actionTools.length - 8);
 
   return (
     <div className="w-full space-y-2 mb-3">
@@ -547,9 +592,33 @@ const ToolActivityFeed: React.FC<{
 
           {isExpanded && (
             <div className="p-3 border-t space-y-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-              {actionTools.map((tool, idx) => (
-                <ToolItemCard key={idx} tool={tool} />
-              ))}
+              {actionTools.length > 8 && !showAllTools && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllTools(true)}
+                  className="w-full py-1.5 px-3 rounded-lg text-[11px] font-medium border text-center transition-colors cursor-pointer border-dashed"
+                  style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
+                >
+                  Afficher les {actionTools.length - 8} actions précédentes...
+                </button>
+              )}
+
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-1 scrollbar-thin">
+                {visibleTools.map((tool, idx) => (
+                  <ToolItemCard key={idx} tool={tool} />
+                ))}
+              </div>
+
+              {actionTools.length > 8 && showAllTools && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllTools(false)}
+                  className="w-full py-1 px-3 text-[10px] opacity-70 hover:opacity-100 text-center cursor-pointer"
+                  style={{ color: 'var(--muted)' }}
+                >
+                  Réduire (voir uniquement les 8 dernières)
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -619,6 +688,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   onOpenCrons,
   onOpenRules,
   onOpenFiles,
+  onOpenArtifacts,
   isRightPanelOpen,
   onToggleRightPanel,
   pendingApproval,
@@ -1066,57 +1136,90 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
           </div>
         ) : (
           messages.map((msg, msgIdx) => {
-            // 1. Checkpoint / System event separator
+            // 1. Checkpoint / System events / Task notifications
             if (msg.role === 'system') {
+              if (msg.subtype === 'task') {
+                return (
+                  <div key={msg.id} className="my-3 max-w-4xl mx-auto w-full animate-fadeIn">
+                    <div
+                      className="p-3 rounded-xl border text-xs flex items-center justify-between gap-3 shadow-xs"
+                      style={{
+                        backgroundColor: 'var(--surface-subtle)',
+                        borderColor: 'var(--border)',
+                      }}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-500 shrink-0">
+                          <Check className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="font-semibold text-xs truncate block" style={{ color: 'var(--strong)' }}>
+                            Tâche d'arrière-plan terminée : <span className="font-mono text-emerald-500">{msg.taskId}</span>
+                          </span>
+                        </div>
+                      </div>
+                      <details className="text-[11px] text-muted shrink-0">
+                        <summary className="cursor-pointer hover:text-strong select-none">Voir détails</summary>
+                        <pre
+                          className="mt-2 p-2.5 rounded-lg text-[10.5px] font-mono overflow-x-auto max-h-48 border leading-relaxed"
+                          style={{
+                            backgroundColor: 'var(--code-bg)',
+                            borderColor: 'var(--border)',
+                            color: 'var(--muted)',
+                          }}
+                        >
+                          {msg.content}
+                        </pre>
+                      </details>
+                    </div>
+                  </div>
+                );
+              }
               return <CheckpointDivider key={msg.id} content={msg.content} stepIndex={msg.stepIndex} />;
             }
 
             // 2. User Message
             if (msg.role === 'user') {
               return (
-                <div key={msg.id} className="flex flex-col items-end max-w-4xl mx-auto w-full group">
-                  <div className="flex items-start gap-2.5 max-w-[85%] sm:max-w-[75%]">
-                    <div className="flex flex-col items-end w-full">
-                      <div className="hermes-user-bubble rounded-2xl rounded-tr-xs px-4 py-3 text-[13.5px] leading-relaxed shadow-sm">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            code: CodeBlock,
-                            blockquote: CalloutBlock,
-                            a: (props: any) => <LinkBlock {...props} onOpenFile={onOpenFiles} />,
-                          }}
-                        >
-                          {msg.content}
-                        </ReactMarkdown>
+                <div key={msg.id} className="flex justify-end max-w-4xl mx-auto w-full mb-6 group animate-fadeIn">
+                  <div className="max-w-[85%] sm:max-w-[78%] hermes-user-bubble rounded-2xl rounded-tr-xs p-4 shadow-sm border transition-all">
+                    <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-white/10 text-xs opacity-75 select-none">
+                      <div className="flex items-center gap-1.5 font-semibold text-[11px] uppercase tracking-wider">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Vous</span>
                       </div>
-                      <div
-                        className="flex items-center justify-end gap-2 text-[10px] font-mono mt-1 px-1 opacity-60 group-hover:opacity-100 transition-opacity"
-                        style={{ color: 'var(--muted)' }}
-                      >
+                      <div className="flex items-center gap-2 text-[10px] font-mono">
                         {msg.timestamp && (
                           <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         )}
                         <button
                           type="button"
                           onClick={() => copyTextToClipboard(msg.content)}
-                          className="p-0.5 hover:text-strong cursor-pointer"
-                          title="Copier le message"
+                          className="p-0.5 hover:opacity-100 opacity-60 cursor-pointer transition-opacity"
+                          title="Copier"
                         >
                           <Copy className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
 
-                    <div
-                      className="w-7 h-7 rounded-xl flex items-center justify-center p-1 shrink-0 border shadow-xs"
-                      style={{
-                        backgroundColor: 'var(--surface-subtle)',
-                        borderColor: 'var(--border)',
-                        color: 'var(--text)',
-                      }}
-                      title="Utilisateur"
-                    >
-                      <User className="w-3.5 h-3.5" />
+                    <div className="text-[13.5px] leading-relaxed markdown-content">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          code: CodeBlock,
+                          blockquote: CalloutBlock,
+                          a: (props: any) => (
+                            <LinkBlock
+                              {...props}
+                              onOpenFile={onOpenFiles}
+                              onOpenArtifacts={onOpenArtifacts}
+                            />
+                          ),
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 </div>
@@ -1126,69 +1229,106 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             // 3. Assistant Message
             const isThoughtOpen = expandedThoughts[msg.id];
             const isToolsExpanded = expandedTools[msg.id] ?? (msg.isLive || false);
+            const isSpeaking = speakingMsgId === msg.id;
 
             return (
-              <div key={msg.id} className="flex flex-col items-start max-w-4xl mx-auto w-full group">
+              <div
+                key={msg.id}
+                className="w-full max-w-4xl mx-auto hermes-assistant-card rounded-2xl border p-5 shadow-xs transition-all mb-6 group relative animate-fadeIn"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                }}
+              >
                 {/* Assistant Role Header */}
-                <div className="flex items-center gap-2 mb-2 text-xs">
-                  <div
-                    className="w-6 h-6 rounded-xl flex items-center justify-center p-0.5 shrink-0 border shadow-xs"
-                    style={{
-                      backgroundColor: 'var(--accent-bg)',
-                      borderColor: 'var(--accent)',
-                      color: 'var(--accent-text)'
-                    }}
-                  >
-                    <AntigravityIcon size={16} />
-                  </div>
-                  <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>
-                    Antigravity
-                  </span>
-                  {activeModel && (
-                    <span
-                      className="text-[10px] font-mono px-2 py-0.5 rounded-full border"
-                      style={{
-                        backgroundColor: 'var(--surface-subtle)',
-                        borderColor: 'var(--border-subtle)',
-                        color: 'var(--muted)'
-                      }}
-                    >
-                      {activeModel}
-                    </span>
-                  )}
-                  {msg.timestamp && (
-                    <span className="text-[10px] opacity-60 ml-0.5" style={{ color: 'var(--muted)' }}>
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
-                  {msg.isLive && (
-                    <span
-                      className="inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full border animate-pulse"
+                <div
+                  className="flex items-center justify-between gap-2 mb-3 pb-2.5 border-b text-xs select-none"
+                  style={{ borderColor: 'var(--border-subtle)' }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="w-7 h-7 rounded-xl flex items-center justify-center p-1 shrink-0 border shadow-xs transition-transform group-hover:scale-105"
                       style={{
                         backgroundColor: 'var(--accent-bg)',
                         borderColor: 'var(--accent-bg-strong)',
-                        color: 'var(--accent-text)'
+                        color: 'var(--accent-text)',
                       }}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ backgroundColor: 'var(--accent)' }} />
-                      <span>En direct</span>
-                    </span>
-                  )}
+                      <AntigravityIcon size={18} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>
+                        Antigravity
+                      </span>
+                      {activeModel && (
+                        <span
+                          className="text-[10px] font-mono px-2 py-0.5 rounded-full border"
+                          style={{
+                            backgroundColor: 'var(--surface-subtle)',
+                            borderColor: 'var(--border)',
+                            color: 'var(--muted)',
+                          }}
+                        >
+                          {activeModel}
+                        </span>
+                      )}
+                      {msg.stepIndex !== undefined && (
+                        <span
+                          className="text-[10px] font-mono px-1.5 py-0.2 rounded border hidden sm:inline-block opacity-70"
+                          style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+                        >
+                          #{msg.stepIndex}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[10.5px] font-mono text-muted">
+                    {msg.timestamp && (
+                      <span className="opacity-70">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                    {msg.isLive && (
+                      <span
+                        className="inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full border animate-pulse"
+                        style={{
+                          backgroundColor: 'var(--accent-bg)',
+                          borderColor: 'var(--accent-bg-strong)',
+                          color: 'var(--accent-text)',
+                        }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ backgroundColor: 'var(--accent)' }} />
+                        <span>En direct</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* Error Banner if turn errored */}
+                {msg.error && (
+                  <div className="mb-3.5 p-3.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-500 text-xs flex items-start gap-2.5 shadow-xs">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <p className="font-bold text-xs uppercase tracking-wide">Alerte d'exécution ou Quota API</p>
+                      <p className="font-mono text-[11.5px] whitespace-pre-wrap leading-relaxed opacity-90">{msg.error}</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Live Thinking Pill */}
                 {msg.isLive && !msg.content && (!msg.toolCalls || msg.toolCalls.length === 0) && (
                   <div
-                    className="flex items-center gap-2.5 py-2 px-3.5 rounded-xl border text-xs hermes-thinking-card animate-pulse shadow-sm my-1"
+                    className="flex items-center gap-2.5 py-2 px-3.5 rounded-xl border text-xs hermes-thinking-card animate-pulse shadow-sm my-2"
                     style={{
                       backgroundColor: 'var(--accent-bg)',
                       borderColor: 'var(--accent-bg-strong)',
-                      color: 'var(--accent-text)'
+                      color: 'var(--accent-text)',
                     }}
                   >
                     <span className="w-2 h-2 rounded-full animate-ping shrink-0" style={{ backgroundColor: 'var(--accent)' }} />
                     <BrainCircuit className="w-3.5 h-3.5 animate-pulse" style={{ color: 'var(--accent)' }} />
-                    <span className="font-medium text-[11px] tracking-wide">Réflexion approfondie en cours...</span>
+                    <span className="font-medium text-[11px] tracking-wide">Raisonnement en cours...</span>
                   </div>
                 )}
 
@@ -1201,10 +1341,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                     <button
                       type="button"
                       onClick={() => toggleThought(msg.id)}
-                      className="w-full flex items-center justify-between px-3.5 py-2.5 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                      className="w-full flex items-center justify-between px-3.5 py-2 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
                       style={{
                         backgroundColor: 'var(--surface-subtle)',
-                        color: 'var(--accent-text)'
+                        color: 'var(--accent-text)',
                       }}
                     >
                       <div className="flex items-center gap-2">
@@ -1226,7 +1366,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                         style={{
                           backgroundColor: 'var(--code-bg)',
                           borderColor: 'var(--border-subtle)',
-                          color: 'var(--muted)'
+                          color: 'var(--muted)',
                         }}
                       >
                         {msg.thought}
@@ -1249,13 +1389,19 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
                 {/* Assistant Markdown Content */}
                 {msg.content ? (
-                  <div className="hermes-assistant-body w-full markdown-content leading-relaxed">
+                  <div className="hermes-assistant-body w-full markdown-content leading-relaxed text-[13.5px]">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
                         code: CodeBlock,
                         blockquote: CalloutBlock,
-                        a: (props: any) => <LinkBlock {...props} onOpenFile={onOpenFiles} />,
+                        a: (props: any) => (
+                          <LinkBlock
+                            {...props}
+                            onOpenFile={onOpenFiles}
+                            onOpenArtifacts={onOpenArtifacts}
+                          />
+                        ),
                       }}
                     >
                       {msg.content}
@@ -1266,53 +1412,55 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
                 {/* Assistant Action Footer */}
                 <div
-                  className="flex items-center gap-2 px-1 text-[10.5px] font-mono mt-2 opacity-60 group-hover:opacity-100 transition-opacity"
-                  style={{ color: 'var(--muted)' }}
+                  className="flex items-center justify-between pt-3 mt-3 border-t text-[11px] font-mono text-muted select-none"
+                  style={{ borderColor: 'var(--border-subtle)' }}
                 >
-                  {msg.stepIndex !== undefined && (
-                    <span className="opacity-60">Étape #{msg.stepIndex}</span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {msg.content && (
+                      <button
+                        type="button"
+                        onClick={() => copyTextToClipboard(msg.content)}
+                        className="px-2.5 py-1 rounded-md border flex items-center gap-1 hover:text-strong hover:bg-surface-subtle transition-all cursor-pointer"
+                        style={{ borderColor: 'var(--border)' }}
+                        title="Copier la réponse complète"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Copier</span>
+                      </button>
+                    )}
 
-                  {msg.content && (
-                    <button
-                      type="button"
-                      onClick={() => copyTextToClipboard(msg.content)}
-                      className="transition-opacity opacity-75 hover:opacity-100 p-1 rounded cursor-pointer flex items-center gap-1"
-                      title="Copier la réponse complète"
-                    >
-                      <Copy className="w-3 h-3" />
-                      <span className="hidden sm:inline">Copier</span>
-                    </button>
-                  )}
+                    {conversationId && onForkMessage && (
+                      <button
+                        type="button"
+                        onClick={() => onForkMessage(msg.stepIndex !== undefined ? msg.stepIndex : msgIdx)}
+                        className="px-2.5 py-1 rounded-md border flex items-center gap-1 hover:text-strong hover:bg-surface-subtle transition-all cursor-pointer"
+                        style={{ borderColor: 'var(--border)' }}
+                        title="Bifurquer à partir de cette étape (créer une branche)"
+                      >
+                        <GitBranch className="w-3 h-3 text-fuchsia-500" />
+                        <span className="hidden sm:inline">Bifurquer</span>
+                      </button>
+                    )}
 
-                  {msg.content && (
-                    <button
-                      type="button"
-                      onClick={() => handleToggleSpeech(msg.id, msg.content)}
-                      className="transition-opacity opacity-75 hover:opacity-100 p-1 rounded cursor-pointer flex items-center gap-1"
-                      title={speakingMsgId === msg.id ? "Arrêter la synthèse vocale" : "Écouter la réponse"}
-                    >
-                      {speakingMsgId === msg.id ? (
-                        <VolumeX className="w-3 h-3 text-rose-400 animate-pulse" />
-                      ) : (
-                        <Volume2 className="w-3 h-3" />
-                      )}
-                      <span className="hidden sm:inline">{speakingMsgId === msg.id ? 'Arrêter' : 'Écouter'}</span>
-                    </button>
-                  )}
+                    {msg.content && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSpeech(msg.id, msg.content)}
+                        className={`px-2.5 py-1 rounded-md border flex items-center gap-1 hover:text-strong transition-all cursor-pointer ${
+                          isSpeaking ? 'text-sky-500 bg-sky-500/10 border-sky-500/30' : 'hover:bg-surface-subtle'
+                        }`}
+                        style={{ borderColor: isSpeaking ? undefined : 'var(--border)' }}
+                        title={speakingMsgId === msg.id ? 'Arrêter la synthèse vocale' : 'Écouter la réponse'}
+                      >
+                        {isSpeaking ? <VolumeX className="w-3 h-3 text-rose-400 animate-pulse" /> : <Volume2 className="w-3 h-3" />}
+                        <span className="hidden sm:inline">{isSpeaking ? 'Arrêter' : 'Écouter'}</span>
+                      </button>
+                    )}
+                  </div>
 
-                  {conversationId && onForkMessage && (
-                    <button
-                      type="button"
-                      onClick={() => onForkMessage(msg.stepIndex !== undefined ? msg.stepIndex : msgIdx)}
-                      className="transition-opacity opacity-75 hover:opacity-100 p-1 rounded cursor-pointer flex items-center gap-1"
-                      style={{ color: 'var(--accent)' }}
-                      title="Bifurquer la discussion à partir de cette étape"
-                    >
-                      <GitBranch className="w-3 h-3" />
-                      <span>Bifurquer</span>
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2 opacity-70">
+                    <span>~{Math.max(1, Math.round((msg.content?.length || 0) / 3.8))} tokens</span>
+                  </div>
                 </div>
               </div>
             );
