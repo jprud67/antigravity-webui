@@ -9,6 +9,7 @@ import { LoginModal } from './components/LoginModal';
 import { FileExplorerModal } from './components/FileExplorerModal';
 import { TaskDashboardModal } from './components/TaskDashboardModal';
 import { WorkspacePanel, type RightPanelTab } from './components/WorkspacePanel';
+import { SessionMetaModal } from './components/SessionMetaModal';
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption } from './types';
 import { 
@@ -17,7 +18,9 @@ import {
   fetchModels, 
   fetchSettings,
   checkAuthStatus,
-  clearAuthToken
+  clearAuthToken,
+  forkConversation,
+  updateConversationMetadata
 } from './services/api';
 import { chatSocket } from './services/ws';
 
@@ -32,6 +35,10 @@ export function App() {
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | undefined>(undefined);
   const [queueCount, setQueueCount] = useState(0);
   const [pendingApproval, setPendingApproval] = useState<{ toolName: string; command?: string; path?: string } | null>(null);
+
+  // Session Metadata Modal (Phase 3)
+  const [isSessionMetaOpen, setIsSessionMetaOpen] = useState(false);
+  const [metaTargetConversation, setMetaTargetConversation] = useState<Conversation | null>(null);
 
   const [models, setModels] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash-high');
@@ -356,6 +363,49 @@ export function App() {
     setQuickPrompt((prev) => (prev ? `${prev} ${pathWithPrefix}` : pathWithPrefix));
   };
 
+  // Phase 3 Session Handlers (Fork, Pin, Tags, Project, Search)
+  const handleTogglePin = async (convId: string, currentPin: boolean) => {
+    try {
+      await updateConversationMetadata(convId, { pinned: !currentPin });
+      setConversations((prev) =>
+        prev.map((c) => (c.conversation_id === convId ? { ...c, pinned: !currentPin } : c))
+      );
+      const convs = await fetchConversations(100);
+      setConversations(convs);
+    } catch (e) {
+      console.error('Failed to toggle pin:', e);
+    }
+  };
+
+  const handleEditSessionMeta = (conv?: Conversation | null) => {
+    setMetaTargetConversation(conv || activeConv || null);
+    setIsSessionMetaOpen(true);
+  };
+
+  const handleForkMessage = async (stepIndex: number) => {
+    if (!activeConversationId) return;
+    try {
+      setIsStreaming(true);
+      const res = await forkConversation(activeConversationId, stepIndex);
+      const convs = await fetchConversations(100);
+      setConversations(convs);
+      await handleSelectConversation(res.conversation_id);
+    } catch (e: any) {
+      alert(`Erreur lors de la bifurcation : ${e.message}`);
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
+  const handleSearchQuery = async (query: string) => {
+    try {
+      const results = await fetchConversations(100, query);
+      setConversations(results);
+    } catch (e) {
+      console.error('Failed to search conversations:', e);
+    }
+  };
+
   const activeConv = conversations.find((c) => c.conversation_id === activeConversationId);
   const currentModelObj = models.find((m) => m.id === selectedModel);
   const displayModelName = currentModelObj ? currentModelObj.name : 'Gemini 3.8 Flash';
@@ -375,6 +425,9 @@ export function App() {
         onOpenFiles={() => openRightPanel('files')}
         onOpenTasks={() => setIsTaskDashboardOpen(true)}
         onLogout={handleLogout}
+        onTogglePin={handleTogglePin}
+        onEditSessionMeta={handleEditSessionMeta}
+        onSearchQuery={handleSearchQuery}
         currentWorkspace={currentWorkspace}
         activeModel={displayModelName}
         activeEffort={displayEffort}
@@ -385,9 +438,14 @@ export function App() {
         <ChatCanvas
           messages={messages}
           isStreaming={isStreaming}
+          conversationId={activeConversationId}
           conversationTitle={activeConv?.title}
           activeModel={displayModelName}
           activeEffort={displayEffort}
+          project={activeConv?.project}
+          projectColor={activeConv?.projectColor}
+          tags={activeConv?.tags}
+          parentConversationId={activeConv?.parent_conversation_id}
           onQuickPrompt={(p) => setQuickPrompt(p)}
           onAnswerQuestion={(ans) =>
             handleSendMessage(ans, {
@@ -405,6 +463,8 @@ export function App() {
           onToggleRightPanel={() => setIsRightPanelOpen(!isRightPanelOpen)}
           pendingApproval={pendingApproval}
           onApprovalResolved={() => setPendingApproval(null)}
+          onForkMessage={handleForkMessage}
+          onEditSessionMeta={() => handleEditSessionMeta(activeConv)}
         />
 
         <ChatInput
@@ -472,6 +532,21 @@ export function App() {
         onClose={() => setIsWorkspacesOpen(false)}
         currentWorkspace={currentWorkspace}
         onSelectWorkspace={(ws) => setCurrentWorkspace(ws)}
+      />
+
+      <SessionMetaModal
+        isOpen={isSessionMetaOpen}
+        onClose={() => setIsSessionMetaOpen(false)}
+        conversation={metaTargetConversation}
+        onUpdated={async () => {
+          const convs = await fetchConversations(100);
+          setConversations(convs);
+        }}
+        onDeleted={(deletedId) => {
+          if (activeConversationId === deletedId) {
+            handleNewConversation();
+          }
+        }}
       />
     </div>
   );

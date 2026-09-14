@@ -1,12 +1,21 @@
 export interface Conversation {
   conversation_id: string;
   title: string;
+  raw_title?: string;
   preview: string;
   step_count: number;
   last_modified_time: string;
   workspace_uris?: string;
   status: string;
   agent_name?: string;
+  parent_conversation_id?: string | null;
+  pinned?: boolean;
+  tags?: string[];
+  project?: string;
+  projectColor?: string;
+  customTitle?: string;
+  match_type?: 'metadata' | 'transcript';
+  match_snippet?: string;
 }
 
 export interface ToolCallItem {

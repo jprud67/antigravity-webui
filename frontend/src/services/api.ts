@@ -65,11 +65,22 @@ export async function updatePassword(oldPassword: string, newPassword: string): 
 }
 
 // Conversations
-export async function fetchConversations(limit = 100): Promise<Conversation[]> {
-  const res = await fetch(`${API_BASE}/conversations?limit=${limit}`, {
+export async function fetchConversations(limit = 100, q?: string): Promise<Conversation[]> {
+  const url = q && q.trim() 
+    ? `${API_BASE}/conversations?limit=${limit}&q=${encodeURIComponent(q.trim())}`
+    : `${API_BASE}/conversations?limit=${limit}`;
+  const res = await fetch(url, {
     headers: getHeaders()
   });
   if (!res.ok) throw new Error(`Failed to load conversations: ${res.statusText}`);
+  return res.json();
+}
+
+export async function searchConversations(query: string, limit = 50): Promise<Conversation[]> {
+  const res = await fetch(`${API_BASE}/conversations/search?q=${encodeURIComponent(query)}&limit=${limit}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(`Failed to search conversations: ${res.statusText}`);
   return res.json();
 }
 
@@ -79,6 +90,76 @@ export async function fetchConversationTranscript(conversationId: string): Promi
   });
   if (!res.ok) throw new Error(`Failed to load transcript: ${res.statusText}`);
   return res.json();
+}
+
+export async function forkConversation(
+  conversationId: string,
+  upToStepIndex: number,
+  newTitle?: string
+): Promise<{ conversation_id: string; title: string; step_count: number; parent_conversation_id: string }> {
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}/fork`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ up_to_step_index: upToStepIndex, new_title: newTitle })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la bifurcation' }));
+    throw new Error(err.detail || 'Impossible de créer la branche');
+  }
+  return res.json();
+}
+
+export async function updateConversationTitle(conversationId: string, title: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}/title`, {
+    method: 'PUT',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ title })
+  });
+  if (!res.ok) throw new Error('Échec du renommage');
+  return res.json();
+}
+
+export async function updateConversationMetadata(
+  conversationId: string,
+  metadata: {
+    pinned?: boolean;
+    tags?: string[];
+    project?: string;
+    projectColor?: string;
+    customTitle?: string;
+  }
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}/metadata`, {
+    method: 'PUT',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(metadata)
+  });
+  if (!res.ok) throw new Error('Échec de la mise à jour des métadonnées');
+  return res.json();
+}
+
+export async function deleteConversation(conversationId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error('Échec de suppression de la conversation');
+  return res.json();
+}
+
+export function getExportHtmlUrl(conversationId: string): string {
+  const token = getAuthToken();
+  return `${API_BASE}/conversations/${conversationId}/export/html${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+}
+
+export function getExportMarkdownUrl(conversationId: string): string {
+  const token = getAuthToken();
+  return `${API_BASE}/conversations/${conversationId}/export/markdown${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+}
+
+export function getExportJsonUrl(conversationId: string): string {
+  const token = getAuthToken();
+  return `${API_BASE}/conversations/${conversationId}/export/json${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 }
 
 // Artifacts

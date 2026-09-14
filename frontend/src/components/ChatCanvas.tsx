@@ -20,20 +20,29 @@ import {
   FileText,
   FolderTree,
   GitBranch,
-  PanelRight
+  PanelRight,
+  Download,
+  Globe,
+  Edit3
 } from 'lucide-react';
 import type { ChatMessage } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
 import { ApprovalCard } from './ApprovalCard';
+import { getExportHtmlUrl, getExportMarkdownUrl, getExportJsonUrl } from '../services/api';
 
 interface ChatCanvasProps {
   messages: ChatMessage[];
   isStreaming: boolean;
+  conversationId?: string | null;
   conversationTitle?: string;
   activeModel?: string;
   activeEffort?: string;
+  project?: string;
+  projectColor?: string;
+  tags?: string[];
+  parentConversationId?: string | null;
   onQuickPrompt?: (prompt: string) => void;
   onAnswerQuestion?: (answer: string) => void;
   onOpenFiles?: () => void;
@@ -46,6 +55,8 @@ interface ChatCanvasProps {
   onToggleRightPanel?: () => void;
   pendingApproval?: { toolName: string; command?: string; path?: string } | null;
   onApprovalResolved?: () => void;
+  onForkMessage?: (stepIndex: number) => void;
+  onEditSessionMeta?: () => void;
 }
 
 const CodeBlock = ({ inline, className, children, ...props }: any) => {
@@ -104,9 +115,14 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
 export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   messages,
   isStreaming,
+  conversationId,
   conversationTitle,
   activeModel,
   activeEffort,
+  project,
+  projectColor,
+  tags,
+  parentConversationId,
   onQuickPrompt,
   onAnswerQuestion,
   onOpenFiles,
@@ -119,9 +135,12 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   onToggleRightPanel,
   pendingApproval,
   onApprovalResolved,
+  onForkMessage,
+  onEditSessionMeta,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -135,15 +154,50 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#080c16]">
       {/* Top Studio Bar */}
       <div className="h-14 border-b border-slate-800/60 px-6 flex items-center justify-between bg-[#0a0f1e]/80 backdrop-blur-md shrink-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-100 truncate max-w-sm">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {projectColor && (
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                style={{ backgroundColor: projectColor }}
+                title={`Projet: ${project || ''}`}
+              />
+            )}
+            <span className="text-xs font-semibold text-slate-100 truncate max-w-xs">
               {conversationTitle || 'Nouvelle conversation'}
             </span>
+
+            {onEditSessionMeta && conversationId && (
+              <button
+                type="button"
+                onClick={onEditSessionMeta}
+                className="p-1 rounded text-slate-500 hover:text-slate-200 hover:bg-slate-800/60 transition-colors cursor-pointer"
+                title="Gérer les métadonnées de la session (titre, tags, projet)"
+              >
+                <Edit3 className="w-3 h-3" />
+              </button>
+            )}
           </div>
 
+          {parentConversationId && (
+            <div className="hidden sm:flex items-center gap-1 text-[10px] font-mono text-fuchsia-400 bg-fuchsia-500/10 border border-fuchsia-500/20 px-2 py-0.5 rounded-full">
+              <GitBranch className="w-3 h-3" />
+              <span>Branche</span>
+            </div>
+          )}
+
+          {tags && tags.length > 0 && (
+            <div className="hidden md:flex items-center gap-1">
+              {tags.slice(0, 3).map((t) => (
+                <span key={t} className="text-[9px] font-mono text-emerald-400/90 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded-full">
+                  #{t}
+                </span>
+              ))}
+            </div>
+          )}
+
           {activeModel && (
-            <div className="flex items-center gap-1.5 text-[10px] font-mono font-medium bg-sky-500/10 border border-sky-500/20 text-sky-400 px-2.5 py-0.5 rounded-full shadow-inner">
+            <div className="hidden lg:flex items-center gap-1.5 text-[10px] font-mono font-medium bg-sky-500/10 border border-sky-500/20 text-sky-400 px-2.5 py-0.5 rounded-full shadow-inner">
               <Cpu className="w-3 h-3 text-sky-400" />
               <span>{activeModel}</span>
               {activeEffort && (
@@ -157,6 +211,73 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
         {/* Right Tools & Status */}
         <div className="flex items-center gap-1.5">
+          {/* Export Dropdown */}
+          {conversationId && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="py-1.5 px-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700/60"
+                title="Exporter la session au format HTML, Markdown ou JSON"
+              >
+                <Download className="w-3.5 h-3.5 text-sky-400" />
+                <span className="text-[11px] font-medium hidden sm:inline">Exporter</span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {showExportMenu && (
+                <div
+                  className="absolute right-0 top-full mt-1.5 w-52 bg-[#0c1222] border border-slate-700/80 rounded-xl shadow-2xl z-40 p-1.5 space-y-1 text-xs animate-fadeIn backdrop-blur-xl"
+                  onMouseLeave={() => setShowExportMenu(false)}
+                >
+                  <a
+                    href={getExportHtmlUrl(conversationId)}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    onClick={() => setShowExportMenu(false)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-800/80 text-slate-200 hover:text-white transition-colors"
+                  >
+                    <Globe className="w-4 h-4 text-sky-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-[11px]">HTML Autonome</span>
+                      <span className="text-[9px] text-slate-500">Complet & stylé hors-ligne</span>
+                    </div>
+                  </a>
+
+                  <a
+                    href={getExportMarkdownUrl(conversationId)}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    onClick={() => setShowExportMenu(false)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-800/80 text-slate-200 hover:text-white transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-[11px]">Markdown (.md)</span>
+                      <span className="text-[9px] text-slate-500">Pour docs ou GitHub</span>
+                    </div>
+                  </a>
+
+                  <a
+                    href={getExportJsonUrl(conversationId)}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    onClick={() => setShowExportMenu(false)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-800/80 text-slate-200 hover:text-white transition-colors"
+                  >
+                    <Code2 className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-[11px]">Données JSON (.json)</span>
+                      <span className="text-[9px] text-slate-500">Transcript brut complet</span>
+                    </div>
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
           {/* Quick 3-Panel Action Badges */}
           {onOpenFiles && (
             <button
@@ -324,7 +445,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             </div>
           </div>
         ) : (
-          messages.map((msg) => {
+          messages.map((msg, msgIdx) => {
             const isUser = msg.role === 'user';
             const isThoughtOpen = expandedThoughts[msg.id];
 
@@ -453,6 +574,37 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                       >
                         {msg.content}
                       </ReactMarkdown>
+                    )}
+                  </div>
+
+                  {/* Message Action Footer (Copy & Fork / Bifurquer) */}
+                  <div className={`flex items-center gap-2 px-1 text-[10px] text-slate-500 font-mono ${isUser ? 'justify-end' : 'justify-start'}`}>
+                    {msg.stepIndex !== undefined && (
+                      <span className="opacity-60">Étape #{msg.stepIndex}</span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content);
+                      }}
+                      className="hover:text-slate-300 transition-colors p-1 rounded hover:bg-slate-800/60 cursor-pointer flex items-center gap-1"
+                      title="Copier le message"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span className="hidden sm:inline">Copier</span>
+                    </button>
+
+                    {conversationId && onForkMessage && (
+                      <button
+                        type="button"
+                        onClick={() => onForkMessage(msg.stepIndex !== undefined ? msg.stepIndex : msgIdx)}
+                        className="hover:text-fuchsia-300 transition-colors p-1 rounded hover:bg-slate-800/60 cursor-pointer flex items-center gap-1 text-slate-500 hover:text-fuchsia-400"
+                        title="Créer une nouvelle branche (bifurcation) à partir de cette étape"
+                      >
+                        <GitBranch className="w-3 h-3 text-fuchsia-400" />
+                        <span>Bifurquer</span>
+                      </button>
                     )}
                   </div>
                 </div>
