@@ -366,14 +366,26 @@ body {
 .hermes-composer-dock {
   background-color: var(--surface) !important;
   border: 1px solid var(--border2) !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   border-radius: 16px !important;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+
+:root:not(.dark) .hermes-composer-dock {
+  background-color: var(--surface, #FFFFFF) !important;
+  border-color: var(--border2, #CBD5E1) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+
+:root.dark .hermes-composer-dock {
+  background-color: var(--surface, #111827) !important;
+  border-color: var(--border2, #334155) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
 }
 
 .hermes-composer-dock:focus-within {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px var(--focus-ring), 0 8px 30px rgba(0, 0, 0, 0.16) !important;
+  box-shadow: 0 0 0 2px var(--focus-ring), 0 8px 30px rgba(0, 0, 0, 0.12) !important;
 }
 
 /* Markdown Content Styling */

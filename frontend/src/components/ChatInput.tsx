@@ -478,116 +478,129 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className="relative p-4 sm:p-5 max-w-4xl mx-auto w-full">
-      {/* Toast Feedback */}
-      {toastMessage && (
-        <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-40 animate-fadeIn">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/95 border border-slate-700 text-xs text-white shadow-xl backdrop-blur-md">
-            {toastMessage.type === 'success' ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            ) : (
-              <AlertCircle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-            )}
-            <span>{toastMessage.text}</span>
+    <div
+      className="w-full shrink-0 border-t"
+      style={{
+        backgroundColor: 'var(--main-bg, var(--bg))',
+        borderColor: 'var(--border-subtle, var(--border))'
+      }}
+    >
+      <div className="relative p-3 sm:p-4 max-w-4xl mx-auto w-full">
+        {/* Toast Feedback */}
+        {toastMessage && (
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-40 animate-fadeIn">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/95 border border-slate-700 text-xs text-white shadow-xl backdrop-blur-md">
+              {toastMessage.type === 'success' ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertCircle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+              )}
+              <span>{toastMessage.text}</span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Hermes Exact Slash Command Popover */}
-      {showSlashMenu && (
-        <div
-          ref={listRef}
-          className="absolute bottom-full left-4 right-4 sm:left-5 sm:right-5 mb-3 rounded-2xl shadow-2xl overflow-hidden z-30 backdrop-blur-xl animate-fadeIn border"
-          style={{
-            backgroundColor: 'var(--surface, #141425)',
-            borderColor: 'var(--border2, rgba(255,255,255,0.15))'
-          }}
-        >
+        {/* Hermes Exact Slash Command Popover */}
+        {showSlashMenu && (
           <div
-            className="px-4 py-2.5 border-b text-[11px] font-semibold flex items-center justify-between"
+            ref={listRef}
+            className="absolute bottom-full left-4 right-4 sm:left-5 sm:right-5 mb-3 rounded-2xl shadow-2xl overflow-hidden z-30 backdrop-blur-xl animate-fadeIn border"
             style={{
-              borderColor: 'var(--border-subtle, rgba(255,255,255,0.08))',
-              color: 'var(--muted, #C0C0C0)'
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border2)'
             }}
           >
-            <div className="flex items-center gap-2">
-              <Slash className="w-3.5 h-3.5" style={{ color: 'var(--accent, #FFD700)' }} />
-              <span className="uppercase tracking-wider">Commandes Antigravity & Hermes</span>
-            </div>
-            <span className="text-[10px] font-mono opacity-70">↑↓ naviguer · ↵ insérer · esc fermer</span>
-          </div>
-
-          <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5">
-            {filteredCommands.length === 0 ? (
-              <div className="p-4 text-xs text-center" style={{ color: 'var(--muted)' }}>
-                Aucune commande correspondante
+            <div
+              className="px-4 py-2.5 border-b text-[11px] font-semibold flex items-center justify-between"
+              style={{
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--muted)'
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <Slash className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+                <span className="uppercase tracking-wider">Commandes Antigravity & Hermes</span>
               </div>
-            ) : (
-              filteredCommands.map((c, idx) => {
-                const Icon = c.icon;
-                const isSelected = idx === selectedIndex;
-                return (
-                  <button
-                    key={c.cmd}
-                    type="button"
-                    onClick={() => selectSlashCommand(c)}
-                    onMouseEnter={() => setSelectedIndex(idx)}
-                    className="w-full text-left px-3 py-2 rounded-xl flex items-center justify-between text-xs transition-colors cursor-pointer group"
-                    style={{
-                      backgroundColor: isSelected ? 'var(--surface-subtle-hover, rgba(255,255,255,0.06))' : 'transparent',
-                      color: 'var(--text)'
-                    }}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border"
-                        style={{
-                          backgroundColor: 'var(--surface-subtle, rgba(255,255,255,0.03))',
-                          borderColor: 'var(--border-subtle, rgba(255,255,255,0.08))'
-                        }}
-                      >
-                        <Icon className={`w-3.5 h-3.5 ${c.color}`} />
-                      </div>
-                      <div className="flex items-baseline gap-1.5 truncate">
-                        <span className="font-mono font-bold" style={{ color: isSelected ? 'var(--accent, #FFD700)' : 'var(--strong, #FFFFFF)' }}>
-                          {c.cmd}
-                        </span>
-                        {c.arg && (
-                          <span className="text-[10px] font-mono opacity-50">
-                            {c.arg}
+              <span className="text-[10px] font-mono opacity-70">↑↓ naviguer · ↵ insérer · esc fermer</span>
+            </div>
+
+            <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5">
+              {filteredCommands.length === 0 ? (
+                <div className="p-4 text-xs text-center" style={{ color: 'var(--muted)' }}>
+                  Aucune commande correspondante
+                </div>
+              ) : (
+                filteredCommands.map((c, idx) => {
+                  const Icon = c.icon;
+                  const isSelected = idx === selectedIndex;
+                  return (
+                    <button
+                      key={c.cmd}
+                      type="button"
+                      onClick={() => selectSlashCommand(c)}
+                      onMouseEnter={() => setSelectedIndex(idx)}
+                      className="w-full text-left px-3 py-2 rounded-xl flex items-center justify-between text-xs transition-colors cursor-pointer group"
+                      style={{
+                        backgroundColor: isSelected ? 'var(--surface-subtle-hover)' : 'transparent',
+                        color: 'var(--text)'
+                      }}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border"
+                          style={{
+                            backgroundColor: 'var(--surface-subtle)',
+                            borderColor: 'var(--border-subtle)'
+                          }}
+                        >
+                          <Icon className={`w-3.5 h-3.5 ${c.color}`} />
+                        </div>
+                        <div className="flex items-baseline gap-1.5 truncate">
+                          <span className="font-mono font-bold" style={{ color: isSelected ? 'var(--accent)' : 'var(--strong)' }}>
+                            {c.cmd}
                           </span>
-                        )}
+                          {c.arg && (
+                            <span className="text-[10px] font-mono opacity-50">
+                              {c.arg}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <span className="text-[11px] truncate max-w-[50%] text-right ml-2" style={{ color: 'var(--muted)' }}>
-                      {c.desc}
-                    </span>
-                  </button>
-                );
-              })
-            )}
+                      <span className="text-[11px] truncate max-w-[50%] text-right ml-2" style={{ color: 'var(--muted)' }}>
+                        {c.desc}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Floating Composer Box - Pure Hermes Design */}
-      <div className="hermes-composer-dock p-3 sm:p-3.5">
-        <textarea
-          ref={textareaRef}
-          value={prompt}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Envoyez une instruction à Antigravity (ou tapez / pour toutes les commandes)..."
-          rows={1}
-          className="w-full bg-transparent text-xs resize-none outline-none leading-relaxed min-h-[42px] max-h-[200px]"
-          style={{ color: 'var(--text)' }}
-        />
-
-        {/* Composer Footer Toolbar */}
+        {/* Floating Composer Box - Pure Hermes Design */}
         <div
-          className="flex items-center justify-between pt-2.5 border-t mt-2 flex-wrap gap-2"
-          style={{ borderColor: 'var(--border-subtle, rgba(255,255,255,0.08))' }}
+          className="hermes-composer-dock p-3 sm:p-3.5"
+          style={{
+            backgroundColor: 'var(--surface)',
+            borderColor: 'var(--border2)'
+          }}
         >
+          <textarea
+            ref={textareaRef}
+            value={prompt}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Envoyez une instruction à Antigravity (ou tapez / pour toutes les commandes)..."
+            rows={1}
+            className="w-full bg-transparent text-xs resize-none outline-none leading-relaxed min-h-[42px] max-h-[200px]"
+            style={{ color: 'var(--text)' }}
+          />
+
+          {/* Composer Footer Toolbar */}
+          <div
+            className="flex items-center justify-between pt-2.5 border-t mt-2 flex-wrap gap-2"
+            style={{ borderColor: 'var(--border-subtle, var(--border))' }}
+          >
           {/* Left Controls */}
           <div className="flex items-center gap-2 flex-wrap">
             {/* Attachment / File Explorer Button */}
@@ -814,8 +827,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 disabled={!prompt.trim()}
                 className="py-1.5 px-4 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer font-sans"
                 style={{
-                  backgroundColor: 'var(--accent, #FFD700)',
-                  color: 'var(--bg, #0D0D1A)'
+                  backgroundColor: 'var(--accent)',
+                  color: '#ffffff'
                 }}
               >
                 <span>Envoyer</span>
@@ -825,6 +838,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 };

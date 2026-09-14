@@ -114,7 +114,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
               stroke="currentColor"
               strokeWidth="2.5"
               fill="transparent"
-              className="text-slate-800"
+              className="opacity-20"
             />
             <circle
               cx="12"

@@ -214,15 +214,15 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
   return (
     <div
-      className="flex-1 flex flex-col h-screen overflow-hidden"
-      style={{ backgroundColor: 'var(--bg, #0D0D1A)' }}
+      className="flex-1 flex flex-col min-h-0 overflow-hidden"
+      style={{ backgroundColor: 'var(--main-bg, var(--bg))' }}
     >
       {/* Top Bar - Pure Hermes Workbench Style */}
       <div
         className="h-14 px-6 flex items-center justify-between shrink-0 z-10 border-b"
         style={{
-          backgroundColor: 'var(--topbar-bg, rgba(20,20,37,0.98))',
-          borderColor: 'var(--border, #2A2A45)'
+          backgroundColor: 'var(--topbar-bg)',
+          borderColor: 'var(--border)'
         }}
       >
         <div className="flex items-center gap-3 min-w-0">
@@ -234,7 +234,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                 title={`Projet: ${project || ''}`}
               />
             )}
-            <span className="text-xs font-semibold truncate max-w-xs" style={{ color: 'var(--strong, #ffffff)' }}>
+            <span className="text-xs font-semibold truncate max-w-xs" style={{ color: 'var(--strong)' }}>
               {conversationTitle || 'Nouvelle conversation'}
             </span>
 

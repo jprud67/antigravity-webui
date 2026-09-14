@@ -636,7 +636,13 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
   const displayEffort = currentModelObj && currentModelObj.supported_efforts.length > 0 ? selectedEffort : undefined;
 
   return (
-    <div className="flex h-screen w-screen bg-[#080c16] text-slate-100 font-sans overflow-hidden antialiased">
+    <div
+      className="flex h-screen w-screen font-sans overflow-hidden antialiased"
+      style={{
+        backgroundColor: 'var(--bg)',
+        color: 'var(--text)'
+      }}
+    >
       {/* Sidebar */}
       <Sidebar
         conversations={conversations}
@@ -663,7 +669,13 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
       />
 
       {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+      <main
+        className="flex-1 flex flex-col h-full overflow-hidden relative"
+        style={{
+          backgroundColor: 'var(--main-bg, var(--bg))',
+          color: 'var(--text)'
+        }}
+      >
         <ChatCanvas
           messages={messages}
           isStreaming={isStreaming}
