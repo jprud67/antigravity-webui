@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Tag, Folder, Palette, Pin, Check, Trash2 } from 'lucide-react';
 import type { Conversation } from '../types';
 import { updateConversationMetadata, deleteConversation } from '../services/api';
+import { showConfirm } from './AppDialog';
 
 interface SessionMetaModalProps {
   isOpen: boolean;
@@ -76,7 +77,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Voulez-vous vraiment supprimer définitivement cette conversation et son historique ?')) {
+    if (!(await showConfirm('Voulez-vous vraiment supprimer définitivement cette conversation et son historique ?', { destructive: true }))) {
       return;
     }
     setLoading(true);

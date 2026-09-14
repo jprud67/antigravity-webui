@@ -34,6 +34,8 @@ import {
 import { chatSocket } from './services/ws';
 import { syncClient } from './services/sync';
 import { getStoredTheme, getStoredSkin, applyAppearance } from './services/theme';
+import { ToastContainer, showToast } from './components/Toast';
+import { ConfirmDialogContainer } from './components/AppDialog';
 
 export const getConvIdFromPath = (pathname: string): string | null => {
   const match = pathname.match(/^\/(?:c|chat)\/([a-zA-Z0-9_-]+)/);
@@ -60,6 +62,7 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentWorkspace, setCurrentWorkspace] = useState('/root');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Stable refs — used in effects with empty deps to avoid stale closures
   const activeConversationIdRef = React.useRef<string | null>(null);
@@ -321,6 +324,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
 
   // Switch Conversation
   const handleSelectConversation = async (convId: string, updateUrl = true) => {
+    setIsMobileSidebarOpen(false);
     if (updateUrl) {
       navigateToConversation(convId);
     }
@@ -348,6 +352,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
   };
 
   const handleNewConversation = () => {
+    setIsMobileSidebarOpen(false);
     navigateToConversation(null);
     setActiveConversationId(null);
     setMessages([]);
@@ -754,7 +759,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
       setConversations(convs);
       await handleSelectConversation(res.conversation_id);
     } catch (e: any) {
-      alert(`Erreur lors de la bifurcation : ${e.message}`);
+      showToast(`Erreur lors de la bifurcation : ${e.message}`, 'error');
     } finally {
       setIsStreaming(false);
     }
@@ -858,7 +863,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
 
   return (
     <div
-      className="flex h-screen w-screen font-sans overflow-hidden antialiased"
+      className="flex h-[100dvh] w-screen font-sans overflow-hidden antialiased"
       style={{
         backgroundColor: 'var(--bg)',
         color: 'var(--text)'
@@ -870,6 +875,8 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
         activeConversationId={activeConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
         onOpenSettings={() => {
           setSettingsTab('models');
           setIsSettingsOpen(true);
@@ -897,7 +904,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
 
       {/* Main Chat Area */}
       <main
-        className="flex-1 flex flex-col h-full overflow-hidden relative"
+        className="flex-1 min-w-0 flex flex-col h-full overflow-hidden relative"
         style={{
           backgroundColor: 'var(--main-bg, var(--bg))',
           color: 'var(--text)'
@@ -932,6 +939,8 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
           isRightPanelOpen={isRightPanelOpen}
           activeRightPanelTab={rightPanelTab}
           onToggleRightPanel={() => setIsRightPanelOpen(!isRightPanelOpen)}
+          onToggleMobileSidebar={() => setIsMobileSidebarOpen((prev) => !prev)}
+          onNewConversation={handleNewConversation}
           pendingApproval={pendingApproval}
           onApprovalResolved={() => setPendingApproval(null)}
           onForkMessage={handleForkMessage}
@@ -1076,6 +1085,10 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
         onClose={() => setIsRulesModalOpen(false)}
         currentWorkspace={currentWorkspace}
       />
+
+      {/* Global Toast & Confirm Dialog containers */}
+      <ToastContainer />
+      <ConfirmDialogContainer />
     </div>
   );
 }

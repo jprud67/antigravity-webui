@@ -627,13 +627,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div
-      className="w-full shrink-0 border-t"
+      className="w-full shrink-0 border-t safe-pb"
       style={{
         backgroundColor: 'var(--main-bg, var(--bg))',
         borderColor: 'var(--border-subtle, var(--border))'
       }}
     >
-      <div className="relative p-3 sm:p-4 max-w-4xl mx-auto w-full">
+      <div className="relative p-2 sm:p-4 max-w-4xl mx-auto w-full">
         {/* Toast Feedback */}
         {toastMessage && (
           <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-40 animate-fadeIn">
@@ -727,7 +727,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Floating Composer Box - Pure Hermes Design */}
         <div
-          className="hermes-composer-dock p-3 sm:p-3.5"
+          className="hermes-composer-dock p-2.5 sm:p-3.5"
           style={{
             backgroundColor: 'var(--surface)',
             borderColor: 'var(--border2)'
@@ -738,19 +738,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             value={prompt}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Envoyez une instruction à Antigravity (ou tapez / pour toutes les commandes)..."
+            placeholder="Envoyez une instruction à Antigravity (ou tapez /)..."
             rows={1}
-            className="w-full bg-transparent text-xs resize-none outline-none leading-relaxed min-h-[42px] max-h-[200px]"
+            className="w-full bg-transparent text-[15px] sm:text-xs resize-none outline-none leading-relaxed min-h-[44px] max-h-[160px] sm:max-h-[200px]"
             style={{ color: 'var(--text)' }}
           />
 
           {/* Composer Footer Toolbar */}
           <div
-            className="flex items-center justify-between pt-2.5 border-t mt-2 flex-wrap gap-2"
+            className="flex items-center justify-between pt-2 border-t mt-1.5 flex-wrap gap-1.5"
             style={{ borderColor: 'var(--border-subtle, var(--border))' }}
           >
           {/* Left Controls */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {/* Attachment / File Explorer Button */}
             {(onOpenFileExplorer || onOpenSkills) && (
               <button
@@ -759,7 +759,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   if (onOpenFileExplorer) onOpenFileExplorer();
                   else if (onOpenSkills) onOpenSkills();
                 }}
-                className="p-1.5 rounded-lg border transition-colors cursor-pointer flex items-center justify-center hover:opacity-100 opacity-80"
+                className="p-2 sm:p-1.5 rounded-lg border transition-colors cursor-pointer flex items-center justify-center hover:opacity-100 opacity-80 shrink-0"
                 style={{
                   backgroundColor: 'var(--surface-subtle)',
                   borderColor: 'var(--border)',
@@ -767,7 +767,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 }}
                 title={t('file_browser', 'Attacher des fichiers ou explorer le workspace (/files)')}
               >
-                <Paperclip className="w-3.5 h-3.5" />
+                <Paperclip className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
               </button>
             )}
 
@@ -775,7 +775,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             <button
               type="button"
               onClick={toggleListening}
-              className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
+              className={`p-2 sm:p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center shrink-0 ${
                 isListening ? 'animate-pulse shadow-md' : ''
               }`}
               style={{
@@ -785,7 +785,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               }}
               title={isListening ? t('stop_voice', 'Arrêter la dictée vocale') : t('voice_dictation', 'Activer la dictée vocale (Microphone)')}
             >
-              {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+              {isListening ? <MicOff className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> : <Mic className="w-4 h-4 sm:w-3.5 sm:h-3.5" />}
             </button>
 
             {/* Hermes YOLO Pill (Auto-Run) */}
@@ -796,7 +796,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 setAutoApprove(next);
                 showToast(next ? '⚡ Mode YOLO activé (Exécution autonome)' : 'Mode YOLO désactivé (Confirmation requise)', next ? 'success' : 'info');
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer shadow-sm"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer shadow-sm shrink-0"
               style={{
                 backgroundColor: autoApprove ? 'var(--accent-bg)' : 'var(--surface-subtle)',
                 borderColor: autoApprove ? 'var(--accent)' : 'var(--border)',
@@ -814,7 +814,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               onClick={() => {
                 if (onOpenWorkspace) onOpenWorkspace();
               }}
-              className="hidden sm:flex items-center gap-1.5 border rounded-lg px-2.5 py-1 text-[11px] font-mono hover:border-amber-400/50 transition-all cursor-pointer group"
+              className="hidden md:flex items-center gap-1.5 border rounded-lg px-2.5 py-1 text-[11px] font-mono hover:border-amber-400/50 transition-all cursor-pointer group shrink-0"
               style={{
                 backgroundColor: 'var(--surface-subtle)',
                 borderColor: 'var(--border)',
@@ -823,14 +823,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               title={`Workspace: ${currentWorkspace || '/root'} (Cliquer pour changer)`}
             >
               <Folder className="w-3 h-3 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
-              <span className="truncate max-w-[120px]" style={{ color: 'var(--text)' }}>
+              <span className="truncate max-w-[100px]" style={{ color: 'var(--text)' }}>
                 {currentWorkspace ? currentWorkspace.split('/').pop() || 'root' : 'root'}
               </span>
             </button>
 
             {/* Base Model Selector */}
             <div
-              className="flex items-center gap-1.5 border rounded-lg px-2 py-1 transition-colors"
+              className="flex items-center gap-1 border rounded-lg px-2 py-1 transition-colors shrink-0 max-w-[130px] sm:max-w-none"
               style={{
                 backgroundColor: 'var(--surface-subtle)',
                 borderColor: 'var(--border)'
@@ -840,7 +840,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               <select
                 value={selectedModel}
                 onChange={(e) => handleModelChange(e.target.value)}
-                className="bg-transparent text-[11px] font-semibold font-sans outline-none cursor-pointer"
+                className="bg-transparent text-[11px] font-semibold font-sans outline-none cursor-pointer truncate"
                 style={{ color: 'var(--text)' }}
                 title="Modèle de base"
               >
@@ -852,10 +852,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               </select>
             </div>
 
-            {/* Effort Selector */}
+            {/* Effort Selector - Hidden on small mobile */}
             {hasEffortSupport ? (
               <div
-                className="flex items-center gap-1.5 border rounded-lg px-2 py-1 transition-colors"
+                className="hidden sm:flex items-center gap-1.5 border rounded-lg px-2 py-1 transition-colors shrink-0"
                 style={{
                   backgroundColor: 'var(--surface-subtle)',
                   borderColor: 'var(--border)'

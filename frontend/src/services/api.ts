@@ -109,6 +109,22 @@ export async function forkConversation(
   return res.json();
 }
 
+export async function handoffConversation(
+  conversationId: string,
+  newTitle?: string
+): Promise<{ conversation_id: string; title: string; step_count: number; parent_conversation_id: string; summary: string }> {
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}/handoff`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ new_title: newTitle })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du transfert de contexte' }));
+    throw new Error(err.detail || 'Impossible de transférer le contexte');
+  }
+  return res.json();
+}
+
 export async function updateConversationTitle(conversationId: string, title: string): Promise<any> {
   const res = await fetch(`${API_BASE}/conversations/${conversationId}/title`, {
     method: 'PUT',

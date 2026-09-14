@@ -33,6 +33,8 @@ import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 import type { GoogleAccountInfo } from '../services/api';
 import { bulkConversationAction, bulkConversationExport } from '../services/api';
+import { showToast } from './Toast';
+import { showConfirm } from './AppDialog';
 
 function parseSafeDate(dateVal: any): Date {
   if (!dateVal) return new Date();
@@ -47,6 +49,8 @@ interface SidebarProps {
   activeConversationId: string | null;
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
   onOpenSettings: () => void;
   onOpenWorkspaces: () => void;
   onOpenArtifacts: () => void;
@@ -71,6 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeConversationId,
   onSelectConversation,
   onNewConversation,
+  isMobileOpen = false,
+  onCloseMobile,
   onOpenSettings,
   onOpenWorkspaces,
   onOpenArtifacts,
@@ -215,7 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleBulkDelete = async () => {
     if (selectedConvIds.size === 0) return;
     const count = selectedConvIds.size;
-    if (!window.confirm(`Supprimer définitivement ces ${count} session(s) ? Cette action est irréversible.`)) {
+    if (!(await showConfirm(`Supprimer définitivement ces ${count} session(s) ? Cette action est irréversible.`, { destructive: true }))) {
       return;
     }
     setIsBulkLoading(true);
@@ -234,7 +240,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
     } catch (err: any) {
-      alert(err.message || 'Erreur lors de la suppression groupée');
+      showToast(err.message || 'Erreur lors de la suppression groupée', 'error');
     } finally {
       setIsBulkLoading(false);
     }
@@ -253,7 +259,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         await onRefreshConversations();
       }
     } catch (err: any) {
-      alert(err.message || "Erreur lors de l'épinglage groupé");
+      showToast(err.message || "Erreur lors de l'épinglage groupé", 'error');
     } finally {
       setIsBulkLoading(false);
     }
@@ -279,7 +285,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setShowBulkTagModal(false);
       setBulkTagInput('');
     } catch (err: any) {
-      alert(err.message || "Erreur lors de l'application des tags");
+      showToast(err.message || "Erreur lors de l'application des tags", 'error');
     } finally {
       setIsBulkLoading(false);
     }
@@ -303,7 +309,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setShowBulkProjectModal(false);
       setBulkProjectInput('');
     } catch (err: any) {
-      alert(err.message || "Erreur lors de l'assignation du projet");
+      showToast(err.message || "Erreur lors de l'assignation du projet", 'error');
     } finally {
       setIsBulkLoading(false);
     }
@@ -315,99 +321,129 @@ export const Sidebar: React.FC<SidebarProps> = ({
     try {
       await bulkConversationExport(Array.from(selectedConvIds));
     } catch (err: any) {
-      alert(err.message || "Erreur lors de l'export groupé");
+      showToast(err.message || "Erreur lors de l'export groupé", 'error');
     } finally {
       setIsBulkLoading(false);
     }
   };
 
   return (
-    <aside
-      className="w-80 h-screen border-r flex flex-col shrink-0 select-none transition-colors"
-      style={{
-        backgroundColor: 'var(--sidebar)',
-        borderColor: 'var(--border)',
-        color: 'var(--text)',
-      }}
-    >
-      {/* Brand Header */}
-      <div
-        className="h-14 px-4 border-b flex items-center justify-between transition-colors shrink-0"
+    <>
+      {/* Mobile Drawer Backdrop */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden animate-fadeIn"
+          onClick={onCloseMobile}
+          aria-label="Fermer le menu latéral"
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[320px] md:static md:w-80 md:z-auto h-full border-r flex flex-col shrink-0 select-none transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          isMobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+        }`}
         style={{
+          backgroundColor: 'var(--sidebar)',
           borderColor: 'var(--border)',
-          backgroundColor: 'var(--surface-subtle)',
+          color: 'var(--text)',
         }}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center shadow-xs p-1 shrink-0 transition-colors"
-            style={{
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            <AntigravityIcon size={22} />
-          </div>
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span
-              className="font-bold text-sm tracking-tight truncate font-sans"
-              style={{ color: 'var(--strong)' }}
-            >
-              Antigravity
-            </span>
-            <span
-              className="text-[9px] px-1.5 py-0.5 rounded font-sans font-semibold"
+        {/* Brand Header */}
+        <div
+          className="h-14 px-4 border-b flex items-center justify-between transition-colors shrink-0 safe-pt"
+          style={{
+            borderColor: 'var(--border)',
+            backgroundColor: 'var(--surface-subtle)',
+          }}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center shadow-xs p-1 shrink-0 transition-colors"
               style={{
-                backgroundColor: 'var(--accent-bg)',
-                color: 'var(--accent)',
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border)',
               }}
             >
-              WebUI
-            </span>
+              <AntigravityIcon size={22} />
+            </div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                className="font-bold text-sm tracking-tight truncate font-sans"
+                style={{ color: 'var(--strong)' }}
+              >
+                Antigravity
+              </span>
+              <span
+                className="text-[9px] px-1.5 py-0.5 rounded font-sans font-semibold"
+                style={{
+                  backgroundColor: 'var(--accent-bg)',
+                  color: 'var(--accent)',
+                }}
+              >
+                WebUI
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {/* Multi-selection Toggle Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsBulkMode((prev) => {
+                  if (prev) setSelectedConvIds(new Set());
+                  return !prev;
+                });
+              }}
+              className="p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center"
+              style={{
+                backgroundColor: isBulkMode ? 'var(--accent)' : 'var(--surface)',
+                borderColor: isBulkMode ? 'var(--accent)' : 'var(--border)',
+                color: isBulkMode ? '#ffffff' : 'var(--muted)',
+              }}
+              title={isBulkMode ? "Quitter la sélection multiple" : "Sélection multiple & actions groupées"}
+            >
+              <CheckSquare className="w-4 h-4" />
+            </button>
+
+            <a
+              href="/"
+              onClick={(e) => {
+                if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+                  e.preventDefault();
+                  onNewConversation();
+                  onCloseMobile?.();
+                }
+              }}
+              className="p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center no-underline"
+              style={{
+                backgroundColor: 'var(--accent-bg)',
+                borderColor: 'var(--accent)',
+                color: 'var(--accent)',
+              }}
+              title={t('new_session', 'Nouvelle session')}
+            >
+              <Plus className="w-4 h-4" />
+            </a>
+
+            {/* Mobile Close Drawer Button */}
+            {onCloseMobile && (
+              <button
+                type="button"
+                onClick={onCloseMobile}
+                className="p-1.5 rounded-lg border md:hidden transition-all cursor-pointer flex items-center justify-center"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--muted)',
+                }}
+                title="Fermer le menu"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
-
-        <div className="flex items-center gap-1.5">
-          {/* Multi-selection Toggle Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsBulkMode((prev) => {
-                if (prev) setSelectedConvIds(new Set());
-                return !prev;
-              });
-            }}
-            className="p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center"
-            style={{
-              backgroundColor: isBulkMode ? 'var(--accent)' : 'var(--surface)',
-              borderColor: isBulkMode ? 'var(--accent)' : 'var(--border)',
-              color: isBulkMode ? '#ffffff' : 'var(--muted)',
-            }}
-            title={isBulkMode ? "Quitter la sélection multiple" : "Sélection multiple & actions groupées"}
-          >
-            <CheckSquare className="w-4 h-4" />
-          </button>
-
-          <a
-            href="/"
-            onClick={(e) => {
-              if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
-                e.preventDefault();
-                onNewConversation();
-              }
-            }}
-            className="p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center no-underline"
-            style={{
-              backgroundColor: 'var(--accent-bg)',
-              borderColor: 'var(--accent)',
-              color: 'var(--accent)',
-            }}
-            title={t('new_session', 'Nouvelle session')}
-          >
-            <Plus className="w-4 h-4" />
-          </a>
-        </div>
-      </div>
 
       {/* Workspace Selector Bar */}
       <div className="p-3 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
@@ -759,6 +795,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
                         e.preventDefault();
                         onSelectConversation(conv.conversation_id);
+                        onCloseMobile?.();
                       }
                     }}
                   >
@@ -1349,5 +1386,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
     </aside>
+    </>
   );
 };

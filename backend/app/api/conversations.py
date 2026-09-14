@@ -8,6 +8,7 @@ from app.services.storage import (
     get_conversation_transcript,
     calculate_conversation_tokens,
     fork_conversation,
+    create_conversation_handoff,
     delete_conversation,
     undo_conversation_turn,
     search_conversations,
@@ -25,6 +26,9 @@ router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 
 class ForkRequest(BaseModel):
     up_to_step_index: int
+    new_title: Optional[str] = None
+
+class HandoffRequest(BaseModel):
     new_title: Optional[str] = None
 
 class TitleUpdateRequest(BaseModel):
@@ -164,6 +168,18 @@ def fork(conversation_id: str, req: ForkRequest, _ = Depends(require_auth)):
             source_conversation_id=conversation_id,
             up_to_step_index=req.up_to_step_index,
             new_title=req.new_title
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{conversation_id}/handoff")
+def handoff(conversation_id: str, req: Optional[HandoffRequest] = None, _ = Depends(require_auth)):
+    try:
+        new_title = req.new_title if req else None
+        result = create_conversation_handoff(
+            source_conversation_id=conversation_id,
+            new_title=new_title
         )
         return result
     except Exception as e:

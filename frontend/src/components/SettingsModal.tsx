@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Settings as SettingsIcon, 
@@ -14,6 +14,7 @@ import {
   KeyRound, 
   ShieldCheck, 
   ChevronRight, 
+  ChevronLeft,
   BookOpen,
   Palette,
   Globe,
@@ -42,6 +43,7 @@ import {
 } from '../services/api';
 import { AVAILABLE_THEMES, AVAILABLE_SKINS, getStoredTheme, getStoredSkin, applyAppearance, type ThemeMode } from '../services/theme';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
+import { showConfirm } from './AppDialog';
 
 export const GoogleIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24">
@@ -119,6 +121,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [googleSuccess, setGoogleSuccess] = useState<string | null>(null);
 
+  // Horizontal tabs scroll management
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkTabsScroll = () => {
+    const el = tabsContainerRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 6);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 6);
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(checkTabsScroll, 120);
+      window.addEventListener('resize', checkTabsScroll);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('resize', checkTabsScroll);
+      };
+    }
+  }, [isOpen, activeTab]);
+
+  const handleScrollTabs = (direction: 'left' | 'right') => {
+    const el = tabsContainerRef.current;
+    if (!el) return;
+    const distance = 200;
+    el.scrollBy({
+      left: direction === 'left' ? -distance : distance,
+      behavior: 'smooth'
+    });
+    setTimeout(checkTabsScroll, 250);
+  };
+
+  const handleTabClick = (tab: typeof activeTab, e: React.MouseEvent<HTMLButtonElement>) => {
+    setActiveTab(tab);
+    e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  };
+
   const loadGoogleAccounts = async () => {
     setGoogleLoading(true);
     try {
@@ -153,7 +194,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleDeleteGoogleAccount = async (email: string) => {
-    if (!confirm(`Supprimer le compte ${email} des comptes enregistrés ?`)) return;
+    if (!(await showConfirm(`Supprimer le compte ${email} des comptes enregistrés ?`, { destructive: true }))) return;
     try {
       await deleteGoogleAccount(email);
       await loadGoogleAccounts();
@@ -352,9 +393,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md animate-fadeIn p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md animate-fadeIn p-2 sm:p-4">
       <div
-        className="w-[780px] max-w-full max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col border"
+        className="w-[780px] max-w-full max-h-[96dvh] sm:max-h-[90vh] rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col border"
         style={{
           backgroundColor: 'var(--surface)',
           borderColor: 'var(--border)',
@@ -363,132 +404,188 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       >
         {/* Header */}
         <div
-          className="px-6 py-4 border-b flex items-center justify-between shrink-0"
+          className="px-4 sm:px-6 py-3.5 sm:py-4 border-b flex items-center justify-between shrink-0 safe-pt"
           style={{
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)',
           }}
         >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-500">
+            <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-500 shrink-0">
               <SettingsIcon className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-sm font-bold tracking-tight" style={{ color: 'var(--strong)' }}>Configuration Antigravity</h2>
-              <p className="text-[11px]" style={{ color: 'var(--muted)' }}>Modèles d'intelligence, permissions, skills et sécurité</p>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold tracking-tight truncate" style={{ color: 'var(--strong)' }}>Configuration Antigravity</h2>
+              <p className="text-[11px] truncate" style={{ color: 'var(--muted)' }}>Modèles d'intelligence, permissions, skills et sécurité</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+            className="p-2 rounded-xl transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 shrink-0 ml-1"
             style={{ color: 'var(--muted)' }}
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs with Horizontal Scroll & Quick Navigation Controls */}
         <div
-          className="flex border-b px-6 gap-2 shrink-0 overflow-x-auto"
+          className="relative flex items-center border-b shrink-0 select-none group/tabs"
           style={{
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)',
           }}
         >
-          <button
-            onClick={() => setActiveTab('models')}
-            className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'models'
-                ? 'border-sky-500 text-sky-600 dark:text-sky-400 font-bold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
-            }`}
-          >
-            <Cpu className="w-4 h-4" />
-            <span>Modèles & Raisonnement</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab('google');
-              loadGoogleAccounts();
-            }}
-            className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'google'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400 font-bold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
-            }`}
-          >
-            <GoogleIcon className="w-4 h-4" />
-            <span>Compte Google</span>
-            {googleData?.active_account && (
-              <span className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 px-1.5 py-0.2 rounded-full font-mono max-w-[120px] truncate">
-                {googleData.active_account.email.split('@')[0]}
+          {/* Scroll Left Button */}
+          {canScrollLeft && (
+            <button
+              type="button"
+              onClick={() => handleScrollTabs('left')}
+              className="absolute left-0 z-20 h-full px-1.5 flex items-center justify-center transition-all cursor-pointer shadow-md animate-fadeIn backdrop-blur-md"
+              style={{
+                background: 'linear-gradient(to right, var(--surface-subtle) 75%, transparent)',
+                color: 'var(--text)'
+              }}
+              title="Défiler vers la gauche"
+            >
+              <span
+                className="p-1 rounded-lg border flex items-center justify-center shadow-xs hover:scale-105 transition-transform"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border2)',
+                  color: 'var(--accent-text)'
+                }}
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
               </span>
-            )}
-          </button>
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('permissions')}
-            className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'permissions'
-                ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
-            }`}
+          <div
+            ref={tabsContainerRef}
+            onScroll={checkTabsScroll}
+            className="flex px-3 sm:px-6 gap-2 shrink-0 overflow-x-auto tabs-horizontal-scroll scroll-smooth w-full py-0.5"
           >
-            <Shield className="w-4 h-4" />
-            <span>Règles de Permissions</span>
-            <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60 px-1.5 py-0.2 rounded-full font-mono font-bold">
-              {allowRules.length}
-            </span>
-          </button>
+            <button
+              onClick={(e) => handleTabClick('models', e)}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'models'
+                  ? 'border-sky-500 text-sky-600 dark:text-sky-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <Cpu className="w-4 h-4" />
+              <span>Modèles & Raisonnement</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('skills')}
-            className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'skills'
-                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-bold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
-            }`}
-          >
-            <Boxes className="w-4 h-4" />
-            <span>Skills ({skills.length})</span>
-          </button>
+            <button
+              onClick={(e) => {
+                handleTabClick('google', e);
+                loadGoogleAccounts();
+              }}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'google'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <GoogleIcon className="w-4 h-4" />
+              <span>Compte Google</span>
+              {googleData?.active_account && (
+                <span className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 px-1.5 py-0.2 rounded-full font-mono max-w-[120px] truncate">
+                  {googleData.active_account.email.split('@')[0]}
+                </span>
+              )}
+            </button>
 
-          <button
-            onClick={() => setActiveTab('security')}
-            className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'security'
-                ? 'border-amber-500 text-amber-600 dark:text-amber-400 font-bold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
-            }`}
-          >
-            <KeyRound className="w-4 h-4" />
-            <span>Sécurité & Accès</span>
-          </button>
+            <button
+              onClick={(e) => handleTabClick('permissions', e)}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'permissions'
+                  ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+              <span>Règles de Permissions</span>
+              <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60 px-1.5 py-0.2 rounded-full font-mono font-bold">
+                {allowRules.length}
+              </span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('appearance')}
-            className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'appearance'
-                ? 'border-purple-500 text-purple-600 dark:text-purple-400 font-bold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
-            }`}
-          >
-            <Palette className="w-4 h-4" />
-            <span>Apparence & Thèmes</span>
-          </button>
+            <button
+              onClick={(e) => handleTabClick('skills', e)}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'skills'
+                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <Boxes className="w-4 h-4" />
+              <span>Skills ({skills.length})</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('languages')}
-            className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'languages'
-                ? 'border-cyan-500 text-cyan-600 dark:text-cyan-400 font-bold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            <span>Langues ({SUPPORTED_LANGUAGES.find(l => l.code === lang)?.flag || '🌐'})</span>
-          </button>
+            <button
+              onClick={(e) => handleTabClick('security', e)}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'security'
+                  ? 'border-amber-500 text-amber-600 dark:text-amber-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>Sécurité & Accès</span>
+            </button>
+
+            <button
+              onClick={(e) => handleTabClick('appearance', e)}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'appearance'
+                  ? 'border-purple-500 text-purple-600 dark:text-purple-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <Palette className="w-4 h-4" />
+              <span>Apparence & Thèmes</span>
+            </button>
+
+            <button
+              onClick={(e) => handleTabClick('languages', e)}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'languages'
+                  ? 'border-cyan-500 text-cyan-600 dark:text-cyan-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              <span>Langues ({SUPPORTED_LANGUAGES.find(l => l.code === lang)?.flag || '🌐'})</span>
+            </button>
+          </div>
+
+          {/* Scroll Right Button */}
+          {canScrollRight && (
+            <button
+              type="button"
+              onClick={() => handleScrollTabs('right')}
+              className="absolute right-0 z-20 h-full px-1.5 flex items-center justify-center transition-all cursor-pointer shadow-md animate-fadeIn backdrop-blur-md"
+              style={{
+                background: 'linear-gradient(to left, var(--surface-subtle) 75%, transparent)',
+                color: 'var(--text)'
+              }}
+              title="Défiler vers la droite"
+            >
+              <span
+                className="p-1 rounded-lg border flex items-center justify-center shadow-xs hover:scale-105 transition-transform"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border2)',
+                  color: 'var(--accent-text)'
+                }}
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Tab Content (Scrollable) */}

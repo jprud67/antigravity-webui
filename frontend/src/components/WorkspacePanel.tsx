@@ -24,6 +24,7 @@ import { KanbanTab } from './KanbanTab';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
 import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent } from '../services/api';
+import { showToast } from './Toast';
 import type { ArtifactItem } from '../types';
 
 export type RightPanelTab = 'files' | 'artifacts' | 'terminal' | 'git' | 'kanban';
@@ -174,7 +175,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err) {
-      alert('Erreur lors de la sauvegarde du fichier.');
+      showToast('Erreur lors de la sauvegarde du fichier.', 'error');
     } finally {
       setSavingFile(false);
     }
@@ -194,7 +195,13 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
     setExpandedFolders((prev) => ({ ...prev, [folderPath]: !prev[folderPath] }));
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return (
+      <div className="hidden" aria-hidden="true">
+        <TerminalTab currentWorkspace={currentWorkspace} />
+      </div>
+    );
+  }
 
   // File Tree Recursive Renderer
   const renderTreeItems = (items: any[], level = 0) => {
@@ -263,34 +270,42 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
   };
 
   return (
-    <aside
-      style={{
-        width: `${panelWidth}px`,
-        backgroundColor: 'var(--surface)',
-        borderColor: 'var(--border)',
-        color: 'var(--text)',
-      }}
-      className="fixed top-0 right-0 bottom-0 z-40 border-l shadow-2xl flex flex-col transition-all duration-75 select-none"
-    >
-      {/* Left Resize Drag Bar */}
+    <>
+      {/* Mobile Backdrop Overlay (< md) */}
       <div
-        onMouseDown={handleMouseDown}
-        className="absolute top-0 left-0 bottom-0 w-1.5 hover:w-2 hover:bg-sky-500/60 transition-all cursor-col-resize z-50 group flex items-center justify-center"
+        onClick={onClose}
+        className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-xs animate-fadeIn"
+      />
+
+      <aside
+        style={{
+          width: typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : `${panelWidth}px`,
+          maxWidth: typeof window !== 'undefined' && window.innerWidth < 768 ? '100vw' : '55vw',
+          backgroundColor: 'var(--surface)',
+          borderColor: 'var(--border)',
+          color: 'var(--text)',
+        }}
+        className="fixed inset-y-0 right-0 z-50 w-full sm:w-[460px] border-l shadow-2xl flex flex-col select-none md:relative md:inset-auto md:z-20 md:shadow-none md:shrink-0 transition-all duration-75"
       >
-        <div className="h-8 w-0.5 bg-slate-400 dark:bg-slate-600 group-hover:bg-sky-400 rounded-full" />
-      </div>
+        {/* Left Resize Drag Bar - Desktop Only */}
+        <div
+          onMouseDown={handleMouseDown}
+          className="hidden md:flex absolute top-0 left-0 bottom-0 w-1.5 hover:w-2 hover:bg-sky-500/60 transition-all cursor-col-resize z-50 group items-center justify-center -ml-0.5"
+        >
+          <div className="h-8 w-0.5 bg-slate-400 dark:bg-slate-600 group-hover:bg-sky-400 rounded-full" />
+        </div>
 
       {/* Panel Master Header */}
       <div
-        className="flex items-center justify-between px-3 py-2.5 border-b shrink-0 transition-colors"
+        className="flex items-center justify-between px-3 py-2.5 border-b shrink-0 transition-colors safe-pt gap-1"
         style={{
           backgroundColor: 'var(--surface-subtle)',
           borderColor: 'var(--border)',
         }}
       >
-        {/* Tab Buttons */}
+        {/* Horizontally Scrollable Tab Buttons */}
         <div
-          className="flex items-center gap-1 p-0.5 rounded-xl border"
+          className="flex items-center gap-1 p-0.5 rounded-xl border overflow-x-auto no-scrollbar touch-scroll min-w-0 flex-1"
           style={{
             backgroundColor: 'var(--surface)',
             borderColor: 'var(--border)',
@@ -298,7 +313,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
         >
           <button
             onClick={() => onTabChange('files')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'files'
                 ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
@@ -310,7 +325,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
 
           <button
             onClick={() => onTabChange('artifacts')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'artifacts'
                 ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
@@ -322,7 +337,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
 
           <button
             onClick={() => onTabChange('terminal')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'terminal'
                 ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
@@ -334,7 +349,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
 
           <button
             onClick={() => onTabChange('git')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'git'
                 ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
@@ -346,7 +361,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
 
           <button
             onClick={() => onTabChange('kanban')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'kanban'
                 ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
@@ -360,7 +375,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+          className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer shrink-0 ml-1"
+          title="Fermer le volet latéral"
         >
           <X className="w-4 h-4" />
         </button>
@@ -633,5 +649,6 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
         )}
       </div>
     </aside>
+    </>
   );
 };

@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { RefreshCw, Trash2, Terminal as TerminalIcon, ShieldAlert } from 'lucide-react';
 import { getAuthToken } from '../services/api';
+import { showConfirm } from './AppDialog';
 
 interface TerminalTabProps {
   currentWorkspace: string;
@@ -93,10 +94,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
 
     ws.onopen = () => {
       setConnected(true);
-      if (xtermRef.current) {
-        xtermRef.current.writeln('\x1b[38;5;38m✔ Connecté au terminal Antigravity (' + currentWorkspace + ')\x1b[0m\r\n');
-      }
-      // Send initial size
+      // Send initial terminal dimensions
       if (ws.readyState === WebSocket.OPEN && xtermRef.current) {
         ws.send(JSON.stringify({ action: 'resize', cols: xtermRef.current.cols, rows: xtermRef.current.rows }));
       }
@@ -182,6 +180,20 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
     }
   };
 
+  const handleRestartSession = async () => {
+    const ok = await showConfirm('Voulez-vous réinitialiser le shell bash (tous les processus en cours seront arrêtés) ?', { destructive: true });
+    if (ok) {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ action: 'restart' }));
+        if (xtermRef.current) {
+          xtermRef.current.clear();
+        }
+      } else {
+        connectTerminal();
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-[#060a12] text-slate-200">
       {/* Terminal Toolbar */}
@@ -193,7 +205,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
         }}
       >
         <div className="flex items-center gap-2">
-          <TerminalIcon className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+          <TerminalIcon className="w-3.5 h-3.5 text-emerald-400" />
           <span className="font-semibold" style={{ color: 'var(--strong)' }}>Terminal PTY</span>
           <span
             className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono border"
@@ -202,29 +214,30 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
               borderColor: 'var(--border-subtle)',
               color: 'var(--muted)'
             }}
+            title="Le terminal et les processus en arrière-plan restent actifs même en fermant le volet"
           >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
                 connected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'
               }`}
             />
-            {connected ? 'En ligne' : 'Déconnecté'}
+            {connected ? 'Persistant (En ligne)' : 'Déconnecté'}
           </span>
         </div>
 
         <div className="flex items-center gap-1">
           <button
             onClick={handleClear}
-            title="Effacer le terminal"
+            title="Effacer l'affichage de l'écran"
             className="p-1.5 rounded-md transition-colors cursor-pointer hover:opacity-100 opacity-70"
             style={{ color: 'var(--muted)' }}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={connectTerminal}
-            title="Relancer le terminal"
-            className="p-1.5 rounded-md transition-colors cursor-pointer hover:opacity-100 opacity-70"
+            onClick={handleRestartSession}
+            title="Réinitialiser l'interpréteur bash"
+            className="p-1.5 rounded-md transition-colors cursor-pointer hover:opacity-100 opacity-70 hover:text-amber-400"
             style={{ color: 'var(--muted)' }}
           >
             <RefreshCw className="w-3.5 h-3.5" />

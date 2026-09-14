@@ -8,7 +8,8 @@ import {
   Check, 
   Download,
   FileCode,
-  Sparkles
+  Sparkles,
+  ChevronLeft
 } from 'lucide-react';
 import type { ArtifactItem } from '../types';
 import { fetchArtifacts, fetchArtifactContent } from '../services/api';
@@ -31,6 +32,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showMobileList, setShowMobileList] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -137,16 +139,16 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
 
         {/* Content Layout */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Artifacts List Sidebar */}
+          {/* Artifacts List Sidebar - Toggleable on mobile */}
           <div
-            className="w-72 border-r overflow-y-auto p-3 space-y-1 shrink-0"
+            className={`${showMobileList || !selectedArtifact ? 'flex' : 'hidden sm:flex'} w-full sm:w-72 border-r flex-col overflow-y-auto p-3 space-y-1 shrink-0 touch-scroll`}
             style={{
               backgroundColor: 'var(--surface-subtle)',
               borderColor: 'var(--border)'
             }}
           >
             <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider px-2.5 mb-2" style={{ color: 'var(--muted)' }}>
-              <span>Fichiers</span>
+              <span>Documents ({artifacts.length})</span>
               <span className="font-mono px-1.5 py-0.2 rounded border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>{artifacts.length}</span>
             </div>
 
@@ -161,7 +163,10 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
                 return (
                   <button
                     key={`${art.conversation_id}-${art.filename}`}
-                    onClick={() => selectArtifact(art)}
+                    onClick={() => {
+                      selectArtifact(art);
+                      setShowMobileList(false);
+                    }}
                     className="w-full text-left p-2.5 rounded-xl text-xs transition-all flex flex-col gap-1 border cursor-pointer"
                     style={{
                       backgroundColor: isSelected ? 'var(--accent-bg)' : 'transparent',
@@ -186,28 +191,43 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
 
           {/* Artifact Preview */}
           <div
-            className="flex-1 flex flex-col overflow-hidden"
+            className={`${!showMobileList && selectedArtifact ? 'flex' : 'hidden sm:flex'} flex-1 flex-col overflow-hidden`}
             style={{ backgroundColor: 'var(--main-bg, var(--surface))' }}
           >
             {selectedArtifact ? (
               <>
                 {/* File info bar */}
                 <div
-                  className="px-6 py-2.5 border-b flex items-center justify-between shrink-0 text-xs"
+                  className="px-3 sm:px-6 py-2.5 border-b flex items-center justify-between shrink-0 text-xs gap-2"
                   style={{
                     backgroundColor: 'var(--surface-subtle)',
                     borderColor: 'var(--border)'
                   }}
                 >
-                  <div className="flex items-center gap-2 font-mono" style={{ color: 'var(--text)' }}>
-                    <span className="font-semibold text-emerald-500">{selectedArtifact.filename}</span>
-                    <span style={{ color: 'var(--border)' }}>|</span>
-                    <span className="text-[10px] truncate max-w-sm" style={{ color: 'var(--muted)' }}>{selectedArtifact.relative_path}</span>
+                  <div className="flex items-center gap-2 min-w-0 font-mono" style={{ color: 'var(--text)' }}>
+                    {/* Mobile Back Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowMobileList(true)}
+                      className="sm:hidden p-1 rounded-lg border flex items-center gap-1 text-[11px] font-sans shrink-0 cursor-pointer"
+                      style={{
+                        backgroundColor: 'var(--surface)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--accent-text)'
+                      }}
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>Liste</span>
+                    </button>
+
+                    <span className="font-semibold text-emerald-500 truncate max-w-[120px] sm:max-w-none">{selectedArtifact.filename}</span>
+                    <span className="hidden sm:inline" style={{ color: 'var(--border)' }}>|</span>
+                    <span className="text-[10px] truncate max-w-sm hidden sm:inline" style={{ color: 'var(--muted)' }}>{selectedArtifact.relative_path}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={copyContent}
-                      className="py-1 px-3 rounded-lg border flex items-center gap-1.5 transition-colors text-[11px] font-medium cursor-pointer"
+                      className="py-1 px-2.5 sm:px-3 rounded-lg border flex items-center gap-1.5 transition-colors text-[11px] font-medium cursor-pointer"
                       style={{
                         backgroundColor: 'var(--surface)',
                         borderColor: 'var(--border)',
@@ -215,11 +235,11 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
                       }}
                     >
                       {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copied ? 'Copié !' : 'Copier'}</span>
+                      <span className="hidden sm:inline">{copied ? 'Copié !' : 'Copier'}</span>
                     </button>
                     <button
                       onClick={downloadContent}
-                      className="py-1 px-3 rounded-lg border flex items-center gap-1.5 transition-colors text-[11px] font-medium cursor-pointer"
+                      className="py-1 px-2.5 sm:px-3 rounded-lg border flex items-center gap-1.5 transition-colors text-[11px] font-medium cursor-pointer"
                       style={{
                         backgroundColor: 'var(--surface)',
                         borderColor: 'var(--border)',
@@ -227,14 +247,14 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
                       }}
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Télécharger</span>
+                      <span className="hidden sm:inline">Télécharger</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Content preview */}
                 <div
-                  className="flex-1 overflow-y-auto p-8 text-xs leading-relaxed"
+                  className="flex-1 overflow-y-auto p-3.5 sm:p-8 text-xs leading-relaxed touch-scroll"
                   style={{ color: 'var(--text)' }}
                 >
                   {loading ? (

@@ -6,6 +6,8 @@ import {
   updateKanbanTask, 
   deleteKanbanTask 
 } from '../services/api';
+import { showToast } from './Toast';
+import { showConfirm } from './AppDialog';
 import { 
   Plus, 
   RefreshCw, 
@@ -115,19 +117,19 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
       setIsModalOpen(false);
       await loadTasks();
     } catch (e: any) {
-      alert(e.message || 'Erreur lors de la sauvegarde');
+      showToast(e.message || 'Erreur lors de la sauvegarde', 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    if (!confirm('Supprimer définitivement cette tâche ?')) return;
+    if (!(await showConfirm('Supprimer définitivement cette tâche ?', { destructive: true }))) return;
     try {
       await deleteKanbanTask(taskId);
       await loadTasks();
     } catch (e: any) {
-      alert(e.message || 'Erreur suppression');
+      showToast(e.message || 'Erreur suppression', 'error');
     }
   };
 

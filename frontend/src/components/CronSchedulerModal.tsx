@@ -20,6 +20,8 @@ import {
   deleteCronJob, 
   triggerCronJob 
 } from '../services/api';
+import { showToast } from './Toast';
+import { showConfirm } from './AppDialog';
 
 interface CronSchedulerModalProps {
   isOpen: boolean;
@@ -96,7 +98,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
       setTimeout(() => setActionNotice(null), 3000);
       await loadCrons();
     } catch (e: any) {
-      alert(e.message || 'Erreur création');
+      showToast(e.message || 'Erreur création', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -108,17 +110,17 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
       await updateCronJob(job.id, { state: nextState });
       await loadCrons();
     } catch (e: any) {
-      alert(e.message || 'Erreur modification statut');
+      showToast(e.message || 'Erreur modification statut', 'error');
     }
   };
 
   const handleDelete = async (jobId: string) => {
-    if (!confirm('Supprimer cette tâche planifiée ?')) return;
+    if (!(await showConfirm('Supprimer cette tâche planifiée ?', { destructive: true }))) return;
     try {
       await deleteCronJob(jobId);
       await loadCrons();
     } catch (e: any) {
-      alert(e.message || 'Erreur suppression');
+      showToast(e.message || 'Erreur suppression', 'error');
     }
   };
 
@@ -132,7 +134,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
       }
       await loadCrons();
     } catch (e: any) {
-      alert(e.message || 'Erreur déclenchement');
+      showToast(e.message || 'Erreur déclenchement', 'error');
     }
   };
 
@@ -152,9 +154,9 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 safe-pt safe-pb">
       <div
-        className="border rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fadeIn"
+        className="border rounded-2xl sm:rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95dvh] sm:max-h-[90vh] animate-fadeIn"
         style={{
           backgroundColor: 'var(--surface)',
           borderColor: 'var(--border2)',

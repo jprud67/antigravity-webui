@@ -355,6 +355,198 @@ def fork_conversation(
         "parent_conversation_id": source_conversation_id
     }
 
+def create_conversation_handoff(
+    source_conversation_id: str,
+    new_title: Optional[str] = None
+) -> Dict[str, Any]:
+    source_steps = get_conversation_transcript(source_conversation_id)
+    if not source_steps:
+        raise ValueError(f"Aucun historique trouvé pour la conversation {source_conversation_id}")
+
+    # Fetch source record from SQLite
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM conversation_summaries WHERE conversation_id = ?", (source_conversation_id,))
+        source_row = cursor.fetchone()
+        source_title = source_row["title"] if source_row and source_row["title"] else "Session"
+        source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else f'["{DEFAULT_WORKSPACE}"]'
+        agent_name = source_row["agent_name"] if source_row and source_row["agent_name"] else ""
+    finally:
+        conn.close()
+
+    # Extract user requests, model actions, and touched files
+    user_requests = []
+    actions_taken = []
+    files_touched = set()
+    artifacts_found = []
+
+    for s in source_steps:
+        stype = s.get("type", "")
+        source = s.get("source", "")
+        content = s.get("content", "")
+        if stype == "USER_INPUT" or source == "USER_EXPLICIT":
+            if content and content.strip():
+                user_requests.append(content.strip()[:300])
+        elif source == "MODEL":
+            tool_calls = s.get("tool_calls", [])
+            for tc in tool_calls:
+                fn = tc.get("name") or tc.get("toolAction") or ""
+                args = tc.get("args") or tc.get("parameters") or {}
+                if "TargetFile" in args:
+                    files_touched.add(args["TargetFile"])
+                elif "SearchDirectory" in args:
+                    files_touched.add(args["SearchDirectory"])
+                elif "CommandLine" in args:
+                    actions_taken.append(f"Exécution: `{args['CommandLine'][:80]}`")
+                elif fn:
+                    actions_taken.append(f"Outil: `{fn}`")
+
+    # Check artifacts in brain directory
+    source_dir = BRAIN_DIR / source_conversation_id
+    if source_dir.exists():
+        for item in source_dir.iterdir():
+            if item.is_file() and item.name.endswith(".md"):
+                artifacts_found.append(item.name)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+
+    user_reqs_md = "\n".join([f"{i+1}. {req}" for i, req in enumerate(user_requests[-6:])]) if user_requests else "Poursuite de la session de développement."
+    files_md = "\n".join([f"- `{f}`" for f in list(files_touched)[:12]]) if files_touched else "- Fichiers du workspace de travail"
+    artifacts_md = ", ".join([f"`{a}`" for a in artifacts_found]) if artifacts_found else "Aucun artefact autonome"
+
+    summary_text = f"""<CONTEXT_SUMMARY>
+Le contexte de la session précédente a été consolidé et transféré dans cette nouvelle section pour libérer l'espace mémoire sans perte d'information :
+
+# Session Précédente : {source_title}
+- **Date de transfert :** {now_str}
+- **Historique source :** {len(source_steps)} étapes archivées dans `{source_conversation_id}`
+- **Workspace actif :** {source_workspace}
+
+# Demandes Utilisateur & Objectifs Clés
+{user_reqs_md}
+
+# Fichiers Traités & Contexte Technique
+{files_md}
+
+# Artefacts Disponibles
+{artifacts_md}
+
+# Statut de la Continuité
+Cette nouvelle section de chat démarre avec un compteur de tokens réinitialisé. Les décisions d'architecture et connaissances restent actives en mémoire.
+</CONTEXT_SUMMARY>"""
+
+    new_id = str(uuid.uuid4())
+    new_conv_dir = BRAIN_DIR / new_id
+    new_logs_dir = new_conv_dir / ".system_generated" / "logs"
+    new_logs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy artifacts if present
+    if source_dir.exists():
+        for item in source_dir.iterdir():
+            if item.name not in [".system_generated", "scratch"]:
+                target = new_conv_dir / item.name
+                if item.is_file():
+                    shutil.copy2(item, target)
+                elif item.is_dir():
+                    shutil.copytree(item, target, dirs_exist_ok=True)
+
+    # Prepare initial steps:
+    # Step 0: System Context Summary
+    # Step 1: Assistant readiness message
+    step_summary = {
+        "step_index": 0,
+        "source": "SYSTEM",
+        "type": "CONTEXT_SUMMARY",
+        "status": "DONE",
+        "created_at": now_iso,
+        "content": summary_text,
+        "conversation_id": new_id
+    }
+    step_assistant = {
+        "step_index": 1,
+        "source": "MODEL",
+        "type": "PLANNER_RESPONSE",
+        "status": "DONE",
+        "created_at": now_iso,
+        "content": f"✨ **Nouvelle section de chat initialisée avec mémoire intégrée !**\n\nJ'ai synthétisé et repris tout le contexte de la conversation précédente (**« {source_title} »**). L'ensemble des décisions, fichiers créés et statuts d'avancement sont préservés, tandis que votre compteur de contexte a été réinitialisé à zéro pour vous garantir une réactivité maximale.\n\nQuelle est l'étape suivante sur laquelle nous travaillons ?",
+        "conversation_id": new_id
+    }
+
+    transcript_path = new_logs_dir / "transcript.jsonl"
+    transcript_full_path = new_logs_dir / "transcript_full.jsonl"
+
+    with open(transcript_path, "w", encoding="utf-8") as f:
+        f.write(json.dumps(step_summary, ensure_ascii=False) + "\n")
+        f.write(json.dumps(step_assistant, ensure_ascii=False) + "\n")
+
+    with open(transcript_full_path, "w", encoding="utf-8") as f:
+        f.write(json.dumps(step_summary, ensure_ascii=False) + "\n")
+        f.write(json.dumps(step_assistant, ensure_ascii=False) + "\n")
+
+    title = new_title or f"[Suite] {source_title}"
+    preview = f"Nouvelle section avec mémoire transférée de « {source_title} »"
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO conversation_summaries (
+                conversation_id,
+                title,
+                preview,
+                step_count,
+                last_modified_time,
+                workspace_uris,
+                status,
+                agent_name,
+                parent_conversation_id,
+                last_user_input_time,
+                last_user_input_step_index
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                new_id,
+                title,
+                preview,
+                2,
+                now_iso,
+                source_workspace,
+                "DONE",
+                agent_name,
+                source_conversation_id,
+                now_iso,
+                0
+            )
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Inherit tags & project from source metadata
+    source_meta = get_session_meta(source_conversation_id) or {}
+    new_tags = list(source_meta.get("tags", []))
+    if "suite" not in new_tags:
+        new_tags.append("suite")
+    update_session_meta(new_id, {
+        "tags": new_tags,
+        "project": source_meta.get("project", ""),
+        "projectColor": source_meta.get("projectColor", ""),
+        "pinned": False,
+        "customTitle": ""
+    })
+
+    return {
+        "conversation_id": new_id,
+        "title": title,
+        "step_count": 2,
+        "parent_conversation_id": source_conversation_id,
+        "summary": summary_text
+    }
+
+
 def delete_conversation(conversation_id: str) -> bool:
     conn = get_db_connection()
     try:

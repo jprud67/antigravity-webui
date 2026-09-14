@@ -1,27 +1,7 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import Prism from 'prismjs';
-
-// Load Prism language components
-import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-typescript';
-import 'prismjs/components/prism-jsx';
-import 'prismjs/components/prism-tsx';
-import 'prismjs/components/prism-python';
-import 'prismjs/components/prism-bash';
-import 'prismjs/components/prism-json';
-import 'prismjs/components/prism-markdown';
-import 'prismjs/components/prism-yaml';
-import 'prismjs/components/prism-sql';
-import 'prismjs/components/prism-css';
-import 'prismjs/components/prism-markup';
-import 'prismjs/components/prism-c';
-import 'prismjs/components/prism-cpp';
-import 'prismjs/components/prism-go';
-import 'prismjs/components/prism-rust';
-import 'prismjs/components/prism-php';
-import 'prismjs/components/prism-docker';
+import { PreBlock, CodeOrInlineBlock } from './AdaptiveCodeBlock';
 
 import { 
   ChevronDown, 
@@ -54,16 +34,19 @@ import {
   ShieldAlert,
   FileCode,
   ExternalLink,
-  User
+  User,
+  Menu,
+  Plus,
+  MoreHorizontal
 } from 'lucide-react';
 import type { ChatMessage, ToolCallItem } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
-import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
 import { ApprovalCard } from './ApprovalCard';
 import { getExportHtmlUrl, getExportMarkdownUrl, getExportJsonUrl } from '../services/api';
 import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
+import { showToast } from './Toast';
 
 interface ChatCanvasProps {
   messages: ChatMessage[];
@@ -89,6 +72,8 @@ interface ChatCanvasProps {
   isRightPanelOpen?: boolean;
   activeRightPanelTab?: string;
   onToggleRightPanel?: () => void;
+  onToggleMobileSidebar?: () => void;
+  onNewConversation?: () => void;
   pendingApproval?: { toolName: string; command?: string; path?: string } | null;
   onApprovalResolved?: () => void;
   onForkMessage?: (stepIndex: number) => void;
@@ -119,119 +104,38 @@ export const copyTextToClipboard = async (text: string): Promise<boolean> => {
 };
 
 /**
- * Modern Syntax-highlighted CodeBlock powered by Prism.js
+ * Shared Markdown rendering components configuration using AdaptiveCodeBlock
  */
-const CodeBlock = ({ inline, className, children, ...props }: any) => {
-  const [copied, setCopied] = useState(false);
-  const match = /language-(\w+)/.exec(className || '');
-  const language = match ? match[1].toLowerCase() : '';
-  const rawCode = String(children).replace(/\n$/, '');
-
-  const handleCopy = async () => {
-    await copyTextToClipboard(rawCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  if (!inline) {
-    if (language === 'mermaid') {
-      return <MermaidRenderer chart={rawCode} />;
-    }
-    if (language === 'diff') {
-      return <DiffViewer diffText={rawCode} />;
-    }
-
-    // Attempt Prism highlighting
-    let highlightedHtml: string | null = null;
-    const grammar = Prism.languages[language];
-    if (grammar) {
-      try {
-        highlightedHtml = Prism.highlight(rawCode, grammar, language);
-      } catch (e) {
-        highlightedHtml = null;
-      }
-    }
-
-    const linesCount = rawCode.split('\n').length;
-
-    return (
-      <div
-        className="relative my-4 rounded-xl overflow-hidden font-mono text-[12px] shadow-sm border group"
-        style={{
-          backgroundColor: 'var(--code-bg)',
-          borderColor: 'var(--border)'
-        }}
-      >
-        {/* Code Block Header with Studio Controls */}
-        <div
-          className="flex items-center justify-between px-3.5 py-2 border-b text-xs select-none"
-          style={{
-            backgroundColor: 'var(--surface-subtle)',
-            borderColor: 'var(--border)',
-            color: 'var(--muted)'
-          }}
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="flex gap-1.5 opacity-70">
-              <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-            </div>
-            <span
-              className="text-[10.5px] font-semibold tracking-wider uppercase pl-1"
-              style={{ color: 'var(--accent)' }}
-            >
-              {language || 'code'}
-            </span>
-            <span className="text-[10px] opacity-60 font-mono">
-              ({linesCount} ligne{linesCount > 1 ? 's' : ''})
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="flex items-center gap-1.5 py-1 px-2.5 rounded-md text-[11px] font-medium transition-all cursor-pointer border"
-            style={{
-              backgroundColor: 'var(--surface)',
-              borderColor: 'var(--border)',
-              color: copied ? '#10B981' : 'var(--muted)'
-            }}
-          >
-            {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-            <span>{copied ? 'Copié !' : 'Copier'}</span>
-          </button>
-        </div>
-
-        {/* Code Pre Area */}
-        <pre className="p-4 overflow-x-auto leading-relaxed scrollbar-thin text-[12px]">
-          {highlightedHtml ? (
-            <code
-              className={`language-${language}`}
-              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-            />
-          ) : (
-            <code>{children}</code>
-          )}
-        </pre>
-      </div>
-    );
-  }
-
-  return (
-    <code
-      className="px-1.5 py-0.5 rounded text-[11.5px] font-mono border"
-      style={{
-        backgroundColor: 'var(--code-inline-bg)',
-        borderColor: 'var(--border-subtle)',
-        color: 'var(--code-text)'
-      }}
+const createMarkdownComponents = (
+  onOpenFile?: () => void,
+  onOpenArtifacts?: () => void,
+  onOpenTerminal?: () => void
+) => ({
+  pre: PreBlock,
+  code: (props: any) => (
+    <CodeOrInlineBlock
       {...props}
-    >
-      {children}
-    </code>
-  );
-};
+      onOpenFile={onOpenFile}
+      onOpenTerminal={onOpenTerminal}
+    />
+  ),
+  blockquote: CalloutBlock,
+  a: (props: any) => (
+    <LinkBlock
+      {...props}
+      onOpenFile={onOpenFile}
+      onOpenArtifacts={onOpenArtifacts}
+    />
+  ),
+  table: ({ children }: any) => (
+    <div className="overflow-x-auto rounded-xl border my-4" style={{ borderColor: 'var(--border)' }}>
+      <table>{children}</table>
+    </div>
+  ),
+  img: ({ src, alt, ...rest }: any) => (
+    <img src={src} alt={alt || ''} loading="lazy" {...rest} />
+  ),
+});
 
 /**
  * GitHub-style Callout & Alert Banner Component ([!NOTE], [!TIP], etc.)
@@ -308,27 +212,54 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
             else if (onOpenFile) onOpenFile();
             else copyTextToClipboard(cleanPath);
           }}
-          className="my-2.5 p-3 rounded-xl border flex items-center justify-between gap-3 cursor-pointer shadow-xs transition-all group block text-left"
+          className="my-3 p-3.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer shadow-sm transition-all group block text-left hover:shadow-md"
           style={{
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)',
           }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--accent)';
+            e.currentTarget.style.backgroundColor = 'var(--accent-bg)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--border)';
+            e.currentTarget.style.backgroundColor = 'var(--surface-subtle)';
+          }}
           title={`Artefact Markdown : ${cleanPath} — Cliquer pour ouvrir`}
         >
-          <span className="flex items-center gap-2.5 min-w-0">
-            <span className="w-8 h-8 rounded-lg bg-sky-500/15 border border-sky-500/25 flex items-center justify-center shrink-0">
-              <FileText className="w-4 h-4 text-sky-500" />
+          <span className="flex items-center gap-3 min-w-0">
+            <span
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border shadow-sm"
+              style={{
+                backgroundColor: 'var(--accent-bg)',
+                borderColor: 'var(--accent-bg-strong)',
+              }}
+            >
+              <FileText className="w-4.5 h-4.5" style={{ color: 'var(--accent)' }} />
             </span>
             <span className="min-w-0">
-              <span className="text-[10px] uppercase font-mono font-bold tracking-wider text-sky-500 block">
+              <span
+                className="text-[10px] uppercase font-mono font-bold tracking-wider block"
+                style={{ color: 'var(--accent)' }}
+              >
                 Artefact généré
               </span>
-              <span className="text-xs font-semibold truncate block group-hover:text-sky-500 transition-colors" style={{ color: 'var(--strong)' }}>
+              <span
+                className="text-[13px] font-semibold truncate block group-hover:opacity-90 transition-colors"
+                style={{ color: 'var(--strong)' }}
+              >
                 {children && typeof children === 'string' && children !== href ? children : filename}
               </span>
             </span>
           </span>
-          <span className="flex items-center gap-1 text-[11px] font-medium text-sky-500 shrink-0">
+          <span
+            className="flex items-center gap-1.5 text-[11px] font-semibold shrink-0 px-2.5 py-1 rounded-lg border transition-colors"
+            style={{
+              backgroundColor: 'var(--accent-bg)',
+              borderColor: 'var(--accent-bg-strong)',
+              color: 'var(--accent-text)',
+            }}
+          >
             <span>Ouvrir</span>
             <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
           </span>
@@ -347,19 +278,47 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
             copyTextToClipboard(cleanPath);
           }
         }}
-        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono text-[11px] cursor-pointer border transition-all my-0.5 shadow-xs hover:border-sky-500/60"
+        className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg font-mono text-[12.5px] cursor-pointer border transition-all my-1 shadow-sm hover:shadow-md group/file"
         style={{
           backgroundColor: 'var(--surface-subtle)',
           borderColor: 'var(--border)',
-          color: 'var(--accent)',
+          color: 'var(--accent-text)',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = 'var(--accent)';
+          e.currentTarget.style.backgroundColor = 'var(--accent-bg)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = 'var(--border)';
+          e.currentTarget.style.backgroundColor = 'var(--surface-subtle)';
         }}
         title={`Fichier local : ${cleanPath}${anchor ? ' (' + anchor + ')' : ''} — Cliquer pour inspecter`}
       >
-        <FileCode className="w-3 h-3 shrink-0 text-sky-500" />
-        <span className="font-semibold underline decoration-dotted">
+        <span
+          className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 border"
+          style={{
+            backgroundColor: 'var(--accent-bg)',
+            borderColor: 'var(--accent-bg-strong)',
+          }}
+        >
+          <FileCode className="w-3 h-3" style={{ color: 'var(--accent)' }} />
+        </span>
+        <span className="font-semibold underline decoration-dotted underline-offset-2 truncate max-w-[280px]">
           {children && typeof children === 'string' && children !== href ? children : filename}
         </span>
-        {anchor && <span className="opacity-75 text-[9.5px] text-muted">#{anchor}</span>}
+        {anchor && (
+          <span
+            className="text-[10px] font-medium px-1.5 py-0.5 rounded-md border shrink-0"
+            style={{
+              backgroundColor: 'var(--accent-bg)',
+              borderColor: 'var(--accent-bg-strong)',
+              color: 'var(--accent-text)',
+            }}
+          >
+            {anchor}
+          </span>
+        )}
+        <ExternalLink className="w-3 h-3 opacity-50 group-hover/file:opacity-100 shrink-0 transition-opacity" />
       </span>
     );
   }
@@ -691,6 +650,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   onOpenArtifacts,
   isRightPanelOpen,
   onToggleRightPanel,
+  onToggleMobileSidebar,
+  onNewConversation,
   pendingApproval,
   onApprovalResolved,
   onForkMessage,
@@ -704,7 +665,20 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showMobileToolsMenu, setShowMobileToolsMenu] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+
+  const handleCopyMessage = async (id: string, text: string) => {
+    await copyTextToClipboard(text);
+    setCopiedMsgId(id);
+    setTimeout(() => setCopiedMsgId(null), 2000);
+  };
+
+  const markdownComponents = useMemo(
+    () => createMarkdownComponents(onOpenFiles, onOpenArtifacts, onOpenTerminal),
+    [onOpenFiles, onOpenArtifacts, onOpenTerminal]
+  );
 
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
@@ -730,7 +704,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
   const handleToggleSpeech = (msgId: string, text: string) => {
     if (!('speechSynthesis' in window)) {
-      alert('La synthèse vocale n\'est pas supportée par votre navigateur.');
+      showToast('La synthèse vocale n\'est pas supportée par votre navigateur.', 'warning');
       return;
     }
     if (speakingMsgId === msgId) {
@@ -760,15 +734,51 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       className="flex-1 flex flex-col min-h-0 overflow-hidden"
       style={{ backgroundColor: 'var(--main-bg, var(--bg))' }}
     >
-      {/* Top Bar - Pure Workbench Style */}
+      {/* Top Bar - Responsive Workbench & Mobile First Header */}
       <div
-        className="h-14 px-6 flex items-center justify-between shrink-0 z-10 border-b"
+        className="h-14 px-3 sm:px-6 flex items-center justify-between shrink-0 z-20 border-b safe-pt gap-2"
         style={{
           backgroundColor: 'var(--topbar-bg)',
           borderColor: 'var(--border)'
         }}
       >
-        <div className="flex items-center gap-3 min-w-0">
+        {/* Left Side: Mobile Menu, New Chat, Session Title */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {/* Mobile Hamburger Toggle Button */}
+          {onToggleMobileSidebar && (
+            <button
+              type="button"
+              onClick={onToggleMobileSidebar}
+              className="p-2 -ml-1 rounded-xl border md:hidden flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-xs"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)',
+              }}
+              title="Ouvrir le menu de navigation"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Mobile Fast New Chat Button */}
+          {onNewConversation && (
+            <button
+              type="button"
+              onClick={onNewConversation}
+              className="p-2 rounded-xl border md:hidden flex items-center justify-center transition-all cursor-pointer shrink-0"
+              style={{
+                backgroundColor: 'var(--accent-bg)',
+                borderColor: 'var(--accent)',
+                color: 'var(--accent-text)',
+              }}
+              title="Nouvelle session"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Conversation Title & Project */}
           <div className="flex items-center gap-2 min-w-0">
             {projectColor && (
               <span
@@ -777,7 +787,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                 title={`Projet: ${project || ''}`}
               />
             )}
-            <span className="text-xs font-semibold truncate max-w-xs" style={{ color: 'var(--strong)' }}>
+            <span
+              className="text-xs font-semibold truncate max-w-[140px] sm:max-w-xs block"
+              style={{ color: 'var(--strong)' }}
+            >
               {conversationTitle || 'Nouvelle conversation'}
             </span>
 
@@ -785,7 +798,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               <button
                 type="button"
                 onClick={onEditSessionMeta}
-                className="p-1 rounded opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                className="p-1 rounded opacity-60 hover:opacity-100 transition-opacity cursor-pointer shrink-0"
                 title="Gérer le titre et les métadonnées"
               >
                 <Edit3 className="w-3 h-3" style={{ color: 'var(--muted)' }} />
@@ -795,7 +808,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
           {parentConversationId && (
             <div
-              className="hidden sm:flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full border"
+              className="hidden sm:flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full border shrink-0"
               style={{
                 backgroundColor: 'var(--accent-bg)',
                 borderColor: 'var(--accent)',
@@ -808,8 +821,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
           )}
 
           {tags && tags.length > 0 && (
-            <div className="hidden md:flex items-center gap-1">
-              {tags.slice(0, 3).map((t) => (
+            <div className="hidden md:flex items-center gap-1 shrink-0">
+              {tags.slice(0, 2).map((t) => (
                 <span
                   key={t}
                   className="text-[9px] font-mono px-1.5 py-0.2 rounded-full border"
@@ -827,7 +840,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
           {activeModel && (
             <div
-              className="hidden lg:flex items-center gap-1.5 text-[10px] font-mono font-medium px-2.5 py-0.5 rounded-full border shadow-sm"
+              className="hidden lg:flex items-center gap-1.5 text-[10px] font-mono font-medium px-2.5 py-0.5 rounded-full border shadow-sm shrink-0"
               style={{
                 backgroundColor: 'var(--accent-bg)',
                 borderColor: 'var(--accent)',
@@ -848,11 +861,129 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
           )}
         </div>
 
-        {/* Right Action Icons */}
-        <div className="flex items-center gap-1.5">
+        {/* Right Side: Tools, Export & Right Panel */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Mobile Tools Dropdown Toggle */}
+          <div className="relative md:hidden">
+            <button
+              type="button"
+              onClick={() => setShowMobileToolsMenu(!showMobileToolsMenu)}
+              className="p-2 rounded-xl border flex items-center justify-center transition-colors cursor-pointer"
+              style={{
+                backgroundColor: showMobileToolsMenu ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                borderColor: showMobileToolsMenu ? 'var(--accent)' : 'var(--border)',
+                color: showMobileToolsMenu ? 'var(--accent-text)' : 'var(--text)',
+              }}
+              title="Outils & Extensions"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+
+            {showMobileToolsMenu && (
+              <div
+                className="absolute right-0 top-full mt-2 w-48 rounded-2xl shadow-2xl z-50 p-2 space-y-1 text-xs animate-fadeIn backdrop-blur-2xl border"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border2)'
+                }}
+              >
+                {onOpenTerminal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenTerminal();
+                      setShowMobileToolsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <Terminal className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="font-medium">Terminal</span>
+                  </button>
+                )}
+
+                {onOpenGit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenGit();
+                      setShowMobileToolsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <GitPullRequest className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span className="font-medium">Git</span>
+                  </button>
+                )}
+
+                {onOpenKanban && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenKanban();
+                      setShowMobileToolsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <KanbanIcon className="w-4 h-4 text-violet-400 shrink-0" />
+                    <span className="font-medium">Kanban</span>
+                  </button>
+                )}
+
+                {onOpenCrons && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenCrons();
+                      setShowMobileToolsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="font-medium">Crons & Tâches</span>
+                  </button>
+                )}
+
+                {onOpenRules && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenRules();
+                      setShowMobileToolsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="font-medium">Règles & Mémoire</span>
+                  </button>
+                )}
+
+                {conversationId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowExportMenu(true);
+                      setShowMobileToolsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left border-t mt-1 pt-2"
+                    style={{ borderColor: 'var(--border-subtle)', color: 'var(--text)' }}
+                  >
+                    <Download className="w-4 h-4 text-sky-400 shrink-0" />
+                    <span className="font-medium">Exporter la session</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Direct Action Buttons */}
           {/* Export Dropdown */}
           {conversationId && (
-            <div className="relative">
+            <div className="relative hidden md:block">
               <button
                 type="button"
                 onClick={() => setShowExportMenu(!showExportMenu)}
@@ -930,11 +1061,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             </div>
           )}
 
-          {/* Direct Action Buttons */}
           {onOpenTerminal && (
             <button
               onClick={onOpenTerminal}
-              className="py-1.5 px-2 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border"
+              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden md:flex"
               style={{
                 backgroundColor: 'var(--surface-subtle)',
                 borderColor: 'var(--border)',
@@ -943,14 +1073,14 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               title="Terminal Interactif (/terminal)"
             >
               <Terminal className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-[11px] font-medium hidden md:inline">Terminal</span>
+              <span className="text-[11px] font-medium hidden lg:inline">Terminal</span>
             </button>
           )}
 
           {onOpenGit && (
             <button
               onClick={onOpenGit}
-              className="py-1.5 px-2 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border"
+              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden md:flex"
               style={{
                 backgroundColor: 'var(--surface-subtle)',
                 borderColor: 'var(--border)',
@@ -959,14 +1089,14 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               title="Gestionnaire Git (/git)"
             >
               <GitPullRequest className="w-3.5 h-3.5 text-rose-400" />
-              <span className="text-[11px] font-medium hidden md:inline">Git</span>
+              <span className="text-[11px] font-medium hidden lg:inline">Git</span>
             </button>
           )}
 
           {onOpenKanban && (
             <button
               onClick={onOpenKanban}
-              className="py-1.5 px-2 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border"
+              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden lg:flex"
               style={{
                 backgroundColor: 'var(--surface-subtle)',
                 borderColor: 'var(--border)',
@@ -975,14 +1105,14 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               title="Tableau Kanban (/kanban)"
             >
               <KanbanIcon className="w-3.5 h-3.5 text-violet-400" />
-              <span className="text-[11px] font-medium hidden lg:inline">Kanban</span>
+              <span className="text-[11px] font-medium">Kanban</span>
             </button>
           )}
 
           {onOpenCrons && (
             <button
               onClick={onOpenCrons}
-              className="py-1.5 px-2 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border"
+              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden lg:flex"
               style={{
                 backgroundColor: 'var(--surface-subtle)',
                 borderColor: 'var(--border)',
@@ -991,14 +1121,14 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               title="Planificateur de Tâches & Crons (/crons)"
             >
               <Clock className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-[11px] font-medium hidden lg:inline">Crons</span>
+              <span className="text-[11px] font-medium">Crons</span>
             </button>
           )}
 
           {onOpenRules && (
             <button
               onClick={onOpenRules}
-              className="py-1.5 px-2 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border"
+              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden xl:flex"
               style={{
                 backgroundColor: 'var(--surface-subtle)',
                 borderColor: 'var(--border)',
@@ -1007,14 +1137,14 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               title="Règles Système & Mémoire AGENTS.md (/rules)"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-[11px] font-medium hidden lg:inline">Règles</span>
+              <span className="text-[11px] font-medium">Règles</span>
             </button>
           )}
 
           {onToggleRightPanel && (
             <button
               onClick={onToggleRightPanel}
-              className="p-1.5 rounded-lg text-xs flex items-center transition-colors cursor-pointer border ml-1"
+              className="p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border"
               style={{
                 backgroundColor: isRightPanelOpen ? 'var(--accent-bg)' : 'var(--surface-subtle)',
                 borderColor: isRightPanelOpen ? 'var(--accent)' : 'var(--border)',
@@ -1022,7 +1152,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
               }}
               title={isRightPanelOpen ? 'Fermer le volet latéral' : 'Ouvrir le volet latéral'}
             >
-              <PanelRight className="w-3.5 h-3.5" />
+              <PanelRight className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -1032,7 +1162,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6"
+        className="flex-1 overflow-y-auto px-2.5 sm:px-6 py-3 sm:py-6 space-y-4 sm:space-y-6 touch-scroll"
       >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center max-w-2xl mx-auto text-center animate-fadeIn py-12">
@@ -1181,8 +1311,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             // 2. User Message
             if (msg.role === 'user') {
               return (
-                <div key={msg.id} className="flex justify-end max-w-4xl mx-auto w-full mb-6 group animate-fadeIn">
-                  <div className="max-w-[85%] sm:max-w-[78%] hermes-user-bubble rounded-2xl rounded-tr-xs p-4 shadow-sm border transition-all">
+                <div key={msg.id} className="flex justify-end max-w-4xl mx-auto w-full mb-4 sm:mb-6 group animate-fadeIn">
+                  <div className="max-w-[92%] sm:max-w-[80%] hermes-user-bubble rounded-2xl rounded-tr-xs p-3 sm:p-4 shadow-sm border transition-all">
                     <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-white/10 text-xs opacity-75 select-none">
                       <div className="flex items-center gap-1.5 font-semibold text-[11px] uppercase tracking-wider">
                         <User className="w-3.5 h-3.5" />
@@ -1194,29 +1324,20 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                         )}
                         <button
                           type="button"
-                          onClick={() => copyTextToClipboard(msg.content)}
-                          className="p-0.5 hover:opacity-100 opacity-60 cursor-pointer transition-opacity"
-                          title="Copier"
+                          onClick={() => handleCopyMessage(msg.id, msg.content)}
+                          className="p-1 hover:opacity-100 opacity-60 cursor-pointer transition-opacity flex items-center gap-1"
+                          title="Copier le message"
                         >
-                          <Copy className="w-3 h-3" />
+                          {copiedMsgId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          {copiedMsgId === msg.id && <span className="text-[10px] text-emerald-400 font-sans">Copié</span>}
                         </button>
                       </div>
                     </div>
 
-                    <div className="text-[13.5px] leading-relaxed markdown-content">
+                    <div className="leading-relaxed markdown-content">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
-                        components={{
-                          code: CodeBlock,
-                          blockquote: CalloutBlock,
-                          a: (props: any) => (
-                            <LinkBlock
-                              {...props}
-                              onOpenFile={onOpenFiles}
-                              onOpenArtifacts={onOpenArtifacts}
-                            />
-                          ),
-                        }}
+                        components={markdownComponents}
                       >
                         {msg.content}
                       </ReactMarkdown>
@@ -1234,7 +1355,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             return (
               <div
                 key={msg.id}
-                className="w-full max-w-4xl mx-auto hermes-assistant-card rounded-2xl border p-5 shadow-xs transition-all mb-6 group relative animate-fadeIn"
+                className="w-full max-w-4xl mx-auto hermes-assistant-card rounded-2xl border p-3.5 sm:p-5 shadow-xs transition-all mb-4 sm:mb-6 group relative animate-fadeIn"
                 style={{
                   backgroundColor: 'var(--surface)',
                   borderColor: 'var(--border)',
@@ -1389,24 +1510,13 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
                 {/* Assistant Markdown Content */}
                 {msg.content ? (
-                  <div className="hermes-assistant-body w-full markdown-content leading-relaxed text-[13.5px]">
+                  <div className={`hermes-assistant-body w-full markdown-content leading-relaxed${msg.isLive ? ' is-streaming' : ''}`}>
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
-                      components={{
-                        code: CodeBlock,
-                        blockquote: CalloutBlock,
-                        a: (props: any) => (
-                          <LinkBlock
-                            {...props}
-                            onOpenFile={onOpenFiles}
-                            onOpenArtifacts={onOpenArtifacts}
-                          />
-                        ),
-                      }}
+                      components={markdownComponents}
                     >
                       {msg.content}
                     </ReactMarkdown>
-                    {msg.isLive && <span className="hermes-streaming-cursor" />}
                   </div>
                 ) : null}
 
@@ -1419,13 +1529,16 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                     {msg.content && (
                       <button
                         type="button"
-                        onClick={() => copyTextToClipboard(msg.content)}
+                        onClick={() => handleCopyMessage(msg.id, msg.content)}
                         className="px-2.5 py-1 rounded-md border flex items-center gap-1 hover:text-strong hover:bg-surface-subtle transition-all cursor-pointer"
-                        style={{ borderColor: 'var(--border)' }}
+                        style={{
+                          borderColor: copiedMsgId === msg.id ? '#10B981' : 'var(--border)',
+                          color: copiedMsgId === msg.id ? '#10B981' : undefined,
+                        }}
                         title="Copier la réponse complète"
                       >
-                        <Copy className="w-3 h-3" />
-                        <span>Copier</span>
+                        {copiedMsgId === msg.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedMsgId === msg.id ? 'Copié !' : 'Copier'}</span>
                       </button>
                     )}
 

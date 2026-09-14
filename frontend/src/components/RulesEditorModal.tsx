@@ -18,6 +18,8 @@ import {
   fetchRuleContent, 
   saveRuleContent 
 } from '../services/api';
+import { showToast } from './Toast';
+import { showConfirm } from './AppDialog';
 
 interface RulesEditorModalProps {
   isOpen: boolean;
@@ -40,6 +42,8 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const gutterRef = React.useRef<HTMLDivElement>(null);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Load files list
   const loadFiles = async () => {
@@ -65,7 +69,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
       setOriginalContent(data.content);
       setCurrentFileMeta(data);
     } catch (e: any) {
-      alert(e.message || 'Erreur lors du chargement du fichier');
+      showToast(e.message || 'Erreur lors du chargement du fichier', 'error');
     } finally {
       setLoadingContent(false);
     }
@@ -104,7 +108,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
 
   const handleSave = async () => {
     if (jsonError) {
-      alert('Veuillez corriger la syntaxe JSON avant d\'enregistrer.');
+      showToast('Veuillez corriger la syntaxe JSON avant d\'enregistrer.', 'warning');
       return;
     }
 
@@ -117,7 +121,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
       setTimeout(() => setSaveSuccess(false), 3000);
       await loadFiles();
     } catch (e: any) {
-      alert(e.message || 'Erreur d\'enregistrement');
+      showToast(e.message || 'Erreur d\'enregistrement', 'error');
     } finally {
       setSaving(false);
     }
@@ -133,17 +137,14 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
     return FileCheck2;
   };
 
-  const gutterRef = React.useRef<HTMLDivElement>(null);
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
-
   // Line numbers calculation
   const linesCount = fileContent.split('\n').length;
   const lineNumbers = Array.from({ length: Math.max(linesCount, 1) }, (_, i) => i + 1);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 safe-pt safe-pb">
       <div
-        className="border rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col h-[88vh] animate-fadeIn"
+        className="border rounded-2xl sm:rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col h-[95dvh] sm:h-[88vh] animate-fadeIn"
         style={{
           backgroundColor: 'var(--surface)',
           borderColor: 'var(--border2)',
@@ -152,38 +153,38 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
       >
         {/* Header */}
         <div
-          className="p-4 border-b flex items-center justify-between shrink-0"
+          className="p-3.5 sm:p-4 border-b flex items-center justify-between shrink-0"
           style={{
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)'
           }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div
-              className="w-9 h-9 rounded-xl border flex items-center justify-center"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center shrink-0"
               style={{
                 backgroundColor: 'var(--accent-bg)',
-                borderColor: 'var(--accent-bg-strong)',
-                color: 'var(--accent)'
+                borderColor: 'var(--accent)',
+                color: 'var(--accent-text)'
               }}
             >
-              <ShieldCheck className="w-5 h-5" />
+              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--strong)' }}>
-                <span>Éditeur de Règles & Mémoire Système</span>
+            <div className="min-w-0">
+              <h2 className="text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 truncate" style={{ color: 'var(--strong)' }}>
+                <span>Éditeur de Règles</span>
                 <span
-                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+                  className="text-[9px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full border hidden xs:inline"
                   style={{
                     backgroundColor: 'var(--accent-bg)',
                     borderColor: 'var(--accent)',
                     color: 'var(--accent-text)'
                   }}
                 >
-                  Zero Token Hermes
+                  Hermes
                 </span>
               </h2>
-              <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+              <p className="text-[10px] sm:text-[11px] truncate hidden sm:block" style={{ color: 'var(--muted)' }}>
                 Gouvernance globale, permissions, règles d'agents et mémoire unifiée
               </p>
             </div>
@@ -200,7 +201,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
 
         {/* File Selector Tabs */}
         <div
-          className="px-4 py-2 border-b flex items-center gap-2 overflow-x-auto scrollbar-thin shrink-0"
+          className="px-3 sm:px-4 py-2 border-b flex items-center gap-2 overflow-x-auto no-scrollbar touch-scroll shrink-0"
           style={{
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)'
@@ -212,9 +213,9 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
             return (
               <button
                 key={f.id}
-                onClick={() => {
+                onClick={async () => {
                   if (hasUnsavedChanges) {
-                    if (!confirm('Vous avez des modifications non enregistrées. Changer de fichier ?')) return;
+                    if (!(await showConfirm('Vous avez des modifications non enregistrées. Changer de fichier ?'))) return;
                   }
                   setSelectedFileId(f.id);
                 }}

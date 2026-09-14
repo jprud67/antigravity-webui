@@ -11,6 +11,8 @@ import {
   Clock 
 } from 'lucide-react';
 import { fetchTasksList, killTask } from '../services/api';
+import { showToast } from './Toast';
+import { showConfirm } from './AppDialog';
 
 interface TaskDashboardModalProps {
   isOpen: boolean;
@@ -51,13 +53,13 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
   };
 
   const handleKillProcess = async (pid: number) => {
-    if (!confirm(`Confirmer l'arrêt forcé du processus PID ${pid} ?`)) return;
+    if (!(await showConfirm(`Confirmer l'arrêt forcé du processus PID ${pid} ?`, { destructive: true }))) return;
     setKillingPid(pid);
     try {
       await killTask(pid);
       await loadData();
     } catch (err: any) {
-      alert(err.message || 'Erreur lors de l\'arrêt du processus');
+      showToast(err.message || 'Erreur lors de l\'arrêt du processus', 'error');
     } finally {
       setKillingPid(null);
     }
@@ -66,9 +68,9 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-6 animate-fadeIn safe-pt safe-pb">
       <div
-        className="w-[950px] max-w-full h-[80vh] border rounded-3xl flex flex-col shadow-2xl overflow-hidden"
+        className="w-[950px] max-w-full h-[90dvh] sm:h-[80vh] border rounded-2xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden"
         style={{
           backgroundColor: 'var(--surface)',
           borderColor: 'var(--border2)',
@@ -77,15 +79,15 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
       >
         {/* Header */}
         <div
-          className="h-14 px-6 border-b flex items-center justify-between shrink-0"
+          className="h-14 px-4 sm:px-6 border-b flex items-center justify-between shrink-0"
           style={{
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)'
           }}
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className="w-7 h-7 rounded-lg border flex items-center justify-center"
+              className="w-7 h-7 rounded-lg border flex items-center justify-center shrink-0"
               style={{
                 backgroundColor: 'var(--accent-bg)',
                 borderColor: 'var(--accent-bg-strong)',
@@ -94,13 +96,13 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
             >
               <Activity className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-xs font-semibold" style={{ color: 'var(--strong)' }}>Supervision & Tâches d'Arrière-Plan</h2>
-              <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Monitoring en temps réel des sous-agents, commandes longues et processus</p>
+            <div className="min-w-0">
+              <h2 className="text-xs font-semibold truncate" style={{ color: 'var(--strong)' }}>Supervision & Tâches d'Arrière-Plan</h2>
+              <p className="text-[10px] truncate hidden sm:block" style={{ color: 'var(--muted)' }}>Monitoring en temps réel des sous-agents, commandes longues et processus</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={loadData}
               className="p-1.5 rounded-lg transition-colors cursor-pointer hover:opacity-100 opacity-70"
@@ -121,7 +123,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
 
         {/* Tab Selector */}
         <div
-          className="px-6 border-b flex items-center gap-4"
+          className="px-3 sm:px-6 border-b flex items-center gap-2 sm:gap-4 overflow-x-auto no-scrollbar touch-scroll"
           style={{
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)'
@@ -129,18 +131,18 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
         >
           <button
             onClick={() => setActiveTab('tasks')}
-            className={`py-3 px-2 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+            className={`py-3 px-2 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'tasks'
                 ? 'border-sky-500 font-semibold text-sky-600 dark:text-sky-400'
                 : 'border-transparent opacity-70 hover:opacity-100'
             }`}
           >
             <Terminal className="w-3.5 h-3.5" />
-            <span>Tâches Antigravity ({data.tasks.length})</span>
+            <span>Tâches ({data.tasks.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('subagents')}
-            className={`py-3 px-2 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+            className={`py-3 px-2 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'subagents'
                 ? 'border-sky-500 font-semibold text-sky-600 dark:text-sky-400'
                 : 'border-transparent opacity-70 hover:opacity-100'
@@ -151,20 +153,20 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('processes')}
-            className={`py-3 px-2 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+            className={`py-3 px-2 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'processes'
                 ? 'border-sky-500 font-semibold text-sky-600 dark:text-sky-400'
                 : 'border-transparent opacity-70 hover:opacity-100'
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />
-            <span>Processus CLI Actifs ({data.processes.length})</span>
+            <span>Processus CLI ({data.processes.length})</span>
           </button>
         </div>
 
         {/* Tab Content */}
         <div
-          className="flex-1 overflow-y-auto p-6"
+          className="flex-1 overflow-y-auto p-3 sm:p-6"
           style={{ backgroundColor: 'var(--surface)' }}
         >
           {activeTab === 'tasks' && (

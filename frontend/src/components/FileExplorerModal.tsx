@@ -11,7 +11,8 @@ import {
    Check, 
    CornerDownLeft, 
    RefreshCw,
-   HardDrive
+   HardDrive,
+   ChevronLeft
  } from 'lucide-react';
 import { fetchFileTree, fetchFileContent } from '../services/api';
 
@@ -205,9 +206,9 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
   const filteredTree = filterNodes(tree, searchQuery);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-6 animate-fadeIn safe-pt safe-pb">
       <div
-        className="w-[1050px] max-w-full h-[85vh] border rounded-3xl flex flex-col shadow-2xl overflow-hidden"
+        className="w-[1050px] max-w-full h-[92dvh] sm:h-[85vh] border rounded-2xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden"
         style={{
           backgroundColor: 'var(--surface)',
           borderColor: 'var(--border2)',
@@ -216,7 +217,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
       >
         {/* Header */}
         <div
-          className="h-14 px-6 border-b flex items-center justify-between shrink-0"
+          className="h-14 px-4 sm:px-6 border-b flex items-center justify-between shrink-0"
           style={{
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)'
@@ -228,7 +229,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
             </div>
             <div>
               <h2 className="text-xs font-semibold" style={{ color: 'var(--strong)' }}>Explorateur du Workspace</h2>
-              <p className="text-[10px] font-mono truncate max-w-md" style={{ color: 'var(--muted)' }}>{currentWorkspace}</p>
+              <p className="text-[10px] font-mono truncate max-w-xs sm:max-w-md" style={{ color: 'var(--muted)' }}>{currentWorkspace}</p>
             </div>
           </div>
 
@@ -255,7 +256,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
         <div className="flex-1 flex overflow-hidden">
           {/* File Tree Left Pane */}
           <div
-            className="w-80 border-r flex flex-col shrink-0"
+            className={`${selectedFile ? 'hidden sm:flex' : 'flex'} w-full sm:w-80 border-r flex flex-col shrink-0`}
             style={{
               backgroundColor: 'var(--surface-subtle)',
               borderColor: 'var(--border)'
@@ -294,25 +295,39 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
 
           {/* File Preview Right Pane */}
           <div
-            className="flex-1 flex flex-col overflow-hidden"
+            className={`${!selectedFile ? 'hidden sm:flex' : 'flex'} flex-1 flex flex-col overflow-hidden`}
             style={{ backgroundColor: 'var(--main-bg, var(--surface))' }}
           >
             {selectedFile ? (
               <>
                 <div
-                  className="px-5 py-2.5 border-b flex items-center justify-between shrink-0 text-xs"
+                  className="px-3 sm:px-5 py-2.5 border-b flex items-center justify-between shrink-0 text-xs gap-2"
                   style={{
                     backgroundColor: 'var(--surface-subtle)',
                     borderColor: 'var(--border)'
                   }}
                 >
-                  <span className="font-mono truncate max-w-md font-semibold text-[11px]" style={{ color: 'var(--strong)' }}>
-                    {selectedFile}
-                  </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <button
+                      onClick={() => setSelectedFile(null)}
+                      className="sm:hidden py-1 px-2 rounded-lg border text-[10px] flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                      style={{
+                        backgroundColor: 'var(--surface)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--text)'
+                      }}
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>Arbre</span>
+                    </button>
+                    <span className="font-mono truncate max-w-[140px] sm:max-w-md font-semibold text-[11px]" style={{ color: 'var(--strong)' }}>
+                      {selectedFile}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     <button
                       onClick={() => copyPath(selectedFile)}
-                      className="py-1 px-2.5 rounded-lg border text-[10px] flex items-center gap-1.5 transition-colors cursor-pointer font-mono"
+                      className="py-1 px-2 sm:px-2.5 rounded-lg border text-[10px] flex items-center gap-1.5 transition-colors cursor-pointer font-mono"
                       style={{
                         backgroundColor: 'var(--surface)',
                         borderColor: 'var(--border)',
@@ -320,14 +335,14 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
                       }}
                     >
                       {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                      <span>{copied ? 'Copié' : 'Chemin'}</span>
+                      <span className="hidden xs:inline">{copied ? 'Copié' : 'Chemin'}</span>
                     </button>
                     <button
                       onClick={() => insertAndClose(selectedFile)}
-                      className="py-1 px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="py-1 px-2.5 sm:px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <CornerDownLeft className="w-3 h-3" />
-                      <span>Insérer @dans le chat</span>
+                      <span>Insérer</span>
                     </button>
                   </div>
                 </div>

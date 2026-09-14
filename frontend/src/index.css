@@ -257,17 +257,27 @@
 }
 
 /* ==========================================================================
-   Base App Typography & Layout Defaults
+   Base App Typography & Layout Defaults (Mobile-First Ready)
    ========================================================================== */
-body {
+html, body, #root {
+  height: 100%;
+  height: 100dvh;
+  width: 100%;
   margin: 0;
+  padding: 0;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+body {
   background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif);
-  overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s ease, color 0.2s ease;
+  overscroll-behavior: none;
 }
 
 /* Scrollbars adapting to active theme */
@@ -284,6 +294,51 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
+}
+
+/* Mobile Touch & Scroll Utilities */
+.touch-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Subtle Horizontal Tabs Scrollbar */
+.tabs-horizontal-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+.tabs-horizontal-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.tabs-horizontal-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tabs-horizontal-scroll::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 9999px;
+}
+.tabs-horizontal-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+.safe-pb {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.safe-pt {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
 }
 
 /* App Surfaces & Semantic Containers */
@@ -392,8 +447,8 @@ body {
 
 /* Markdown Content Styling & Typography */
 .markdown-content {
-  font-size: 0.875rem; /* 14px modern reading size */
-  line-height: 1.68;
+  font-size: 0.9375rem; /* 15px — balanced modern reading size */
+  line-height: 1.72;
 }
 
 .markdown-content h1,
@@ -427,10 +482,38 @@ body {
   font-size: 0.9rem;
 }
 
+.markdown-content h5 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--strong);
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content h6 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
 .markdown-content p {
   line-height: 1.7;
   margin-bottom: 0.85rem;
   color: var(--text);
+}
+
+.markdown-content strong {
+  color: var(--strong);
+  font-weight: 650;
+}
+
+.markdown-content em {
+  color: var(--em);
+  font-style: italic;
 }
 
 .markdown-content ul,
@@ -453,10 +536,95 @@ body {
   line-height: 1.65;
 }
 
+/* Nested list styles — different bullets per depth */
+.markdown-content ul ul { list-style-type: circle; }
+.markdown-content ul ul ul { list-style-type: square; }
+.markdown-content ol ol { list-style-type: lower-alpha; }
+.markdown-content ol ol ol { list-style-type: lower-roman; }
+
+.markdown-content ul ul,
+.markdown-content ul ol,
+.markdown-content ol ul,
+.markdown-content ol ol {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* GFM Task List Checkboxes */
+.markdown-content li.task-list-item {
+  list-style: none;
+  margin-left: -1.35rem;
+  padding-left: 0;
+}
+
+.markdown-content input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--border2);
+  border-radius: 4px;
+  margin-right: 0.5rem;
+  vertical-align: -0.15em;
+  cursor: default;
+  position: relative;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.markdown-content input[type="checkbox"]:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+.markdown-content input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: white;
+}
+
 .markdown-content hr {
   border: none;
   border-top: 1px solid var(--border);
   margin: 1.5rem 0;
+}
+
+/* Responsive Images */
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  margin: 0.75rem 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* Streaming Cursor — injected as ::after on last child for inline flow */
+.markdown-content.is-streaming > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 1.15em;
+  background-color: var(--accent, #FFD700);
+  border-radius: 1.5px;
+  margin-left: 4px;
+  vertical-align: -0.16em;
+  animation: hermes-cursor-blink 0.95s steps(2, start) infinite;
+}
+
+/* Fade-in animation for messages */
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out both;
 }
 
 /* Beautiful Markdown Tables */
