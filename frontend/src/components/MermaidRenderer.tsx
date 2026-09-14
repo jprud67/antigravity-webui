@@ -186,8 +186,19 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
 
   return (
     <>
-      {renderContent(false)}
-      {isExpanded && typeof document !== 'undefined' && createPortal(renderContent(true), document.body)}
+      {!isExpanded ? (
+        renderContent(false)
+      ) : (
+        <>
+          <div
+            className="my-3 h-24 rounded-2xl border border-dashed flex items-center justify-center text-xs opacity-50 font-mono"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            Diagramme affiché en plein écran
+          </div>
+          {typeof document !== 'undefined' && createPortal(renderContent(true), document.body)}
+        </>
+      )}
     </>
   );
 };

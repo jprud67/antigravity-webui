@@ -24,7 +24,15 @@ def list_active_tasks(conversation_id: Optional[str] = None, _ = Depends(require
 
     # 1. Scan background tasks from brain
     if BRAIN_DIR.exists():
-        conv_dirs = [BRAIN_DIR / conversation_id] if conversation_id and (BRAIN_DIR / conversation_id).exists() else list(BRAIN_DIR.iterdir())
+        if conversation_id and (BRAIN_DIR / conversation_id).exists():
+            conv_dirs = [BRAIN_DIR / conversation_id]
+        else:
+            try:
+                all_dirs = [d for d in BRAIN_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")]
+                all_dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+                conv_dirs = all_dirs[:30]
+            except Exception:
+                conv_dirs = []
         for cdir in conv_dirs:
             if not cdir.is_dir():
                 continue

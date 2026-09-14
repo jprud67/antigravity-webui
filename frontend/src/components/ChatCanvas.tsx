@@ -704,6 +704,15 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     }
   }, [messages, isStreaming]);
 
+  // Cancel speech synthesis on conversation change or unmount
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [conversationId]);
+
   const toggleThought = (id: string) => {
     setExpandedThoughts((prev) => ({ ...prev, [id]: !prev[id] }));
   };

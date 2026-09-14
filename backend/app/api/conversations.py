@@ -37,6 +37,7 @@ class TitleUpdateRequest(BaseModel):
 
 class MetadataUpdateRequest(BaseModel):
     pinned: Optional[bool] = None
+    archived: Optional[bool] = None
     tags: Optional[List[str]] = None
     project: Optional[str] = None
     projectColor: Optional[str] = None
@@ -77,6 +78,16 @@ def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
         for cid in ids:
             try:
                 update_session_meta(cid, {"pinned": pinned})
+                results[cid] = True
+            except Exception:
+                results[cid] = False
+        return {"success": True, "action": action, "count": len(ids), "results": results}
+
+    elif action in ("archive", "unarchive"):
+        archived = (action == "archive")
+        for cid in ids:
+            try:
+                update_session_meta(cid, {"archived": archived})
                 results[cid] = True
             except Exception:
                 results[cid] = False

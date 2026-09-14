@@ -57,13 +57,15 @@ def _compute_next_run(schedule: Union[str, Dict[str, Any]]) -> Optional[str]:
         expr = schedule.strip()
     elif isinstance(schedule, dict):
         if schedule.get("kind") == "interval":
-            try:
-                mins = int(schedule.get("minutes", 15))
-                return (now + timedelta(minutes=mins)).isoformat()
-            except (ValueError, TypeError):
-                return (now + timedelta(minutes=15)).isoformat()
+            if "minutes" in schedule and schedule["minutes"] is not None:
+                try:
+                    mins = int(schedule["minutes"])
+                    return (now + timedelta(minutes=mins)).isoformat()
+                except (ValueError, TypeError):
+                    pass
+            expr = schedule.get("expr") or schedule.get("display") or ""
         elif schedule.get("kind") == "cron":
-            expr = schedule.get("expr", "")
+            expr = schedule.get("expr") or schedule.get("display") or ""
         else:
             expr = schedule.get("display") or schedule.get("expr") or ""
 

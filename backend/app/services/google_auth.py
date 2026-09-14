@@ -124,9 +124,19 @@ def list_google_accounts() -> Dict[str, Any]:
     }
 
 
+def _validate_account_file(email: str) -> Path:
+    cleaned = email.strip()
+    if not cleaned or "/" in cleaned or "\\" in cleaned or ".." in cleaned or "@" not in cleaned:
+        raise ValueError("Adresse email invalide ou chemin suspect.")
+    target_file = (ACCOUNTS_DIR / f"{cleaned}.json").resolve()
+    if target_file.parent != ACCOUNTS_DIR.resolve():
+        raise ValueError("Tentative de traversée de répertoire non autorisée.")
+    return target_file
+
+
 def switch_google_account(target_email: str) -> Dict[str, Any]:
     ensure_dirs()
-    target_file = ACCOUNTS_DIR / f"{target_email}.json"
+    target_file = _validate_account_file(target_email)
     if not target_file.exists():
         raise FileNotFoundError(f"Le compte {target_email} n'est pas enregistré.")
 
@@ -149,7 +159,7 @@ def switch_google_account(target_email: str) -> Dict[str, Any]:
 
 def delete_google_account(email: str) -> Dict[str, Any]:
     ensure_dirs()
-    target_file = ACCOUNTS_DIR / f"{email}.json"
+    target_file = _validate_account_file(email)
     if not target_file.exists():
         raise FileNotFoundError(f"Le compte {email} est introuvable.")
 

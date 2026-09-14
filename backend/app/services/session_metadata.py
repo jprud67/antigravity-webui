@@ -27,6 +27,7 @@ def get_session_meta(conversation_id: str) -> Dict[str, Any]:
     all_meta = get_all_session_metadata()
     return all_meta.get(conversation_id, {
         "pinned": False,
+        "archived": False,
         "tags": [],
         "project": "",
         "projectColor": "",
@@ -37,6 +38,7 @@ def update_session_meta(conversation_id: str, updates: Dict[str, Any]) -> Dict[s
     all_meta = get_all_session_metadata()
     current = all_meta.get(conversation_id, {
         "pinned": False,
+        "archived": False,
         "tags": [],
         "project": "",
         "projectColor": "",

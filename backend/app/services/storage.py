@@ -74,6 +74,7 @@ def list_conversations(limit: int = 100) -> List[Dict[str, Any]]:
                 "agent_name": r["agent_name"],
                 "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
                 "pinned": meta.get("pinned", False),
+                "archived": meta.get("archived", False),
                 "tags": meta.get("tags", []),
                 "project": meta.get("project", ""),
                 "projectColor": meta.get("projectColor", ""),
@@ -128,6 +129,7 @@ def get_conversation_by_id(conversation_id: str) -> Optional[Dict[str, Any]]:
             "agent_name": r["agent_name"],
             "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
             "pinned": meta.get("pinned", False),
+            "archived": meta.get("archived", False),
             "tags": meta.get("tags", []),
             "project": meta.get("project", ""),
             "projectColor": meta.get("projectColor", ""),
@@ -598,15 +600,41 @@ def undo_conversation_turn(conversation_id: str) -> Dict[str, Any]:
     else:
         remaining_steps = steps[:-1]
 
-    # Persist updated transcript files
+    # Persist updated compact transcript file
     if transcript_file.exists():
         with open(transcript_file, "w", encoding="utf-8") as f:
             for s in remaining_steps:
                 f.write(json.dumps(s, ensure_ascii=False) + "\n")
 
+    # Persist updated full transcript file independently to avoid degrading unabridged history
     if transcript_full_file.exists():
+        full_steps = []
+        try:
+            with open(transcript_full_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line_str = line.strip()
+                    if line_str:
+                        full_steps.append(json.loads(line_str))
+        except Exception as e:
+            logger.warning(f"Failed to read transcript_full_file: {e}")
+            full_steps = []
+
+        if full_steps:
+            last_full_user_idx = -1
+            for i in range(len(full_steps) - 1, -1, -1):
+                s = full_steps[i]
+                if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
+                    last_full_user_idx = i
+                    break
+            if last_full_user_idx != -1:
+                remaining_full_steps = full_steps[:last_full_user_idx]
+            else:
+                remaining_full_steps = full_steps[:-1]
+        else:
+            remaining_full_steps = remaining_steps
+
         with open(transcript_full_file, "w", encoding="utf-8") as f:
-            for s in remaining_steps:
+            for s in remaining_full_steps:
                 f.write(json.dumps(s, ensure_ascii=False) + "\n")
 
     # Update summary in SQLite database
@@ -1355,9 +1383,56 @@ def import_conversation(payload: Dict[str, Any]) -> Dict[str, Any]:
     update_session_meta(new_id, {
         "customTitle": title,
         "title": title,
+        "pinned": False,
+        "archived": False,
         "tags": payload.get("tags") or ["importé"],
         "project": payload.get("project") or ""
     })
+
+    # Persist summary in SQLite database so the imported session appears in session lists
+    preview = ""
+    for s in steps:
+        c = s.get("content") or s.get("thinking") or ""
+        if c:
+            preview = c[:150]
+            break
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO conversation_summaries (
+                conversation_id,
+                title,
+                preview,
+                step_count,
+                last_modified_time,
+                workspace_uris,
+                status,
+                agent_name,
+                parent_conversation_id,
+                last_user_input_time,
+                last_user_input_step_index
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                new_id,
+                title,
+                preview,
+                len(steps),
+                now_iso,
+                f'["file://{DEFAULT_WORKSPACE}"]',
+                "DONE",
+                "import",
+                "",
+                now_iso,
+                0
+            )
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
     return {
         "success": True,

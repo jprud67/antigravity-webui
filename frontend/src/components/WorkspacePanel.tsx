@@ -25,7 +25,7 @@ import { GitTab } from './GitTab';
 import { KanbanTab } from './KanbanTab';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
-import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent, fetchGitStatus } from '../services/api';
+import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent, fetchGitStatus, getAuthToken } from '../services/api';
 import { showToast } from './Toast';
 import { showConfirm } from './AppDialog';
 import type { ArtifactItem } from '../types';
@@ -608,7 +608,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                       ) : selectedFilePath.match(/\.(png|jpe?g|gif|svg|webp)$/i) ? (
                         <div className="flex-1 flex items-center justify-center p-4">
                           <img
-                            src={`/api/files/download?path=${encodeURIComponent(selectedFilePath)}`}
+                            src={`/api/files/download?path=${encodeURIComponent(selectedFilePath)}${getAuthToken() ? `&token=${encodeURIComponent(getAuthToken()!)}` : ''}`}
                             alt={selectedFilePath.split('/').pop()}
                             className="max-w-full max-h-full object-contain rounded-lg shadow-sm border"
                             style={{ borderColor: 'var(--border)' }}

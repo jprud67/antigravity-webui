@@ -150,6 +150,25 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
           timestamp: createdAt
         });
         continue;
+      } else {
+        // Extraire le message système réel en retirant le préambule d'antigravity
+        let sysText = content;
+        const msgMatch = /<SYSTEM_MESSAGE>([\s\S]*?)<\/SYSTEM_MESSAGE>/i.exec(content);
+        if (msgMatch) {
+          sysText = msgMatch[1].trim();
+        }
+        if (sysText.trim()) {
+          flushAssistant();
+          messages.push({
+            id: `system-notify-${idx}`,
+            role: 'system',
+            subtype: 'system',
+            content: sysText.trim(),
+            stepIndex,
+            timestamp: createdAt
+          });
+          continue;
+        }
       }
     }
 

@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from app.config import DEFAULT_WORKSPACE
 from app.api.auth import require_auth
@@ -149,4 +150,16 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
             tmp_path.unlink()
         logger.error(f"Error saving file {resolved_path}: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement : {str(e)}")
+
+@router.get("/download")
+def download_file(path: str = Query(...), _ = Depends(require_auth)):
+    file_path = Path(path)
+    resolved_path = _validate_path_access(file_path)
+    if not resolved_path.exists() or not resolved_path.is_file():
+        raise HTTPException(status_code=404, detail="Fichier introuvable.")
+
+    return FileResponse(
+        path=str(resolved_path),
+        filename=resolved_path.name
+    )
 

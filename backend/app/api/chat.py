@@ -207,11 +207,20 @@ async def chat_websocket(websocket: WebSocket, token: Optional[str] = None):
         logger.error(f"WebSocket error: {e}")
     finally:
         worker_task.cancel()
-        if active_proc:
+        if active_proc and active_proc.returncode is None:
+            # Allow running turn a grace period to finish naturally upon transient disconnect
             try:
-                pgid = os.getpgid(active_proc.pid)
-                os.killpg(pgid, signal.SIGTERM)
+                for _ in range(10):
+                    if not active_proc or active_proc.returncode is not None:
+                        break
+                    await asyncio.sleep(0.5)
             except Exception:
                 pass
+            if active_proc and active_proc.returncode is None:
+                try:
+                    pgid = os.getpgid(active_proc.pid)
+                    os.killpg(pgid, signal.SIGTERM)
+                except Exception:
+                    pass
         if active_task and not active_task.done():
             active_task.cancel()
