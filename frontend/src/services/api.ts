@@ -159,6 +159,46 @@ export async function undoConversationTurn(conversationId: string): Promise<any>
   return res.json();
 }
 
+export interface BulkActionPayload {
+  action: 'delete' | 'pin' | 'unpin' | 'tag' | 'project';
+  conversation_ids: string[];
+  payload?: {
+    tags?: string[];
+    mode?: 'add' | 'replace';
+    project?: string;
+    projectColor?: string;
+  };
+}
+
+export async function bulkConversationAction(data: BulkActionPayload): Promise<any> {
+  const res = await fetch(`${API_BASE}/conversations/bulk`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'action groupée" }));
+    throw new Error(err.detail || "Impossible d'exécuter l'action groupée");
+  }
+  return res.json();
+}
+
+export async function bulkConversationExport(conversationIds: string[]): Promise<void> {
+  const res = await fetch(`${API_BASE}/conversations/bulk/export`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ action: 'export', conversation_ids: conversationIds })
+  });
+  if (!res.ok) throw new Error("Échec de l'export groupé");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `antigravity_bulk_export_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function getExportHtmlUrl(conversationId: string): string {
   const token = getAuthToken();
   return `${API_BASE}/conversations/${conversationId}/export/html${token ? `?token=${encodeURIComponent(token)}` : ''}`;

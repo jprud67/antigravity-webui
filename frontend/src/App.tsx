@@ -953,6 +953,10 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
         onTogglePin={handleTogglePin}
         onEditSessionMeta={handleEditSessionMeta}
         onSearchQuery={handleSearchQuery}
+        onRefreshConversations={async () => {
+          const convs = await fetchConversations(100);
+          setConversations(convs);
+        }}
         currentWorkspace={currentWorkspace}
         activeModel={displayModelName}
         activeEffort={displayEffort}
