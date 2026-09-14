@@ -16,10 +16,13 @@ import {
   Save,
   Check
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { TerminalTab } from './TerminalTab';
 import { GitTab } from './GitTab';
 import { KanbanTab } from './KanbanTab';
 import { MermaidRenderer } from './MermaidRenderer';
+import { DiffViewer } from './DiffViewer';
 import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent } from '../services/api';
 import type { ArtifactItem } from '../types';
 
@@ -569,28 +572,42 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                       <h2 className="text-base font-bold mb-1" style={{ color: 'var(--strong)' }}>{selectedArtifact.filename}</h2>
                       <p className="text-xs font-mono" style={{ color: 'var(--muted)' }}>{selectedArtifact.relative_path}</p>
                     </div>
-                    {/* Render Mermaid if code block or raw markdown */}
-                    {artifactMarkdown.includes('```mermaid') ? (
-                      <div>
-                        {artifactMarkdown.split('```mermaid').map((chunk, idx) => {
-                          if (idx === 0) {
-                            return <div key={idx} className="whitespace-pre-wrap">{chunk}</div>;
-                          }
-                          const parts = chunk.split('```');
-                          const chartCode = parts[0];
-                          const remainingText = parts.slice(1).join('```');
-                          return (
-                            <div key={idx} className="my-4">
-                              <MermaidRenderer chart={chartCode.trim()} />
-                              {remainingText && (
-                                <div className="whitespace-pre-wrap mt-4">{remainingText}</div>
-                              )}
-                            </div>
-                          );
-                        })}
+                    {/* Render Artifact with full Markdown & Diagram support */}
+                    {selectedArtifact.filename.endsWith('.md') ? (
+                      <div className="markdown-content max-w-none text-xs leading-relaxed" style={{ color: 'var(--text)' }}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            code: ({ inline, className, children, ...props }: any) => {
+                              const match = /language-(\w+)/.exec(className || '');
+                              const language = match ? match[1] : '';
+                              const codeContent = String(children).replace(/\n$/, '');
+                              if (!inline) {
+                                if (language === 'mermaid') {
+                                  return <MermaidRenderer chart={codeContent} />;
+                                }
+                                if (language === 'diff') {
+                                  return <DiffViewer diffText={codeContent} />;
+                                }
+                                return (
+                                  <pre className="p-3 my-2 rounded-xl overflow-x-auto text-[11px] font-mono border" style={{ backgroundColor: 'var(--code-bg)', borderColor: 'var(--border)' }}>
+                                    <code>{children}</code>
+                                  </pre>
+                                );
+                              }
+                              return (
+                                <code className="px-1.5 py-0.5 rounded text-[11px] font-mono border" style={{ backgroundColor: 'var(--code-inline-bg)', borderColor: 'var(--border-subtle)', color: 'var(--code-text)' }} {...props}>
+                                  {children}
+                                </code>
+                              );
+                            }
+                          }}
+                        >
+                          {artifactMarkdown}
+                        </ReactMarkdown>
                       </div>
                     ) : (
-                      <pre className="whitespace-pre-wrap font-sans" style={{ color: 'var(--text)' }}>
+                      <pre className="whitespace-pre-wrap font-mono p-3 rounded-xl border text-xs" style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)', color: 'var(--text)' }}>
                         {artifactMarkdown}
                       </pre>
                     )}

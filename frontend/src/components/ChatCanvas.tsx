@@ -65,19 +65,42 @@ interface ChatCanvasProps {
   onEditSessionMeta?: () => void;
 }
 
+export const copyTextToClipboard = async (text: string): Promise<boolean> => {
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) {}
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) {
+    return false;
+  }
+};
+
 const CodeBlock = ({ inline, className, children, ...props }: any) => {
   const [copied, setCopied] = useState(false);
   const match = /language-(\w+)/.exec(className || '');
   const language = match ? match[1] : '';
   const codeContent = String(children).replace(/\n$/, '');
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(codeContent);
+  const handleCopy = async () => {
+    await copyTextToClipboard(codeContent);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!inline && match) {
+  if (!inline) {
     if (language === 'mermaid') {
       return <MermaidRenderer chart={codeContent} />;
     }
@@ -108,11 +131,11 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
             </div>
             <span className="text-[10px] font-semibold tracking-wider uppercase pl-1" style={{ color: 'var(--accent, #FFD700)' }}>
-              {language}
+              {language || 'code'}
             </span>
           </div>
           <button
-            onClick={copyToClipboard}
+            onClick={handleCopy}
             className="flex items-center gap-1.5 py-1 px-2 rounded-md text-[10px] transition-colors cursor-pointer"
             style={{
               color: 'var(--muted)',
@@ -188,13 +211,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
   useEffect(() => {
     if (!bottomRef.current) return;
-    if (isStreaming) {
-      if (!userScrolledUpRef.current) {
-        bottomRef.current.scrollIntoView({ behavior: 'auto' });
-      }
-    } else {
-      userScrolledUpRef.current = false;
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!userScrolledUpRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: isStreaming ? 'auto' : 'smooth' });
     }
   }, [messages, isStreaming]);
 
@@ -630,7 +648,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                     )}
                     <button
                       type="button"
-                      onClick={() => navigator.clipboard.writeText(msg.content)}
+                      onClick={() => copyTextToClipboard(msg.content)}
                       className="p-0.5 hover:opacity-100 cursor-pointer"
                       title="Copier le message"
                     >
@@ -863,7 +881,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                   {msg.content && (
                     <button
                       type="button"
-                      onClick={() => navigator.clipboard.writeText(msg.content)}
+                      onClick={() => copyTextToClipboard(msg.content)}
                       className="transition-opacity opacity-75 hover:opacity-100 p-1 rounded cursor-pointer flex items-center gap-1"
                       title="Copier le message"
                     >

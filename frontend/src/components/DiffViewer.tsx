@@ -63,29 +63,55 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   const additionsCount = parsedLines.filter((l) => l.type === 'add').length;
   const deletionsCount = parsedLines.filter((l) => l.type === 'del').length;
 
-  const copyDiff = () => {
-    navigator.clipboard.writeText(diffText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyDiff = async () => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(diffText);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = diffText;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {}
   };
 
   return (
-    <div className="my-3 bg-[#070b14] border border-slate-800/90 rounded-2xl overflow-hidden shadow-lg font-mono text-xs">
+    <div
+      className="my-3 rounded-2xl overflow-hidden shadow-lg font-mono text-xs border"
+      style={{
+        backgroundColor: 'var(--surface)',
+        borderColor: 'var(--border)',
+        color: 'var(--text)'
+      }}
+    >
       {/* Header */}
-      <div className="px-4 py-2.5 bg-[#0b1020] border-b border-slate-800 flex items-center justify-between">
+      <div
+        className="px-4 py-2.5 border-b flex items-center justify-between"
+        style={{
+          backgroundColor: 'var(--surface-subtle)',
+          borderColor: 'var(--border)'
+        }}
+      >
         <div className="flex items-center gap-2.5">
-          <GitCommit className="w-4 h-4 text-sky-400" />
-          <span className="font-semibold text-slate-200 text-xs">
+          <GitCommit className="w-4 h-4 text-sky-500" />
+          <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>
             {filename || title}
           </span>
           <div className="flex items-center gap-1.5 text-[10px] font-bold ml-2">
             {additionsCount > 0 && (
-              <span className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
+              <span className="text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
                 +{additionsCount}
               </span>
             )}
             {deletionsCount > 0 && (
-              <span className="text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.2 rounded">
+              <span className="text-rose-500 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.2 rounded">
                 -{deletionsCount}
               </span>
             )}
@@ -95,14 +121,24 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={copyDiff}
-            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] flex items-center gap-1 cursor-pointer transition-colors"
+            className="px-2 py-1 rounded text-[10px] flex items-center gap-1 cursor-pointer transition-colors border"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border)',
+              color: 'var(--text)'
+            }}
           >
-            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+            {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
             <span>{copied ? 'Copié' : 'Copier'}</span>
           </button>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded cursor-pointer transition-colors"
+            className="p-1 rounded cursor-pointer transition-colors border"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border)',
+              color: 'var(--muted)'
+            }}
           >
             {collapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
           </button>
@@ -115,30 +151,36 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
           <table className="w-full border-collapse font-mono text-[11px] leading-5 select-text">
             <tbody>
               {parsedLines.map((line, idx) => {
-                let rowBg = 'hover:bg-slate-900/40';
-                let textCol = 'text-slate-300';
+                let rowBg = 'hover:bg-black/5 dark:hover:bg-white/5';
+                let textCol = 'text-slate-700 dark:text-slate-300';
                 let sign = ' ';
 
                 if (line.type === 'add') {
-                  rowBg = 'bg-emerald-950/30 hover:bg-emerald-950/50';
-                  textCol = 'text-emerald-300';
+                  rowBg = 'bg-emerald-500/10 hover:bg-emerald-500/15';
+                  textCol = 'text-emerald-600 dark:text-emerald-400';
                   sign = '+';
                 } else if (line.type === 'del') {
-                  rowBg = 'bg-rose-950/30 hover:bg-rose-950/50';
-                  textCol = 'text-rose-300 line-through decoration-rose-500/50';
+                  rowBg = 'bg-rose-500/10 hover:bg-rose-500/15';
+                  textCol = 'text-rose-600 dark:text-rose-400 line-through decoration-rose-500/50';
                   sign = '-';
                 } else if (line.type === 'meta') {
-                  rowBg = 'bg-sky-950/20 text-sky-400 font-semibold';
-                  textCol = 'text-sky-400';
+                  rowBg = 'bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold';
+                  textCol = 'text-sky-600 dark:text-sky-400';
                   sign = '@';
                 }
 
                 return (
                   <tr key={idx} className={`${rowBg} transition-colors`}>
-                    <td className="w-10 text-right pr-2 py-0 text-slate-600 select-none text-[10px] border-r border-slate-800/60 font-mono">
+                    <td
+                      className="w-10 text-right pr-2 py-0 select-none text-[10px] border-r font-mono"
+                      style={{ color: 'var(--muted)', borderColor: 'var(--border)' }}
+                    >
                       {line.oldLineNum ?? ''}
                     </td>
-                    <td className="w-10 text-right pr-2 py-0 text-slate-600 select-none text-[10px] border-r border-slate-800/60 font-mono">
+                    <td
+                      className="w-10 text-right pr-2 py-0 select-none text-[10px] border-r font-mono"
+                      style={{ color: 'var(--muted)', borderColor: 'var(--border)' }}
+                    >
                       {line.newLineNum ?? ''}
                     </td>
                     <td className="w-6 text-center select-none font-bold opacity-60">

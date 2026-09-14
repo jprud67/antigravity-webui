@@ -745,6 +745,7 @@ def list_artifacts(conversation_id: Optional[str] = None) -> List[Dict[str, Any]
 def read_artifact_content(conversation_id: str, filename: str) -> str:
     # Strictly confine path to BRAIN_DIR / conversation_id
     base_dir = (BRAIN_DIR / conversation_id).resolve()
+    target_path = (base_dir / filename).resolve()
     try:
         if not target_path.is_relative_to(base_dir):
             raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")

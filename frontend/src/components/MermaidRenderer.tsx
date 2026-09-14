@@ -18,11 +18,12 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
 
     const renderChart = async () => {
       try {
+        const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
         const mermaid = (await import('mermaid')).default;
         mermaid.initialize({
           startOnLoad: false,
-          theme: 'dark',
-          themeVariables: {
+          theme: isDark ? 'dark' : 'default',
+          themeVariables: isDark ? {
             darkMode: true,
             background: '#090d1a',
             primaryColor: '#0284c7',
@@ -31,6 +32,15 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
             lineColor: '#64748b',
             secondaryColor: '#3b82f6',
             tertiaryColor: '#1e293b',
+          } : {
+            darkMode: false,
+            background: '#ffffff',
+            primaryColor: '#0284c7',
+            primaryTextColor: '#0f172a',
+            primaryBorderColor: '#0284c7',
+            lineColor: '#94a3b8',
+            secondaryColor: '#e0f2fe',
+            tertiaryColor: '#f1f5f9',
           },
           securityLevel: 'strict',
           fontFamily: 'ui-sans-serif, system-ui, sans-serif',
@@ -56,26 +66,54 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
     };
   }, [chart]);
 
-  const copyChartCode = () => {
-    navigator.clipboard.writeText(chart);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyChartCode = async () => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(chart);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = chart;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {}
   };
 
   if (error) {
     return (
-      <div className="my-3 p-4 bg-[#0a0f1e] border border-amber-500/30 rounded-xl text-xs">
+      <div
+        className="my-3 p-4 rounded-xl text-xs border"
+        style={{
+          backgroundColor: 'var(--surface-subtle)',
+          borderColor: 'var(--border)',
+          color: 'var(--text)'
+        }}
+      >
         <div className="flex items-center justify-between mb-2">
-          <span className="text-amber-400 font-semibold font-mono text-[11px]">Diagramme Mermaid</span>
+          <span className="font-semibold font-mono text-[11px]" style={{ color: 'var(--accent)' }}>Diagramme Mermaid (Source)</span>
           <button
             onClick={copyChartCode}
-            className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+            className="text-[10px] flex items-center gap-1 cursor-pointer"
+            style={{ color: 'var(--muted)' }}
           >
-            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+            {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
             <span>Copier la source</span>
           </button>
         </div>
-        <pre className="font-mono bg-[#050811] p-3 rounded-lg border border-slate-800 text-slate-300 text-[10px] overflow-x-auto">
+        <pre
+          className="font-mono p-3 rounded-lg border text-[10px] overflow-x-auto"
+          style={{
+            backgroundColor: 'var(--code-bg)',
+            borderColor: 'var(--border-subtle)',
+            color: 'var(--code-text)'
+          }}
+        >
           {chart}
         </pre>
       </div>
@@ -84,29 +122,50 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
 
   const renderContent = (fullscreen: boolean) => (
     <div
-      className={`bg-[#070b16] border border-sky-500/20 rounded-2xl overflow-hidden transition-all shadow-lg ${
+      className={`rounded-2xl overflow-hidden transition-all shadow-lg border ${
         fullscreen
-          ? 'fixed inset-4 z-[9999] flex flex-col bg-[#070b16]/95 backdrop-blur-xl border-sky-500/50 shadow-2xl'
+          ? 'fixed inset-4 z-[9999] flex flex-col backdrop-blur-xl shadow-2xl'
           : 'my-3'
       }`}
+      style={{
+        backgroundColor: 'var(--surface)',
+        borderColor: 'var(--border)',
+        color: 'var(--text)'
+      }}
     >
       {/* Header toolbar */}
-      <div className="px-4 py-2 bg-[#0c1222] border-b border-slate-800 flex items-center justify-between text-xs shrink-0">
+      <div
+        className="px-4 py-2 border-b flex items-center justify-between text-xs shrink-0"
+        style={{
+          backgroundColor: 'var(--surface-subtle)',
+          borderColor: 'var(--border)'
+        }}
+      >
         <div className="flex items-center gap-2">
-          <Eye className="w-3.5 h-3.5 text-sky-400" />
-          <span className="font-semibold text-slate-200 text-[11px]">Diagramme Architecture / Flux</span>
+          <Eye className="w-3.5 h-3.5 text-sky-500" />
+          <span className="font-semibold text-[11px]" style={{ color: 'var(--strong)' }}>Diagramme Architecture / Flux</span>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={copyChartCode}
-            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] flex items-center gap-1 cursor-pointer transition-colors"
+            className="px-2 py-1 rounded text-[10px] flex items-center gap-1 cursor-pointer transition-colors border"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border)',
+              color: 'var(--text)'
+            }}
           >
-            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+            {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
             <span>{copied ? 'Copié' : 'Source'}</span>
           </button>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded cursor-pointer transition-colors"
+            className="p-1 rounded cursor-pointer transition-colors border"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border)',
+              color: 'var(--muted)'
+            }}
             title={fullscreen ? 'Réduire' : 'Plein écran'}
           >
             {fullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
