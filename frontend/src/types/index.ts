@@ -38,10 +38,9 @@ export interface ArtifactItem {
 export interface ModelOption {
   id: string;
   name: string;
-  family_id?: string;
-  family_name?: string;
-  effort?: string | null;
-  supported_efforts?: string[];
+  default_effort?: string | null;
+  supported_efforts: string[];
+  variants: Record<string, string>;
 }
 
 export interface AppSettings {

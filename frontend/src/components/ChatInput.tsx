@@ -11,7 +11,8 @@ import {
   Sparkles,
   Globe,
   MessageSquareCode,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Cpu
 } from 'lucide-react';
 import type { ModelOption } from '../types';
 
@@ -67,32 +68,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, [prompt]);
 
-  const currentModelObj = models.find((m) => m.id === selectedModel);
-  const supportedEfforts = currentModelObj?.supported_efforts ?? ['high', 'medium', 'low'];
+  const currentModelObj = models.find((m) => m.id === selectedModel) || models[0];
+  const supportedEfforts = currentModelObj?.supported_efforts ?? [];
   const hasEffortSupport = supportedEfforts.length > 0;
 
   // Handle Model change
   const handleModelChange = (newModelId: string) => {
     onSelectModel(newModelId);
     const newModelObj = models.find((m) => m.id === newModelId);
-    if (newModelObj?.effort) {
-      onSelectEffort(newModelObj.effort as any);
-    } else if (newModelObj?.supported_efforts && newModelObj.supported_efforts.length > 0) {
+    if (newModelObj && newModelObj.supported_efforts.length > 0) {
+      // If current effort is not supported by new model, fallback to default or first supported
       if (!newModelObj.supported_efforts.includes(selectedEffort)) {
-        onSelectEffort(newModelObj.supported_efforts[0] as any);
+        onSelectEffort((newModelObj.default_effort as any) || (newModelObj.supported_efforts[0] as any) || 'high');
       }
-    }
-  };
-
-  // Handle Effort change
-  const handleEffortChange = (newEffort: 'low' | 'medium' | 'high') => {
-    onSelectEffort(newEffort);
-    const familyId = currentModelObj?.family_id || selectedModel;
-    const matchingVariant = models.find(
-      (m) => m.family_id === familyId && m.effort === newEffort
-    );
-    if (matchingVariant) {
-      onSelectModel(matchingVariant.id);
     }
   };
 
@@ -125,8 +113,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   const handleSubmit = () => {
     if (!prompt.trim() || isStreaming) return;
+    
+    // Resolve concrete model variant ID
+    const concreteVariant = hasEffortSupport && currentModelObj?.variants?.[selectedEffort]
+      ? currentModelObj.variants[selectedEffort]
+      : currentModelObj?.variants?.['default'] || selectedModel;
+
     onSendMessage(prompt.trim(), {
-      model: selectedModel,
+      model: concreteVariant,
       effort: hasEffortSupport ? selectedEffort : undefined,
       autoApprove,
     });
@@ -192,28 +186,32 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {/* Toolbar */}
         <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/80 mt-2">
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Model Selector */}
-            <select
-              value={selectedModel}
-              onChange={(e) => handleModelChange(e.target.value)}
-              className="bg-[#080c16] text-slate-300 border border-slate-700/70 hover:border-slate-600 rounded-lg px-2.5 py-1 text-[11px] font-mono outline-none focus:border-sky-500 transition-colors cursor-pointer"
-            >
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
+            {/* Base Model Selector (clean unique names) */}
+            <div className="flex items-center gap-1.5 bg-[#080c16] border border-slate-700/70 hover:border-slate-600 rounded-lg px-2.5 py-1 transition-colors">
+              <Cpu className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+              <select
+                value={selectedModel}
+                onChange={(e) => handleModelChange(e.target.value)}
+                className="bg-transparent text-slate-200 text-[11px] font-semibold font-sans outline-none focus:text-white transition-colors cursor-pointer"
+                title="Modèle de base"
+              >
+                {models.map((m) => (
+                  <option key={m.id} value={m.id} className="bg-slate-900 text-slate-200">
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            {/* Effort Selector - Synchronized with Model */}
+            {/* Effort Selector */}
             {hasEffortSupport ? (
-              <div className="flex items-center gap-1 bg-[#080c16] border border-slate-700/70 rounded-lg px-1.5 py-0.5">
-                <SlidersHorizontal className="w-3 h-3 text-slate-500" />
+              <div className="flex items-center gap-1.5 bg-[#080c16] border border-slate-700/70 hover:border-slate-600 rounded-lg px-2 py-1 transition-colors">
+                <SlidersHorizontal className="w-3 h-3 text-indigo-400 shrink-0" />
                 <select
                   value={selectedEffort}
-                  onChange={(e) => handleEffortChange(e.target.value as any)}
-                  className="bg-transparent text-slate-300 text-[11px] font-mono outline-none cursor-pointer py-0.5"
-                  title="Niveau d'effort de raisonnement (synchronisé avec le modèle)"
+                  onChange={(e) => onSelectEffort(e.target.value as any)}
+                  className="bg-transparent text-slate-300 text-[11px] font-mono outline-none cursor-pointer"
+                  title="Niveau de réflexion / Effort"
                 >
                   {supportedEfforts.includes('high') && (
                     <option value="high" className="bg-slate-900 text-slate-200">
@@ -233,9 +231,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 </select>
               </div>
             ) : (
-              <span className="text-[10px] bg-slate-900/80 border border-slate-800 text-slate-500 px-2 py-1 rounded-lg font-mono" title="Ce modèle ne requiert pas de réglage d'effort">
-                Effort: Natif
-              </span>
+              <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1 text-slate-500 text-[10px] font-mono cursor-not-allowed" title="Ce modèle utilise un raisonnement Thinking natif non configurable">
+                <span>Effort: Fixe</span>
+              </div>
             )}
 
             {/* Auto-Run Toggle */}

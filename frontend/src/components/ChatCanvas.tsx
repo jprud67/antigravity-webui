@@ -24,6 +24,7 @@ interface ChatCanvasProps {
   isStreaming: boolean;
   conversationTitle?: string;
   activeModel?: string;
+  activeEffort?: string;
   onQuickPrompt?: (prompt: string) => void;
 }
 
@@ -78,6 +79,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   isStreaming,
   conversationTitle,
   activeModel,
+  activeEffort,
   onQuickPrompt
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -106,6 +108,11 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             <div className="flex items-center gap-1.5 text-[10px] font-mono font-medium bg-sky-500/10 border border-sky-500/20 text-sky-400 px-2.5 py-0.5 rounded-full shadow-inner">
               <Cpu className="w-3 h-3 text-sky-400" />
               <span>{activeModel}</span>
+              {activeEffort && (
+                <span className="text-[9px] bg-sky-400/20 text-sky-300 px-1.5 py-0.2 rounded font-bold uppercase ml-1">
+                  {activeEffort}
+                </span>
+              )}
             </div>
           )}
         </div>

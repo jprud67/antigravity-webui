@@ -22,6 +22,7 @@ interface SidebarProps {
   onOpenArtifacts: () => void;
   currentWorkspace: string;
   activeModel?: string;
+  activeEffort?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -33,7 +34,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenWorkspaces,
   onOpenArtifacts,
   currentWorkspace,
-  activeModel = 'Gemini 3.8 Flash'
+  activeModel = 'Gemini 3.8 Flash',
+  activeEffort
 }) => {
   const [searchFilter, setSearchFilter] = useState('');
 
@@ -196,7 +198,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <span className="font-medium text-xs">Configuration & Modèles</span>
           </div>
-          <span className="text-[10px] text-slate-400 truncate max-w-[90px] font-mono">{activeModel.split(' ')[0]}</span>
+          <div className="flex items-center gap-1 font-mono text-[10px] text-slate-400 truncate max-w-[110px]">
+            <span className="truncate">{activeModel.split(' ')[0]}</span>
+            {activeEffort && (
+              <span className="bg-slate-800 text-sky-400 px-1 rounded text-[9px] uppercase font-bold">
+                {activeEffort}
+              </span>
+            )}
+          </div>
         </button>
       </div>
     </aside>

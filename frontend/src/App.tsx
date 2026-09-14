@@ -49,20 +49,28 @@ export function App() {
       // Harmonize model selection from settings
       if (settings.model && mods.length > 0) {
         const found = mods.find(
-          (m) => m.name === settings.model || m.id === settings.model
+          (m) =>
+            m.name === settings.model ||
+            m.id === settings.model ||
+            (settings.model ? settings.model.includes(m.name) || settings.model.includes(m.id) : false)
         );
         if (found) {
           setSelectedModel(found.id);
-          if (found.effort) {
-            setSelectedEffort(found.effort as any);
+          const lowerModel = settings.model.toLowerCase();
+          if (lowerModel.includes('low')) {
+            setSelectedEffort('low');
+          } else if (lowerModel.includes('medium') || lowerModel.includes('med')) {
+            setSelectedEffort('medium');
+          } else {
+            setSelectedEffort((found.default_effort as any) || 'high');
           }
         } else {
           setSelectedModel(mods[0].id);
-          if (mods[0].effort) setSelectedEffort(mods[0].effort as any);
+          setSelectedEffort((mods[0].default_effort as any) || 'high');
         }
       } else if (mods.length > 0) {
         setSelectedModel(mods[0].id);
-        if (mods[0].effort) setSelectedEffort(mods[0].effort as any);
+        setSelectedEffort((mods[0].default_effort as any) || 'high');
       }
 
       if (settings.trustedWorkspaces && settings.trustedWorkspaces.length > 0) {
@@ -210,14 +218,15 @@ export function App() {
   const handleModelSavedFromSettings = (newModelId: string) => {
     setSelectedModel(newModelId);
     const found = models.find((m) => m.id === newModelId);
-    if (found?.effort) {
-      setSelectedEffort(found.effort as any);
+    if (found?.default_effort) {
+      setSelectedEffort(found.default_effort as any);
     }
   };
 
   const activeConv = conversations.find((c) => c.conversation_id === activeConversationId);
   const currentModelObj = models.find((m) => m.id === selectedModel);
-  const displayModelName = currentModelObj ? currentModelObj.name : selectedModel;
+  const displayModelName = currentModelObj ? currentModelObj.name : 'Gemini 3.8 Flash';
+  const displayEffort = currentModelObj && currentModelObj.supported_efforts.length > 0 ? selectedEffort : undefined;
 
   return (
     <div className="flex h-screen w-screen bg-[#080c16] text-slate-100 font-sans overflow-hidden antialiased">
@@ -232,6 +241,7 @@ export function App() {
         onOpenArtifacts={() => setIsArtifactsOpen(true)}
         currentWorkspace={currentWorkspace}
         activeModel={displayModelName}
+        activeEffort={displayEffort}
       />
 
       {/* Main Chat Area */}
@@ -241,6 +251,7 @@ export function App() {
           isStreaming={isStreaming}
           conversationTitle={activeConv?.title}
           activeModel={displayModelName}
+          activeEffort={displayEffort}
           onQuickPrompt={(p) => setQuickPrompt(p)}
         />
 

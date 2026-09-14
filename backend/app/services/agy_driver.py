@@ -68,6 +68,28 @@ async def get_available_models() -> List[Dict[str, Any]]:
             models.append(parse_model_metadata(m_id, m_id))
     return models
 
+async def get_model_families() -> List[Dict[str, Any]]:
+    """
+    Returns unique base model families deduplicated with supported efforts and concrete variant IDs.
+    """
+    models_raw = await get_available_models()
+    families: Dict[str, Dict[str, Any]] = {}
+    for meta in models_raw:
+        fid = meta['family_id']
+        if fid not in families:
+            families[fid] = {
+                'id': fid,
+                'name': meta['family_name'],
+                'default_effort': meta['effort'] or ('high' if meta['supported_efforts'] else None),
+                'supported_efforts': meta['supported_efforts'],
+                'variants': {}
+            }
+        if meta['effort']:
+            families[fid]['variants'][meta['effort']] = meta['id']
+        else:
+            families[fid]['variants']['default'] = meta['id']
+    return list(families.values())
+
 def resolve_model_and_effort(model: Optional[str], effort: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
     """
     Safely reconciles model and effort parameters for agy CLI.

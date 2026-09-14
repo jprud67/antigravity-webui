@@ -29,7 +29,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       fetchSettings().then((s) => {
         setSettings(s);
         if (s.model) {
-          const match = models.find((m) => m.name === s.model || m.id === s.model);
+          const match = models.find(
+            (m) =>
+              m.name === s.model ||
+              m.id === s.model ||
+              (s.model ? s.model.includes(m.name) || s.model.includes(m.id) : false)
+          );
           if (match) setSelectedModelId(match.id);
         }
       });
@@ -90,11 +95,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <select
               value={selectedModelId}
               onChange={(e) => setSelectedModelId(e.target.value)}
-              className="w-full bg-[#0d1322] border border-slate-700/80 rounded-xl p-3 text-slate-200 font-mono text-xs focus:border-sky-500 outline-none transition-colors cursor-pointer"
+              className="w-full bg-[#0d1322] border border-slate-700/80 rounded-xl p-3 text-slate-200 font-sans text-xs focus:border-sky-500 outline-none transition-colors cursor-pointer font-medium"
             >
               {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ({m.id})
+                <option key={m.id} value={m.id} className="bg-slate-900 text-slate-200">
+                  {m.name}
                 </option>
               ))}
             </select>

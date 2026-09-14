@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from typing import Dict, Any, List
 from app.services.storage import get_settings, save_settings
-from app.services.agy_driver import get_available_models
+from app.services.agy_driver import get_model_families
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -15,4 +15,4 @@ def update_settings(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 @router.get("/models")
 async def list_models() -> List[Dict[str, Any]]:
-    return await get_available_models()
+    return await get_model_families()
