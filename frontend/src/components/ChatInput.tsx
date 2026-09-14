@@ -4,7 +4,13 @@ import {
   Square, 
   Slash, 
   ShieldCheck, 
-  ShieldAlert 
+  ShieldAlert,
+  Compass,
+  Zap,
+  Clock,
+  Sparkles,
+  Globe,
+  MessageSquareCode
 } from 'lucide-react';
 import type { ModelOption } from '../types';
 
@@ -15,15 +21,16 @@ interface ChatInputProps {
   models: ModelOption[];
   selectedModel: string;
   onSelectModel: (m: string) => void;
+  initialPrompt?: string;
 }
 
 const SLASH_COMMANDS = [
-  { cmd: '/goal', desc: 'Tâche long cours autonome sans interruption' },
-  { cmd: '/plan', desc: 'Planifier et concevoir avant d\'exécuter' },
-  { cmd: '/grill-me', desc: 'Entretien interactif d\'alignement et de cadrage' },
-  { cmd: '/browser', desc: 'Navigation et interaction web automatisée' },
-  { cmd: '/schedule', desc: 'Planification récurrente (cron) ou minuteur' },
-  { cmd: '/boost', desc: 'Raisonnement profond multi-perspectives' },
+  { cmd: '/plan', desc: 'Planifier et concevoir avant d\'exécuter', icon: Compass, color: 'text-sky-400' },
+  { cmd: '/goal', desc: 'Tâche long cours autonome sans interruption', icon: Zap, color: 'text-amber-400' },
+  { cmd: '/browser', desc: 'Navigation et interaction web automatisée', icon: Globe, color: 'text-emerald-400' },
+  { cmd: '/grill-me', desc: 'Entretien d\'alignement et de cadrage', icon: MessageSquareCode, color: 'text-purple-400' },
+  { cmd: '/schedule', desc: 'Planification récurrente (cron) ou minuteur', icon: Clock, color: 'text-rose-400' },
+  { cmd: '/boost', desc: 'Raisonnement profond multi-perspectives', icon: Sparkles, color: 'text-cyan-400' },
 ];
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -33,8 +40,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   models,
   selectedModel,
   onSelectModel,
+  initialPrompt = ''
 }) => {
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(initialPrompt);
   const [effort, setEffort] = useState<'low' | 'medium' | 'high'>('high');
   const [autoApprove, setAutoApprove] = useState(true);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
@@ -42,9 +50,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    if (initialPrompt) {
+      setPrompt(initialPrompt);
+      textareaRef.current?.focus();
+    }
+  }, [initialPrompt]);
+
+  useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   }, [prompt]);
 
@@ -94,53 +109,61 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   );
 
   return (
-    <div className="relative p-4 max-w-4xl mx-auto w-full">
+    <div className="relative p-5 max-w-4xl mx-auto w-full">
       {/* Slash command popover */}
       {showSlashMenu && (
-        <div className="absolute bottom-full left-4 right-4 mb-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-20">
-          <div className="p-2 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+        <div className="absolute bottom-full left-5 right-5 mb-3 bg-[#0d1424] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden z-30 backdrop-blur-xl animate-fadeIn">
+          <div className="px-4 py-2.5 border-b border-slate-800 text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
             <Slash className="w-3.5 h-3.5 text-sky-400" />
-            <span>Commandes Spéciales Antigravity</span>
+            <span>Commandes Antigravity disponibles</span>
           </div>
-          <div className="max-h-48 overflow-y-auto p-1 space-y-1">
+          <div className="max-h-56 overflow-y-auto p-1.5 space-y-1">
             {filteredCommands.length === 0 ? (
-              <div className="p-2 text-xs text-slate-500">Aucune commande correspondante</div>
+              <div className="p-3 text-xs text-slate-500 text-center">Aucune commande correspondante</div>
             ) : (
-              filteredCommands.map((c) => (
-                <button
-                  key={c.cmd}
-                  onClick={() => insertSlashCommand(c.cmd)}
-                  className="w-full text-left p-2 rounded-lg hover:bg-slate-800 flex items-center justify-between text-xs transition-colors"
-                >
-                  <span className="font-mono font-semibold text-sky-400">{c.cmd}</span>
-                  <span className="text-slate-400 text-[11px]">{c.desc}</span>
-                </button>
-              ))
+              filteredCommands.map((c) => {
+                const Icon = c.icon;
+                return (
+                  <button
+                    key={c.cmd}
+                    onClick={() => insertSlashCommand(c.cmd)}
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/80 flex items-center justify-between text-xs transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-6 h-6 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center">
+                        <Icon className={`w-3.5 h-3.5 ${c.color}`} />
+                      </div>
+                      <span className="font-mono font-semibold text-slate-200 group-hover:text-sky-300 transition-colors">{c.cmd}</span>
+                    </div>
+                    <span className="text-slate-400 text-[11px]">{c.desc}</span>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
       )}
 
-      {/* Main Input Container */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 shadow-xl backdrop-blur focus-within:border-sky-500/50 transition-all">
+      {/* Floating Glass Dock */}
+      <div className="bg-[#0b101f]/95 border border-slate-700/70 rounded-2xl p-3.5 shadow-2xl backdrop-blur-xl focus-within:border-sky-500/60 focus-within:shadow-sky-500/10 transition-all duration-200">
         <textarea
           ref={textareaRef}
           value={prompt}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder="Envoyez une instruction à Antigravity (ex: Crée un composant, /plan pour structurer, etc.)..."
+          placeholder="Envoyez une instruction à Antigravity (ex: Crée une route, analyse le bug, tapez / pour les commandes)..."
           rows={1}
-          className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-xs resize-none outline-none leading-relaxed min-h-[40px] max-h-[180px]"
+          className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-xs resize-none outline-none leading-relaxed min-h-[42px] max-h-[200px]"
         />
 
-        {/* Action Toolbar */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 mt-2">
-          <div className="flex items-center gap-2">
-            {/* Model select */}
+        {/* Toolbar */}
+        <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/80 mt-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Model Selector */}
             <select
               value={selectedModel}
               onChange={(e) => onSelectModel(e.target.value)}
-              className="bg-slate-800/80 text-slate-300 border border-slate-700/80 rounded-md px-2 py-1 text-[11px] font-mono outline-none focus:border-sky-500"
+              className="bg-[#080c16] text-slate-300 border border-slate-700/70 hover:border-slate-600 rounded-lg px-2.5 py-1 text-[11px] font-mono outline-none focus:border-sky-500 transition-colors cursor-pointer"
             >
               {models.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -149,27 +172,27 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               ))}
             </select>
 
-            {/* Effort select */}
+            {/* Effort Selector */}
             <select
               value={effort}
               onChange={(e) => setEffort(e.target.value as any)}
-              className="bg-slate-800/80 text-slate-300 border border-slate-700/80 rounded-md px-2 py-1 text-[11px] font-mono outline-none focus:border-sky-500"
-              title="Niveau de réflexion de l'agent"
+              className="bg-[#080c16] text-slate-300 border border-slate-700/70 hover:border-slate-600 rounded-lg px-2.5 py-1 text-[11px] font-mono outline-none focus:border-sky-500 transition-colors cursor-pointer"
+              title="Niveau de réflexion / Thinking"
             >
-              <option value="low">Effort: Low</option>
-              <option value="medium">Effort: Medium</option>
-              <option value="high">Effort: High</option>
+              <option value="high">Effort: Haut (High)</option>
+              <option value="medium">Effort: Moyen (Med)</option>
+              <option value="low">Effort: Rapide (Low)</option>
             </select>
 
-            {/* Auto-approve toggle */}
+            {/* Auto-Run Toggle */}
             <button
               onClick={() => setAutoApprove(!autoApprove)}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${
                 autoApprove
-                  ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-400'
-                  : 'bg-slate-800 border-slate-700 text-slate-400'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                  : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:bg-slate-800'
               }`}
-              title={autoApprove ? "Exécution auto des commandes sans invite" : "Mode confirmation activé"}
+              title={autoApprove ? "Exécution autonome sans confirmation" : "Demander confirmation"}
             >
               {autoApprove ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldAlert className="w-3.5 h-3.5" />}
               <span>Auto-Run</span>
@@ -177,10 +200,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <span className="hidden sm:inline text-[10px] text-slate-500 font-mono">Entrée ↵</span>
+
             {isStreaming ? (
               <button
                 onClick={onStopStreaming}
-                className="py-1.5 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
+                className="py-1.5 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-md shadow-rose-600/20 cursor-pointer"
               >
                 <Square className="w-3.5 h-3.5 fill-current" />
                 <span>Arrêter</span>
@@ -189,9 +214,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               <button
                 onClick={handleSubmit}
                 disabled={!prompt.trim()}
-                className="py-1.5 px-3.5 rounded-lg bg-sky-500 hover:bg-sky-400 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                className="py-1.5 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-sky-500/20 active:scale-95 cursor-pointer"
               >
-                <span>Exécuter</span>
+                <span>Envoyer</span>
                 <Send className="w-3.5 h-3.5" />
               </button>
             )}

@@ -23,6 +23,7 @@ export function App() {
 
   const [models, setModels] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash-high');
+  const [quickPrompt, setQuickPrompt] = useState('');
 
   // Modals
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
@@ -191,9 +192,10 @@ export function App() {
   };
 
   const activeConv = conversations.find((c) => c.conversation_id === activeConversationId);
+  const currentModelName = models.find((m) => m.id === selectedModel)?.name || selectedModel;
 
   return (
-    <div className="flex h-screen w-screen bg-[#0b0f19] text-slate-100 font-sans overflow-hidden">
+    <div className="flex h-screen w-screen bg-[#080c16] text-slate-100 font-sans overflow-hidden antialiased">
       {/* Sidebar */}
       <Sidebar
         conversations={conversations}
@@ -204,6 +206,7 @@ export function App() {
         onOpenWorkspaces={() => setIsWorkspacesOpen(true)}
         onOpenArtifacts={() => setIsArtifactsOpen(true)}
         currentWorkspace={currentWorkspace}
+        activeModel={currentModelName}
       />
 
       {/* Main Chat Area */}
@@ -212,7 +215,8 @@ export function App() {
           messages={messages}
           isStreaming={isStreaming}
           conversationTitle={activeConv?.title}
-          activeModel={selectedModel}
+          activeModel={currentModelName}
+          onQuickPrompt={(p) => setQuickPrompt(p)}
         />
 
         <ChatInput
@@ -222,6 +226,7 @@ export function App() {
           models={models}
           selectedModel={selectedModel}
           onSelectModel={setSelectedModel}
+          initialPrompt={quickPrompt}
         />
       </main>
 
