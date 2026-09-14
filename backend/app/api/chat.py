@@ -42,6 +42,12 @@ async def chat_websocket(websocket: WebSocket, token: Optional[str] = None):
             nonlocal active_proc
             active_proc = p
 
+        async def safe_send(payload: dict):
+            try:
+                await websocket.send_json(payload)
+            except Exception:
+                pass
+
         try:
             async for event in stream_turn(
                 prompt=prompt,
@@ -52,15 +58,15 @@ async def chat_websocket(websocket: WebSocket, token: Optional[str] = None):
                 auto_approve=auto_approve,
                 proc_callback=on_proc_spawned
             ):
-                await websocket.send_json(event)
+                await safe_send(event)
 
-            await websocket.send_json({"event": "done", "queue_size": message_queue.qsize()})
+            await safe_send({"event": "done", "queue_size": message_queue.qsize()})
         except asyncio.CancelledError:
             logger.info("Turn cancelled / interrupted by client")
-            await websocket.send_json({"event": "interrupted", "message": "Exécution interrompue."})
+            await safe_send({"event": "interrupted", "message": "Exécution interrompue."})
         except Exception as e:
             logger.error(f"Error in turn: {e}")
-            await websocket.send_json({"event": "error", "message": str(e)})
+            await safe_send({"event": "error", "message": str(e)})
         finally:
             active_proc = None
             is_turn_running = False

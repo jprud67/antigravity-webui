@@ -11,22 +11,26 @@ from app.api.auth import require_auth
 logger = logging.getLogger("antigravity.git")
 router = APIRouter(prefix="/api/git", tags=["git"])
 
-GIT_TIMEOUT = 10
+GIT_TIMEOUT = 12
 
-def run_git(args: List[str], cwd: Path) -> subprocess.CompletedProcess:
+def run_git(args: List[str], cwd: Path, timeout: int = GIT_TIMEOUT) -> subprocess.CompletedProcess:
     # Always enforce strict author and committer for jprud67
     base_args = [
         "git",
         "-c", "user.name=jprud67",
         "-c", "user.email=jprud67@gmail.com"
     ] + args
-    return subprocess.run(
-        base_args,
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-        timeout=GIT_TIMEOUT
-    )
+    try:
+        return subprocess.run(
+            base_args,
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+    except subprocess.TimeoutExpired:
+        logger.warning(f"Git timeout ({timeout}s) for {args} in {cwd}")
+        raise HTTPException(status_code=504, detail=f"Délai d'attente Git dépassé ({timeout}s) pour l'opération.")
 
 @router.get("/status")
 def get_git_status(workspace: Optional[str] = Query(None), _ = Depends(require_auth)):
@@ -74,7 +78,7 @@ def get_git_status(workspace: Optional[str] = Query(None), _ = Depends(require_a
                             pass
                     if "behind " in track_info:
                         try:
-                            behind = int(track_info.split("behind ")[1].split("]")[0])
+                            behind = int(track_info.split("behind ")[1].split("]")[0].split(",")[0].strip())
                         except Exception:
                             pass
                 else:
@@ -212,7 +216,7 @@ def git_push(req: PushRequest, _ = Depends(require_auth)):
         res_br = run_git(["branch", "--show-current"], target)
         branch = res_br.stdout.strip() or "main"
 
-    push_res = run_git(["push", req.remote, branch], target)
+    push_res = run_git(["push", req.remote, branch], target, timeout=35)
     if push_res.returncode != 0:
         raise HTTPException(status_code=500, detail=f"Échec du push : {push_res.stderr or push_res.stdout}")
 

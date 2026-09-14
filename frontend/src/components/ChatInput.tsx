@@ -14,7 +14,9 @@ import {
   SlidersHorizontal,
   Cpu,
   Layers,
-  X
+  X,
+  Mic,
+  MicOff
 } from 'lucide-react';
 import type { ModelOption } from '../types';
 import { ContextRing, type TokenUsageData } from './ContextRing';
@@ -69,7 +71,64 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [autoApprove, setAutoApprove] = useState(true);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashFilter, setSlashFilter] = useState('');
+  const [isListening, setIsListening] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  const toggleListening = () => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('La reconnaissance vocale n\'est pas supportée par votre navigateur (navigateurs recommandés : Chrome, Edge, Safari).');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'fr-FR';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript.trim()) {
+          setPrompt((prev) => {
+            const separator = prev && !prev.endsWith(' ') ? ' ' : '';
+            return prev + separator + transcript.trim();
+          });
+        }
+      };
+
+      recognition.onerror = (e: any) => {
+        console.warn('Speech recognition event:', e);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('Failed to start speech recognition', err);
+      setIsListening(false);
+    }
+  };
 
   useEffect(() => {
     if (initialPrompt) {
@@ -323,7 +382,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   </>
                 )}
 
-                {/* Stop / Interrupt Button */}
                 <button
                   type="button"
                   onClick={onStopStreaming}
@@ -335,15 +393,31 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => handleSubmit('normal')}
-                disabled={!prompt.trim()}
-                className="py-1.5 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-sky-500/20 active:scale-95 cursor-pointer"
-              >
-                <span>Envoyer</span>
-                <Send className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                {/* Voice Dictation Button */}
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  className={`p-1.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
+                    isListening
+                      ? 'bg-rose-500/20 border-rose-500/50 text-rose-400 animate-pulse shadow-md shadow-rose-500/20'
+                      : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                  title={isListening ? "Arrêter la dictée vocale" : "Démarrer la dictée vocale (Microphone)"}
+                >
+                  {isListening ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSubmit('normal')}
+                  disabled={!prompt.trim()}
+                  className="py-1.5 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-sky-500/20 active:scale-95 cursor-pointer"
+                >
+                  <span>Envoyer</span>
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </div>
             )}
           </div>
         </div>

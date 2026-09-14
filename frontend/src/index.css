@@ -104,3 +104,104 @@ body {
 .markdown-content tr:nth-child(even) {
   background: rgba(15, 23, 42, 0.4);
 }
+
+/* ==========================================================================
+   Multi-Theme Overrides
+   ========================================================================== */
+
+/* 1. OLED Pitch Black (#000000) */
+[data-theme="oled"] body {
+  background-color: #000000 !important;
+}
+[data-theme="oled"] .bg-\[\#080c14\],
+[data-theme="oled"] .bg-\[\#080c16\],
+[data-theme="oled"] .bg-\[\#070b14\],
+[data-theme="oled"] .bg-\[\#060a14\] {
+  background-color: #000000 !important;
+}
+[data-theme="oled"] .bg-\[\#0b101f\],
+[data-theme="oled"] .bg-\[\#0a101f\],
+[data-theme="oled"] .bg-\[\#0c1222\],
+[data-theme="oled"] .bg-\[\#0f172a\],
+[data-theme="oled"] .bg-\[\#0e1424\] {
+  background-color: #050505 !important;
+}
+[data-theme="oled"] .border-slate-800,
+[data-theme="oled"] .border-slate-700\/80 {
+  border-color: #1a1a1a !important;
+}
+
+/* 2. Minimalist Slate */
+[data-theme="slate"] body {
+  background-color: #0b0f19 !important;
+}
+[data-theme="slate"] .bg-\[\#080c14\],
+[data-theme="slate"] .bg-\[\#080c16\],
+[data-theme="slate"] .bg-\[\#070b14\] {
+  background-color: #0b0f19 !important;
+}
+[data-theme="slate"] .bg-\[\#0b101f\],
+[data-theme="slate"] .bg-\[\#0c1222\],
+[data-theme="slate"] .bg-\[\#0f172a\] {
+  background-color: #111726 !important;
+}
+
+/* 3. Cyberpunk Neon */
+[data-theme="cyberpunk"] body {
+  background-color: #030511 !important;
+}
+[data-theme="cyberpunk"] .bg-\[\#080c14\],
+[data-theme="cyberpunk"] .bg-\[\#080c16\] {
+  background-color: #030511 !important;
+}
+[data-theme="cyberpunk"] .text-sky-400 {
+  color: #00f0ff !important;
+}
+[data-theme="cyberpunk"] .border-sky-500\/30,
+[data-theme="cyberpunk"] .border-sky-500\/40 {
+  border-color: rgba(0, 240, 255, 0.4) !important;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.15);
+}
+
+/* 4. Studio Light */
+[data-theme="light"] {
+  color-scheme: light;
+}
+[data-theme="light"] body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+[data-theme="light"] .bg-\[\#080c14\],
+[data-theme="light"] .bg-\[\#080c16\],
+[data-theme="light"] .bg-\[\#070b14\],
+[data-theme="light"] .bg-\[\#060a14\],
+[data-theme="light"] .bg-\[\#050810\] {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+[data-theme="light"] .bg-\[\#0b101f\],
+[data-theme="light"] .bg-\[\#0a101f\],
+[data-theme="light"] .bg-\[\#0c1222\],
+[data-theme="light"] .bg-\[\#0f172a\],
+[data-theme="light"] .bg-\[\#0e1424\],
+[data-theme="light"] .bg-\[\#0d1424\],
+[data-theme="light"] .bg-\[\#0e1529\]\/80 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+[data-theme="light"] .text-white,
+[data-theme="light"] .text-slate-100,
+[data-theme="light"] .text-slate-200 {
+  color: #0f172a !important;
+}
+[data-theme="light"] .text-slate-300,
+[data-theme="light"] .text-slate-400 {
+  color: #475569 !important;
+}
+[data-theme="light"] .border-slate-800,
+[data-theme="light"] .border-slate-800\/80,
+[data-theme="light"] .border-slate-700\/80,
+[data-theme="light"] .border-slate-700\/60 {
+  border-color: #e2e8f0 !important;
+}
+

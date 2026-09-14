@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from app.services.storage import (
     list_conversations,
+    get_conversation_by_id,
     get_conversation_transcript,
     fork_conversation,
     delete_conversation,
@@ -50,8 +51,7 @@ def get_all_metadata():
 @router.get("/{conversation_id}")
 def get_conversation(conversation_id: str):
     transcript = get_conversation_transcript(conversation_id)
-    convs = [c for c in list_conversations(limit=200) if c["conversation_id"] == conversation_id]
-    meta = convs[0] if convs else get_session_meta(conversation_id)
+    meta = get_conversation_by_id(conversation_id) or get_session_meta(conversation_id)
     return {
         "conversation_id": conversation_id,
         "meta": meta,
@@ -113,10 +113,10 @@ def export_markdown(conversation_id: str):
 @router.get("/{conversation_id}/export/json")
 def export_json(conversation_id: str):
     steps = get_conversation_transcript(conversation_id)
-    convs = [c for c in list_conversations(limit=200) if c["conversation_id"] == conversation_id]
+    meta = get_conversation_by_id(conversation_id) or get_session_meta(conversation_id)
     export_payload = {
         "conversation_id": conversation_id,
-        "metadata": convs[0] if convs else {},
+        "metadata": meta,
         "steps": steps
     }
     import json

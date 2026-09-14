@@ -25,6 +25,7 @@ import {
   updateConversationMetadata
 } from './services/api';
 import { chatSocket } from './services/ws';
+import { getStoredTheme, applyTheme } from './services/theme';
 
 export function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -69,6 +70,7 @@ export function App() {
 
   // Initialize
   useEffect(() => {
+    applyTheme(getStoredTheme());
     loadInitialData();
   }, []);
 

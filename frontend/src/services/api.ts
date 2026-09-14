@@ -255,6 +255,19 @@ export async function fetchFileContent(path: string): Promise<any> {
   return res.json();
 }
 
+export async function saveFileContent(path: string, content: string): Promise<{ success: boolean; path: string; size: number; last_modified: number }> {
+  const res = await fetch(`${API_BASE}/files/save`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ path, content })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la sauvegarde' }));
+    throw new Error(err.detail || 'Erreur lors de la sauvegarde du fichier');
+  }
+  return res.json();
+}
+
 // Tasks & Subagents Monitoring
 export async function fetchTasksList(conversationId?: string): Promise<{ tasks: any[]; subagents: any[]; processes: any[] }> {
   const url = conversationId

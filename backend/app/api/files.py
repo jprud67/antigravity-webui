@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, Depends
+from pydantic import BaseModel
 from app.config import DEFAULT_WORKSPACE
 from app.api.auth import require_auth
 
@@ -90,3 +91,30 @@ def get_file_content(path: str = Query(...), _ = Depends(require_auth)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur de lecture du fichier : {str(e)}")
+
+class SaveFileRequest(BaseModel):
+    path: str
+    content: str
+
+@router.post("/save")
+def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
+    file_path = Path(req.path)
+    try:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = file_path.with_suffix(file_path.suffix + ".tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(req.content)
+        tmp_path.replace(file_path)
+        stat = file_path.stat()
+        return {
+            "success": True,
+            "path": str(file_path.resolve()),
+            "size": stat.st_size,
+            "last_modified": stat.st_mtime
+        }
+    except Exception as e:
+        if 'tmp_path' in locals() and tmp_path.exists():
+            tmp_path.unlink()
+        logger.error(f"Error saving file {file_path}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement : {str(e)}")
+

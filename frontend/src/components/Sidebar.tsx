@@ -15,9 +15,11 @@ import {
   Pin,
   MoreVertical,
   GitBranch,
-  X
+  X,
+  Palette
 } from 'lucide-react';
 import type { Conversation } from '../types';
+import { getStoredTheme, applyTheme, type AppTheme } from '../services/theme';
 
 interface SidebarProps {
   conversations: Conversation[];
@@ -421,15 +423,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="text-[11px]">Paramètres</span>
           </button>
 
-          {onLogout && (
+          <div className="flex items-center gap-1">
             <button
-              onClick={onLogout}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-              title="Déconnexion"
+              onClick={() => {
+                const themes: AppTheme[] = ['dark', 'oled', 'slate', 'cyberpunk', 'light'];
+                const current = getStoredTheme();
+                const nextIdx = (themes.indexOf(current) + 1) % themes.length;
+                applyTheme(themes[nextIdx]);
+              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors cursor-pointer"
+              title="Changer rapidement de thème visuel"
             >
-              <LogOut className="w-4 h-4" />
+              <Palette className="w-4 h-4" />
             </button>
-          )}
+
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                title="Déconnexion"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </aside>

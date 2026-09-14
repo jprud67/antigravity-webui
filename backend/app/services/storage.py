@@ -85,6 +85,56 @@ def list_conversations(limit: int = 100) -> List[Dict[str, Any]]:
     finally:
         conn.close()
 
+def get_conversation_by_id(conversation_id: str) -> Optional[Dict[str, Any]]:
+    if not CONVERSATION_DB.exists():
+        return None
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT 
+                conversation_id,
+                title,
+                preview,
+                step_count,
+                last_modified_time,
+                workspace_uris,
+                status,
+                agent_name,
+                parent_conversation_id
+            FROM conversation_summaries
+            WHERE conversation_id = ?
+            LIMIT 1
+            """,
+            (conversation_id,)
+        )
+        r = cursor.fetchone()
+        if not r:
+            return None
+        meta = get_session_meta(conversation_id)
+        custom_title = meta.get("customTitle", "").strip()
+        display_title = custom_title or r["title"] or "Nouvelle session"
+        return {
+            "conversation_id": r["conversation_id"],
+            "title": display_title,
+            "raw_title": r["title"] or "Nouvelle session",
+            "preview": r["preview"],
+            "step_count": r["step_count"],
+            "last_modified_time": r["last_modified_time"],
+            "workspace_uris": r["workspace_uris"],
+            "status": r["status"],
+            "agent_name": r["agent_name"],
+            "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
+            "pinned": meta.get("pinned", False),
+            "tags": meta.get("tags", []),
+            "project": meta.get("project", ""),
+            "projectColor": meta.get("projectColor", ""),
+            "customTitle": custom_title
+        }
+    finally:
+        conn.close()
+
 def get_conversation_transcript(conversation_id: str) -> List[Dict[str, Any]]:
     conv_dir = BRAIN_DIR / conversation_id
     transcript_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"

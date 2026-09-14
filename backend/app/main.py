@@ -64,7 +64,10 @@ if FRONTEND_DIST.exists():
         if full_path.startswith("api/") or full_path.startswith("ws/"):
             raise HTTPException(status_code=404, detail="API route not found")
         
-        file_candidate = FRONTEND_DIST / full_path
-        if file_candidate.is_file():
-            return FileResponse(file_candidate)
+        try:
+            file_candidate = (FRONTEND_DIST / full_path).resolve()
+            if FRONTEND_DIST.resolve() in file_candidate.parents and file_candidate.is_file():
+                return FileResponse(file_candidate)
+        except Exception:
+            pass
         return FileResponse(FRONTEND_DIST / "index.html")

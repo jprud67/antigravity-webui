@@ -11,13 +11,16 @@ import {
   File, 
   RefreshCw, 
   Plus,
-  Kanban as KanbanIcon
+  Kanban as KanbanIcon,
+  Edit3,
+  Save,
+  Check
 } from 'lucide-react';
 import { TerminalTab } from './TerminalTab';
 import { GitTab } from './GitTab';
 import { KanbanTab } from './KanbanTab';
 import { MermaidRenderer } from './MermaidRenderer';
-import { fetchFileTree, fetchFileContent, fetchArtifacts, fetchArtifactContent } from '../services/api';
+import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent } from '../services/api';
 import type { ArtifactItem } from '../types';
 
 export type RightPanelTab = 'files' | 'artifacts' | 'terminal' | 'git' | 'kanban';
@@ -52,6 +55,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [loadingContent, setLoadingContent] = useState(false);
+  const [isEditingFile, setIsEditingFile] = useState(false);
+  const [editedFileContent, setEditedFileContent] = useState('');
+  const [savingFile, setSavingFile] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
 
   // Artifacts Tab State
@@ -130,14 +137,33 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
 
   const handleSelectFile = async (path: string) => {
     setSelectedFilePath(path);
+    setIsEditingFile(false);
+    setSaveSuccess(false);
     setLoadingContent(true);
     try {
       const res = await fetchFileContent(path);
       setFileContent(res.content);
+      setEditedFileContent(res.content);
     } catch (err) {
       setFileContent('Erreur lors du chargement du fichier.');
+      setEditedFileContent('');
     } finally {
       setLoadingContent(false);
+    }
+  };
+
+  const handleSaveFile = async () => {
+    if (!selectedFilePath) return;
+    setSavingFile(true);
+    try {
+      await saveFileContent(selectedFilePath, editedFileContent);
+      setFileContent(editedFileContent);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+    } catch (err) {
+      alert('Erreur lors de la sauvegarde du fichier.');
+    } finally {
+      setSavingFile(false);
     }
   };
 
@@ -356,24 +382,64 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                 )}
               </div>
 
-              {/* File Content Preview Column */}
+              {/* File Content Preview / Editor Column */}
               <div className="w-1/2 flex flex-col min-h-0 bg-[#070b14]">
                 {selectedFilePath ? (
                   <>
-                    <div className="flex items-center justify-between px-3 py-1.5 bg-[#0a101f] border-b border-slate-800 text-[11px] text-slate-400">
+                    <div className="flex items-center justify-between px-3 py-1.5 bg-[#0a101f] border-b border-slate-800 text-[11px] text-slate-400 shrink-0">
                       <span className="font-mono truncate">{selectedFilePath.split('/').pop()}</span>
-                      {onInsertPath && (
+                      <div className="flex items-center gap-1.5">
+                        {onInsertPath && (
+                          <button
+                            onClick={() => onInsertPath(selectedFilePath)}
+                            className="text-[10px] text-sky-400 hover:text-sky-300 font-medium cursor-pointer mr-1"
+                            title="Insérer le chemin"
+                          >
+                            + Insérer
+                          </button>
+                        )}
                         <button
-                          onClick={() => onInsertPath(selectedFilePath)}
-                          className="text-[10px] text-sky-400 hover:text-sky-300 font-medium cursor-pointer"
+                          onClick={() => {
+                            if (!isEditingFile) {
+                              setEditedFileContent(fileContent || '');
+                            }
+                            setIsEditingFile(!isEditingFile);
+                          }}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
+                            isEditingFile 
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                          }`}
                         >
-                          + Insérer
+                          <Edit3 className="w-2.5 h-2.5" />
+                          <span>{isEditingFile ? 'Lecture' : 'Éditer'}</span>
                         </button>
-                      )}
+                        {isEditingFile && (
+                          <button
+                            onClick={handleSaveFile}
+                            disabled={savingFile}
+                            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
+                              saveSuccess
+                                ? 'bg-emerald-500 text-white'
+                                : 'bg-sky-600 hover:bg-sky-500 text-white'
+                            }`}
+                          >
+                            {saveSuccess ? <Check className="w-2.5 h-2.5" /> : <Save className="w-2.5 h-2.5" />}
+                            <span>{saveSuccess ? 'Enregistré' : savingFile ? '...' : 'Sauvegarder'}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1 overflow-auto p-3 font-mono text-xs text-slate-300 bg-[#050810]">
+                    <div className="flex-1 overflow-auto p-3 font-mono text-xs text-slate-300 bg-[#050810] flex flex-col">
                       {loadingContent ? (
                         <div className="text-slate-500">Chargement du contenu...</div>
+                      ) : isEditingFile ? (
+                        <textarea
+                          value={editedFileContent}
+                          onChange={(e) => setEditedFileContent(e.target.value)}
+                          className="w-full h-full bg-transparent resize-none outline-none font-mono text-xs text-slate-200 leading-relaxed"
+                          spellCheck={false}
+                        />
                       ) : (
                         <pre className="whitespace-pre-wrap">{fileContent}</pre>
                       )}
@@ -381,7 +447,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = ({
                   </>
                 ) : (
                   <div className="flex-1 flex items-center justify-center text-slate-500 text-xs p-4 text-center">
-                    Sélectionnez un fichier pour prévisualiser son contenu.
+                    Sélectionnez un fichier pour prévisualiser ou éditer son contenu.
                   </div>
                 )}
               </div>

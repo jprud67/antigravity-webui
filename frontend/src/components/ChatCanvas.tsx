@@ -26,7 +26,9 @@ import {
   Edit3,
   Kanban as KanbanIcon,
   Clock,
-  ShieldCheck
+  ShieldCheck,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import type { ChatMessage } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
@@ -150,6 +152,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   const bottomRef = useRef<HTMLDivElement>(null);
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -157,6 +160,34 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
 
   const toggleThought = (id: string) => {
     setExpandedThoughts((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleToggleSpeech = (msgId: string, text: string) => {
+    if (!('speechSynthesis' in window)) {
+      alert('La synthèse vocale n\'est pas supportée par votre navigateur.');
+      return;
+    }
+    if (speakingMsgId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMsgId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    // Clean markdown code blocks and syntax for smooth reading
+    const cleanText = text
+      .replace(/```[\s\S]*?```/g, 'Bloc de code omis.')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/[#*~[\]()]/g, ' ')
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'fr-FR';
+    utterance.rate = 1.0;
+    utterance.onend = () => setSpeakingMsgId(null);
+    utterance.onerror = () => setSpeakingMsgId(null);
+    setSpeakingMsgId(msgId);
+    window.speechSynthesis.speak(utterance);
   };
 
   return (
@@ -640,6 +671,26 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                       <Copy className="w-3 h-3" />
                       <span className="hidden sm:inline">Copier</span>
                     </button>
+
+                    {!isUser && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSpeech(msg.id, msg.content)}
+                        className={`transition-colors p-1 rounded hover:bg-slate-800/60 cursor-pointer flex items-center gap-1 ${
+                          speakingMsgId === msg.id
+                            ? 'text-sky-400 bg-sky-500/10 border border-sky-500/30'
+                            : 'hover:text-slate-300 text-slate-500'
+                        }`}
+                        title={speakingMsgId === msg.id ? "Arrêter la synthèse vocale" : "Écouter la réponse (Synthèse vocale)"}
+                      >
+                        {speakingMsgId === msg.id ? (
+                          <VolumeX className="w-3 h-3 text-sky-400 animate-pulse" />
+                        ) : (
+                          <Volume2 className="w-3 h-3" />
+                        )}
+                        <span className="hidden sm:inline">{speakingMsgId === msg.id ? 'Arrêter' : 'Écouter'}</span>
+                      </button>
+                    )}
 
                     {conversationId && onForkMessage && (
                       <button

@@ -14,10 +14,12 @@ import {
   KeyRound, 
   ShieldCheck, 
   ChevronRight, 
-  BookOpen 
+  BookOpen,
+  Palette
 } from 'lucide-react';
 import type { AppSettings, ModelOption } from '../types';
 import { fetchSettings, saveSettings, fetchSkills, fetchSkillDetail, updatePassword } from '../services/api';
+import { AVAILABLE_THEMES, getStoredTheme, applyTheme, type AppTheme } from '../services/theme';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -44,10 +46,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   currentModel,
   onModelSaved,
 }) => {
-  const [activeTab, setActiveTab] = useState<'models' | 'permissions' | 'skills' | 'security'>('models');
+  const [activeTab, setActiveTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance'>('models');
   const [settings, setSettings] = useState<AppSettings>({});
   const [selectedModelId, setSelectedModelId] = useState(currentModel);
   const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
+  const [currentTheme, setCurrentTheme] = useState<AppTheme>(getStoredTheme());
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -281,6 +284,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <KeyRound className="w-4 h-4" />
             <span>Sécurité & Accès</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('appearance')}
+            className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'appearance'
+                ? 'border-indigo-500 text-indigo-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Palette className="w-4 h-4" />
+            <span>Apparence & Thèmes</span>
           </button>
         </div>
 
@@ -686,6 +701,77 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span>{pwdLoading ? 'Mise à jour...' : 'Mettre à jour le mot de passe'}</span>
                   </button>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: APPEARANCE & THEMES */}
+          {activeTab === 'appearance' && (
+            <div className="p-6 space-y-6">
+              <div>
+                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-indigo-400" />
+                  <span>Thèmes d'interface personnalisés</span>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Personnalisez l'ambiance visuelle du cockpit Antigravity. Le thème choisi est appliqué immédiatement et mémorisé dans votre navigateur.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {AVAILABLE_THEMES.map((th) => {
+                  const isSelected = currentTheme === th.id;
+                  return (
+                    <button
+                      key={th.id}
+                      type="button"
+                      onClick={() => {
+                        setCurrentTheme(th.id);
+                        applyTheme(th.id);
+                      }}
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                        isSelected
+                          ? 'border-sky-500 bg-sky-500/10 shadow-lg shadow-sky-500/10'
+                          : 'border-slate-800 bg-[#080d1a] hover:border-slate-700 hover:bg-[#0c1326]'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-5 h-5 rounded-lg border shadow-sm flex items-center justify-center"
+                              style={{ backgroundColor: th.previewBg, borderColor: th.previewBorder }}
+                            >
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: th.previewAccent }} />
+                            </div>
+                            <span className="font-bold text-xs text-white">{th.name}</span>
+                          </div>
+                          <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/60">
+                            {th.badge}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
+                          {th.desc}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/60 text-[10px]">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3 h-3 rounded-full border border-slate-700" style={{ backgroundColor: th.previewBg }} />
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: th.previewAccent }} />
+                        </div>
+                        {isSelected ? (
+                          <span className="text-sky-400 font-semibold flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5" />
+                            Actif
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 hover:text-slate-300">Sélectionner</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
