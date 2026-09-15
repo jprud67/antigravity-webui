@@ -41,7 +41,8 @@ def spawn_group_kwargs() -> dict:
     processus), afin de pouvoir le terminer proprement avec ses enfants.
     """
     if IS_WINDOWS:
-        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+        return {"creationflags": creationflags}
     return {"start_new_session": True}
 
 

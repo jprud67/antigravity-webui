@@ -97,7 +97,7 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
                 "workspace_uris": r["workspace_uris"],
                 "status": r["status"],
                 "agent_name": r["agent_name"],
-                "parent_conversation_id": r.get("parent_conversation_id", None),
+                "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
                 "pinned": meta.get("pinned", False),
                 "archived": meta.get("archived", False),
                 "tags": meta.get("tags", []),
@@ -152,7 +152,7 @@ def get_conversation_by_id(conversation_id: str) -> dict[str, Any] | None:
             "workspace_uris": r["workspace_uris"],
             "status": r["status"],
             "agent_name": r["agent_name"],
-            "parent_conversation_id": r.get("parent_conversation_id", None),
+            "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
             "pinned": meta.get("pinned", False),
             "archived": meta.get("archived", False),
             "tags": meta.get("tags", []),
@@ -757,7 +757,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 "workspace_uris": r["workspace_uris"],
                 "status": r["status"],
                 "agent_name": r["agent_name"],
-                "parent_conversation_id": r.get("parent_conversation_id", None),
+                "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
                 "pinned": meta.get("pinned", False),
                 "archived": meta.get("archived", False),
                 "tags": meta.get("tags", []),
@@ -785,11 +785,11 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 or q_lower in project
                 or any(q_lower in t or t in q_lower for t in tags)
             ):
-                c = get_conversation_by_id(cid)
-                if c:
-                    c["match_type"] = "metadata"
-                    c["match_snippet"] = meta.get("customTitle") or meta.get("project") or c.get("preview")
-                    matched.append(c)
+                c_item = get_conversation_by_id(cid)
+                if c_item:
+                    c_item["match_type"] = "metadata"
+                    c_item["match_snippet"] = meta.get("customTitle") or meta.get("project") or c_item.get("preview")
+                    matched.append(c_item)
                     seen_ids.add(cid)
                     if len(matched) >= limit:
                         break
@@ -1376,7 +1376,7 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
                 "size": stat.st_size,
                 "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
             })
-    artifacts.sort(key=lambda x: x["last_modified"], reverse=True)
+    artifacts.sort(key=lambda x: str(x["last_modified"]), reverse=True)
     return artifacts
 
 def read_artifact_content(conversation_id: str, filename: str) -> str:
