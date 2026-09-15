@@ -45,6 +45,8 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                     stat = tfile.stat()
                     try:
                         with open(tfile, "r", encoding="utf-8", errors="replace") as f:
+                            if stat.st_size > 65536:
+                                f.seek(stat.st_size - 65536)
                             lines = f.readlines()
                             preview = "".join(lines[-10:]) if lines else ""
                     except Exception:

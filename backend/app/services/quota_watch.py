@@ -19,12 +19,17 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
-import aiofiles
-
 from app.config import LOG_DIR
 from app.services.google_auth import is_hard_quota_error
 
 logger = logging.getLogger("antigravity.quota_watch")
+
+
+def _read_log_chunk(path: Path, off: int) -> tuple[str, int]:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        f.seek(off)
+        data = f.read()
+        return data, f.tell()
 
 
 def _newest_log_after(since_ts: float) -> Path | None:
@@ -111,10 +116,7 @@ async def watch_agy_log_for_quota(
             continue
 
         try:
-            async with aiofiles.open(log_file, "r", encoding="utf-8", errors="replace") as f:
-                await f.seek(offset)
-                chunk = await f.read()
-                offset = await f.tell()
+            chunk, offset = await asyncio.to_thread(_read_log_chunk, log_file, offset)
         except (OSError, ValueError) as exc:
             logger.debug(f"quota_watch: lecture impossible ({log_file}): {exc}")
             continue

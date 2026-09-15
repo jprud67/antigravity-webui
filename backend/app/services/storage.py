@@ -796,36 +796,52 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
 
     # 3. Deep transcript scan for content if room left (scans recent active sessions)
     if len(matched) < limit:
-        recent_convs = list_conversations(limit=100)
+        recent_convs = list_conversations(limit=50)
         for c in recent_convs:
             cid = c["conversation_id"]
             if cid in seen_ids:
                 continue
 
-            steps = get_conversation_transcript(cid)
-            for s in steps:
-                raw_content = s.get("content") or ""
-                raw_thinking = s.get("thinking") or ""
-                content_lower = raw_content.lower()
-                thinking_lower = raw_thinking.lower()
-                if q_lower in content_lower or q_lower in thinking_lower:
-                    if q_lower in content_lower:
-                        idx = content_lower.find(q_lower)
-                        start = max(0, idx - 40)
-                        end = min(len(raw_content), idx + 80)
-                        snippet = ("..." if start > 0 else "") + raw_content[start:end] + ("..." if end < len(raw_content) else "")
-                    else:
-                        idx = thinking_lower.find(q_lower)
-                        start = max(0, idx - 40)
-                        end = min(len(raw_thinking), idx + 80)
-                        snippet = "[Raisonnement] " + ("..." if start > 0 else "") + raw_thinking[start:end] + ("..." if end < len(raw_thinking) else "")
-                    
-                    c_copy = dict(c)
-                    c_copy["match_type"] = "transcript"
-                    c_copy["match_snippet"] = snippet
-                    matched.append(c_copy)
-                    seen_ids.add(cid)
-                    break
+            conv_dir = BRAIN_DIR / cid
+            t_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
+            if not t_file.exists():
+                t_file = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
+            if not t_file.exists():
+                continue
+
+            try:
+                with open(t_file, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        if q_lower not in line.lower():
+                            continue
+                        try:
+                            s = json.loads(line)
+                            raw_content = s.get("content") or ""
+                            raw_thinking = s.get("thinking") or ""
+                            content_lower = raw_content.lower()
+                            thinking_lower = raw_thinking.lower()
+                            if q_lower in content_lower or q_lower in thinking_lower:
+                                if q_lower in content_lower:
+                                    idx = content_lower.find(q_lower)
+                                    start = max(0, idx - 40)
+                                    end = min(len(raw_content), idx + 80)
+                                    snippet = ("..." if start > 0 else "") + raw_content[start:end] + ("..." if end < len(raw_content) else "")
+                                else:
+                                    idx = thinking_lower.find(q_lower)
+                                    start = max(0, idx - 40)
+                                    end = min(len(raw_thinking), idx + 80)
+                                    snippet = "[Raisonnement] " + ("..." if start > 0 else "") + raw_thinking[start:end] + ("..." if end < len(raw_thinking) else "")
+
+                                c_copy = dict(c)
+                                c_copy["match_type"] = "transcript"
+                                c_copy["match_snippet"] = snippet
+                                matched.append(c_copy)
+                                seen_ids.add(cid)
+                                break
+                        except Exception:
+                            continue
+            except Exception:
+                continue
 
             if len(matched) >= limit:
                 break
@@ -942,8 +958,8 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
 
 def export_conversation_markdown(conversation_id: str) -> str:
     steps = get_conversation_transcript(conversation_id)
-    all_convs = [c for c in list_conversations(limit=200) if c["conversation_id"] == conversation_id]
-    title = all_convs[0]["title"] if all_convs else "Conversation Antigravity"
+    conv = get_conversation_by_id(conversation_id)
+    title = conv["title"] if conv else "Conversation Antigravity"
     turns = aggregate_steps_into_turns(steps)
 
     md_lines = [
@@ -1013,8 +1029,8 @@ def export_conversation_markdown(conversation_id: str) -> str:
 
 def export_conversation_html(conversation_id: str) -> str:
     steps = get_conversation_transcript(conversation_id)
-    all_convs = [c for c in list_conversations(limit=200) if c["conversation_id"] == conversation_id]
-    title = all_convs[0]["title"] if all_convs else "Conversation Antigravity"
+    conv = get_conversation_by_id(conversation_id)
+    title = conv["title"] if conv else "Conversation Antigravity"
     date_str = datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M:%S UTC')
     turns = aggregate_steps_into_turns(steps)
 

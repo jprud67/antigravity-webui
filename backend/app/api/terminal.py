@@ -304,10 +304,12 @@ async def terminal_websocket(
     # Identify session (default to global persistent session for workspace)
     sid = session_id or f"ws_{abs(hash(cwd)) % 1000000}"
 
+    session: PersistentTerminalSession | None = None
     try:
         session, is_new = await get_or_create_session(sid, cwd)
-    except RuntimeError as e:
-        # Terminal indisponible sur cette plateforme (ex. Windows sans pywinpty)
+    except Exception as e:
+        # Terminal indisponible sur cette plateforme ou erreur d'initialisation
+        logger.error(f"Failed to start terminal session {sid}: {e}")
         try:
             await websocket.send_text(f"\r\n\x1b[31m✖ {e}\x1b[0m\r\n")
         except Exception as send_err:
@@ -362,7 +364,7 @@ async def terminal_websocket(
         logger.debug(f"Terminal client disconnected from session {sid}: {e}")
     finally:
         # DETACH CLIENT BUT KEEP PTY PROCESS ALIVE!
-        if session.active_websocket == websocket:
+        if session and session.active_websocket == websocket:
             session.active_websocket = None
         logger.info(f"Terminal WebSocket detached from session {sid} (process kept running)")
 

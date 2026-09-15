@@ -466,7 +466,10 @@ class ExecutionManager:
         return bool(session and session.is_running)
 
     def get_running_conversations(self) -> list[str]:
-        return [cid for cid, s in self.sessions.items() if s.is_running and cid]
+        cids = {cid for cid, s in self.sessions.items() if s.is_running and cid}
+        if self.active_session and self.active_session.is_running and self.active_session.conversation_id:
+            cids.add(self.active_session.conversation_id)
+        return list(cids)
 
     async def attach(self, conversation_id: str | None, ws: WebSocket) -> dict[str, Any]:
         session = self.get_session(conversation_id)

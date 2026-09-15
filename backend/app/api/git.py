@@ -190,16 +190,21 @@ def get_branches(workspace: str | None = Query(None), _ = Depends(require_auth))
         raise HTTPException(status_code=400, detail="Impossible de récupérer les branches.")
 
     branches = []
+    seen = set()
     current = "main"
     for line in res.stdout.strip().split("\n"):
         clean_line = line.strip()
-        if not clean_line:
+        if not clean_line or " -> " in clean_line:
             continue
         if clean_line.startswith("* "):
-            current = clean_line[2:]
-            branches.append(current)
+            current = clean_line[2:].strip()
+            branch_name = current
         else:
-            branches.append(clean_line)
+            branch_name = clean_line
+
+        if branch_name not in seen:
+            seen.add(branch_name)
+            branches.append(branch_name)
 
     return {
         "current": current,

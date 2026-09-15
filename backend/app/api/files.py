@@ -133,6 +133,7 @@ class SaveFileRequest(BaseModel):
 def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
     file_path = Path(req.path)
     resolved_path = _validate_path_access(file_path)
+    tmp_path: Path | None = None
     try:
         resolved_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = resolved_path.parent / f".{resolved_path.name}.tmp.{uuid.uuid4().hex[:8]}"
@@ -147,7 +148,7 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
             "last_modified": stat.st_mtime
         }
     except Exception as e:
-        if 'tmp_path' in locals():
+        if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)
         logger.error(f"Error saving file {resolved_path}: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement : {e!s}")

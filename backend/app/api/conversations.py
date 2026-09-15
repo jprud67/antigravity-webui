@@ -186,7 +186,6 @@ def get_conversation(conversation_id: str, _ = Depends(require_auth)):
     transcript = get_conversation_transcript(conversation_id)
     meta = get_conversation_by_id(conversation_id) or get_session_meta(conversation_id)
     usage = calculate_conversation_tokens(transcript)
-    from app.services.execution_manager import execution_manager
     is_running = execution_manager.is_running(conversation_id)
     return {
         "conversation_id": conversation_id,
