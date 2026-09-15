@@ -122,7 +122,7 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
         return transcripts, artifacts
 
     # Initial scan
-    transcript_mtimes, artifact_mtimes = _scan_brain()
+    transcript_mtimes, artifact_mtimes = await asyncio.to_thread(_scan_brain)
 
     while True:
         await asyncio.sleep(poll_interval)
@@ -140,7 +140,7 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                     })
 
             # --- 2. Check transcript and artifact files (single traversal) ---
-            cur_transcripts, cur_artifacts = _scan_brain()
+            cur_transcripts, cur_artifacts = await asyncio.to_thread(_scan_brain)
 
             # New or modified transcripts
             for path, mtime in cur_transcripts.items():

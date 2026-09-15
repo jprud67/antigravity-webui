@@ -1412,8 +1412,16 @@ def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
     current.update(new_settings)
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp_file = SETTINGS_FILE.parent / f".settings.json.tmp.{uuid.uuid4().hex[:8]}"
-    tmp_file.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
-    tmp_file.replace(SETTINGS_FILE)
+    try:
+        tmp_file.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp_file.replace(SETTINGS_FILE)
+    except Exception:
+        if tmp_file.exists():
+            try:
+                tmp_file.unlink()
+            except Exception:
+                pass
+        raise
     return current
 
 def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:

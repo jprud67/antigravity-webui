@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from typing import Any
 
 from app.config import SESSION_METADATA_FILE
@@ -16,13 +17,19 @@ def get_all_session_metadata() -> dict[str, dict[str, Any]]:
         return {}
 
 def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
+    tmp_file = None
     try:
         SESSION_METADATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-        tmp_file = SESSION_METADATA_FILE.with_suffix(".tmp")
+        tmp_file = SESSION_METADATA_FILE.parent / f"{SESSION_METADATA_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
         tmp_file.write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
         tmp_file.replace(SESSION_METADATA_FILE)
     except Exception as e:
         logger.error(f"Failed to write session metadata: {e}")
+        if tmp_file and tmp_file.exists():
+            try:
+                tmp_file.unlink()
+            except Exception:
+                pass
 
 def get_session_meta(conversation_id: str) -> dict[str, Any]:
     all_meta = get_all_session_metadata()

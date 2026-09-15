@@ -509,6 +509,13 @@ class ExecutionManager:
                     await terminate_process_group_async(session.active_proc, grace=0.5)
                 if session.active_task and not session.active_task.done():
                     session.active_task.cancel()
+                # Purge obsolete pending messages in the queue so the steering directive executes immediately
+                while not session.message_queue.empty():
+                    try:
+                        session.message_queue.get_nowait()
+                        session.message_queue.task_done()
+                    except (asyncio.QueueEmpty, ValueError):
+                        break
                 data["prompt"] = f"[Instruction Prioritaire de Guidage] : {prompt}"
                 await session.message_queue.put(data)
                 await session.broadcast({

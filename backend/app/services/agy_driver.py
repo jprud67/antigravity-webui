@@ -334,7 +334,8 @@ async def get_usage_quota() -> dict[str, Any]:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
+            **spawn_group_kwargs(),
         )
         try:
             stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
@@ -344,8 +345,7 @@ async def get_usage_quota() -> dict[str, Any]:
                 return data
         except Exception:
             try:
-                proc.kill()
-                await proc.wait()
+                await terminate_process_group_async(proc, grace=0.5)
             except Exception:
                 pass
             raise
@@ -366,7 +366,8 @@ async def get_credits() -> dict[str, Any]:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
+            **spawn_group_kwargs(),
         )
         try:
             stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
@@ -376,8 +377,7 @@ async def get_credits() -> dict[str, Any]:
                 return data
         except Exception:
             try:
-                proc.kill()
-                await proc.wait()
+                await terminate_process_group_async(proc, grace=0.5)
             except Exception:
                 pass
             raise
@@ -398,7 +398,8 @@ async def get_changelog() -> dict[str, Any]:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
+            **spawn_group_kwargs(),
         )
         try:
             stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
@@ -408,8 +409,7 @@ async def get_changelog() -> dict[str, Any]:
                 return data
         except Exception:
             try:
-                proc.kill()
-                await proc.wait()
+                await terminate_process_group_async(proc, grace=0.5)
             except Exception:
                 pass
             raise

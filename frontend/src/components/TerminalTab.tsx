@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -19,7 +19,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const connectTerminal = () => {
+  const connectTerminal = useCallback(() => {
     if (!terminalRef.current) return;
 
     // Clean up previous
@@ -29,13 +29,13 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
         wsRef.current.onerror = null;
         wsRef.current.onmessage = null;
         wsRef.current.close();
-      } catch (e) {}
+      } catch {}
       wsRef.current = null;
     }
     if (xtermRef.current) {
       try {
         xtermRef.current.dispose();
-      } catch (e) {}
+      } catch {}
       xtermRef.current = null;
     }
 
@@ -132,7 +132,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
         ws.send(data);
       }
     });
-  };
+  }, [currentWorkspace]);
 
   useEffect(() => {
     connectTerminal();
@@ -148,7 +148,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
               rows: xtermRef.current.rows,
             })
           );
-        } catch (e) {}
+        } catch {}
       }
     };
 
@@ -162,17 +162,17 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
           wsRef.current.onerror = null;
           wsRef.current.onmessage = null;
           wsRef.current.close();
-        } catch (e) {}
+        } catch {}
         wsRef.current = null;
       }
       if (xtermRef.current) {
         try {
           xtermRef.current.dispose();
-        } catch (e) {}
+        } catch {}
         xtermRef.current = null;
       }
     };
-  }, [currentWorkspace]);
+  }, [connectTerminal]);
 
   const handleClear = () => {
     if (xtermRef.current) {

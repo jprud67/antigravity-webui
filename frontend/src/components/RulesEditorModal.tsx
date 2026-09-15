@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   X, 
   FileCode, 
@@ -46,7 +46,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Load files list
-  const loadFiles = async () => {
+  const loadFiles = useCallback(async () => {
     try {
       const res = await fetchRulesFiles(currentWorkspace);
       setFileList(res.files);
@@ -56,10 +56,10 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
     } catch (e) {
       console.error('Failed to load rules files list', e);
     }
-  };
+  }, [currentWorkspace, selectedFileId]);
 
   // Load content of selected file
-  const loadContent = async (fileId: string) => {
+  const loadContent = useCallback(async (fileId: string) => {
     setLoadingContent(true);
     setJsonError(null);
     setSaveSuccess(false);
@@ -73,19 +73,19 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
     } finally {
       setLoadingContent(false);
     }
-  };
+  }, [currentWorkspace]);
 
   useEffect(() => {
     if (isOpen) {
       loadFiles();
     }
-  }, [isOpen, currentWorkspace]);
+  }, [isOpen, loadFiles]);
 
   useEffect(() => {
     if (isOpen && selectedFileId) {
       loadContent(selectedFileId);
     }
-  }, [isOpen, selectedFileId]);
+  }, [isOpen, selectedFileId, loadContent]);
 
   if (!isOpen) return null;
 

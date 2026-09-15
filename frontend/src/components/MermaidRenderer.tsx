@@ -92,7 +92,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (e) {}
+    } catch {}
   };
 
   if (error) {

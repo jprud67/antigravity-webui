@@ -29,12 +29,14 @@ export const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({
   const [submitted, setSubmitted] = useState(false);
   const [finalAnswer, setFinalAnswer] = useState<string>('');
 
-  React.useEffect(() => {
+  const [prevToolArgs, setPrevToolArgs] = useState(toolArgs);
+  if (toolArgs !== prevToolArgs) {
+    setPrevToolArgs(toolArgs);
     setSelectedAnswers({});
     setCustomInputs({});
     setSubmitted(false);
     setFinalAnswer('');
-  }, [toolArgs]);
+  }
 
   if (questions.length === 0) return null;
 

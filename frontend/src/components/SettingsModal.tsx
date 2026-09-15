@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, 
   Settings as SettingsIcon, 
@@ -110,6 +110,8 @@ const MODEL_DESCRIPTIONS: Record<string, { desc: string; badge: string; iconColo
   'gpt-oss-120b': { desc: 'Modèle open-weights haute performance 120B.', badge: 'Open-OSS', iconColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
 };
 
+const CONV_PALETTE = ['#0ea5e9', '#10b981', '#f59e0b', '#f43f5e', '#6366f1', '#a855f7', '#ec4899', '#06b6d4'] as const;
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
@@ -142,10 +144,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [updateProgressMsg, setUpdateProgressMsg] = useState<string | null>(null);
 
   // Conversation state
-  const CONV_PALETTE = ['#0ea5e9', '#10b981', '#f59e0b', '#f43f5e', '#6366f1', '#a855f7', '#ec4899', '#06b6d4'];
   const [convTitle, setConvTitle] = useState('');
   const [convProject, setConvProject] = useState('');
-  const [convProjectColor, setConvProjectColor] = useState(CONV_PALETTE[0]);
+  const [convProjectColor, setConvProjectColor] = useState<string>(CONV_PALETTE[0]);
   const [convTagsStr, setConvTagsStr] = useState('');
   const [convPinned, setConvPinned] = useState(false);
   const [convArchived, setConvArchived] = useState(false);
@@ -182,7 +183,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setConvPinned(false);
       setConvArchived(false);
     }
-  }, [activeConversation, activeTab, isOpen]);
+  }, [activeConversation, isOpen]);
 
   const handleSaveConvMeta = async () => {
     if (!activeConversation) return;
@@ -413,7 +414,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   };
 
-  const loadGoogleAccounts = async () => {
+  const loadGoogleAccounts = useCallback(async () => {
     setGoogleLoading(true);
     try {
       const data = await fetchGoogleAccounts();
@@ -426,7 +427,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } finally {
       setGoogleLoading(false);
     }
-  };
+  }, [onGoogleAccountChanged]);
 
   const handleSwitchGoogleAccount = async (email: string) => {
     setGoogleSwitching(email);
@@ -538,7 +539,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       // Load Google accounts
       loadGoogleAccounts();
     }
-  }, [isOpen, currentModel, models]);
+  }, [isOpen, currentModel, models, initialTab, loadGoogleAccounts]);
 
   const activeModelObj = models.find((m) => m.id === selectedModelId);
   const supportedEfforts = activeModelObj ? activeModelObj.supported_efforts : [];

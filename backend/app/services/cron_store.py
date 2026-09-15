@@ -14,6 +14,7 @@ import logging
 import os
 import re
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -68,10 +69,18 @@ def save_jobs(data: dict[str, Any]) -> None:
     """Écrit jobs.json de façon atomique."""
     ensure_dirs()
     data["updated_at"] = now_iso()
-    temp_path = JOBS_FILE.with_suffix(".tmp")
-    with open(temp_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-    temp_path.replace(JOBS_FILE)
+    temp_path = JOBS_FILE.parent / f"{JOBS_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
+    try:
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        temp_path.replace(JOBS_FILE)
+    except Exception:
+        if temp_path.exists():
+            try:
+                temp_path.unlink()
+            except Exception:
+                pass
+        raise
 
 
 def compute_next_run(schedule: str | dict[str, Any]) -> str | None:
