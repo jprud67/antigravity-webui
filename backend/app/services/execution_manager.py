@@ -1,12 +1,18 @@
 import asyncio
 import logging
 import time
-from typing import Optional, Dict, Any, Set, List
+from typing import Any
+
 from fastapi import WebSocket
-from app.services.agy_driver import stream_turn
+
 from app.platform_utils import terminate_process_group_async
+from app.services.agy_driver import stream_turn
+from app.services.google_auth import (
+    get_active_account,
+    is_quota_error,
+    switch_to_next_healthy_account,
+)
 from app.services.storage import get_settings, save_settings
-from app.services.google_auth import is_quota_error, switch_to_next_healthy_account, get_active_account
 
 logger = logging.getLogger("antigravity.execution")
 
@@ -17,14 +23,14 @@ class ExecutionSession:
     Decoupled from ephemeral client WebSocket connections.
     Runs until natural completion or explicit user cancellation ('Arrêter').
     """
-    def __init__(self, conversation_id: Optional[str] = None, workspace_path: Optional[str] = None):
-        self.conversation_id: Optional[str] = conversation_id
-        self.workspace_path: Optional[str] = workspace_path
-        self.message_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
-        self.subscribers: Set[WebSocket] = set()
-        self.active_proc: Optional[asyncio.subprocess.Process] = None
-        self.active_task: Optional[asyncio.Task] = None
-        self.worker_task: Optional[asyncio.Task] = None
+    def __init__(self, conversation_id: str | None = None, workspace_path: str | None = None):
+        self.conversation_id: str | None = conversation_id
+        self.workspace_path: str | None = workspace_path
+        self.message_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        self.subscribers: set[WebSocket] = set()
+        self.active_proc: asyncio.subprocess.Process | None = None
+        self.active_task: asyncio.Task | None = None
+        self.worker_task: asyncio.Task | None = None
         self.is_running: bool = False
         self.is_steering: bool = False
         self.started_at: float = 0.0
@@ -33,10 +39,10 @@ class ExecutionSession:
         # Live state for reconnection and late hydration
         self.live_thought: str = ""
         self.live_content: str = ""
-        self.live_tool_calls: List[Dict[str, Any]] = []
-        self.live_usage: Optional[Dict[str, Any]] = None
-        self.pending_approval: Optional[Dict[str, Any]] = None
-        self.recent_events: List[Dict[str, Any]] = []
+        self.live_tool_calls: list[dict[str, Any]] = []
+        self.live_usage: dict[str, Any] | None = None
+        self.pending_approval: dict[str, Any] | None = None
+        self.recent_events: list[dict[str, Any]] = []
 
     def add_subscriber(self, ws: WebSocket):
         self.subscribers.add(ws)
@@ -44,7 +50,7 @@ class ExecutionSession:
     def remove_subscriber(self, ws: WebSocket):
         self.subscribers.discard(ws)
 
-    def get_live_state(self) -> Dict[str, Any]:
+    def get_live_state(self) -> dict[str, Any]:
         return {
             "conversation_id": self.conversation_id,
             "is_running": self.is_running,
@@ -60,7 +66,7 @@ class ExecutionSession:
             "recent_events": self.recent_events[-30:]
         }
 
-    async def broadcast(self, event: Dict[str, Any]):
+    async def broadcast(self, event: dict[str, Any]):
         self.last_active_at = time.time()
         # Keep ring buffer of recent events
         self.recent_events.append(event)
@@ -80,7 +86,7 @@ class ExecutionSession:
         for ws in dead:
             self.subscribers.discard(ws)
 
-    def _update_live_state(self, event: Dict[str, Any]):
+    def _update_live_state(self, event: dict[str, Any]):
         evt_type = event.get("event")
         if evt_type == "init":
             cid = event.get("conversation_id")
@@ -188,12 +194,10 @@ class ExecutionSession:
                 "command": event.get("command"),
                 "path": event.get("path")
             }
-        elif evt_type == "approval_resolved":
-            self.pending_approval = None
-        elif evt_type in ("done", "interrupted", "error"):
+        elif evt_type == "approval_resolved" or evt_type in ("done", "interrupted", "error"):
             self.pending_approval = None
 
-    async def run_turn(self, params: Dict[str, Any]):
+    async def run_turn(self, params: dict[str, Any]):
         self.is_running = True
         self.started_at = time.time()
         self.live_thought = ""
@@ -367,9 +371,9 @@ class ExecutionManager:
     Guarantees tasks never abort on accidental client reload or network drops.
     """
     def __init__(self):
-        self.sessions: Dict[str, ExecutionSession] = {}
-        self.active_session: Optional[ExecutionSession] = None
-        self.connected_sockets: Set[WebSocket] = set()
+        self.sessions: dict[str, ExecutionSession] = {}
+        self.active_session: ExecutionSession | None = None
+        self.connected_sockets: set[WebSocket] = set()
 
     def register_socket(self, ws: WebSocket):
         self.connected_sockets.add(ws)
@@ -411,7 +415,7 @@ class ExecutionManager:
                 s.worker_task.cancel()
             logger.info(f"Pruned inactive execution session for conversation {cid} from memory.")
 
-    def get_or_create_session(self, conversation_id: Optional[str], workspace_path: Optional[str] = None) -> ExecutionSession:
+    def get_or_create_session(self, conversation_id: str | None, workspace_path: str | None = None) -> ExecutionSession:
         self.prune_inactive_sessions()
         if conversation_id and conversation_id in self.sessions:
             s = self.sessions[conversation_id]
@@ -432,7 +436,7 @@ class ExecutionManager:
         self.active_session = session
         return session
 
-    def get_session(self, conversation_id: Optional[str]) -> Optional[ExecutionSession]:
+    def get_session(self, conversation_id: str | None) -> ExecutionSession | None:
         if conversation_id:
             if conversation_id in self.sessions:
                 return self.sessions[conversation_id]
@@ -451,14 +455,14 @@ class ExecutionManager:
                 return running[0]
         return None
 
-    def is_running(self, conversation_id: Optional[str]) -> bool:
+    def is_running(self, conversation_id: str | None) -> bool:
         session = self.get_session(conversation_id)
         return bool(session and session.is_running)
 
-    def get_running_conversations(self) -> List[str]:
+    def get_running_conversations(self) -> list[str]:
         return [cid for cid, s in self.sessions.items() if s.is_running and cid]
 
-    async def attach(self, conversation_id: Optional[str], ws: WebSocket) -> Dict[str, Any]:
+    async def attach(self, conversation_id: str | None, ws: WebSocket) -> dict[str, Any]:
         session = self.get_session(conversation_id)
         if session:
             session.add_subscriber(ws)
@@ -474,7 +478,7 @@ class ExecutionManager:
             "recent_events": []
         }
 
-    async def submit_prompt(self, ws: WebSocket, data: Dict[str, Any]):
+    async def submit_prompt(self, ws: WebSocket, data: dict[str, Any]):
         prompt = data.get("prompt", "").strip()
         if not prompt:
             await ws.send_json({"event": "error", "message": "Le prompt ne peut pas être vide."})
@@ -514,7 +518,7 @@ class ExecutionManager:
         else:
             await session.message_queue.put(data)
 
-    async def interrupt(self, conversation_id: Optional[str] = None):
+    async def interrupt(self, conversation_id: str | None = None):
         session = self.get_session(conversation_id)
         if not session:
             return
@@ -544,7 +548,7 @@ class ExecutionManager:
             "queue_size": 0
         })
 
-    async def clear_queue(self, conversation_id: Optional[str] = None):
+    async def clear_queue(self, conversation_id: str | None = None):
         session = self.get_session(conversation_id)
         if not session:
             return
@@ -560,7 +564,7 @@ class ExecutionManager:
             "queue_size": 0
         })
 
-    async def handle_approval(self, conversation_id: Optional[str], decision: str, rule: Optional[str]):
+    async def handle_approval(self, conversation_id: str | None, decision: str, rule: str | None):
         session = self.get_session(conversation_id)
         if not session:
             return

@@ -1,11 +1,12 @@
 import json
 import logging
-from typing import Dict, Any
+from typing import Any
+
 from app.config import SESSION_METADATA_FILE
 
 logger = logging.getLogger("antigravity-webui.session_metadata")
 
-def get_all_session_metadata() -> Dict[str, Dict[str, Any]]:
+def get_all_session_metadata() -> dict[str, dict[str, Any]]:
     if not SESSION_METADATA_FILE.exists():
         return {}
     try:
@@ -14,7 +15,7 @@ def get_all_session_metadata() -> Dict[str, Dict[str, Any]]:
         logger.error(f"Failed to read session metadata: {e}")
         return {}
 
-def save_all_session_metadata(metadata: Dict[str, Dict[str, Any]]) -> None:
+def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
     try:
         SESSION_METADATA_FILE.parent.mkdir(parents=True, exist_ok=True)
         tmp_file = SESSION_METADATA_FILE.with_suffix(".tmp")
@@ -23,7 +24,7 @@ def save_all_session_metadata(metadata: Dict[str, Dict[str, Any]]) -> None:
     except Exception as e:
         logger.error(f"Failed to write session metadata: {e}")
 
-def get_session_meta(conversation_id: str) -> Dict[str, Any]:
+def get_session_meta(conversation_id: str) -> dict[str, Any]:
     all_meta = get_all_session_metadata()
     return all_meta.get(conversation_id, {
         "pinned": False,
@@ -34,7 +35,7 @@ def get_session_meta(conversation_id: str) -> Dict[str, Any]:
         "customTitle": ""
     })
 
-def update_session_meta(conversation_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+def update_session_meta(conversation_id: str, updates: dict[str, Any]) -> dict[str, Any]:
     all_meta = get_all_session_metadata()
     current = all_meta.get(conversation_id, {
         "pinned": False,

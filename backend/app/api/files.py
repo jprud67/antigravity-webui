@@ -1,12 +1,14 @@
-import uuid
 import logging
+import uuid
 from pathlib import Path
-from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Query, Depends
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from app.config import DEFAULT_WORKSPACE
+
 from app.api.auth import require_auth
+from app.config import DEFAULT_WORKSPACE
 
 logger = logging.getLogger("antigravity.files")
 router = APIRouter(prefix="/api/files", tags=["files"])
@@ -16,7 +18,7 @@ IGNORED_DIRS = {
     "dist", ".cache", ".next", ".turbo", "vendor"
 }
 
-def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> List[Dict[str, Any]]:
+def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> list[dict[str, Any]]:
     if current_depth > max_depth or not dir_path.is_dir():
         return []
 
@@ -33,7 +35,7 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> List
             try:
                 stat = entry.stat()
                 is_dir = entry.is_dir()
-                item: Dict[str, Any] = {
+                item: dict[str, Any] = {
                     "name": name,
                     "path": str(entry.resolve()),
                     "is_dir": is_dir,
@@ -53,6 +55,7 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> List
     return items
 
 from app.services.storage import get_settings
+
 
 def _validate_path_access(file_path: Path) -> Path:
     try:
@@ -82,7 +85,7 @@ def _validate_path_access(file_path: Path) -> Path:
 
 @router.get("/tree")
 def get_file_tree(
-    path: Optional[str] = Query(None),
+    path: str | None = Query(None),
     depth: int = Query(2, ge=1, le=4),
     _ = Depends(require_auth)
 ):
@@ -121,7 +124,7 @@ def get_file_content(path: str = Query(...), _ = Depends(require_auth)):
             "content": content
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur de lecture du fichier : {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur de lecture du fichier : {e!s}")
 
 class SaveFileRequest(BaseModel):
     path: str
@@ -148,7 +151,7 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
         if 'tmp_path' in locals() and tmp_path.exists():
             tmp_path.unlink()
         logger.error(f"Error saving file {resolved_path}: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement : {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement : {e!s}")
 
 @router.get("/download")
 def download_file(path: str = Query(...), _ = Depends(require_auth)):

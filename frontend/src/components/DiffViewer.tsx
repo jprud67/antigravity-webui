@@ -79,7 +79,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (e) {}
+    } catch (e) {
+      console.warn('Clipboard error:', e);
+    }
   };
 
   return (

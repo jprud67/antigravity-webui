@@ -1,10 +1,12 @@
-import re
 import logging
+import re
 from pathlib import Path
-from typing import Dict, Any
-from fastapi import APIRouter, HTTPException, Depends
-from app.config import GEMINI_DIR, HOME
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
+
 from app.api.auth import require_auth
+from app.config import GEMINI_DIR, HOME
 
 logger = logging.getLogger("antigravity.skills")
 router = APIRouter(prefix="/api/skills", tags=["skills"])
@@ -15,7 +17,7 @@ SKILL_DIRS = [
     {"type": "builtin", "dir": GEMINI_DIR / "builtin" / "skills"},
 ]
 
-def parse_skill_md(skill_file: Path) -> Dict[str, Any]:
+def parse_skill_md(skill_file: Path) -> dict[str, Any]:
     name = skill_file.parent.name
     description = ""
     content = ""

@@ -17,7 +17,6 @@ import shutil
 import signal
 import subprocess
 import sys
-from typing import List, Optional
 
 logger = logging.getLogger("antigravity.platform")
 
@@ -111,7 +110,7 @@ def restrict_file_permissions(path) -> None:
         logger.warning(f"Impossible de restreindre les permissions de {path} : {exc}")
 
 
-def which_command(*names: str) -> Optional[str]:
+def which_command(*names: str) -> str | None:
     """Retourne le premier exécutable trouvé dans le PATH (gère .exe/.cmd sous Windows)."""
     for name in names:
         found = shutil.which(name)
@@ -120,7 +119,7 @@ def which_command(*names: str) -> Optional[str]:
     return None
 
 
-def npm_argv(*args: str) -> List[str]:
+def npm_argv(*args: str) -> list[str]:
     """
     Construit la ligne de commande npm compatible Windows (npm.cmd doit
     passer par `cmd /c`) et POSIX (Linux/macOS).

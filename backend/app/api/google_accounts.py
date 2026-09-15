@@ -1,18 +1,19 @@
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any
 
 from app.api.auth import require_auth
 from app.services.google_auth import (
-    get_active_account,
-    list_google_accounts,
-    switch_google_account,
+    cancel_google_login_flow,
     delete_google_account,
+    get_active_account,
+    import_raw_token,
+    list_google_accounts,
     start_google_login_flow,
     submit_google_auth_code,
-    cancel_google_login_flow,
-    import_raw_token
+    switch_google_account,
 )
 
 logger = logging.getLogger("antigravity.google_api")
@@ -33,7 +34,7 @@ class CancelSessionRequest(BaseModel):
 
 
 class ImportTokenRequest(BaseModel):
-    token_data: Dict[str, Any]
+    token_data: dict[str, Any]
 
 
 @router.get("/accounts")

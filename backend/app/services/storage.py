@@ -1,23 +1,19 @@
-import json
-import sqlite3
-import shutil
-import uuid
 import html
-import re
+import json
 import logging
-from typing import List, Dict, Any, Optional
+import re
+import shutil
+import sqlite3
+import uuid
 from datetime import datetime, timezone
-from app.config import (
-    CONVERSATION_DB,
-    BRAIN_DIR,
-    SETTINGS_FILE,
-    DEFAULT_WORKSPACE
-)
+from typing import Any
+
+from app.config import BRAIN_DIR, CONVERSATION_DB, DEFAULT_WORKSPACE, SETTINGS_FILE
 from app.services.session_metadata import (
+    delete_session_meta,
     get_all_session_metadata,
     get_session_meta,
     update_session_meta,
-    delete_session_meta
 )
 
 logger = logging.getLogger("antigravity.storage")
@@ -30,7 +26,7 @@ def get_db_connection() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     return conn
 
-def list_conversations(limit: int = 100) -> List[Dict[str, Any]]:
+def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
     if not CONVERSATION_DB.exists():
         return []
     
@@ -90,7 +86,7 @@ def list_conversations(limit: int = 100) -> List[Dict[str, Any]]:
     finally:
         conn.close()
 
-def get_conversation_by_id(conversation_id: str) -> Optional[Dict[str, Any]]:
+def get_conversation_by_id(conversation_id: str) -> dict[str, Any] | None:
     if not CONVERSATION_DB.exists():
         return None
     conn = get_db_connection()
@@ -141,7 +137,7 @@ def get_conversation_by_id(conversation_id: str) -> Optional[Dict[str, Any]]:
     finally:
         conn.close()
 
-def get_conversation_transcript(conversation_id: str) -> List[Dict[str, Any]]:
+def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
     conv_dir = BRAIN_DIR / conversation_id
     transcript_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
     transcript_full_file = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
@@ -168,7 +164,7 @@ def get_conversation_transcript(conversation_id: str) -> List[Dict[str, Any]]:
         pass
     return steps
 
-def calculate_conversation_tokens(steps: List[Dict[str, Any]]) -> Dict[str, Any]:
+def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]:
     if not steps:
         return {
             "input_tokens": 0,
@@ -230,8 +226,8 @@ def calculate_conversation_tokens(steps: List[Dict[str, Any]]) -> Dict[str, Any]
 def fork_conversation(
     source_conversation_id: str,
     up_to_step_index: int,
-    new_title: Optional[str] = None
-) -> Dict[str, Any]:
+    new_title: str | None = None
+) -> dict[str, Any]:
     source_steps = get_conversation_transcript(source_conversation_id)
     if not source_steps:
         raise ValueError(f"Aucun historique trouvé pour la conversation {source_conversation_id}")
@@ -362,8 +358,8 @@ def fork_conversation(
 
 def create_conversation_handoff(
     source_conversation_id: str,
-    new_title: Optional[str] = None
-) -> Dict[str, Any]:
+    new_title: str | None = None
+) -> dict[str, Any]:
     source_steps = get_conversation_transcript(source_conversation_id)
     if not source_steps:
         raise ValueError(f"Aucun historique trouvé pour la conversation {source_conversation_id}")
@@ -581,7 +577,7 @@ def update_conversation_title(conversation_id: str, new_title: str) -> bool:
         conn.close()
     return True
 
-def undo_conversation_turn(conversation_id: str) -> Dict[str, Any]:
+def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
     conv_dir = BRAIN_DIR / conversation_id
     transcript_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
     transcript_full_file = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
@@ -668,7 +664,7 @@ def undo_conversation_turn(conversation_id: str) -> Dict[str, Any]:
         "usage": usage
     }
 
-def search_conversations(query: str, limit: int = 50) -> List[Dict[str, Any]]:
+def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
     if not query.strip():
         return list_conversations(limit=limit)
 
@@ -800,12 +796,12 @@ def clean_user_prompt(raw: str) -> str:
     text = re.sub(r'<USER_SETTINGS_CHANGE>[\s\S]*?</USER_SETTINGS_CHANGE>', '', text)
     return text.strip()
 
-def aggregate_steps_into_turns(steps: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not steps:
         return []
 
-    turns: List[Dict[str, Any]] = []
-    current_asst: Optional[Dict[str, Any]] = None
+    turns: list[dict[str, Any]] = []
+    current_asst: dict[str, Any] | None = None
 
     def flush_asst():
         nonlocal current_asst
@@ -1293,7 +1289,7 @@ def export_conversation_html(conversation_id: str) -> str:
 </html>
 """
 
-def list_artifacts(conversation_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
     artifacts = []
     if conversation_id:
         dirs_to_scan = [BRAIN_DIR / conversation_id]
@@ -1340,7 +1336,7 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
         raw = target_path.read_bytes()
         return f"[Fichier binaire : {len(raw)} octets]"
 
-def get_settings() -> Dict[str, Any]:
+def get_settings() -> dict[str, Any]:
     if not SETTINGS_FILE.exists():
         return {
             "agentMode": "accept-edits",
@@ -1350,7 +1346,7 @@ def get_settings() -> Dict[str, Any]:
         }
     return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
 
-def save_settings(new_settings: Dict[str, Any]) -> Dict[str, Any]:
+def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
     current = get_settings()
     current.update(new_settings)
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -1359,7 +1355,7 @@ def save_settings(new_settings: Dict[str, Any]) -> Dict[str, Any]:
     tmp_file.replace(SETTINGS_FILE)
     return current
 
-def import_conversation(payload: Dict[str, Any]) -> Dict[str, Any]:
+def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
     """
     Import a conversation from JSON payload.
     Supports:

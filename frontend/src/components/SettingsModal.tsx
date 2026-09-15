@@ -639,6 +639,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const detail = await fetchSkillDetail(skill.id);
       setSelectedSkill(detail);
     } catch (e) {
+      console.warn('Error fetching skill detail:', e);
       setSelectedSkill(skill);
     }
   };

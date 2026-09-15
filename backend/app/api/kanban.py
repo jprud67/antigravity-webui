@@ -1,14 +1,15 @@
+import logging
 import os
+import sqlite3
 import time
 import uuid
-import sqlite3
-import logging
 from pathlib import Path
-from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, Depends
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+
 from app.api.auth import require_auth
-from app.config import GEMINI_DIR, DEFAULT_WORKSPACE
+from app.config import DEFAULT_WORKSPACE, GEMINI_DIR
 
 logger = logging.getLogger("antigravity.kanban")
 router = APIRouter(prefix="/api/kanban", tags=["kanban"])
@@ -16,6 +17,7 @@ router = APIRouter(prefix="/api/kanban", tags=["kanban"])
 KANBAN_DB_PATH = Path(os.environ.get("ANTIGRAVITY_KANBAN_DB", str(GEMINI_DIR / "webui_kanban.db")))
 
 from contextlib import contextmanager
+
 
 def get_db_connection() -> sqlite3.Connection:
     KANBAN_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -81,27 +83,27 @@ def _ensure_schema(conn: sqlite3.Connection):
 
 class CreateTaskRequest(BaseModel):
     title: str
-    body: Optional[str] = ""
-    assignee: Optional[str] = "antigravity"
-    status: Optional[str] = "todo"
-    priority: Optional[int] = 0
-    workspace_path: Optional[str] = None
-    project_id: Optional[str] = "default"
+    body: str | None = ""
+    assignee: str | None = "antigravity"
+    status: str | None = "todo"
+    priority: int | None = 0
+    workspace_path: str | None = None
+    project_id: str | None = "default"
 
 class UpdateTaskRequest(BaseModel):
-    title: Optional[str] = None
-    body: Optional[str] = None
-    assignee: Optional[str] = None
-    status: Optional[str] = None
-    priority: Optional[int] = None
-    workspace_path: Optional[str] = None
-    project_id: Optional[str] = None
-    result: Optional[str] = None
+    title: str | None = None
+    body: str | None = None
+    assignee: str | None = None
+    status: str | None = None
+    priority: int | None = None
+    workspace_path: str | None = None
+    project_id: str | None = None
+    result: str | None = None
 
 @router.get("/tasks")
 def list_tasks(
-    status: Optional[str] = Query(None),
-    project_id: Optional[str] = Query(None),
+    status: str | None = Query(None),
+    project_id: str | None = Query(None),
     _ = Depends(require_auth)
 ):
     try:

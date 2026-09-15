@@ -17,7 +17,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
 from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
@@ -49,7 +49,7 @@ _running_jobs: set = set()
 _jobs_write_lock = asyncio.Lock()
 
 
-async def run_agy_task(prompt: str, timeout: int = JOB_TIMEOUT_SECONDS) -> Tuple[str, str, int]:
+async def run_agy_task(prompt: str, timeout: int = JOB_TIMEOUT_SECONDS) -> tuple[str, str, int]:
     """
     Exécute un prompt via `agy` en mode headless. Retourne (stdout, stderr, code).
 
@@ -70,7 +70,7 @@ async def run_agy_task(prompt: str, timeout: int = JOB_TIMEOUT_SECONDS) -> Tuple
 
     stdout_chunks: list = []
     stderr_chunks: list = []
-    quota_seen: Dict[str, Any] = {"line": None}
+    quota_seen: dict[str, Any] = {"line": None}
 
     async def pump(stream, chunks, watch_quota: bool = False):
         while True:
@@ -142,7 +142,7 @@ async def run_agy_task(prompt: str, timeout: int = JOB_TIMEOUT_SECONDS) -> Tuple
     return out, err, code
 
 
-async def run_job_with_failover(job: Dict[str, Any]) -> Dict[str, Any]:
+async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
     """
     Exécute un job avec bascule automatique de compte Google en cas de quota
     atteint, puis relance immédiate de la tâche.
@@ -150,7 +150,7 @@ async def run_job_with_failover(job: Dict[str, Any]) -> Dict[str, Any]:
     """
     prompt = (job.get("prompt") or "").strip()
     attempts = 0
-    failovers: List[Dict[str, Any]] = []
+    failovers: list[dict[str, Any]] = []
     output = ""
     status = "error"
 
@@ -198,7 +198,7 @@ async def run_job_with_failover(job: Dict[str, Any]) -> Dict[str, Any]:
     return {"status": status, "attempts": attempts, "failovers": failovers, "output": output}
 
 
-async def _execute_job(job: Dict[str, Any]) -> None:
+async def _execute_job(job: dict[str, Any]) -> None:
     job_id = job.get("id")
     name = job.get("name") or job_id
     started = time.time()
@@ -239,7 +239,7 @@ async def _execute_job(job: Dict[str, Any]) -> None:
     logger.info(f"[Cron] Job « {name} » terminé: {result['status']} ({duration}s).")
 
 
-async def _guarded_execute(job: Dict[str, Any]) -> None:
+async def _guarded_execute(job: dict[str, Any]) -> None:
     try:
         await _execute_job(job)
     except Exception as e:
@@ -254,7 +254,7 @@ async def tick_once() -> int:
     Retourne le nombre de jobs lancés.
     """
     ensure_dirs()
-    to_launch: List[Dict[str, Any]] = []
+    to_launch: list[dict[str, Any]] = []
 
     async with _jobs_write_lock:
         data = load_jobs()

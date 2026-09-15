@@ -1,14 +1,15 @@
 import logging
-from typing import Optional
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from app.services.auth import verify_access_token, get_auth_config
+
+from app.services.auth import get_auth_config, verify_access_token
 from app.services.execution_manager import execution_manager
 
 logger = logging.getLogger("antigravity.chat")
 router = APIRouter(tags=["chat"])
 
 @router.websocket("/ws/chat")
-async def chat_websocket(websocket: WebSocket, token: Optional[str] = None):
+async def chat_websocket(websocket: WebSocket, token: str | None = None):
     config = get_auth_config()
     if config.get("enabled", True) and not verify_access_token(token):
         await websocket.close(code=1008, reason="Unauthorized")

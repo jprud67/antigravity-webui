@@ -1,11 +1,12 @@
-import os
-import time
-import hmac
 import hashlib
+import hmac
 import json
-import secrets
 import logging
-from typing import Optional, Dict, Any
+import os
+import secrets
+import time
+from typing import Any
+
 from app.config import GEMINI_DIR
 from app.platform_utils import restrict_file_permissions
 
@@ -16,13 +17,13 @@ AUTH_CONFIG_FILE = GEMINI_DIR / "webui_auth.json"
 DEFAULT_SECRET = "antigravity-super-secret-webui-token-key-2026"
 DEFAULT_PASSWORD = os.environ.get("WEBUI_PASSWORD", "antigravity2026")
 
-def hash_password(password: str, salt: Optional[str] = None) -> str:
+def hash_password(password: str, salt: str | None = None) -> str:
     if not salt:
         salt = secrets.token_hex(16)
     key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000)
     return f"pbkdf2_sha256${salt}${key.hex()}"
 
-def get_auth_config() -> Dict[str, Any]:
+def get_auth_config() -> dict[str, Any]:
     if AUTH_CONFIG_FILE.exists():
         try:
             with open(AUTH_CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -39,7 +40,7 @@ def get_auth_config() -> Dict[str, Any]:
     save_auth_config(config)
     return config
 
-def save_auth_config(config: Dict[str, Any]):
+def save_auth_config(config: dict[str, Any]):
     AUTH_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     temp_file = AUTH_CONFIG_FILE.with_suffix(".tmp")
     with open(temp_file, "w", encoding="utf-8") as f:
@@ -78,7 +79,7 @@ def create_access_token(expires_in_days: int = 7) -> str:
     sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
     return f"{payload}:{sig}"
 
-def verify_access_token(token: Optional[str]) -> bool:
+def verify_access_token(token: str | None) -> bool:
     if not token:
         return False
     config = get_auth_config()

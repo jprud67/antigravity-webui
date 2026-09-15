@@ -16,7 +16,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from croniter import croniter
 
@@ -44,7 +44,7 @@ def write_heartbeat() -> None:
     HEARTBEAT_FILE.write_text(str(time.time()), encoding="utf-8")
 
 
-def load_jobs() -> Dict[str, Any]:
+def load_jobs() -> dict[str, Any]:
     """Charge jobs.json (crée une structure vide si absent ou illisible)."""
     ensure_dirs()
     if not JOBS_FILE.exists():
@@ -64,7 +64,7 @@ def load_jobs() -> Dict[str, Any]:
     return {"jobs": [], "updated_at": now_iso()}
 
 
-def save_jobs(data: Dict[str, Any]) -> None:
+def save_jobs(data: dict[str, Any]) -> None:
     """Écrit jobs.json de façon atomique."""
     ensure_dirs()
     data["updated_at"] = now_iso()
@@ -74,7 +74,7 @@ def save_jobs(data: Dict[str, Any]) -> None:
     temp_path.replace(JOBS_FILE)
 
 
-def compute_next_run(schedule: Union[str, Dict[str, Any]]) -> Optional[str]:
+def compute_next_run(schedule: str | dict[str, Any]) -> str | None:
     """Calcule la prochaine date d'exécution depuis une expression cron ou un intervalle."""
     now = datetime.now(timezone.utc)
     expr = ""

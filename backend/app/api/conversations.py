@@ -1,50 +1,52 @@
-from fastapi import APIRouter, HTTPException, Query, Response, Depends
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+
 from app.api.auth import require_auth
-from app.services.storage import (
-    list_conversations,
-    get_conversation_by_id,
-    get_conversation_transcript,
-    calculate_conversation_tokens,
-    fork_conversation,
-    create_conversation_handoff,
-    delete_conversation,
-    undo_conversation_turn,
-    search_conversations,
-    update_conversation_title,
-    export_conversation_html,
-    export_conversation_markdown,
-    import_conversation,
-)
 from app.services.session_metadata import (
     get_all_session_metadata,
     get_session_meta,
-    update_session_meta
+    update_session_meta,
+)
+from app.services.storage import (
+    calculate_conversation_tokens,
+    create_conversation_handoff,
+    delete_conversation,
+    export_conversation_html,
+    export_conversation_markdown,
+    fork_conversation,
+    get_conversation_by_id,
+    get_conversation_transcript,
+    import_conversation,
+    list_conversations,
+    search_conversations,
+    undo_conversation_turn,
+    update_conversation_title,
 )
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 
 class ForkRequest(BaseModel):
     up_to_step_index: int
-    new_title: Optional[str] = None
+    new_title: str | None = None
 
 class HandoffRequest(BaseModel):
-    new_title: Optional[str] = None
+    new_title: str | None = None
 
 class TitleUpdateRequest(BaseModel):
     title: str
 
 class MetadataUpdateRequest(BaseModel):
-    pinned: Optional[bool] = None
-    archived: Optional[bool] = None
-    tags: Optional[List[str]] = None
-    project: Optional[str] = None
-    projectColor: Optional[str] = None
-    customTitle: Optional[str] = None
+    pinned: bool | None = None
+    archived: bool | None = None
+    tags: list[str] | None = None
+    project: str | None = None
+    projectColor: str | None = None
+    customTitle: str | None = None
 
-@router.get("", response_model=List[Dict[str, Any]])
-def get_conversations(limit: int = 100, q: Optional[str] = None, _ = Depends(require_auth)):
+@router.get("", response_model=list[dict[str, Any]])
+def get_conversations(limit: int = 100, q: str | None = None, _ = Depends(require_auth)):
     from app.services.execution_manager import execution_manager
     running_set = set(execution_manager.get_running_conversations())
     if q and q.strip():
@@ -55,14 +57,14 @@ def get_conversations(limit: int = 100, q: Optional[str] = None, _ = Depends(req
         c["is_running"] = c.get("conversation_id") in running_set
     return items
 
-@router.get("/search", response_model=List[Dict[str, Any]])
+@router.get("/search", response_model=list[dict[str, Any]])
 def search(q: str = Query(..., min_length=1), limit: int = 50, _ = Depends(require_auth)):
     return search_conversations(query=q, limit=limit)
 
 class BulkActionRequest(BaseModel):
     action: str  # "delete", "pin", "unpin", "tag", "project"
-    conversation_ids: List[str]
-    payload: Optional[Dict[str, Any]] = None
+    conversation_ids: list[str]
+    payload: dict[str, Any] | None = None
 
 @router.post("/bulk")
 def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
@@ -118,7 +120,7 @@ def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
 
     elif action == "project":
         payload = req.payload or {}
-        updates: Dict[str, Any] = {}
+        updates: dict[str, Any] = {}
         if "project" in payload:
             updates["project"] = payload.get("project") or ""
         if "projectColor" in payload:
@@ -195,7 +197,7 @@ def fork(conversation_id: str, req: ForkRequest, _ = Depends(require_auth)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/{conversation_id}/handoff")
-def handoff(conversation_id: str, req: Optional[HandoffRequest] = None, _ = Depends(require_auth)):
+def handoff(conversation_id: str, req: HandoffRequest | None = None, _ = Depends(require_auth)):
     try:
         new_title = req.new_title if req else None
         result = create_conversation_handoff(
@@ -273,10 +275,10 @@ def export_json(conversation_id: str, _ = Depends(require_auth)):
     )
 
 @router.post("/import")
-def import_session(payload: Dict[str, Any], _ = Depends(require_auth)):
+def import_session(payload: dict[str, Any], _ = Depends(require_auth)):
     try:
         res = import_conversation(payload)
         return res
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Échec de l'import : {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Échec de l'import : {e!s}")
 

@@ -1,13 +1,14 @@
-import os
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, Depends
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+
 from app.api.auth import require_auth
-from app.config import HOME, SETTINGS_FILE, DEFAULT_WORKSPACE
+from app.config import DEFAULT_WORKSPACE, HOME, SETTINGS_FILE
 from app.services.storage import get_settings
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
@@ -45,7 +46,7 @@ def _get_current_journal_path() -> Path:
     log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir / f"server_actions_{month_str}.md"
 
-def _resolve_file_path(file_id: str, workspace_path: Optional[str] = None) -> Optional[Path]:
+def _resolve_file_path(file_id: str, workspace_path: str | None = None) -> Path | None:
     if file_id == "agents_global":
         return GLOBAL_AGENTS_FILE
     elif file_id == "settings_cli":
@@ -63,10 +64,10 @@ def _resolve_file_path(file_id: str, workspace_path: Optional[str] = None) -> Op
 class SaveRuleRequest(BaseModel):
     file_id: str
     content: str
-    workspace_path: Optional[str] = None
+    workspace_path: str | None = None
 
 @router.get("/files")
-def list_rules_files(workspace_path: Optional[str] = Query(None), _ = Depends(require_auth)):
+def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(require_auth)):
     files = [
         {
             "id": "agents_global",
@@ -147,7 +148,7 @@ def list_rules_files(workspace_path: Optional[str] = Query(None), _ = Depends(re
 @router.get("/content")
 def get_rule_content(
     file_id: str = Query(...),
-    workspace_path: Optional[str] = Query(None),
+    workspace_path: str | None = Query(None),
     _ = Depends(require_auth)
 ):
     target_path = _resolve_file_path(file_id, workspace_path)

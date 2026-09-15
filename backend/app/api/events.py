@@ -10,8 +10,10 @@ GET /api/events/stream  →  persistent SSE stream
 import asyncio
 import json
 import logging
+
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
+
 from app.services.fs_watcher import add_subscriber, remove_subscriber
 
 logger = logging.getLogger("antigravity.events")
@@ -49,7 +51,7 @@ async def event_stream(request: Request, token: str = None):
     the CLI creates or updates conversations/transcripts.
     """
     # Auth check (same pattern as other endpoints)
-    from app.services.auth import verify_access_token, get_auth_config
+    from app.services.auth import get_auth_config, verify_access_token
     config = get_auth_config()
     if config.get("enabled", True):
         if not token:

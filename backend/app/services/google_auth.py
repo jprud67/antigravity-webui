@@ -1,10 +1,10 @@
-import os
-import json
 import base64
-import shutil
-import time
+import json
+import os
 import re
 import select
+import shutil
+import time
 
 try:
     import pty
@@ -17,12 +17,13 @@ try:
     HAS_WINPTY = True
 except ImportError:
     HAS_WINPTY = False
-import subprocess
 import logging
-from typing import Dict, Any, List, Optional
-from urllib.parse import urlparse, parse_qs
+import subprocess
 from pathlib import Path
-from app.config import AGY_BIN, HOME, GEMINI_DIR
+from typing import Any
+from urllib.parse import parse_qs, urlparse
+
+from app.config import AGY_BIN, GEMINI_DIR, HOME
 from app.platform_utils import IS_WINDOWS, restrict_file_permissions
 
 logger = logging.getLogger("antigravity.google_auth")
@@ -31,7 +32,7 @@ TOKEN_FILE = GEMINI_DIR / "antigravity-oauth-token"
 ACCOUNTS_DIR = GEMINI_DIR / "accounts"
 
 # Active login sessions: session_id -> { "proc": subprocess.Popen, "started_at": float, "stash_path": str }
-_LOGIN_SESSIONS: Dict[str, Dict[str, Any]] = {}
+_LOGIN_SESSIONS: dict[str, dict[str, Any]] = {}
 
 
 def ensure_dirs():
@@ -39,7 +40,7 @@ def ensure_dirs():
     ACCOUNTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def parse_jwt_claims(jwt_str: str) -> Dict[str, Any]:
+def parse_jwt_claims(jwt_str: str) -> dict[str, Any]:
     try:
         if not jwt_str or "." not in jwt_str:
             return {}
@@ -52,7 +53,7 @@ def parse_jwt_claims(jwt_str: str) -> Dict[str, Any]:
         return {}
 
 
-def get_account_meta_from_token_data(data: Dict[str, Any]) -> Dict[str, Any]:
+def get_account_meta_from_token_data(data: dict[str, Any]) -> dict[str, Any]:
     jwt_str = data.get("id_token")
     claims = parse_jwt_claims(jwt_str) if jwt_str else {}
     
@@ -95,7 +96,7 @@ def sync_active_account_to_store():
         logger.error(f"Error syncing active account: {e}")
 
 
-def get_active_account() -> Optional[Dict[str, Any]]:
+def get_active_account() -> dict[str, Any] | None:
     ensure_dirs()
     if not TOKEN_FILE.exists():
         return None
@@ -110,7 +111,7 @@ def get_active_account() -> Optional[Dict[str, Any]]:
         return None
 
 
-def list_google_accounts() -> Dict[str, Any]:
+def list_google_accounts() -> dict[str, Any]:
     ensure_dirs()
     sync_active_account_to_store()
     active_meta = get_active_account()
@@ -149,7 +150,7 @@ def _validate_account_file(email: str) -> Path:
     return target_file
 
 
-def switch_google_account(target_email: str) -> Dict[str, Any]:
+def switch_google_account(target_email: str) -> dict[str, Any]:
     ensure_dirs()
     target_file = _validate_account_file(target_email)
     if not target_file.exists():
@@ -175,7 +176,7 @@ def switch_google_account(target_email: str) -> Dict[str, Any]:
     }
 
 
-def delete_google_account(email: str) -> Dict[str, Any]:
+def delete_google_account(email: str) -> dict[str, Any]:
     ensure_dirs()
     target_file = _validate_account_file(email)
     if not target_file.exists():
@@ -265,7 +266,7 @@ def _read_auth_url(proc, master_fd, win_pty, timeout: float = 12.0):
     output = ""
 
     if IS_WINDOWS:
-        chunks: "queue.Queue" = queue.Queue()
+        chunks: queue.Queue = queue.Queue()
 
         def reader():
             try:
@@ -315,7 +316,7 @@ def _read_auth_url(proc, master_fd, win_pty, timeout: float = 12.0):
     return None, output
 
 
-def start_google_login_flow() -> Dict[str, Any]:
+def start_google_login_flow() -> dict[str, Any]:
     ensure_dirs()
     cleanup_stale_sessions()
 
@@ -362,7 +363,7 @@ def start_google_login_flow() -> Dict[str, Any]:
         raise e
 
 
-def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
+def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
     session = _LOGIN_SESSIONS.get(session_id)
     if not session:
         raise ValueError("Session de connexion expirée ou invalide.")
@@ -377,7 +378,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
         try:
             parsed = urlparse(code)
             params = parse_qs(parsed.query)
-            if "code" in params and params["code"]:
+            if params.get("code"):
                 code = params["code"][0]
         except Exception:
             pass
@@ -389,7 +390,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
         if IS_WINDOWS and proc is not None:
             proc.write(f"{code}\n")
         elif master_fd is not None:
-            os.write(master_fd, f"{code}\n".encode("utf-8"))
+            os.write(master_fd, f"{code}\n".encode())
 
         # Wait for agy to complete token exchange
         start_wait = time.time()
@@ -429,12 +430,11 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
         _close_login_resources(master_fd, proc)
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
-        if session_id in _LOGIN_SESSIONS:
-            del _LOGIN_SESSIONS[session_id]
+        _LOGIN_SESSIONS.pop(session_id, None)
         raise e
 
 
-def cancel_google_login_flow(session_id: str) -> Dict[str, Any]:
+def cancel_google_login_flow(session_id: str) -> dict[str, Any]:
     session = _LOGIN_SESSIONS.pop(session_id, None)
     if session:
         _close_login_resources(session.get("master_fd"), session.get("proc"))
@@ -454,7 +454,7 @@ def cleanup_stale_sessions():
         cancel_google_login_flow(sid)
 
 
-def import_raw_token(token_data: Dict[str, Any]) -> Dict[str, Any]:
+def import_raw_token(token_data: dict[str, Any]) -> dict[str, Any]:
     ensure_dirs()
     meta = get_account_meta_from_token_data(token_data)
     email = meta.get("email")
@@ -476,7 +476,7 @@ def import_raw_token(token_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-_account_exhaustion_tracker: Dict[str, float] = {}
+_account_exhaustion_tracker: dict[str, float] = {}
 
 
 def is_quota_error(message: str) -> bool:
@@ -543,7 +543,7 @@ def is_account_marked_exhausted(email: str) -> bool:
     return time.time() < exp
 
 
-def get_candidate_accounts(exclude_email: Optional[str] = None) -> List[str]:
+def get_candidate_accounts(exclude_email: str | None = None) -> list[str]:
     ensure_dirs()
     candidates = []
     for p in ACCOUNTS_DIR.glob("*.json"):
@@ -557,7 +557,7 @@ def get_candidate_accounts(exclude_email: Optional[str] = None) -> List[str]:
     return candidates
 
 
-def switch_to_next_healthy_account(exclude_email: Optional[str] = None, model: Optional[str] = None) -> Optional[str]:
+def switch_to_next_healthy_account(exclude_email: str | None = None, model: str | None = None) -> str | None:
     """
     Selects and activates the next available healthy Google account.
     Returns the email of the newly activated account, or None if no valid candidate exists.

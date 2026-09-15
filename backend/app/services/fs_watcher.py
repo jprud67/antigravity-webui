@@ -6,17 +6,17 @@ Publishes events to SSE subscribers so the WebUI updates without reload.
 """
 import asyncio
 import logging
-import time
 import re
+import time
 from pathlib import Path
-from typing import Set, Dict, Any, Optional
+from typing import Any
 
 logger = logging.getLogger("antigravity.fs_watcher")
 
 # Global asyncio queue where all SSE subscribers register themselves
-_subscribers: Set[asyncio.Queue] = set()
+_subscribers: set[asyncio.Queue] = set()
 
-def get_subscribers() -> Set[asyncio.Queue]:
+def get_subscribers() -> set[asyncio.Queue]:
     return _subscribers
 
 def add_subscriber(q: asyncio.Queue) -> None:
@@ -25,7 +25,7 @@ def add_subscriber(q: asyncio.Queue) -> None:
 def remove_subscriber(q: asyncio.Queue) -> None:
     _subscribers.discard(q)
 
-async def _broadcast(event: Dict[str, Any]) -> None:
+async def _broadcast(event: dict[str, Any]) -> None:
     dead = set()
     for q in _subscribers:
         try:
@@ -49,7 +49,7 @@ _UUID_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-def extract_conv_id(transcript_path: Path, brain_dir: Optional[Path] = None) -> Optional[str]:
+def extract_conv_id(transcript_path: Path, brain_dir: Path | None = None) -> str | None:
     """Extract conversation UUID from transcript.jsonl path."""
     p = transcript_path.resolve()
     # Case 1: brain_dir/<conv_id>/.system_generated/logs/transcript.jsonl
@@ -82,11 +82,11 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
     # Track last-seen mtime for all watched paths
     prev_db_mtime: float = conv_db.stat().st_mtime if conv_db.exists() else 0.0
     # transcript path → last mtime
-    transcript_mtimes: Dict[str, float] = {}
+    transcript_mtimes: dict[str, float] = {}
     # artifact path → last mtime
-    artifact_mtimes: Dict[str, float] = {}
+    artifact_mtimes: dict[str, float] = {}
 
-    def _scan_transcripts() -> Dict[str, float]:
+    def _scan_transcripts() -> dict[str, float]:
         result = {}
         if not brain_dir.exists():
             return result
@@ -113,7 +113,7 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
             logger.debug(f"scan des transcripts impossible : {e}")
         return result
 
-    def _scan_artifacts() -> Dict[str, float]:
+    def _scan_artifacts() -> dict[str, float]:
         result = {}
         if not brain_dir.exists():
             return result

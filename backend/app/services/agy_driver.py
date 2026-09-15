@@ -2,15 +2,17 @@ import asyncio
 import json
 import logging
 import time
-from typing import AsyncGenerator, Dict, Any, Optional, List, Tuple
+from collections.abc import AsyncGenerator
 from pathlib import Path
+from typing import Any
+
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
 from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
 from app.services.quota_watch import watch_agy_log_for_quota
 
 logger = logging.getLogger("antigravity.driver")
 
-def parse_model_metadata(m_id: str, m_name: str) -> Dict[str, Any]:
+def parse_model_metadata(m_id: str, m_name: str) -> dict[str, Any]:
     effort = None
     family_id = m_id
     for sfx in ['-high', '-medium', '-low']:
@@ -43,7 +45,7 @@ def parse_model_metadata(m_id: str, m_name: str) -> Dict[str, Any]:
         'supported_efforts': supported_efforts
     }
 
-async def get_available_models() -> List[Dict[str, Any]]:
+async def get_available_models() -> list[dict[str, Any]]:
     cmd = [AGY_BIN, "models"]
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -71,10 +73,10 @@ async def get_available_models() -> List[Dict[str, Any]]:
             models.append(parse_model_metadata(m_id, m_id))
     return models
 
-_models_cache: Dict[str, Any] = {"data": None, "timestamp": 0.0}
+_models_cache: dict[str, Any] = {"data": None, "timestamp": 0.0}
 
 
-async def get_model_families() -> List[Dict[str, Any]]:
+async def get_model_families() -> list[dict[str, Any]]:
     """
     Returns unique base model families deduplicated with supported efforts and concrete variant IDs.
     Cached for 5 minutes to avoid spawning the `agy models` CLI on every settings/model fetch.
@@ -92,7 +94,7 @@ async def get_model_families() -> List[Dict[str, Any]]:
             return _models_cache["data"]
         raise
 
-    families: Dict[str, Dict[str, Any]] = {}
+    families: dict[str, dict[str, Any]] = {}
     for meta in models_raw:
         fid = meta['family_id']
         if fid not in families:
@@ -112,7 +114,7 @@ async def get_model_families() -> List[Dict[str, Any]]:
     _models_cache = {"data": result, "timestamp": now}
     return result
 
-def resolve_model_and_effort(model: Optional[str], effort: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str | None, str | None]:
     """
     Safely reconciles model and effort parameters for agy CLI.
     Prevents CLI errors like 'invalid model selection' or 'model conflicts with --effort'.
@@ -125,8 +127,7 @@ def resolve_model_and_effort(model: Optional[str], effort: Optional[str]) -> Tup
     # Claude models do NOT accept --effort flag and must not have -high/-medium/-low suffix
     if "claude" in model.lower():
         for sfx in ["-high", "-medium", "-low"]:
-            if model.endswith(sfx):
-                model = model[:-len(sfx)]
+            model = model.removesuffix(sfx)
         return model, None
 
     # GPT-OSS only supports medium
@@ -159,14 +160,14 @@ def resolve_model_and_effort(model: Optional[str], effort: Optional[str]) -> Tup
 
 async def stream_turn(
     prompt: str,
-    conversation_id: Optional[str] = None,
-    workspace_path: Optional[str] = None,
-    model: Optional[str] = None,
-    effort: Optional[str] = None,
+    conversation_id: str | None = None,
+    workspace_path: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
     auto_approve: bool = True,
-    agent_mode: Optional[str] = None,
-    proc_callback: Optional[Any] = None
-) -> AsyncGenerator[Dict[str, Any], None]:
+    agent_mode: str | None = None,
+    proc_callback: Any | None = None
+) -> AsyncGenerator[dict[str, Any], None]:
     """
     Executes a turn using `agy --output-format stream-json` and yields parsed NDJSON events.
     Supports cancellation, process group termination, agent_mode, and proc_callback.
@@ -213,7 +214,7 @@ async def stream_turn(
     if proc_callback:
         proc_callback(proc)
 
-    quota_detected: Dict[str, Any] = {"line": None}
+    quota_detected: dict[str, Any] = {"line": None}
 
     async def quota_supervisor():
         """
@@ -309,12 +310,12 @@ async def stream_turn(
             await terminate_process_group_async(proc, grace=0.8)
 
 
-_quota_cache: Dict[str, Any] = {"data": None, "timestamp": 0.0}
-_credits_cache: Dict[str, Any] = {"data": None, "timestamp": 0.0}
-_changelog_cache: Dict[str, Any] = {"data": None, "timestamp": 0.0}
+_quota_cache: dict[str, Any] = {"data": None, "timestamp": 0.0}
+_credits_cache: dict[str, Any] = {"data": None, "timestamp": 0.0}
+_changelog_cache: dict[str, Any] = {"data": None, "timestamp": 0.0}
 
 
-async def get_usage_quota() -> Dict[str, Any]:
+async def get_usage_quota() -> dict[str, Any]:
     global _quota_cache
     now = time.time()
     if _quota_cache["data"] is not None and (now - _quota_cache["timestamp"]) < 10:
@@ -346,7 +347,7 @@ async def get_usage_quota() -> Dict[str, Any]:
     return _quota_cache["data"] or {"status": "unavailable", "message": "Impossible de charger les quotas Antigravity."}
 
 
-async def get_credits() -> Dict[str, Any]:
+async def get_credits() -> dict[str, Any]:
     global _credits_cache
     now = time.time()
     if _credits_cache["data"] is not None and (now - _credits_cache["timestamp"]) < 30:
@@ -378,7 +379,7 @@ async def get_credits() -> Dict[str, Any]:
     return _credits_cache["data"] or {"status": "unavailable"}
 
 
-async def get_changelog() -> Dict[str, Any]:
+async def get_changelog() -> dict[str, Any]:
     global _changelog_cache
     now = time.time()
     if _changelog_cache["data"] is not None and (now - _changelog_cache["timestamp"]) < 300:

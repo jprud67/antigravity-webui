@@ -1,12 +1,14 @@
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Dict, Any, Optional
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
+
 from app.api.auth import require_auth
 from app.services.storage import list_artifacts, read_artifact_content
 
 router = APIRouter(prefix="/api/artifacts", tags=["artifacts"])
 
-@router.get("", response_model=List[Dict[str, Any]])
-def get_artifacts(conversation_id: Optional[str] = None, _ = Depends(require_auth)):
+@router.get("", response_model=list[dict[str, Any]])
+def get_artifacts(conversation_id: str | None = None, _ = Depends(require_auth)):
     return list_artifacts(conversation_id=conversation_id)
 
 @router.get("/{conversation_id}/{filename:path}")

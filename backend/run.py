@@ -1,5 +1,6 @@
-import uvicorn
 import os
+
+import uvicorn
 
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")

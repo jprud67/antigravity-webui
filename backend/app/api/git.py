@@ -1,11 +1,12 @@
-import subprocess
 import logging
+import subprocess
 from pathlib import Path
-from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Query, Depends
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from app.config import DEFAULT_WORKSPACE
+
 from app.api.auth import require_auth
+from app.config import DEFAULT_WORKSPACE
 
 logger = logging.getLogger("antigravity.git")
 router = APIRouter(prefix="/api/git", tags=["git"])
@@ -14,7 +15,7 @@ from app.services.storage import get_settings
 
 GIT_TIMEOUT = 12
 
-def _validate_workspace(workspace: Optional[str]) -> Path:
+def _validate_workspace(workspace: str | None) -> Path:
     target = Path(workspace) if workspace else Path(DEFAULT_WORKSPACE)
     try:
         resolved = target.resolve()
@@ -38,7 +39,7 @@ def _validate_workspace(workspace: Optional[str]) -> Path:
 
     return resolved
 
-def run_git(args: List[str], cwd: Path, timeout: int = GIT_TIMEOUT) -> subprocess.CompletedProcess:
+def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT) -> subprocess.CompletedProcess:
     # Always enforce strict author and committer for jprud67
     base_args = [
         "git",
@@ -58,7 +59,7 @@ def run_git(args: List[str], cwd: Path, timeout: int = GIT_TIMEOUT) -> subproces
         raise HTTPException(status_code=504, detail=f"Délai d'attente Git dépassé ({timeout}s) pour l'opération.")
 
 @router.get("/status")
-def get_git_status(workspace: Optional[str] = Query(None), _ = Depends(require_auth)):
+def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth)):
     target = _validate_workspace(workspace)
 
     # Check if git repo
@@ -160,8 +161,8 @@ def get_git_status(workspace: Optional[str] = Query(None), _ = Depends(require_a
 
 @router.get("/diff")
 def get_git_diff(
-    workspace: Optional[str] = Query(None),
-    path: Optional[str] = Query(None),
+    workspace: str | None = Query(None),
+    path: str | None = Query(None),
     staged: bool = Query(False),
     _ = Depends(require_auth)
 ):
@@ -180,7 +181,7 @@ def get_git_diff(
     }
 
 @router.get("/branches")
-def get_branches(workspace: Optional[str] = Query(None), _ = Depends(require_auth)):
+def get_branches(workspace: str | None = Query(None), _ = Depends(require_auth)):
     target = _validate_workspace(workspace)
     res = run_git(["branch", "-a"], target)
     if res.returncode != 0:
@@ -204,7 +205,7 @@ def get_branches(workspace: Optional[str] = Query(None), _ = Depends(require_aut
     }
 
 class CommitRequest(BaseModel):
-    workspace: Optional[str] = None
+    workspace: str | None = None
     message: str
     stage_all: bool = True
 
@@ -232,9 +233,9 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
     }
 
 class PushRequest(BaseModel):
-    workspace: Optional[str] = None
+    workspace: str | None = None
     remote: str = "origin"
-    branch: Optional[str] = None
+    branch: str | None = None
 
 @router.post("/push")
 def git_push(req: PushRequest, _ = Depends(require_auth)):

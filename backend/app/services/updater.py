@@ -28,10 +28,10 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.config import GEMINI_DIR
-from app.platform_utils import IS_WINDOWS, IS_MACOS, npm_argv, platform_name
+from app.platform_utils import IS_MACOS, IS_WINDOWS, npm_argv, platform_name
 
 logger = logging.getLogger("antigravity.updater")
 
@@ -44,10 +44,10 @@ CURRENT_VERSION = "0.1.1"
 CACHE_DURATION_SECONDS = 6 * 3600
 REFRESH_INTERVAL_SECONDS = 6 * 3600
 
-_update_result_cache: Optional[Dict[str, Any]] = None
+_update_result_cache: dict[str, Any] | None = None
 
 
-def _git_cmd(args: List[str], timeout: int = 10, cwd: Optional[Path] = None) -> Optional[str]:
+def _git_cmd(args: list[str], timeout: int = 10, cwd: Path | None = None) -> str | None:
     target_cwd = cwd or REPO_DIR
     try:
         res = subprocess.run(
@@ -66,7 +66,7 @@ def _git_cmd(args: List[str], timeout: int = 10, cwd: Optional[Path] = None) -> 
         return None
 
 
-def get_local_version_info() -> Dict[str, Any]:
+def get_local_version_info() -> dict[str, Any]:
     """Returns local git commit hash, branch, release tag, and version string."""
     sha = _git_cmd(["rev-parse", "--short=8", "HEAD"]) or "unknown"
     branch = _git_cmd(["branch", "--show-current"]) or "main"
@@ -85,7 +85,7 @@ def get_local_version_info() -> Dict[str, Any]:
     }
 
 
-def _recent_upstream_commits(n: int = 20) -> List[Dict[str, Any]]:
+def _recent_upstream_commits(n: int = 20) -> list[dict[str, Any]]:
     """
     Returns commits the local checkout is behind origin/main by, newest first.
     Replicates Hermes' git log format (%H%x1f%s%x1f%an%x1f%ct).
@@ -102,7 +102,7 @@ def _recent_upstream_commits(n: int = 20) -> List[Dict[str, Any]]:
     if not raw:
         return []
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for line in raw.splitlines():
         if not line.strip():
             continue
@@ -122,7 +122,7 @@ def _recent_upstream_commits(n: int = 20) -> List[Dict[str, Any]]:
 # Cache disque (principe Hermes : ~/.hermes/.update_check versionné par commit)
 # ---------------------------------------------------------------------------
 
-def _read_disk_cache() -> Optional[Dict[str, Any]]:
+def _read_disk_cache() -> dict[str, Any] | None:
     if not CACHE_FILE.exists():
         return None
     try:
@@ -132,7 +132,7 @@ def _read_disk_cache() -> Optional[Dict[str, Any]]:
         return None
 
 
-def _write_disk_cache(payload: Dict[str, Any], now: float) -> None:
+def _write_disk_cache(payload: dict[str, Any], now: float) -> None:
     try:
         CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         CACHE_FILE.write_text(
@@ -195,7 +195,7 @@ def _check_incomplete_marker() -> None:
 # Vérification des mises à jour (cœur du principe Hermes)
 # ---------------------------------------------------------------------------
 
-def check_for_updates(force: bool = False) -> Dict[str, Any]:
+def check_for_updates(force: bool = False) -> dict[str, Any]:
     """
     Vérifie si une mise à jour est disponible sur GitHub origin/main.
 
@@ -221,7 +221,7 @@ def check_for_updates(force: bool = False) -> Dict[str, Any]:
                 return payload
 
     version_info = get_local_version_info()
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "install_method": "git",
         "current_version": version_info["version"],
         "current_commit": version_info["commit"],
@@ -302,7 +302,7 @@ def prefetch_update_check():
 # Application de la mise à jour (principe Hermes : pull sûr + rollback)
 # ---------------------------------------------------------------------------
 
-async def apply_update() -> Dict[str, Any]:
+async def apply_update() -> dict[str, Any]:
     """
     Applique la mise à jour : pull fast-forward, rebuild frontend,
     rollback automatique si le build échoue, puis redémarrage du service.

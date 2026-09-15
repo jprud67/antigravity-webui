@@ -82,25 +82,27 @@ interface ChatCanvasProps {
   onRetry?: () => void;
 }
 
-export const copyTextToClipboard = async (text: string): Promise<boolean> => {
+const copyTextToClipboard = async (text: string): Promise<boolean> => {
   try {
-    if (navigator?.clipboard?.writeText) {
+    if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(text);
       return true;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Clipboard writeText error', e);
+  }
   try {
     const ta = document.createElement('textarea');
     ta.value = text;
-    ta.style.position = 'fixed';
+    ta.style.position = 'absolute';
     ta.style.opacity = '0';
     document.body.appendChild(ta);
-    ta.focus();
     ta.select();
     const ok = document.execCommand('copy');
     document.body.removeChild(ta);
     return ok;
   } catch (e) {
+    console.warn('Clipboard execCommand error', e);
     return false;
   }
 };

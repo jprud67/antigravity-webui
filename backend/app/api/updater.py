@@ -1,26 +1,23 @@
 import logging
-from fastapi import APIRouter, HTTPException, Query, Depends
-from typing import Dict, Any
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.auth import require_auth
-from app.services.updater import (
-    get_local_version_info,
-    check_for_updates,
-    apply_update
-)
+from app.services.updater import apply_update, check_for_updates, get_local_version_info
 
 logger = logging.getLogger("antigravity.updater_api")
 router = APIRouter(prefix="/api/system", tags=["system_updates"])
 
 
 @router.get("/version")
-def get_version(_ = Depends(require_auth)) -> Dict[str, Any]:
+def get_version(_ = Depends(require_auth)) -> dict[str, Any]:
     """Returns local version, commit, active branch, and release tag."""
     return get_local_version_info()
 
 
 @router.get("/update/check")
-async def api_check_for_updates(force: bool = Query(False), _ = Depends(require_auth)) -> Dict[str, Any]:
+async def api_check_for_updates(force: bool = Query(False), _ = Depends(require_auth)) -> dict[str, Any]:
     """
     Checks if an update is available on GitHub origin/main.
     Follows Hermes' non-blocking and cached update check architecture.
@@ -30,7 +27,7 @@ async def api_check_for_updates(force: bool = Query(False), _ = Depends(require_
 
 
 @router.post("/update/apply")
-async def api_apply_update(_ = Depends(require_auth)) -> Dict[str, Any]:
+async def api_apply_update(_ = Depends(require_auth)) -> dict[str, Any]:
     """
     Applies the latest update from origin/main, rebuilds frontend if required,
     and cleanly restarts the service in the background.

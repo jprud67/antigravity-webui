@@ -15,9 +15,9 @@ dans le dossier de données de l'application.
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, List, Optional
 
 from app.config import LOG_DIR
 from app.services.google_auth import is_hard_quota_error
@@ -25,7 +25,7 @@ from app.services.google_auth import is_hard_quota_error
 logger = logging.getLogger("antigravity.quota_watch")
 
 
-def _newest_log_after(since_ts: float) -> Optional[Path]:
+def _newest_log_after(since_ts: float) -> Path | None:
     """Retourne le journal cli-*.log créé/modifié depuis `since_ts` (le plus récent)."""
     candidates = []
     try:
@@ -45,14 +45,14 @@ def _newest_log_after(since_ts: float) -> Optional[Path]:
     return candidates[-1][1]
 
 
-def _expected_log_candidates(since_ts: float, window: float = 5.0) -> List[Path]:
+def _expected_log_candidates(since_ts: float, window: float = 5.0) -> list[Path]:
     """
     Le CLI agy nomme son journal ``cli-AAAAMMJJ_HHMMSS.log`` avec l'heure
     locale de démarrage de la session (vérifié empiriquement). On cible donc
     précisément les fichiers dont le nom correspond à la seconde du spawn
     (± quelques secondes) — ce qui lève l'ambiguïté entre runs concurrents.
     """
-    out: List[Path] = []
+    out: list[Path] = []
     base = int(since_ts) - 1
     for t in range(base, base + int(window) + 2):
         try:
@@ -73,7 +73,7 @@ async def watch_agy_log_for_quota(
     should_stop: Callable[[], bool],
     poll_interval: float = 1.0,
     max_seconds: float = 1800.0,
-) -> Optional[str]:
+) -> str | None:
     """
     Surveille le journal CLI créé par un run agy et retourne la première ligne
     signalant un quota DUR (compte épuisé), ou None si le run se termine avant.
@@ -83,7 +83,7 @@ async def watch_agy_log_for_quota(
     - `should_stop` : callback vérifié à chaque tour (ex: processus terminé).
     """
     start = time.time()
-    log_file: Optional[Path] = None
+    log_file: Path | None = None
     offset = 0
 
     while not should_stop() and (time.time() - start) < max_seconds:

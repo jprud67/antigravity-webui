@@ -10,9 +10,8 @@ L'exécution des jobs est assurée par le ticker interne
 import logging
 import time
 import uuid
-from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
@@ -33,16 +32,16 @@ class CreateCronJobRequest(BaseModel):
     name: str
     prompt: str
     schedule: str  # e.g. "*/15 * * * *" or "every 30m"
-    deliver: Optional[str] = "local"
-    skills: Optional[List[str]] = None
+    deliver: str | None = "local"
+    skills: list[str] | None = None
 
 
 class UpdateCronJobRequest(BaseModel):
-    name: Optional[str] = None
-    prompt: Optional[str] = None
-    schedule: Optional[str] = None
-    state: Optional[str] = None  # "scheduled" or "paused"
-    skills: Optional[List[str]] = None
+    name: str | None = None
+    prompt: str | None = None
+    schedule: str | None = None
+    state: str | None = None  # "scheduled" or "paused"
+    skills: list[str] | None = None
 
 
 @router.get("")

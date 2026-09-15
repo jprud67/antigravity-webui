@@ -1,14 +1,15 @@
 import logging
-from fastapi import APIRouter, HTTPException, Header, Query, Depends, status
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel
-from typing import Optional
+
 from app.services.auth import (
-    verify_password, 
-    create_access_token, 
-    verify_access_token, 
-    update_password, 
+    create_access_token,
     get_auth_config,
-    save_auth_config
+    save_auth_config,
+    update_password,
+    verify_access_token,
+    verify_password,
 )
 
 logger = logging.getLogger("antigravity.auth")
@@ -25,9 +26,9 @@ class AuthToggleRequest(BaseModel):
     enabled: bool
 
 def get_current_token(
-    authorization: Optional[str] = Header(None),
-    token: Optional[str] = Query(None)
-) -> Optional[str]:
+    authorization: str | None = Header(None),
+    token: str | None = Query(None)
+) -> str | None:
     if authorization:
         if authorization.startswith("Bearer "):
             return authorization[7:].strip()
@@ -36,7 +37,7 @@ def get_current_token(
         return token.strip()
     return None
 
-def require_auth(token: Optional[str] = Depends(get_current_token)):
+def require_auth(token: str | None = Depends(get_current_token)):
     config = get_auth_config()
     if not config.get("enabled", True):
         return True
@@ -49,7 +50,7 @@ def require_auth(token: Optional[str] = Depends(get_current_token)):
     return True
 
 @router.get("/status")
-def auth_status(authorization: Optional[str] = Header(None)):
+def auth_status(authorization: str | None = Header(None)):
     config = get_auth_config()
     enabled = config.get("enabled", True)
     token = None

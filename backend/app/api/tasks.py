@@ -1,22 +1,23 @@
+import logging
 import os
 import time
-import logging
+
 import psutil
-from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.config import BRAIN_DIR
+
 from app.api.auth import require_auth
+from app.config import BRAIN_DIR
 
 logger = logging.getLogger("antigravity.tasks")
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 class KillTaskRequest(BaseModel):
-    pid: Optional[int] = None
-    task_id: Optional[str] = None
+    pid: int | None = None
+    task_id: str | None = None
 
 @router.get("/list")
-def list_active_tasks(conversation_id: Optional[str] = None, _ = Depends(require_auth)):
+def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_auth)):
     tasks = []
     subagents = []
 
@@ -150,4 +151,4 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
         raise
     except Exception as e:
         logger.error(f"Error terminating PID {target_pid}: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur lors de l'arrêt du processus: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'arrêt du processus: {e!s}")

@@ -1,21 +1,27 @@
-import os
-import struct
 import asyncio
 import json
 import logging
+import os
+import struct
 import threading
 import time
 from pathlib import Path
-from typing import Optional, Dict
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+
 from app.api.auth import require_auth
-from app.services.auth import verify_access_token, get_auth_config
-from app.platform_utils import IS_WINDOWS, IS_MACOS, spawn_group_kwargs, terminate_process_group_async
+from app.platform_utils import (
+    IS_MACOS,
+    IS_WINDOWS,
+    spawn_group_kwargs,
+    terminate_process_group_async,
+)
+from app.services.auth import get_auth_config, verify_access_token
 
 # Modules POSIX uniquement — absents de Windows (import conditionnel obligatoire).
 try:
-    import pty
     import fcntl
+    import pty
     import termios
     HAS_PTY = True
 except ImportError:  # Windows
@@ -57,17 +63,17 @@ class PersistentTerminalSession:
         self.session_id = session_id
         self.cwd = cwd
         self.master_fd: int = -1
-        self.proc: Optional[asyncio.subprocess.Process] = None
+        self.proc: asyncio.subprocess.Process | None = None
         self.win_pty = None  # winpty.PtyProcess (Windows)
-        self._win_reader: Optional[threading.Thread] = None
+        self._win_reader: threading.Thread | None = None
         self._closing = False
         self.scrollback: bytearray = bytearray()
         self.max_scrollback = 1024 * 1024  # 1 MB memory buffer
-        self.active_websocket: Optional[WebSocket] = None
+        self.active_websocket: WebSocket | None = None
         self.last_active: float = time.time()
         self.cols: int = 80
         self.rows: int = 24
-        self.loop: Optional[asyncio.AbstractEventLoop] = None
+        self.loop: asyncio.AbstractEventLoop | None = None
 
     def is_alive(self) -> bool:
         if IS_WINDOWS:
@@ -253,7 +259,7 @@ class PersistentTerminalSession:
             self.proc = None
         logger.info(f"Persistent PTY session terminated: {self.session_id}")
 
-_sessions: Dict[str, PersistentTerminalSession] = {}
+_sessions: dict[str, PersistentTerminalSession] = {}
 _sessions_lock = asyncio.Lock()
 
 async def get_or_create_session(session_id: str, cwd: str) -> tuple[PersistentTerminalSession, bool]:
@@ -280,9 +286,9 @@ async def kill_session(session_id: str):
 @router.websocket("/ws/terminal")
 async def terminal_websocket(
     websocket: WebSocket,
-    token: Optional[str] = None,
-    workspace: Optional[str] = None,
-    session_id: Optional[str] = None
+    token: str | None = None,
+    workspace: str | None = None,
+    session_id: str | None = None
 ):
     # Verify authentication
     config = get_auth_config()
@@ -323,9 +329,9 @@ async def terminal_websocket(
     try:
         while True:
             message = await websocket.receive()
-            if "bytes" in message and message["bytes"]:
+            if message.get("bytes"):
                 await session.write(message["bytes"])
-            elif "text" in message and message["text"]:
+            elif message.get("text"):
                 text = message["text"]
                 if text.startswith("{"):
                     try:
