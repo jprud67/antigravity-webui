@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
@@ -60,8 +61,7 @@ def auth_status(token: str | None = Depends(get_current_token)):
     }
 
 @router.post("/login")
-def login(req: LoginRequest):
-    import time as _time
+async def login(req: LoginRequest):
     if verify_password(req.password):
         token = create_access_token(expires_in_days=14)
         logger.info("Successful authentication login")
@@ -71,8 +71,8 @@ def login(req: LoginRequest):
             "message": "Connexion réussie"
         }
     else:
-        # Délai constant anti-bruteforce (0.5s) — indépendant du temps de vérification
-        _time.sleep(0.5)
+        # Délai constant anti-bruteforce (0.5s) — asynchrone pour ne pas bloquer les threads workers
+        await asyncio.sleep(0.5)
         logger.warning("Failed authentication login attempt")
         raise HTTPException(status_code=401, detail="Mot de passe incorrect.")
 

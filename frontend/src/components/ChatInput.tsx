@@ -1535,6 +1535,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       </div>
     </div>
-    </div>
-  );
+  </div>
+);
 };

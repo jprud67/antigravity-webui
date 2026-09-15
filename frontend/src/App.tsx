@@ -209,6 +209,8 @@ export function App() {
     }
     setActiveConversationId(convId);
     chatSocket.setCurrentConversation(convId);
+    setPendingApproval(null);
+    setQueueCount(0);
     try {
       const data = await fetchConversationTranscript(convId);
       const chatMsgs = parseStepsToMessages(data.steps || []);
@@ -781,11 +783,17 @@ export function App() {
           }
         });
       } else if (event.event === 'approval_request') {
-        setPendingApproval({
-          toolName: event.tool_name || 'Action système',
-          command: event.command,
-          path: event.path,
-        });
+        if (!event.conversation_id || !activeConversationIdRef.current || event.conversation_id === activeConversationIdRef.current) {
+          setPendingApproval({
+            toolName: event.tool_name || 'Action système',
+            command: event.command,
+            path: event.path,
+          });
+        }
+      } else if (event.event === 'approval_resolved') {
+        if (!event.conversation_id || !activeConversationIdRef.current || event.conversation_id === activeConversationIdRef.current) {
+          setPendingApproval(null);
+        }
       } else if (event.event === 'queued') {
         if (typeof event.queue_size === 'number') {
           setQueueCount(event.queue_size);

@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -29,6 +30,8 @@ CRON_DIR = Path(os.environ.get("ANTIGRAVITY_CRON_DIR", str(GEMINI_DIR / "cron"))
 JOBS_FILE = CRON_DIR / "jobs.json"
 HEARTBEAT_FILE = CRON_DIR / "ticker_heartbeat"
 OUTPUT_DIR = CRON_DIR / "output"
+
+_jobs_lock = threading.RLock()
 
 
 def ensure_dirs() -> None:
@@ -47,40 +50,42 @@ def write_heartbeat() -> None:
 
 def load_jobs() -> dict[str, Any]:
     """Charge jobs.json (crée une structure vide si absent ou illisible)."""
-    ensure_dirs()
-    if not JOBS_FILE.exists():
-        return {"jobs": [], "updated_at": now_iso()}
-    try:
-        with open(JOBS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception as e:
-        logger.error(f"Lecture de jobs.json impossible: {e}")
-        return {"jobs": [], "updated_at": now_iso()}
+    with _jobs_lock:
+        ensure_dirs()
+        if not JOBS_FILE.exists():
+            return {"jobs": [], "updated_at": now_iso()}
+        try:
+            with open(JOBS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            logger.error(f"Lecture de jobs.json impossible: {e}")
+            return {"jobs": [], "updated_at": now_iso()}
 
-    if isinstance(data, dict):
-        data.setdefault("jobs", [])
-        return data
-    if isinstance(data, list):
-        return {"jobs": data, "updated_at": now_iso()}
-    return {"jobs": [], "updated_at": now_iso()}
+        if isinstance(data, dict):
+            data.setdefault("jobs", [])
+            return data
+        if isinstance(data, list):
+            return {"jobs": data, "updated_at": now_iso()}
+        return {"jobs": [], "updated_at": now_iso()}
 
 
 def save_jobs(data: dict[str, Any]) -> None:
     """Écrit jobs.json de façon atomique."""
-    ensure_dirs()
-    data["updated_at"] = now_iso()
-    temp_path = JOBS_FILE.parent / f"{JOBS_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
-    try:
-        with open(temp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        temp_path.replace(JOBS_FILE)
-    except Exception:
-        if temp_path.exists():
-            try:
-                temp_path.unlink()
-            except Exception:
-                pass
-        raise
+    with _jobs_lock:
+        ensure_dirs()
+        data["updated_at"] = now_iso()
+        temp_path = JOBS_FILE.parent / f"{JOBS_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
+        try:
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            temp_path.replace(JOBS_FILE)
+        except Exception:
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception:
+                    pass
+            raise
 
 
 def compute_next_run(schedule: str | dict[str, Any]) -> str | None:

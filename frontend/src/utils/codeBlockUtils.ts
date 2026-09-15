@@ -17,8 +17,9 @@ export const copyText = async (text: string): Promise<boolean> => {
   } catch {
     // Fallback below
   }
+  let el: HTMLTextAreaElement | null = null;
   try {
-    const el = document.createElement('textarea');
+    el = document.createElement('textarea');
     el.value = text;
     el.setAttribute('readonly', '');
     el.style.contain = 'strict';
@@ -27,10 +28,12 @@ export const copyText = async (text: string): Promise<boolean> => {
     el.style.fontSize = '12pt';
     document.body.appendChild(el);
     el.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(el);
-    return ok;
+    return document.execCommand('copy');
   } catch {
     return false;
+  } finally {
+    if (el && el.parentNode) {
+      el.parentNode.removeChild(el);
+    }
   }
 };
