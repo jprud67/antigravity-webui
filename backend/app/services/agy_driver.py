@@ -255,6 +255,7 @@ async def stream_turn(
 
         stderr_task = asyncio.create_task(read_stderr())
 
+        assert proc.stdout is not None
         while True:
             line = await proc.stdout.readline()
             if not line:

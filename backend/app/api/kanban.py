@@ -108,7 +108,7 @@ def list_tasks(
     try:
         with get_db() as conn:
             query = "SELECT * FROM tasks WHERE 1=1"
-            params = []
+            params: list = []
             if status:
                 query += " AND status = ?"
                 params.append(status)
@@ -203,7 +203,7 @@ def update_task(task_id: str, req: UpdateTaskRequest, _ = Depends(require_auth))
 
             current = dict(row)
             updates = []
-            params = []
+            params: list = []
 
             if req.title is not None:
                 updates.append("title = ?")
