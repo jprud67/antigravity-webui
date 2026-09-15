@@ -10,6 +10,7 @@ from typing import Any
 
 from app.config import BRAIN_DIR, CONVERSATION_DB, DEFAULT_WORKSPACE, SETTINGS_FILE
 from app.services.session_metadata import (
+    bulk_delete_session_meta,
     delete_session_meta,
     get_all_session_metadata,
     get_session_meta,
@@ -547,6 +548,25 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
         "summary": summary_text
     }
 
+
+def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
+    if not conversation_ids:
+        return True
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.executemany("DELETE FROM conversation_summaries WHERE conversation_id = ?", [(cid,) for cid in conversation_ids])
+        conn.commit()
+    finally:
+        conn.close()
+
+    for cid in conversation_ids:
+        conv_dir = BRAIN_DIR / cid
+        if conv_dir.exists():
+            shutil.rmtree(conv_dir, ignore_errors=True)
+
+    bulk_delete_session_meta(conversation_ids)
+    return True
 
 def delete_conversation(conversation_id: str) -> bool:
     conn = get_db_connection()

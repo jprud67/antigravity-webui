@@ -5,11 +5,14 @@ from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.services.session_metadata import (
+    bulk_update_session_meta,
+    bulk_update_session_meta_batch,
     get_all_session_metadata,
     get_session_meta,
     update_session_meta,
 )
 from app.services.storage import (
+    bulk_delete_conversations,
     calculate_conversation_tokens,
     create_conversation_handoff,
     delete_conversation,
@@ -73,48 +76,56 @@ def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
     results = {}
 
     if action == "delete":
-        for cid in ids:
-            try:
-                delete_conversation(cid)
+        try:
+            bulk_delete_conversations(ids)
+            for cid in ids:
                 results[cid] = True
-            except Exception:
+        except Exception:
+            for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
 
     elif action in ("pin", "unpin"):
         pinned = (action == "pin")
-        for cid in ids:
-            try:
-                update_session_meta(cid, {"pinned": pinned})
+        try:
+            bulk_update_session_meta(ids, {"pinned": pinned})
+            for cid in ids:
                 results[cid] = True
-            except Exception:
+        except Exception:
+            for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
 
     elif action in ("archive", "unarchive"):
         archived = (action == "archive")
-        for cid in ids:
-            try:
-                update_session_meta(cid, {"archived": archived})
+        try:
+            bulk_update_session_meta(ids, {"archived": archived})
+            for cid in ids:
                 results[cid] = True
-            except Exception:
+        except Exception:
+            for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
 
     elif action == "tag":
         tags = req.payload.get("tags", []) if req.payload else []
         mode = req.payload.get("mode", "add") if req.payload else "add"
+        updates_per_id = {}
         for cid in ids:
-            try:
-                if mode == "replace":
-                    merged = list(dict.fromkeys(tags))
-                else:
-                    current_meta = get_session_meta(cid)
-                    existing_tags = current_meta.get("tags") or []
-                    merged = list(dict.fromkeys(existing_tags + tags))
-                update_session_meta(cid, {"tags": merged})
+            if mode == "replace":
+                merged = list(dict.fromkeys(tags))
+            else:
+                current_meta = get_session_meta(cid)
+                existing_tags = current_meta.get("tags") or []
+                merged = list(dict.fromkeys(existing_tags + tags))
+            updates_per_id[cid] = {"tags": merged}
+        
+        try:
+            bulk_update_session_meta_batch(updates_per_id)
+            for cid in ids:
                 results[cid] = True
-            except Exception:
+        except Exception:
+            for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
 
@@ -124,13 +135,14 @@ def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
         if "project" in payload:
             updates["project"] = payload.get("project") or ""
         if "projectColor" in payload:
-            # Key-presence based so an empty color can explicitly clear the project color
             updates["projectColor"] = payload.get("projectColor") or ""
-        for cid in ids:
-            try:
-                update_session_meta(cid, updates)
+        
+        try:
+            bulk_update_session_meta(ids, updates)
+            for cid in ids:
                 results[cid] = True
-            except Exception:
+        except Exception:
+            for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
 

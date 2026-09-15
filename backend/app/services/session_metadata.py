@@ -36,22 +36,39 @@ def get_session_meta(conversation_id: str) -> dict[str, Any]:
     })
 
 def update_session_meta(conversation_id: str, updates: dict[str, Any]) -> dict[str, Any]:
+    return bulk_update_session_meta([conversation_id], updates)[conversation_id]
+
+def bulk_update_session_meta(conversation_ids: list[str], updates: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return bulk_update_session_meta_batch({cid: updates for cid in conversation_ids})
+
+def bulk_update_session_meta_batch(updates_per_id: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     all_meta = get_all_session_metadata()
-    current = all_meta.get(conversation_id, {
-        "pinned": False,
-        "archived": False,
-        "tags": [],
-        "project": "",
-        "projectColor": "",
-        "customTitle": ""
-    })
-    current.update(updates)
-    all_meta[conversation_id] = current
-    save_all_session_metadata(all_meta)
-    return current
+    results = {}
+    for cid, updates in updates_per_id.items():
+        current = all_meta.get(cid, {
+            "pinned": False,
+            "archived": False,
+            "tags": [],
+            "project": "",
+            "projectColor": "",
+            "customTitle": ""
+        })
+        current.update(updates)
+        all_meta[cid] = current
+        results[cid] = current
+    if updates_per_id:
+        save_all_session_metadata(all_meta)
+    return results
 
 def delete_session_meta(conversation_id: str) -> None:
+    bulk_delete_session_meta([conversation_id])
+
+def bulk_delete_session_meta(conversation_ids: list[str]) -> None:
     all_meta = get_all_session_metadata()
-    if conversation_id in all_meta:
-        del all_meta[conversation_id]
+    changed = False
+    for cid in conversation_ids:
+        if cid in all_meta:
+            del all_meta[cid]
+            changed = True
+    if changed:
         save_all_session_metadata(all_meta)

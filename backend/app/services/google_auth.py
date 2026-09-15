@@ -462,11 +462,15 @@ def import_raw_token(token_data: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Données de jeton invalides : adresse email introuvable.")
 
     account_file = ACCOUNTS_DIR / f"{email}.json"
-    with open(account_file, "w") as f:
+    temp_acc = Path(str(account_file) + ".tmp")
+    with open(temp_acc, "w") as f:
         json.dump(token_data, f, indent=2)
+    temp_acc.replace(account_file)
 
-    with open(TOKEN_FILE, "w") as f:
+    temp_file = Path(str(TOKEN_FILE) + ".tmp")
+    with open(temp_file, "w") as f:
         json.dump(token_data, f, indent=2)
+    temp_file.replace(TOKEN_FILE)
     restrict_file_permissions(TOKEN_FILE)
 
     return {
