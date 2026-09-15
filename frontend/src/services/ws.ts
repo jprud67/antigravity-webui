@@ -9,6 +9,7 @@ export class ChatWebSocketClient {
   private heartbeatTimer: any = null;
   private heartbeatTimeout: any = null;
   private _status: 'connected' | 'disconnected' | 'reconnecting' = 'disconnected';
+  private currentConversationId: string | null = null;
 
   // Heartbeat config
   private static readonly HEARTBEAT_INTERVAL = 5000; // 5s ping
@@ -24,6 +25,13 @@ export class ChatWebSocketClient {
 
   public get connectionStatus() {
     return this._status;
+  }
+
+  public setCurrentConversation(convId: string | null) {
+    this.currentConversationId = convId;
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && convId) {
+      this.sendAttach(convId);
+    }
   }
 
   private setStatus(status: 'connected' | 'disconnected' | 'reconnecting') {
@@ -51,6 +59,9 @@ export class ChatWebSocketClient {
         console.log('[WS] Connected to Antigravity WebUI chat socket');
         this.setStatus('connected');
         this.startHeartbeat();
+        if (this.currentConversationId) {
+          this.sendAttach(this.currentConversationId);
+        }
       };
 
       this.ws.onmessage = (e) => {
@@ -153,6 +164,13 @@ export class ChatWebSocketClient {
     };
   }
 
+  public sendAttach(conversationId?: string) {
+    const cid = conversationId || this.currentConversationId;
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ action: 'attach', conversation_id: cid }));
+    }
+  }
+
   public sendPrompt(params: {
     prompt: string;
     conversationId?: string;
@@ -167,10 +185,15 @@ export class ChatWebSocketClient {
       throw new Error('Connexion WebSocket en cours de rétablissement. Réessayez dans un instant.');
     }
 
+    const cid = params.conversationId || this.currentConversationId;
+    if (cid) {
+      this.currentConversationId = cid;
+    }
+
     const payload = {
       action: 'prompt',
       prompt: params.prompt,
-      conversation_id: params.conversationId,
+      conversation_id: cid,
       workspace_path: params.workspacePath,
       model: params.model,
       effort: params.effort,
@@ -181,21 +204,24 @@ export class ChatWebSocketClient {
     this.ws.send(JSON.stringify(payload));
   }
 
-  public sendInterrupt() {
+  public sendInterrupt(conversationId?: string) {
+    const cid = conversationId || this.currentConversationId;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ action: 'interrupt' }));
+      this.ws.send(JSON.stringify({ action: 'interrupt', conversation_id: cid }));
     }
   }
 
-  public sendClearQueue() {
+  public sendClearQueue(conversationId?: string) {
+    const cid = conversationId || this.currentConversationId;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ action: 'clear_queue' }));
+      this.ws.send(JSON.stringify({ action: 'clear_queue', conversation_id: cid }));
     }
   }
 
-  public sendApproval(decision: 'allow-once' | 'allow-session' | 'always-allow' | 'deny', rule?: string) {
+  public sendApproval(decision: 'allow-once' | 'allow-session' | 'always-allow' | 'deny', rule?: string, conversationId?: string) {
+    const cid = conversationId || this.currentConversationId;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ action: 'approval', decision, rule }));
+      this.ws.send(JSON.stringify({ action: 'approval', decision, rule, conversation_id: cid }));
     }
   }
 }

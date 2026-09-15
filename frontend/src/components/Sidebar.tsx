@@ -884,9 +884,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             </button>
 
                             {/* Normal icon (hidden on hover) */}
-                            {conv.projectColor ? (
-                              <span
-                                className="w-2 h-2 rounded-full shrink-0 shadow-xs group-hover:hidden"
+                            {conv.is_running ? (
+                              <span className="relative flex h-2.5 w-2.5 shrink-0 group-hover:hidden" title="Tâche en cours d'exécution en arrière-plan...">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                              </span>
+                            ) : conv.projectColor ? (
+                              <div
+                                className="w-2.5 h-2.5 rounded-full shrink-0 group-hover:hidden"
                                 style={{ backgroundColor: conv.projectColor }}
                                 title={`Projet: ${conv.project || 'Sans nom'}`}
                               />

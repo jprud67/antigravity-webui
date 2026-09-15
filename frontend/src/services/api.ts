@@ -797,3 +797,28 @@ export async function exportConversationJSON(conversationId: string): Promise<Bl
   return res.blob();
 }
 
+export async function fetchUsageQuota(): Promise<any> {
+  const res = await fetch(`${API_BASE}/settings/usage`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error("Impossible de récupérer les quotas Antigravity");
+  return res.json();
+}
+
+export async function fetchCredits(): Promise<any> {
+  const res = await fetch(`${API_BASE}/settings/credits`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error("Impossible de récupérer les crédits Antigravity");
+  return res.json();
+}
+
+export async function fetchChangelog(): Promise<any> {
+  const res = await fetch(`${API_BASE}/settings/changelog`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error("Impossible de récupérer le changelog Antigravity");
+  return res.json();
+}
+
+

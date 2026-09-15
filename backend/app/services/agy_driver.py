@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 from typing import AsyncGenerator, Dict, Any, Optional, List, Tuple
 from pathlib import Path
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
@@ -256,4 +257,82 @@ async def stream_turn(
                 await stderr_task
             except (asyncio.CancelledError, Exception):
                 pass
+
+
+_quota_cache: Dict[str, Any] = {"data": None, "timestamp": 0.0}
+_credits_cache: Dict[str, Any] = {"data": None, "timestamp": 0.0}
+_changelog_cache: Dict[str, Any] = {"data": None, "timestamp": 0.0}
+
+
+async def get_usage_quota() -> Dict[str, Any]:
+    global _quota_cache
+    now = time.time()
+    if _quota_cache["data"] is not None and (now - _quota_cache["timestamp"]) < 10:
+        return _quota_cache["data"]
+
+    cmd = [AGY_BIN, "--output-format", "json", "-p", "/usage"]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+        if proc.returncode == 0 and stdout:
+            data = json.loads(stdout.decode(errors="replace"))
+            _quota_cache = {"data": data, "timestamp": now}
+            return data
+    except Exception as e:
+        logger.warning(f"Error fetching usage quota: {e}")
+
+    return _quota_cache["data"] or {"status": "unavailable", "message": "Impossible de charger les quotas Antigravity."}
+
+
+async def get_credits() -> Dict[str, Any]:
+    global _credits_cache
+    now = time.time()
+    if _credits_cache["data"] is not None and (now - _credits_cache["timestamp"]) < 30:
+        return _credits_cache["data"]
+
+    cmd = [AGY_BIN, "--output-format", "json", "-p", "/credits"]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+        if proc.returncode == 0 and stdout:
+            data = json.loads(stdout.decode(errors="replace"))
+            _credits_cache = {"data": data, "timestamp": now}
+            return data
+    except Exception as e:
+        logger.warning(f"Error fetching credits: {e}")
+
+    return _credits_cache["data"] or {"status": "unavailable"}
+
+
+async def get_changelog() -> Dict[str, Any]:
+    global _changelog_cache
+    now = time.time()
+    if _changelog_cache["data"] is not None and (now - _changelog_cache["timestamp"]) < 300:
+        return _changelog_cache["data"]
+
+    cmd = [AGY_BIN, "--output-format", "json", "-p", "/changelog"]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+        if proc.returncode == 0 and stdout:
+            data = json.loads(stdout.decode(errors="replace"))
+            _changelog_cache = {"data": data, "timestamp": now}
+            return data
+    except Exception as e:
+        logger.warning(f"Error fetching changelog: {e}")
+
+    return _changelog_cache["data"] or {"status": "unavailable"}
+
 

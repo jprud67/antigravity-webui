@@ -37,7 +37,9 @@ import {
   Languages,
   ListTodo,
   KeyRound,
-  UserCheck
+  UserCheck,
+  Coins,
+  History
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -338,10 +340,34 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
   },
   {
     cmd: '/usage',
-    desc: 'Afficher les métriques de tokens et de contexte',
+    desc: 'Afficher les quotas Antigravity et les métriques de tokens',
     category: 'system',
     icon: PieChart,
     color: 'text-yellow-400',
+    isAction: true
+  },
+  {
+    cmd: '/quota',
+    desc: 'Alias de /usage pour afficher les quotas et limites de tokens',
+    category: 'system',
+    icon: PieChart,
+    color: 'text-yellow-400',
+    isAction: true
+  },
+  {
+    cmd: '/credits',
+    desc: 'Afficher les crédits Antigravity G1 et le lien de recharge',
+    category: 'system',
+    icon: Coins,
+    color: 'text-amber-400',
+    isAction: true
+  },
+  {
+    cmd: '/changelog',
+    desc: 'Afficher les notes de version et nouveautés d\'Antigravity CLI',
+    category: 'system',
+    icon: History,
+    color: 'text-sky-400',
     isAction: true
   },
   {

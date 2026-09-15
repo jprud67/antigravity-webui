@@ -1,0 +1,553 @@
+import asyncio
+import json
+import logging
+import os
+import signal
+import time
+from typing import Optional, Dict, Any, Set, List
+from fastapi import WebSocket
+from app.services.agy_driver import stream_turn
+from app.services.storage import get_settings, save_settings
+from app.services.google_auth import is_quota_error, switch_to_next_healthy_account, get_active_account
+
+logger = logging.getLogger("antigravity.execution")
+
+
+class ExecutionSession:
+    """
+    Represents an ongoing execution lifecycle for a conversation.
+    Decoupled from ephemeral client WebSocket connections.
+    Runs until natural completion or explicit user cancellation ('Arrêter').
+    """
+    def __init__(self, conversation_id: Optional[str] = None, workspace_path: Optional[str] = None):
+        self.conversation_id: Optional[str] = conversation_id
+        self.workspace_path: Optional[str] = workspace_path
+        self.message_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
+        self.subscribers: Set[WebSocket] = set()
+        self.active_proc: Optional[asyncio.subprocess.Process] = None
+        self.active_task: Optional[asyncio.Task] = None
+        self.worker_task: Optional[asyncio.Task] = None
+        self.is_running: bool = False
+        self.is_steering: bool = False
+        self.started_at: float = 0.0
+
+        # Live state for reconnection and late hydration
+        self.live_thought: str = ""
+        self.live_content: str = ""
+        self.live_tool_calls: List[Dict[str, Any]] = []
+        self.live_usage: Optional[Dict[str, Any]] = None
+        self.pending_approval: Optional[Dict[str, Any]] = None
+        self.recent_events: List[Dict[str, Any]] = []
+
+    def add_subscriber(self, ws: WebSocket):
+        self.subscribers.add(ws)
+
+    def remove_subscriber(self, ws: WebSocket):
+        self.subscribers.discard(ws)
+
+    def get_live_state(self) -> Dict[str, Any]:
+        return {
+            "conversation_id": self.conversation_id,
+            "is_running": self.is_running,
+            "queue_size": self.message_queue.qsize(),
+            "started_at": self.started_at,
+            "live_state": {
+                "thought": self.live_thought,
+                "content": self.live_content,
+                "tool_calls": self.live_tool_calls,
+                "usage": self.live_usage,
+                "pending_approval": self.pending_approval,
+            },
+            "recent_events": self.recent_events[-30:]
+        }
+
+    async def broadcast(self, event: Dict[str, Any]):
+        # Keep ring buffer of recent events
+        self.recent_events.append(event)
+        if len(self.recent_events) > 100:
+            self.recent_events.pop(0)
+
+        # Update live state from event
+        self._update_live_state(event)
+
+        # Broadcast to all connected subscribers
+        dead = set()
+        for ws in list(self.subscribers):
+            try:
+                await ws.send_json(event)
+            except Exception:
+                dead.add(ws)
+        for ws in dead:
+            self.subscribers.discard(ws)
+
+    def _update_live_state(self, event: Dict[str, Any]):
+        evt_type = event.get("event")
+        if evt_type == "init":
+            cid = event.get("conversation_id")
+            if cid:
+                self.conversation_id = cid
+                execution_manager.register_session_cid(self, cid)
+
+        elif evt_type == "step_update":
+            update = event.get("step_update", {})
+            cid = update.get("conversation_id")
+            if cid:
+                self.conversation_id = cid
+                execution_manager.register_session_cid(self, cid)
+
+            if update.get("thinking"):
+                self.live_thought += update["thinking"]
+
+            if update.get("step_type") == "agent_response" and update.get("text_delta"):
+                self.live_content += update["text_delta"]
+
+            if update.get("usage"):
+                self.live_usage = update["usage"]
+
+            if update.get("step_type") in ("permission_request", "ask_permission"):
+                self.pending_approval = {
+                    "toolName": update.get("tool_name") or "Action Requise",
+                    "command": update.get("command"),
+                    "path": update.get("path")
+                }
+
+            if update.get("step_type") == "tool":
+                tool_name = update.get("tool_name") or update.get("tool_info", {}).get("name") or "tool"
+                tool_args = update.get("tool_info", {}).get("parameters") or update.get("parameters")
+                tool_output = update.get("tool_info", {}).get("output")
+                is_done = update.get("state") == "DONE"
+
+                found = False
+                for t in self.live_tool_calls:
+                    if t.get("name") == tool_name and t.get("status") == "running":
+                        if is_done:
+                            t["status"] = "done"
+                            t["result"] = tool_output
+                        found = True
+                        break
+                if not found:
+                    self.live_tool_calls.append({
+                        "name": tool_name,
+                        "args": tool_args,
+                        "result": tool_output,
+                        "status": "done" if is_done else "running"
+                    })
+
+        elif evt_type == "command_result":
+            cmd = event.get("command", {})
+            c_name = cmd.get("name")
+            c_data = cmd.get("data", {})
+            if c_name == "usage":
+                lines = ["### 📊 Quotas & Limites Antigravity (Google Cloud)\n"]
+                desc = c_data.get("description")
+                if desc:
+                    lines.append(f"> {desc}\n")
+                groups = c_data.get("groups", [])
+                for g in groups:
+                    lines.append(f"#### {g.get('name')}")
+                    lines.append("| Limite | Restant | Réinitialisation |")
+                    lines.append("| :--- | :---: | :--- |")
+                    for b in g.get("buckets", []):
+                        pct = int(round(b.get("remaining_fraction", 0) * 100))
+                        reset = b.get("reset_time", "N/A")
+                        lines.append(f"| **{b.get('name')}** | `{pct}%` | `{reset}` |")
+                    lines.append("")
+                self.live_content = "\n".join(lines)
+            elif c_name == "credits":
+                rem = c_data.get("remaining_credits", 0)
+                uri = c_data.get("upgrade_uri", "")
+                self.live_content = f"### 💳 Crédits Antigravity G1\n\n- **Crédits restants :** `{rem}`\n- **Recharge / Souscription :** [{uri}]({uri})"
+
+        elif evt_type == "result":
+            res = event.get("result", {})
+            resp = res.get("response")
+            if resp:
+                if not self.live_content:
+                    if "\t" in resp and "\n" in resp:
+                        raw_lines = [l.strip() for l in resp.strip().splitlines() if l.strip()]
+                        table_lines = ["| Élément / Modèle | Métrique | Valeur | Réinitialisation |", "| :--- | :--- | :---: | :--- |"]
+                        for line in raw_lines:
+                            cols = [c.strip() for c in line.split("\t") if c.strip()]
+                            if len(cols) >= 4:
+                                table_lines.append(f"| **{cols[0]}** | {cols[1]} | `{cols[2]}` | `{cols[3]}` |")
+                            elif len(cols) == 3:
+                                table_lines.append(f"| **{cols[0]}** | {cols[1]} | `{cols[2]}` | - |")
+                            elif len(cols) == 2:
+                                table_lines.append(f"| **{cols[0]}** | {cols[1]} | - | - |")
+                            else:
+                                table_lines.append(f"| {line} | | | |")
+                        self.live_content = "\n".join(table_lines)
+                    else:
+                        self.live_content = resp
+            if res.get("usage"):
+                self.live_usage = res["usage"]
+
+        elif evt_type == "approval_request":
+            self.pending_approval = {
+                "toolName": event.get("tool_name") or "Action système",
+                "command": event.get("command"),
+                "path": event.get("path")
+            }
+        elif evt_type == "approval_resolved":
+            self.pending_approval = None
+        elif evt_type in ("done", "interrupted", "error"):
+            self.pending_approval = None
+
+    async def run_turn(self, params: Dict[str, Any]):
+        self.is_running = True
+        self.started_at = time.time()
+        self.live_thought = ""
+        self.live_content = ""
+        self.live_tool_calls = []
+        self.pending_approval = None
+
+        prompt = params.get("prompt", "")
+        conv_id = params.get("conversation_id") or self.conversation_id
+        ws_path = params.get("workspace_path") or self.workspace_path
+        model = params.get("model")
+        effort = params.get("effort")
+        auto_approve = params.get("auto_approve", True)
+
+        def on_proc_spawned(p: asyncio.subprocess.Process):
+            self.active_proc = p
+
+        attempt = 0
+        max_failover_attempts = 5
+
+        try:
+            while attempt < max_failover_attempts:
+                attempt += 1
+                quota_error_detected = False
+                quota_error_msg = ""
+
+                try:
+                    active_cid = self.conversation_id or conv_id
+                    logger.info(f"[Session {active_cid}] Starting turn in background (attempt {attempt})...")
+                    async for event in stream_turn(
+                        prompt=prompt,
+                        conversation_id=active_cid,
+                        workspace_path=ws_path,
+                        model=model,
+                        effort=effort,
+                        auto_approve=auto_approve,
+                        proc_callback=on_proc_spawned
+                    ):
+                        cid = event.get("conversation_id") or event.get("step_update", {}).get("conversation_id")
+                        if cid and not self.conversation_id:
+                            self.conversation_id = cid
+                            execution_manager.register_session_cid(self, cid)
+
+                        # Check for quota error in event
+                        if event.get("event") == "error":
+                            err_msg = event.get("message", "")
+                            if is_quota_error(err_msg):
+                                quota_error_detected = True
+                                quota_error_msg = err_msg
+                                logger.warning(f"[Session {self.conversation_id}] Quota error detected in event: {err_msg}")
+                                break
+
+                        await self.broadcast(event)
+
+                except asyncio.CancelledError:
+                    if not self.is_steering:
+                        logger.info(f"[Session {self.conversation_id}] Turn cancelled by user interruption.")
+                        await self.broadcast({
+                            "event": "interrupted",
+                            "conversation_id": self.conversation_id,
+                            "message": "Exécution interrompue."
+                        })
+                    else:
+                        logger.info(f"[Session {self.conversation_id}] Turn cancelled for steering directive.")
+                    return
+                except Exception as e:
+                    err_text = str(e)
+                    if is_quota_error(err_text):
+                        quota_error_detected = True
+                        quota_error_msg = err_text
+                    else:
+                        logger.error(f"[Session {self.conversation_id}] Error during turn execution: {e}")
+                        await self.broadcast({
+                            "event": "error",
+                            "conversation_id": self.conversation_id,
+                            "message": str(e)
+                        })
+                        return
+
+                if quota_error_detected:
+                    current_meta = get_active_account()
+                    current_email = current_meta.get("email") if current_meta else "inconnu"
+                    logger.warning(
+                        f"[Session {self.conversation_id}] Google Account {current_email} reached quota limits. Triggering auto-failover..."
+                    )
+
+                    new_account = switch_to_next_healthy_account(exclude_email=current_email, model=model)
+                    if new_account:
+                        logger.info(
+                            f"[Session {self.conversation_id}] Auto-failover: Switched from {current_email} to {new_account}. Relaunching task immediately..."
+                        )
+                        await self.broadcast({
+                            "event": "account_failover",
+                            "conversation_id": self.conversation_id,
+                            "previous_account": current_email,
+                            "new_account": new_account,
+                            "message": f"Quota atteint sur le compte Google {current_email}. Basculement automatique sur {new_account} et relance de la tâche..."
+                        })
+                        # Brief 1s pause before restarting to ensure token file is cleanly committed and locked
+                        await asyncio.sleep(1.0)
+                        continue
+                    else:
+                        logger.error(f"[Session {self.conversation_id}] Auto-failover failed: No alternative healthy accounts.")
+                        await self.broadcast({
+                            "event": "error",
+                            "conversation_id": self.conversation_id,
+                            "message": f"Quota atteint sur le compte Google ({current_email}). Aucun autre compte avec quota disponible n'a été trouvé. Veuillez patienter jusqu'à la réinitialisation ou ajouter un nouveau compte Google."
+                        })
+                        return
+                else:
+                    logger.info(f"[Session {self.conversation_id}] Turn finished naturally.")
+                    await self.broadcast({
+                        "event": "done",
+                        "conversation_id": self.conversation_id,
+                        "queue_size": self.message_queue.qsize()
+                    })
+                    return
+
+        finally:
+            self.active_proc = None
+            self.is_running = False
+
+    async def queue_worker(self):
+        while True:
+            try:
+                item = await self.message_queue.get()
+            except asyncio.CancelledError:
+                break
+            self.is_steering = False
+            self.active_task = asyncio.create_task(self.run_turn(item))
+            try:
+                await self.active_task
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.error(f"[Session {self.conversation_id}] Worker task error: {e}")
+            self.message_queue.task_done()
+
+
+class ExecutionManager:
+    """
+    Server-level singleton managing all active background turns across conversations.
+    Guarantees tasks never abort on accidental client reload or network drops.
+    """
+    def __init__(self):
+        self.sessions: Dict[str, ExecutionSession] = {}
+        self.active_session: Optional[ExecutionSession] = None
+        self.connected_sockets: Set[WebSocket] = set()
+
+    def register_socket(self, ws: WebSocket):
+        self.connected_sockets.add(ws)
+
+    def unregister_socket(self, ws: WebSocket):
+        self.connected_sockets.discard(ws)
+        # Detach from all sessions WITHOUT stopping or cancelling anything!
+        for s in list(self.sessions.values()):
+            s.remove_subscriber(ws)
+        if self.active_session:
+            self.active_session.remove_subscriber(ws)
+        logger.info(
+            f"WebSocket client disconnected; {len(self.get_running_conversations())} background task(s) continue running uninterrupted."
+        )
+
+    def register_session_cid(self, session: ExecutionSession, cid: str):
+        if cid:
+            self.sessions[cid] = session
+
+    def get_or_create_session(self, conversation_id: Optional[str], workspace_path: Optional[str] = None) -> ExecutionSession:
+        if conversation_id and conversation_id in self.sessions:
+            s = self.sessions[conversation_id]
+            if workspace_path:
+                s.workspace_path = workspace_path
+            # Ensure worker task is running
+            if not s.worker_task or s.worker_task.done():
+                s.worker_task = asyncio.create_task(s.queue_worker())
+            return s
+
+        if not conversation_id and self.active_session and self.active_session.is_running and not self.active_session.conversation_id:
+            return self.active_session
+
+        session = ExecutionSession(conversation_id=conversation_id, workspace_path=workspace_path)
+        session.worker_task = asyncio.create_task(session.queue_worker())
+        if conversation_id:
+            self.sessions[conversation_id] = session
+        self.active_session = session
+        return session
+
+    def get_session(self, conversation_id: Optional[str]) -> Optional[ExecutionSession]:
+        if conversation_id:
+            if conversation_id in self.sessions:
+                return self.sessions[conversation_id]
+            for s in list(self.sessions.values()):
+                if s.conversation_id == conversation_id:
+                    self.sessions[conversation_id] = s
+                    return s
+            if self.active_session and self.active_session.conversation_id == conversation_id:
+                self.sessions[conversation_id] = self.active_session
+                return self.active_session
+        else:
+            if self.active_session and self.active_session.is_running:
+                return self.active_session
+            running = [s for s in self.sessions.values() if s.is_running]
+            if running:
+                return running[0]
+        return None
+
+    def is_running(self, conversation_id: Optional[str]) -> bool:
+        session = self.get_session(conversation_id)
+        return bool(session and session.is_running)
+
+    def get_running_conversations(self) -> List[str]:
+        return [cid for cid, s in self.sessions.items() if s.is_running and cid]
+
+    async def attach(self, conversation_id: Optional[str], ws: WebSocket) -> Dict[str, Any]:
+        session = self.get_session(conversation_id)
+        if session:
+            session.add_subscriber(ws)
+            if session.conversation_id and session.conversation_id not in self.sessions:
+                self.sessions[session.conversation_id] = session
+            return session.get_live_state()
+
+        return {
+            "conversation_id": conversation_id,
+            "is_running": False,
+            "queue_size": 0,
+            "live_state": None,
+            "recent_events": []
+        }
+
+    async def submit_prompt(self, ws: WebSocket, data: Dict[str, Any]):
+        prompt = data.get("prompt", "").strip()
+        if not prompt:
+            await ws.send_json({"event": "error", "message": "Le prompt ne peut pas être vide."})
+            return
+
+        conv_id = data.get("conversation_id")
+        ws_path = data.get("workspace_path")
+        mode = data.get("mode", "normal")
+
+        session = self.get_or_create_session(conv_id, ws_path)
+        session.add_subscriber(ws)
+        self.active_session = session
+
+        if session.is_running:
+            if mode == "steer":
+                logger.info(f"Steering session {session.conversation_id}")
+                session.is_steering = True
+                if session.active_task and not session.active_task.done():
+                    session.active_task.cancel()
+                data["prompt"] = f"[Instruction Prioritaire de Guidage] : {prompt}"
+                await session.message_queue.put(data)
+                await session.broadcast({
+                    "event": "steered",
+                    "conversation_id": session.conversation_id,
+                    "message": "Guidage transmis : nouvelle instruction prioritaire en cours d'exécution."
+                })
+            else:
+                await session.message_queue.put(data)
+                qsize = session.message_queue.qsize()
+                logger.info(f"Queued message in session {session.conversation_id} (queue size: {qsize})")
+                await session.broadcast({
+                    "event": "queued",
+                    "conversation_id": session.conversation_id,
+                    "queue_size": qsize,
+                    "prompt_preview": prompt[:60]
+                })
+        else:
+            await session.message_queue.put(data)
+
+    async def interrupt(self, conversation_id: Optional[str] = None):
+        session = self.get_session(conversation_id)
+        if not session:
+            return
+
+        logger.info(f"User requested explicit interruption for session {session.conversation_id}")
+        # 1. Drain queued items
+        while not session.message_queue.empty():
+            try:
+                session.message_queue.get_nowait()
+                session.message_queue.task_done()
+            except asyncio.QueueEmpty:
+                break
+
+        # 2. Terminate active CLI process group
+        if session.active_proc and session.active_proc.returncode is None:
+            try:
+                pgid = os.getpgid(session.active_proc.pid)
+                os.killpg(pgid, signal.SIGTERM)
+                logger.info(f"Sent SIGTERM to process group {pgid}")
+            except Exception as e:
+                logger.debug(f"Error terminating proc group: {e}")
+
+        # 3. Cancel active task
+        if session.active_task and not session.active_task.done():
+            session.active_task.cancel()
+
+        session.is_running = False
+        await session.broadcast({
+            "event": "interrupted",
+            "conversation_id": session.conversation_id,
+            "message": "Tour et file d'attente interrompus par l'utilisateur.",
+            "queue_size": 0
+        })
+
+    async def clear_queue(self, conversation_id: Optional[str] = None):
+        session = self.get_session(conversation_id)
+        if not session:
+            return
+        while not session.message_queue.empty():
+            try:
+                session.message_queue.get_nowait()
+                session.message_queue.task_done()
+            except asyncio.QueueEmpty:
+                break
+        await session.broadcast({
+            "event": "queue_cleared",
+            "conversation_id": session.conversation_id,
+            "queue_size": 0
+        })
+
+    async def handle_approval(self, conversation_id: Optional[str], decision: str, rule: Optional[str]):
+        session = self.get_session(conversation_id)
+        if not session:
+            return
+
+        logger.info(f"Approval decision: {decision} for rule: {rule} in session {session.conversation_id}")
+        if decision in ["allow-session", "always-allow"] and rule:
+            try:
+                settings = get_settings()
+                allow_rules = settings.get("permissions", {}).get("allow", [])
+                if rule not in allow_rules:
+                    allow_rules.append(rule)
+                    if "permissions" not in settings:
+                        settings["permissions"] = {}
+                    settings["permissions"]["allow"] = allow_rules
+                    save_settings(settings)
+                    logger.info(f"Rule {rule} permanently added to permissions")
+            except Exception as e:
+                logger.error(f"Failed to update settings for approval: {e}")
+
+        if session.active_proc and session.active_proc.stdin:
+            try:
+                input_char = "y\n" if decision in ["allow-once", "allow-session", "always-allow"] else "n\n"
+                session.active_proc.stdin.write(input_char.encode())
+                await session.active_proc.stdin.drain()
+            except Exception as e:
+                logger.warning(f"Error writing approval to proc stdin: {e}")
+
+        session.pending_approval = None
+        await session.broadcast({
+            "event": "approval_resolved",
+            "conversation_id": session.conversation_id,
+            "decision": decision
+        })
+
+
+execution_manager = ExecutionManager()

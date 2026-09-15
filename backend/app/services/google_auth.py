@@ -388,3 +388,84 @@ def import_raw_token(token_data: Dict[str, Any]) -> Dict[str, Any]:
         "active_account": get_active_account(),
         "message": f"Compte {email} importé et activé avec succès."
     }
+
+
+_account_exhaustion_tracker: Dict[str, float] = {}
+
+
+def is_quota_error(message: str) -> bool:
+    if not message:
+        return False
+    lower = message.lower()
+    patterns = [
+        "resource_exhausted",
+        "code 429",
+        "429",
+        "quota reached",
+        "quota exceeded",
+        "individual quota reached",
+        "exceeded your quota",
+        "exhausted your capacity",
+        "rate limit exceeded",
+        "rate limit reached",
+        "increase your limits",
+        "free tier quota",
+        "out of quota",
+        "too many requests"
+    ]
+    return any(p in lower for p in patterns)
+
+
+def mark_account_exhausted(email: str, duration_seconds: float = 900.0):
+    """Mark an account as exhausted for a given duration (default 15 minutes)."""
+    _account_exhaustion_tracker[email] = time.time() + duration_seconds
+    logger.warning(f"Google account {email} marked as quota-exhausted for {duration_seconds}s")
+
+
+def is_account_marked_exhausted(email: str) -> bool:
+    exp = _account_exhaustion_tracker.get(email, 0.0)
+    return time.time() < exp
+
+
+def get_candidate_accounts(exclude_email: Optional[str] = None) -> List[str]:
+    ensure_dirs()
+    candidates = []
+    for p in ACCOUNTS_DIR.glob("*.json"):
+        email = p.stem
+        if exclude_email and email.lower() == exclude_email.lower():
+            continue
+        candidates.append(email)
+
+    # Sort candidates: prioritize accounts that are NOT marked exhausted
+    candidates.sort(key=lambda e: (is_account_marked_exhausted(e), e))
+    return candidates
+
+
+def switch_to_next_healthy_account(exclude_email: Optional[str] = None, model: Optional[str] = None) -> Optional[str]:
+    """
+    Selects and activates the next available healthy Google account.
+    Returns the email of the newly activated account, or None if no valid candidate exists.
+    """
+    if exclude_email:
+        mark_account_exhausted(exclude_email, duration_seconds=1800.0)
+
+    candidates = get_candidate_accounts(exclude_email=exclude_email)
+    if not candidates:
+        logger.warning("No candidate Google accounts available for auto-failover.")
+        return None
+
+    # Filter out accounts currently marked exhausted if any non-exhausted candidate exists
+    non_exhausted = [c for c in candidates if not is_account_marked_exhausted(c)]
+    target_list = non_exhausted if non_exhausted else candidates
+
+    for target_email in target_list:
+        try:
+            switch_google_account(target_email)
+            logger.info(f"Auto-Failover: Switched active Google account to {target_email}")
+            return target_email
+        except Exception as e:
+            logger.error(f"Auto-Failover: Failed switching to {target_email}: {e}")
+            continue
+
+    return None
+

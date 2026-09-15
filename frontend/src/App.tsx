@@ -29,6 +29,9 @@ import {
   undoConversationTurn,
   fetchGoogleAccounts,
   saveSettings,
+  fetchUsageQuota,
+  fetchCredits,
+  fetchChangelog,
   type GoogleAccountInfo
 } from './services/api';
 import { chatSocket } from './services/ws';
@@ -367,6 +370,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
       navigateToConversation(convId);
     }
     setActiveConversationId(convId);
+    chatSocket.setCurrentConversation(convId);
     try {
       const data = await fetchConversationTranscript(convId);
       const chatMsgs = parseStepsToMessages(data.steps || []);
@@ -384,6 +388,14 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
       } else {
         setTokenUsage(estimateUsageFromMessages(chatMsgs));
       }
+
+      // Check if task is actively running in background on server
+      if ((data as any).is_running) {
+        setIsStreaming(true);
+        chatSocket.sendAttach(convId);
+      } else {
+        setIsStreaming(false);
+      }
     } catch (err) {
       console.error('Failed to load transcript:', err);
     }
@@ -393,18 +405,96 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
     setIsMobileSidebarOpen(false);
     navigateToConversation(null);
     setActiveConversationId(null);
+    chatSocket.setCurrentConversation(null);
     setMessages([]);
     setTokenUsage(undefined);
     setQueueCount(0);
     setPendingApproval(null);
+    setIsStreaming(false);
   };
 
   // WebSocket event handler — subscribe once, use ref for conversation id
   useEffect(() => {
     const unsubscribe = chatSocket.subscribe((event: any) => {
-      if (event.event === 'init') {
+      // 0. Handshake / Re-attachment upon connection
+      if (event.event === 'connected') {
+        if (event.active_conversations && Array.isArray(event.active_conversations)) {
+          const runningSet = new Set(event.active_conversations);
+          setConversations((prev) =>
+            prev.map((c) => ({ ...c, is_running: runningSet.has(c.conversation_id) }))
+          );
+        }
+        if (event.active_turn && event.active_turn.is_running) {
+          const turnCid = event.active_turn.conversation_id;
+          if (!activeConversationIdRef.current && turnCid) {
+            setActiveConversationId(turnCid);
+            chatSocket.setCurrentConversation(turnCid);
+            navigateToConversation(turnCid, true);
+          }
+          if (!activeConversationIdRef.current || activeConversationIdRef.current === turnCid) {
+            setIsStreaming(true);
+            if (typeof event.active_turn.queue_size === 'number') {
+              setQueueCount(event.active_turn.queue_size);
+            }
+            const live = event.active_turn.live_state;
+            if (live) {
+              if (live.pending_approval) setPendingApproval(live.pending_approval);
+              if (live.usage) setTokenUsage(live.usage);
+            }
+          }
+        }
+      } else if (event.event === 'attached') {
+        const attachedCid = event.conversation_id;
+        if (!activeConversationIdRef.current || activeConversationIdRef.current === attachedCid) {
+          if (event.is_running) {
+            setIsStreaming(true);
+            if (typeof event.queue_size === 'number') {
+              setQueueCount(event.queue_size);
+            }
+            const live = event.live_state;
+            if (live) {
+              if (live.pending_approval) setPendingApproval(live.pending_approval);
+              if (live.usage) setTokenUsage(live.usage);
+              const hasContent = live.content || live.thought || (live.tool_calls && live.tool_calls.length > 0);
+              if (hasContent) {
+                setMessages((prev) => {
+                  const last = prev[prev.length - 1];
+                  if (last && last.role === 'assistant') {
+                    return [
+                      ...prev.slice(0, -1),
+                      {
+                        ...last,
+                        thought: live.thought || last.thought,
+                        content: live.content || last.content,
+                        toolCalls: (live.tool_calls && live.tool_calls.length > 0) ? live.tool_calls : last.toolCalls,
+                        isLive: true
+                      }
+                    ];
+                  } else {
+                    return [
+                      ...prev,
+                      {
+                        id: `live-assistant-${Date.now()}`,
+                        role: 'assistant',
+                        content: live.content || '',
+                        thought: live.thought || '',
+                        toolCalls: live.tool_calls || [],
+                        isLive: true,
+                        timestamp: new Date().toISOString()
+                      }
+                    ];
+                  }
+                });
+              }
+            }
+          } else {
+            setIsStreaming(false);
+          }
+        }
+      } else if (event.event === 'init') {
         if (event.conversation_id && !activeConversationIdRef.current) {
           setActiveConversationId(event.conversation_id);
+          chatSocket.setCurrentConversation(event.conversation_id);
           navigateToConversation(event.conversation_id, true);
         }
       } else if (event.event === 'step_update') {
@@ -413,6 +503,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
 
         if (update.conversation_id && !activeConversationIdRef.current) {
           setActiveConversationId(update.conversation_id);
+          chatSocket.setCurrentConversation(update.conversation_id);
           navigateToConversation(update.conversation_id, true);
         }
 
@@ -591,6 +682,27 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
         }
       } else if (event.event === 'steered') {
         setIsStreaming(true);
+      } else if (event.event === 'account_failover') {
+        showToast(
+          `🔄 Quota atteint sur ${event.previous_account}. Basculement automatique sur ${event.new_account} et relance...`,
+          'info'
+        );
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant') {
+            const notice = `\n\n> 🔄 **Basculement automatique de compte :** Quota atteint sur \`${event.previous_account}\`. Poursuite immédiate de l'exécution avec \`${event.new_account}\`...\n\n`;
+            return [
+              ...prev.slice(0, -1),
+              {
+                ...last,
+                thought: (last.thought || '') + notice,
+                isLive: true
+              }
+            ];
+          }
+          return prev;
+        });
+        setIsStreaming(true);
       } else if (event.event === 'interrupted') {
         setIsStreaming(false);
         setQueueCount(0);
@@ -725,14 +837,14 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
   };
 
   const handleStopStreaming = () => {
-    chatSocket.sendInterrupt();
+    chatSocket.sendInterrupt(activeConversationId || undefined);
     setIsStreaming(false);
     setQueueCount(0);
     setPendingApproval(null);
   };
 
   const handleClearQueue = () => {
-    chatSocket.sendClearQueue();
+    chatSocket.sendClearQueue(activeConversationId || undefined);
     setQueueCount(0);
   };
 
@@ -832,6 +944,130 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
       timestamp: new Date().toISOString()
     };
     setMessages((prev) => [...prev, statusMsg]);
+  };
+
+  const handleShowUsageCard = async (type: 'usage' | 'quota' | 'credits' | 'changelog' = 'usage') => {
+    const userCmd = type === 'credits' ? '/credits' : type === 'changelog' ? '/changelog' : '/usage';
+    const userMsg: ChatMessage = {
+      id: `usr-${Date.now()}`,
+      role: 'user',
+      content: userCmd,
+      timestamp: new Date().toISOString()
+    };
+
+    const loadingId = `usage-${Date.now()}`;
+    const loadingMsg: ChatMessage = {
+      id: loadingId,
+      role: 'assistant',
+      content: '⏳ **Interrogation des quotas et métriques Antigravity en temps réel...**',
+      isLive: true,
+      timestamp: new Date().toISOString()
+    };
+
+    setMessages((prev) => [...prev, userMsg, loadingMsg]);
+
+    try {
+      if (type === 'credits') {
+        const data = await fetchCredits();
+        const rem = data?.command?.data?.remaining_credits ?? 0;
+        const uri = data?.command?.data?.upgrade_uri ?? 'https://antigravity.google/g1-upgrade';
+        const content = [
+          '### 💳 Crédits Antigravity G1',
+          `- **Crédits disponibles :** \`${rem}\``,
+          `- **Lien de souscription / recharge :** [Accéder au portail de recharge G1](${uri})`,
+          '',
+          '> Les crédits G1 vous permettent d’exécuter des requêtes à haute puissance même lorsque les quotas standard sont temporairement épuisés.'
+        ].join('\n');
+
+        setMessages((prev) =>
+          prev.map((m) => (m.id === loadingId ? { ...m, content, isLive: false } : m))
+        );
+        return;
+      }
+
+      if (type === 'changelog') {
+        const data = await fetchChangelog();
+        const raw = data?.response || data?.command?.data?.changelog || 'Aucune note de version disponible.';
+        const parts = raw.split(/^##\s+/m);
+        const excerpt = parts.slice(0, 4).join('## ');
+        const content = [
+          '### 📜 Journal des Modifications Antigravity CLI',
+          excerpt.trim(),
+          '',
+          '*Pour consulter l’historique complet, exécutez `agy changelog` dans le terminal.*'
+        ].join('\n');
+
+        setMessages((prev) =>
+          prev.map((m) => (m.id === loadingId ? { ...m, content, isLive: false } : m))
+        );
+        return;
+      }
+
+      // Default: /usage or /quota
+      const data = await fetchUsageQuota();
+      const cmdData = data?.command?.data;
+      const groups = cmdData?.groups || [];
+
+      const totalTok = tokenUsage?.totalTokens ? tokenUsage.totalTokens.toLocaleString() : '0';
+      const inTok = tokenUsage?.inputTokens ? tokenUsage.inputTokens.toLocaleString() : '0';
+      const outTok = tokenUsage?.outputTokens ? tokenUsage.outputTokens.toLocaleString() : '0';
+      const thinkTok = tokenUsage?.thinkingTokens ? tokenUsage.thinkingTokens.toLocaleString() : '0';
+
+      const lines: string[] = ['### 📊 Quotas Antigravity & Consommation de Tokens\n'];
+
+      lines.push('#### 💬 Consommation de la Discussion Active');
+      lines.push(`- **Total Tokens consommés :** **${totalTok}** tokens`);
+      lines.push(`- **Entrée (Prompts & Contexte) :** \`${inTok}\` tokens`);
+      lines.push(`- **Sortie (Réponses de l'IA) :** \`${outTok}\` tokens`);
+      if (tokenUsage?.thinkingTokens) {
+        lines.push(`- **Réflexion (Thinking CoT) :** \`${thinkTok}\` tokens`);
+      }
+      lines.push('');
+
+      if (groups.length > 0) {
+        lines.push('#### 🌐 Quotas Globaux des Modèles (Google Cloud)');
+        if (cmdData?.description) {
+          lines.push(`> ${cmdData.description}\n`);
+        }
+        for (const g of groups) {
+          lines.push(`##### ${g.name}`);
+          lines.push('| Fenêtre de Quota | Restant | Prochaine Réinitialisation |');
+          lines.push('| :--- | :---: | :--- |');
+          for (const b of g.buckets || []) {
+            const pct = Math.round((b.remaining_fraction || 0) * 100);
+            const resetTime = b.reset_time ? new Date(b.reset_time).toLocaleString() : 'N/A';
+            const statusIcon = pct > 50 ? '🟢' : pct > 20 ? '🟡' : '🔴';
+            lines.push(`| **${b.name}** | ${statusIcon} **${pct}%** | \`${resetTime}\` |`);
+          }
+          lines.push('');
+        }
+      } else if (data?.response) {
+        lines.push('#### 🌐 Quotas Antigravity');
+        lines.push('```\n' + data.response + '\n```');
+      }
+
+      const content = lines.join('\n');
+      setMessages((prev) =>
+        prev.map((m) => (m.id === loadingId ? { ...m, content, isLive: false } : m))
+      );
+    } catch (err: any) {
+      const totalTok = tokenUsage?.totalTokens ? tokenUsage.totalTokens.toLocaleString() : '0';
+      const inTok = tokenUsage?.inputTokens ? tokenUsage.inputTokens.toLocaleString() : '0';
+      const outTok = tokenUsage?.outputTokens ? tokenUsage.outputTokens.toLocaleString() : '0';
+
+      const fallbackContent = [
+        '### 📊 Métriques de Consommation de Tokens',
+        `- **Total Tokens :** **${totalTok}** tokens`,
+        `- **Entrée :** \`${inTok}\` tokens`,
+        `- **Sortie :** \`${outTok}\` tokens`,
+        '',
+        '> ℹ️ *Les quotas globaux de modèles distants n\'ont pas pu être rechargés à cet instant.*'
+      ].join('\n');
+
+      setMessages((prev) =>
+        prev.map((m) => (m.id === loadingId ? { ...m, content: fallbackContent, isLive: false } : m))
+      );
+    }
   };
 
   const handleRetry = () => {
@@ -1054,6 +1290,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
           onRetry={handleRetry}
           onUndo={handleUndo}
           onShowStatus={handleShowStatusCard}
+          onShowUsage={handleShowUsageCard}
           onOpenGoogleAccount={handleOpenGoogleAccount}
         />
       </main>

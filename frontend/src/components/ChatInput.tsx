@@ -68,6 +68,7 @@ interface ChatInputProps {
   onRetry?: () => void;
   onUndo?: () => void;
   onShowStatus?: () => void;
+  onShowUsage?: (type?: 'usage' | 'quota' | 'credits' | 'changelog') => void;
   onOpenGoogleAccount?: () => void;
 }
 
@@ -105,6 +106,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onRetry,
   onUndo,
   onShowStatus,
+  onShowUsage,
   onOpenGoogleAccount
 }) => {
   const { lang, t } = useI18n();
@@ -578,13 +580,32 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         return true;
 
       case '/usage':
-        if (usage) {
+      case '/quota':
+        if (onShowUsage) {
+          onShowUsage('usage');
+        } else if (usage) {
           showToast(
             `📊 Tokens: ${usage.totalTokens.toLocaleString()} (Entrée: ${usage.inputTokens.toLocaleString()}, Sortie: ${usage.outputTokens.toLocaleString()})`,
             'info'
           );
         } else {
           showToast('Métriques de tokens non disponibles.', 'info');
+        }
+        return true;
+
+      case '/credits':
+        if (onShowUsage) {
+          onShowUsage('credits');
+        } else {
+          showToast('Consultation des crédits Antigravity...', 'info');
+        }
+        return true;
+
+      case '/changelog':
+        if (onShowUsage) {
+          onShowUsage('changelog');
+        } else {
+          showToast('Consultation du journal des modifications...', 'info');
         }
         return true;
 

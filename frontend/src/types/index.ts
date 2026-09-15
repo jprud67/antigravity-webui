@@ -17,6 +17,7 @@ export interface Conversation {
   customTitle?: string;
   match_type?: 'metadata' | 'transcript';
   match_snippet?: string;
+  is_running?: boolean;
 }
 
 export interface ToolCallItem {

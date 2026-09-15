@@ -45,9 +45,15 @@ class MetadataUpdateRequest(BaseModel):
 
 @router.get("", response_model=List[Dict[str, Any]])
 def get_conversations(limit: int = 100, q: Optional[str] = None, _ = Depends(require_auth)):
+    from app.services.execution_manager import execution_manager
+    running_set = set(execution_manager.get_running_conversations())
     if q and q.strip():
-        return search_conversations(query=q.strip(), limit=limit)
-    return list_conversations(limit=limit)
+        items = search_conversations(query=q.strip(), limit=limit)
+    else:
+        items = list_conversations(limit=limit)
+    for c in items:
+        c["is_running"] = c.get("conversation_id") in running_set
+    return items
 
 @router.get("/search", response_model=List[Dict[str, Any]])
 def search(q: str = Query(..., min_length=1), limit: int = 50, _ = Depends(require_auth)):
@@ -166,11 +172,14 @@ def get_conversation(conversation_id: str, _ = Depends(require_auth)):
     transcript = get_conversation_transcript(conversation_id)
     meta = get_conversation_by_id(conversation_id) or get_session_meta(conversation_id)
     usage = calculate_conversation_tokens(transcript)
+    from app.services.execution_manager import execution_manager
+    is_running = execution_manager.is_running(conversation_id)
     return {
         "conversation_id": conversation_id,
         "meta": meta,
         "steps": transcript,
-        "usage": usage
+        "usage": usage,
+        "is_running": is_running
     }
 
 @router.post("/{conversation_id}/fork")
