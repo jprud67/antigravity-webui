@@ -444,6 +444,26 @@ export async function gitPush(workspace?: string, remote: string = 'origin', bra
   return res.json();
 }
 
+export async function fetchGitTags(workspace?: string): Promise<{ tags: string[] }> {
+  const url = workspace ? `${API_BASE}/git/tags?workspace=${encodeURIComponent(workspace)}` : `${API_BASE}/git/tags`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) throw new Error(`Failed to fetch Git tags: ${res.statusText}`);
+  return res.json();
+}
+
+export async function gitCreateTag(tag: string, message?: string, push: boolean = false, workspace?: string): Promise<{ success: boolean; tag: string; output: string; push_output?: string }> {
+  const res = await fetch(`${API_BASE}/git/tag`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ tag, message, push, workspace })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la création du tag' }));
+    throw new Error(err.detail || 'Erreur lors de la création du tag');
+  }
+  return res.json();
+}
+
 // Kanban API
 export interface KanbanTask {
   id: string;

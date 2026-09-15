@@ -202,6 +202,10 @@ def trigger_cron_job_now(job_id: str, _ = Depends(require_auth)):
         raise HTTPException(status_code=404, detail="Job cron introuvable")
 
     # Le ticker interne exécute le job dès le prochain tick (<= 20 s)
+    # Si le job était en pause ou désactivé, on le réactive pour qu'il soit pris en compte par tick_once
+    target["enabled"] = True
+    target["state"] = "scheduled"
+    target["paused_at"] = None
     target["next_run_at"] = now_iso()
     target["last_run_at"] = now_iso()
     target["last_status"] = "triggered"

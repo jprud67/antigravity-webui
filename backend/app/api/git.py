@@ -271,3 +271,52 @@ def git_push(req: PushRequest, _ = Depends(require_auth)):
         "success": True,
         "output": push_res.stdout.strip() or push_res.stderr.strip()
     }
+
+
+@router.get("/tags")
+def get_git_tags(workspace: str | None = Query(None), _ = Depends(require_auth)):
+    target = _validate_workspace(workspace)
+    res = run_git(["tag", "-l", "--sort=-v:refname"], target)
+    if res.returncode != 0:
+        raise HTTPException(status_code=400, detail="Impossible de récupérer les tags.")
+    tags = [line.strip() for line in res.stdout.strip().split("\n") if line.strip()]
+    return {"tags": tags}
+
+
+class TagRequest(BaseModel):
+    workspace: str | None = None
+    tag: str
+    message: str | None = None
+    push: bool = False
+    remote: str = "origin"
+
+
+@router.post("/tag")
+def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
+    import os as _os
+    target = _validate_workspace(req.workspace)
+    tag_name = req.tag.strip()
+    if not tag_name:
+        raise HTTPException(status_code=400, detail="Le nom du tag ne peut être vide.")
+
+    tag_args = ["tag", "-a", tag_name, "-m", req.message.strip() if req.message else tag_name]
+    res_tag = run_git(tag_args, target)
+    if res_tag.returncode != 0:
+        raise HTTPException(status_code=500, detail=f"Échec de la création du tag : {res_tag.stderr or res_tag.stdout}")
+
+    push_output = None
+    if req.push:
+        git_env = _os.environ.copy()
+        git_env["GIT_TERMINAL_PROMPT"] = "0"
+        push_res = run_git(["push", req.remote, tag_name], target, timeout=35, env=git_env)
+        if push_res.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"Tag créé mais échec du push : {push_res.stderr or push_res.stdout}")
+        push_output = push_res.stdout.strip() or push_res.stderr.strip()
+
+    return {
+        "success": True,
+        "tag": tag_name,
+        "output": res_tag.stdout.strip(),
+        "push_output": push_output,
+    }
+

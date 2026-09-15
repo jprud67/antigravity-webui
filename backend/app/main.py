@@ -22,12 +22,14 @@ from app.api.rules import router as rules_router
 from app.api.settings import router as set_router
 from app.api.skills import router as skills_router
 from app.api.tasks import router as tasks_router
+from app.api.terminal import close_all_terminal_sessions
 from app.api.terminal import router as terminal_router
 from app.api.updater import router as updater_router
 from app.api.workspaces import router as ws_router
 from app.config import BRAIN_DIR, CONVERSATION_DB
 from app.services.cron_ticker import cron_ticker_loop
 from app.services.fs_watcher import watch_filesystem
+from app.services.google_auth import restore_stashed_token_if_needed
 from app.services.updater import prefetch_update_check
 
 logger = logging.getLogger("antigravity.main")
@@ -49,6 +51,7 @@ def _warn_if_default_password() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Démarre les services d'arrière-plan : watcher FS, ticker des tâches planifiées, prefetch MAJ."""
+    restore_stashed_token_if_needed()
     prefetch_update_check()
     _warn_if_default_password()
     watcher_task = asyncio.create_task(
@@ -69,6 +72,10 @@ async def lifespan(app: FastAPI):
         await cron_task
     except asyncio.CancelledError:
         pass
+    try:
+        await close_all_terminal_sessions()
+    except Exception as e:
+        logger.debug(f"Erreur arrêt sessions terminal: {e}")
     logger.info("Filesystem watcher stopped")
     logger.info("Cron ticker stopped")
 
@@ -76,7 +83,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Antigravity WebUI",
     description="Web Interface to orchestrate Antigravity CLI without touching the terminal",
-    version="0.1.2",
+    version="0.1.3",
     lifespan=lifespan
 )
 

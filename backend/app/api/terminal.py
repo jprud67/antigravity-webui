@@ -289,6 +289,17 @@ async def kill_session(session_id: str):
         if session:
             await session.close()
 
+async def close_all_terminal_sessions():
+    """Ferme proprement toutes les sessions de terminal PTY persistantes."""
+    async with _sessions_lock:
+        sessions = list(_sessions.values())
+        _sessions.clear()
+    for s in sessions:
+        try:
+            await s.close()
+        except Exception as e:
+            logger.debug(f"Erreur fermeture session terminal {s.session_id}: {e}")
+
 @router.websocket("/ws/terminal")
 async def terminal_websocket(
     websocket: WebSocket,

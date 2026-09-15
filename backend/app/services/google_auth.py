@@ -475,6 +475,35 @@ def cleanup_stale_sessions():
         cancel_google_login_flow(sid)
 
 
+def restore_stashed_token_if_needed() -> None:
+    """Restaure le token d'authentification s'il est resté stashed suite à un crash/redémarrage."""
+    try:
+        ensure_dirs()
+        if TOKEN_FILE.exists():
+            for p in GEMINI_DIR.glob("antigravity-oauth-token.stash_*"):
+                try:
+                    p.unlink(missing_ok=True)
+                    logger.info(f"Orphan token stash supprimé : {p.name}")
+                except Exception as e:
+                    logger.debug(f"Impossible de supprimer l'orphan stash {p}: {e}")
+            return
+
+        stashes = sorted(
+            GEMINI_DIR.glob("antigravity-oauth-token.stash_*"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if stashes:
+            latest_stash = stashes[0]
+            shutil.move(latest_stash, TOKEN_FILE)
+            restrict_file_permissions(TOKEN_FILE)
+            logger.info(f"Token OAuth restauré depuis le stash orphelin : {latest_stash.name}")
+            for remaining in stashes[1:]:
+                remaining.unlink(missing_ok=True)
+    except Exception as e:
+        logger.warning(f"Erreur lors de la vérification des stashes orphelins : {e}")
+
+
 def import_raw_token(token_data: dict[str, Any]) -> dict[str, Any]:
     ensure_dirs()
     meta = get_account_meta_from_token_data(token_data)

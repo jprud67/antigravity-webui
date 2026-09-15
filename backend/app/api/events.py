@@ -31,8 +31,11 @@ async def _sse_generator(request: Request, q: asyncio.Queue):
 
             try:
                 event = await asyncio.wait_for(q.get(), timeout=20.0)
-                payload = json.dumps(event)
-                yield f"data: {payload}\n\n"
+                try:
+                    payload = json.dumps(event)
+                    yield f"data: {payload}\n\n"
+                finally:
+                    q.task_done()
             except asyncio.TimeoutError:
                 # Send keepalive ping every 20s to prevent proxy/browser timeout
                 yield 'data: {"type":"ping"}\n\n'

@@ -21,6 +21,20 @@ from app.services.session_metadata import (
 logger = logging.getLogger("antigravity.storage")
 
 
+def is_safe_conversation_id(conversation_id: str) -> bool:
+    """Verifies conversation_id is safe, contains no directory traversal elements, and stays inside BRAIN_DIR."""
+    if not conversation_id or not isinstance(conversation_id, str):
+        return False
+    if ".." in conversation_id or "/" in conversation_id or "\\" in conversation_id:
+        return False
+    try:
+        resolved_brain = BRAIN_DIR.resolve()
+        resolved_conv = (BRAIN_DIR / conversation_id).resolve()
+        return resolved_conv.is_relative_to(resolved_brain) and resolved_conv != resolved_brain
+    except Exception:
+        return False
+
+
 def get_db_connection() -> sqlite3.Connection:
     # Crée le dossier parent si nécessaire (premier démarrage) ; sqlite3.connect crée la DB si absente.
     CONVERSATION_DB.parent.mkdir(parents=True, exist_ok=True)
@@ -156,6 +170,8 @@ def get_conversation_by_id(conversation_id: str) -> dict[str, Any] | None:
 
 
 def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
+    if not is_safe_conversation_id(conversation_id):
+        return []
     conv_dir = BRAIN_DIR / conversation_id
     transcript_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
     transcript_full_file = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
@@ -582,23 +598,29 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
 def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
     if not conversation_ids:
         return True
+    safe_ids = [cid for cid in conversation_ids if is_safe_conversation_id(cid)]
+    if not safe_ids:
+        return True
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.executemany("DELETE FROM conversation_summaries WHERE conversation_id = ?", [(cid,) for cid in conversation_ids])
+        cursor.executemany("DELETE FROM conversation_summaries WHERE conversation_id = ?", [(cid,) for cid in safe_ids])
         conn.commit()
     finally:
         conn.close()
 
-    for cid in conversation_ids:
-        conv_dir = BRAIN_DIR / cid
-        if conv_dir.exists():
+    brain_resolved = BRAIN_DIR.resolve()
+    for cid in safe_ids:
+        conv_dir = (BRAIN_DIR / cid).resolve()
+        if conv_dir.exists() and conv_dir.is_relative_to(brain_resolved) and conv_dir != brain_resolved:
             shutil.rmtree(conv_dir, ignore_errors=True)
 
-    bulk_delete_session_meta(conversation_ids)
+    bulk_delete_session_meta(safe_ids)
     return True
 
 def delete_conversation(conversation_id: str) -> bool:
+    if not is_safe_conversation_id(conversation_id):
+        return False
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -607,9 +629,10 @@ def delete_conversation(conversation_id: str) -> bool:
     finally:
         conn.close()
 
-    # Remove brain directory
-    conv_dir = BRAIN_DIR / conversation_id
-    if conv_dir.exists():
+    # Remove brain directory safely
+    brain_resolved = BRAIN_DIR.resolve()
+    conv_dir = (BRAIN_DIR / conversation_id).resolve()
+    if conv_dir.exists() and conv_dir.is_relative_to(brain_resolved) and conv_dir != brain_resolved:
         shutil.rmtree(conv_dir, ignore_errors=True)
 
     # Delete metadata
@@ -628,6 +651,8 @@ def update_conversation_title(conversation_id: str, new_title: str) -> bool:
     return True
 
 def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
+    if not is_safe_conversation_id(conversation_id):
+        raise ValueError("Invalid conversation_id")
     conv_dir = BRAIN_DIR / conversation_id
     transcript_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
     transcript_full_file = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
@@ -1488,17 +1513,14 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
     transcript_path = new_logs_dir / "transcript.jsonl"
     transcript_full_path = new_logs_dir / "transcript_full.jsonl"
 
-    with open(transcript_path, "w", encoding="utf-8") as f:
-        for s in steps:
-            cloned = dict(s)
-            cloned["conversation_id"] = new_id
-            f.write(json.dumps(cloned, ensure_ascii=False) + "\n")
+    cloned_steps = []
+    for s in steps:
+        cloned = dict(s)
+        cloned["conversation_id"] = new_id
+        cloned_steps.append(cloned)
 
-    with open(transcript_full_path, "w", encoding="utf-8") as f:
-        for s in steps:
-            cloned = dict(s)
-            cloned["conversation_id"] = new_id
-            f.write(json.dumps(cloned, ensure_ascii=False) + "\n")
+    atomic_write_jsonl(transcript_path, cloned_steps)
+    atomic_write_jsonl(transcript_full_path, cloned_steps)
 
     from app.services.session_metadata import update_session_meta
     update_session_meta(new_id, {
