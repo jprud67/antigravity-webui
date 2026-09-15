@@ -172,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       }
       if (!searchFilter.trim()) return true;
       const q = searchFilter.toLowerCase();
-      const titleMatch = (c.title || '').toLowerCase().includes(q);
+      const titleMatch = (c.customTitle || c.title || '').toLowerCase().includes(q);
       const previewMatch = (c.preview || '').toLowerCase().includes(q);
       const projectMatch = (c.project || '').toLowerCase().includes(q);
       const tagsMatch = (c.tags || []).some((t) => t.toLowerCase().includes(q));
@@ -924,7 +924,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                         )}
 
                         <span className="truncate font-medium text-xs" style={{ color: (isBulkMode ? isBulkSelected : isSelected) ? 'var(--strong)' : 'var(--text)' }}>
-                          {conv.title || `Session ${conv.conversation_id.substring(0, 8)}`}
+                          {conv.customTitle || conv.title || `Session ${conv.conversation_id.substring(0, 8)}`}
                         </span>
                       </div>
 

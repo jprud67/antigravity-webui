@@ -12,13 +12,26 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isDarkTheme, setIsDarkTheme] = useState(() =>
+    typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : false
+  );
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const observer = new MutationObserver(() => {
+      setIsDarkTheme(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
+    let currentId: string | null = null;
 
     const renderChart = async () => {
       try {
-        const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+        const isDark = typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : isDarkTheme;
         const mermaid = (await import('mermaid')).default;
         mermaid.initialize({
           startOnLoad: false,
@@ -47,6 +60,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
         });
 
         const id = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
+        currentId = id;
         try {
           const { svg } = await mermaid.render(id, chart.trim());
           if (isMounted) {
@@ -73,8 +87,16 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
 
     return () => {
       isMounted = false;
+      if (currentId) {
+        try {
+          const stray = document.getElementById(currentId);
+          if (stray) stray.remove();
+          const dStray = document.getElementById(`d${currentId}`);
+          if (dStray) dStray.remove();
+        } catch {}
+      }
     };
-  }, [chart]);
+  }, [chart, isDarkTheme]);
 
   const copyChartCode = async () => {
     try {

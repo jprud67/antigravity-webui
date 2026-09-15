@@ -39,7 +39,7 @@ logger = logging.getLogger("antigravity.updater")
 REPO_DIR = Path(__file__).resolve().parent.parent.parent.parent
 CACHE_FILE = GEMINI_DIR / ".update_check"
 MARKER_FILE = GEMINI_DIR / ".update_incomplete"
-CURRENT_VERSION = "0.1.3"
+CURRENT_VERSION = "0.1.4"
 
 # Principe Hermes : cache de 6 h + rafraîchissement périodique de 6 h
 CACHE_DURATION_SECONDS = 6 * 3600

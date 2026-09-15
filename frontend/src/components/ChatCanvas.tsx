@@ -107,58 +107,6 @@ const copyTextToClipboard = async (text: string): Promise<boolean> => {
   }
 };
 
-/**
- * Shared Markdown rendering components configuration using AdaptiveCodeBlock
- */
-const createMarkdownComponents = (
-  onOpenFile?: () => void,
-  onOpenArtifacts?: () => void,
-  onOpenTerminal?: () => void
-) => ({
-  pre: PreBlock,
-  code: (props: any) => (
-    <CodeOrInlineBlock
-      {...props}
-      onOpenFile={onOpenFile}
-      onOpenTerminal={onOpenTerminal}
-    />
-  ),
-  blockquote: CalloutBlock,
-  a: (props: any) => (
-    <LinkBlock
-      {...props}
-      onOpenFile={onOpenFile}
-      onOpenArtifacts={onOpenArtifacts}
-    />
-  ),
-  table: ({ children }: any) => (
-    <div className="overflow-x-auto rounded-xl border my-4" style={{ borderColor: 'var(--border)' }}>
-      <table>{children}</table>
-    </div>
-  ),
-  img: ({ src, alt, ...rest }: any) => (
-    <img src={src} alt={alt || ''} loading="lazy" {...rest} />
-  ),
-});
-
-// Stable plugin array — avoids re-parsing markdown on every streaming re-render
-const REMARK_PLUGINS = [remarkGfm];
-
-/**
- * Memoized markdown renderer: only re-parses markdown when its own text changes.
- * This keeps token-by-token streaming fast on long conversations (unchanged
- * messages are not re-rendered at all).
- */
-const MarkdownContent = React.memo(
-  function MarkdownContent({ content, components }: { content: string; components: any }) {
-    return (
-      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components}>
-        {content}
-      </ReactMarkdown>
-    );
-  },
-  (prev, next) => prev.content === next.content && prev.components === next.components
-);
 
 /**
  * GitHub-style Callout & Alert Banner Component ([!NOTE], [!TIP], etc.)
@@ -366,6 +314,59 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
     </a>
   );
 };
+
+/**
+ * Shared Markdown rendering components configuration using AdaptiveCodeBlock
+ */
+const createMarkdownComponents = (
+  onOpenFile?: () => void,
+  onOpenArtifacts?: () => void,
+  onOpenTerminal?: () => void
+) => ({
+  pre: PreBlock,
+  code: (props: any) => (
+    <CodeOrInlineBlock
+      {...props}
+      onOpenFile={onOpenFile}
+      onOpenTerminal={onOpenTerminal}
+    />
+  ),
+  blockquote: CalloutBlock,
+  a: (props: any) => (
+    <LinkBlock
+      {...props}
+      onOpenFile={onOpenFile}
+      onOpenArtifacts={onOpenArtifacts}
+    />
+  ),
+  table: ({ children }: any) => (
+    <div className="overflow-x-auto rounded-xl border my-4" style={{ borderColor: 'var(--border)' }}>
+      <table>{children}</table>
+    </div>
+  ),
+  img: ({ src, alt, ...rest }: any) => (
+    <img src={src} alt={alt || ''} loading="lazy" {...rest} />
+  ),
+});
+
+// Stable plugin array — avoids re-parsing markdown on every streaming re-render
+const REMARK_PLUGINS = [remarkGfm];
+
+/**
+ * Memoized markdown renderer: only re-parses markdown when its own text changes.
+ * This keeps token-by-token streaming fast on long conversations (unchanged
+ * messages are not re-rendered at all).
+ */
+const MarkdownContent = React.memo(
+  function MarkdownContent({ content, components }: { content: string; components: any }) {
+    return (
+      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components}>
+        {content}
+      </ReactMarkdown>
+    );
+  },
+  (prev, next) => prev.content === next.content && prev.components === next.components
+);
 
 /**
  * Specialized Micro-Card for single tool execution

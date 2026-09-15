@@ -25,6 +25,18 @@ class SyncSSEClient {
   private maxReconnectDelay = 30000;
   private hasConnectedOnce = false;
 
+  constructor() {
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          if (!this.es || this.es.readyState === EventSource.CLOSED) {
+            this.reconnect();
+          }
+        }
+      });
+    }
+  }
+
   connect() {
     if (this.es && (this.es.readyState === EventSource.OPEN || this.es.readyState === EventSource.CONNECTING)) {
       return;

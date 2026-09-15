@@ -27,20 +27,25 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
 
 let LOCALES: Record<string, Record<string, string>> = {};
 
-// Asynchronously load the 1.5MB locales file to avoid blocking HMR and main bundle load
+// Asynchronously load the locales file to avoid blocking HMR and main bundle load
 fetch('/locales.json')
-  .then(res => res.json())
+  .then(res => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  })
   .then(data => {
-    LOCALES = data;
-    // Trigger re-render for active listeners once loaded
-    if (typeof window !== 'undefined') {
-      // Small timeout to avoid immediate re-render thrashing on mount
-      setTimeout(() => {
-        LISTENERS.forEach((fn) => fn(currentLanguage));
-      }, 100);
+    if (data && typeof data === 'object') {
+      LOCALES = data;
+      // Trigger re-render for active listeners once loaded
+      if (typeof window !== 'undefined') {
+        // Small timeout to avoid immediate re-render thrashing on mount
+        setTimeout(() => {
+          LISTENERS.forEach((fn) => fn(currentLanguage));
+        }, 100);
+      }
     }
   })
-  .catch(err => console.error('Failed to load locales.json:', err));
+  .catch(err => console.warn('Locales file /locales.json non chargé (utilisation des traductions intégrées):', err));
 
 
 export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
