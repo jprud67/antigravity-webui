@@ -162,11 +162,12 @@ async def stream_turn(
     model: Optional[str] = None,
     effort: Optional[str] = None,
     auto_approve: bool = True,
+    agent_mode: Optional[str] = None,
     proc_callback: Optional[Any] = None
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Executes a turn using `agy --output-format stream-json` and yields parsed NDJSON events.
-    Supports cancellation, process group termination, and proc_callback.
+    Supports cancellation, process group termination, agent_mode, and proc_callback.
     """
     import os
     import signal
@@ -179,6 +180,9 @@ async def stream_turn(
 
     if auto_approve:
         cmd.append("--dangerously-skip-permissions")
+
+    if agent_mode and agent_mode in ["accept-edits", "plan"]:
+        cmd.extend(["--mode", agent_mode])
 
     if conversation_id:
         cmd.extend(["--conversation", conversation_id])
@@ -253,21 +257,6 @@ async def stream_turn(
             }
     except asyncio.CancelledError:
         logger.info(f"stream_turn cancelled: terminating process group {proc.pid}")
-        if stderr_task and not stderr_task.done():
-            stderr_task.cancel()
-            try:
-                await stderr_task
-            except (asyncio.CancelledError, Exception):
-                pass
-        try:
-            pgid = os.getpgid(proc.pid)
-            os.killpg(pgid, signal.SIGTERM)
-            await asyncio.sleep(0.1)
-            if proc.returncode is None:
-                os.killpg(pgid, signal.SIGKILL)
-            await asyncio.wait_for(proc.wait(), timeout=1.0)
-        except Exception as e:
-            logger.debug(f"Error terminating proc group: {e}")
         raise
     finally:
         if stderr_task and not stderr_task.done():
@@ -276,6 +265,21 @@ async def stream_turn(
                 await stderr_task
             except (asyncio.CancelledError, Exception):
                 pass
+
+        # Robustly terminate process group if still running (handles GeneratorExit, break, errors)
+        if proc.returncode is None:
+            try:
+                pgid = os.getpgid(proc.pid)
+                os.killpg(pgid, signal.SIGTERM)
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=0.8)
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    os.killpg(pgid, signal.SIGKILL)
+                    await proc.wait()
+            except ProcessLookupError:
+                pass
+            except Exception as e:
+                logger.debug(f"Error terminating proc group in finally: {e}")
 
 
 _quota_cache: Dict[str, Any] = {"data": None, "timestamp": 0.0}

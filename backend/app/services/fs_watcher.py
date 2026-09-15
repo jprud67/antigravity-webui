@@ -121,12 +121,12 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
             for child in brain_dir.iterdir():
                 if not child.is_dir() or not _UUID_PATTERN.match(child.name):
                     continue
-                    for f in child.iterdir():
-                        try:
-                            if f.name not in [".system_generated", "scratch"] and f.is_file():
-                                result[str(f)] = f.stat().st_mtime
-                        except OSError:
-                            continue
+                for f in child.iterdir():
+                    try:
+                        if f.name not in [".system_generated", "scratch"] and f.is_file():
+                            result[str(f)] = f.stat().st_mtime
+                    except OSError:
+                        continue
         except OSError:
             pass
         return result

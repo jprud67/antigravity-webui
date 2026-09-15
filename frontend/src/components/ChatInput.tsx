@@ -1450,7 +1450,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             {isStreaming ? (
               <div className="flex items-center gap-2">
-                {prompt.trim().length > 0 && (
+                {(prompt.trim().length > 0 || attachments.length > 0) && (
                   <>
                     {/* Steer Button */}
                     <button
@@ -1497,7 +1497,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               <button
                 type="button"
                 onClick={() => handleSubmit('normal')}
-                disabled={!prompt.trim()}
+                disabled={!prompt.trim() && attachments.length === 0}
                 className="py-1.5 px-4 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer font-sans"
                 style={{
                   backgroundColor: 'var(--accent)',

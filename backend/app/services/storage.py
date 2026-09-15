@@ -299,7 +299,7 @@ def fork_conversation(
         cursor.execute("SELECT * FROM conversation_summaries WHERE conversation_id = ?", (source_conversation_id,))
         source_row = cursor.fetchone()
         source_title = source_row["title"] if source_row and source_row["title"] else "Session"
-        source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else f'["{DEFAULT_WORKSPACE}"]'
+        source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else f'["file://{DEFAULT_WORKSPACE}"]'
         agent_name = source_row["agent_name"] if source_row and source_row["agent_name"] else ""
 
         title = new_title or f"{source_title} (Branche #{up_to_step_index})"
@@ -375,7 +375,7 @@ def create_conversation_handoff(
         cursor.execute("SELECT * FROM conversation_summaries WHERE conversation_id = ?", (source_conversation_id,))
         source_row = cursor.fetchone()
         source_title = source_row["title"] if source_row and source_row["title"] else "Session"
-        source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else f'["{DEFAULT_WORKSPACE}"]'
+        source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else f'["file://{DEFAULT_WORKSPACE}"]'
         agent_name = source_row["agent_name"] if source_row and source_row["agent_name"] else ""
     finally:
         conn.close()
@@ -672,39 +672,91 @@ def search_conversations(query: str, limit: int = 50) -> List[Dict[str, Any]]:
     if not query.strip():
         return list_conversations(limit=limit)
 
-    q_lower = query.lower().strip()
-    all_convs = list_conversations(limit=200)
+    q_clean = query.strip()
+    q_lower = q_clean.lower()
     all_meta = get_all_session_metadata()
-
     matched = []
     seen_ids = set()
 
-    # 1. Match title, preview, customTitle, tags, project
-    for c in all_convs:
-        cid = c["conversation_id"]
-        meta = all_meta.get(cid, {})
-        title = (c.get("title") or "").lower()
-        preview = (c.get("preview") or "").lower()
-        custom_title = (meta.get("customTitle") or "").lower()
-        project = (meta.get("project") or "").lower()
-        tags = [t.lower() for t in meta.get("tags", [])]
-
-        if (
-            q_lower in title
-            or q_lower in preview
-            or q_lower in custom_title
-            or q_lower in project
-            or any(q_lower in t or t in q_lower for t in tags)
-        ):
-            c_copy = dict(c)
-            c_copy["match_type"] = "metadata"
-            c_copy["match_snippet"] = c.get("preview") or c.get("title")
-            matched.append(c_copy)
+    # 1. Direct SQLite Search on title and preview across the entire database
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT 
+                conversation_id,
+                title,
+                preview,
+                step_count,
+                last_modified_time,
+                workspace_uris,
+                status,
+                agent_name,
+                parent_conversation_id
+            FROM conversation_summaries
+            WHERE title LIKE ? OR preview LIKE ?
+            ORDER BY last_modified_time DESC
+            LIMIT ?
+            """,
+            (f"%{q_clean}%", f"%{q_clean}%", limit)
+        )
+        for r in cursor.fetchall():
+            cid = r["conversation_id"]
+            meta = all_meta.get(cid, {})
+            custom_title = meta.get("customTitle", "").strip()
+            display_title = custom_title or r["title"] or "Nouvelle session"
+            c = {
+                "conversation_id": cid,
+                "title": display_title,
+                "raw_title": r["title"] or "Nouvelle session",
+                "preview": r["preview"],
+                "step_count": r["step_count"],
+                "last_modified_time": r["last_modified_time"],
+                "workspace_uris": r["workspace_uris"],
+                "status": r["status"],
+                "agent_name": r["agent_name"],
+                "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
+                "pinned": meta.get("pinned", False),
+                "archived": meta.get("archived", False),
+                "tags": meta.get("tags", []),
+                "project": meta.get("project", ""),
+                "projectColor": meta.get("projectColor", ""),
+                "customTitle": custom_title,
+                "match_type": "metadata",
+                "match_snippet": r["preview"] or display_title
+            }
+            matched.append(c)
             seen_ids.add(cid)
+    finally:
+        conn.close()
 
-    # 2. Deep transcript scan for content if room left
+    # 2. Match customTitle, tags, project from session metadata for convs not yet matched
     if len(matched) < limit:
-        for c in all_convs:
+        for cid, meta in all_meta.items():
+            if cid in seen_ids:
+                continue
+            custom_title = (meta.get("customTitle") or "").lower()
+            project = (meta.get("project") or "").lower()
+            tags = [t.lower() for t in meta.get("tags", [])]
+            if (
+                q_lower in custom_title
+                or q_lower in project
+                or any(q_lower in t or t in q_lower for t in tags)
+            ):
+                c = get_conversation_by_id(cid)
+                if c:
+                    c["match_type"] = "metadata"
+                    c["match_snippet"] = meta.get("customTitle") or meta.get("project") or c.get("preview")
+                    matched.append(c)
+                    seen_ids.add(cid)
+                    if len(matched) >= limit:
+                        break
+
+    # 3. Deep transcript scan for content if room left (scans recent active sessions)
+    if len(matched) < limit:
+        recent_convs = list_conversations(limit=100)
+        for c in recent_convs:
             cid = c["conversation_id"]
             if cid in seen_ids:
                 continue
@@ -716,7 +768,6 @@ def search_conversations(query: str, limit: int = 50) -> List[Dict[str, Any]]:
                 content_lower = raw_content.lower()
                 thinking_lower = raw_thinking.lower()
                 if q_lower in content_lower or q_lower in thinking_lower:
-                    snippet = ""
                     if q_lower in content_lower:
                         idx = content_lower.find(q_lower)
                         start = max(0, idx - 40)

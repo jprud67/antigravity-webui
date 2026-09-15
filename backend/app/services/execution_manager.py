@@ -208,6 +208,14 @@ class ExecutionSession:
         model = params.get("model")
         effort = params.get("effort")
         auto_approve = params.get("auto_approve", True)
+        agent_mode = params.get("agent_mode")
+        if not agent_mode:
+            try:
+                from app.services.storage import get_settings
+                settings = get_settings()
+                agent_mode = settings.get("agentMode")
+            except Exception:
+                agent_mode = None
 
         def on_proc_spawned(p: asyncio.subprocess.Process):
             self.active_proc = p
@@ -230,6 +238,7 @@ class ExecutionSession:
                         model=model,
                         effort=effort,
                         auto_approve=auto_approve,
+                        agent_mode=agent_mode,
                         proc_callback=on_proc_spawned
                     ):
                         cid = event.get("conversation_id") or event.get("step_update", {}).get("conversation_id")
