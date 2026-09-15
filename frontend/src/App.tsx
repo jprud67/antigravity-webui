@@ -1,18 +1,20 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatCanvas } from './components/ChatCanvas';
 import { ChatInput } from './components/ChatInput';
-import { ArtifactViewer } from './components/ArtifactViewer';
-import { SettingsModal } from './components/SettingsModal';
-import { WorkspaceModal } from './components/WorkspaceModal';
-import { LoginModal } from './components/LoginModal';
-import { FileExplorerModal } from './components/FileExplorerModal';
-import { TaskDashboardModal } from './components/TaskDashboardModal';
-import { WorkspacePanel, type RightPanelTab } from './components/WorkspacePanel';
-import { SessionMetaModal } from './components/SessionMetaModal';
-import { CronSchedulerModal } from './components/CronSchedulerModal';
-import { RulesEditorModal } from './components/RulesEditorModal';
-import { HelpModal } from './components/HelpModal';
+
+const ArtifactViewer = lazy(() => import('./components/ArtifactViewer').then(m => ({ default: m.ArtifactViewer })));
+const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const WorkspaceModal = lazy(() => import('./components/WorkspaceModal').then(m => ({ default: m.WorkspaceModal })));
+const LoginModal = lazy(() => import('./components/LoginModal').then(m => ({ default: m.LoginModal })));
+const FileExplorerModal = lazy(() => import('./components/FileExplorerModal').then(m => ({ default: m.FileExplorerModal })));
+const TaskDashboardModal = lazy(() => import('./components/TaskDashboardModal').then(m => ({ default: m.TaskDashboardModal })));
+import { type RightPanelTab } from './components/WorkspacePanel';
+const WorkspacePanel = lazy(() => import('./components/WorkspacePanel').then(m => ({ default: m.WorkspacePanel })));
+const SessionMetaModal = lazy(() => import('./components/SessionMetaModal').then(m => ({ default: m.SessionMetaModal })));
+const CronSchedulerModal = lazy(() => import('./components/CronSchedulerModal').then(m => ({ default: m.CronSchedulerModal })));
+const RulesEditorModal = lazy(() => import('./components/RulesEditorModal').then(m => ({ default: m.RulesEditorModal })));
+const HelpModal = lazy(() => import('./components/HelpModal').then(m => ({ default: m.HelpModal })));
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption } from './types';
 import { parseStepsToMessages } from './utils/transcriptParser';
@@ -1513,6 +1515,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
         />
       </main>
 
+      <Suspense fallback={null}>
       {/* 3-Panel Demand-Driven Workspace Panel */}
       <WorkspacePanel
         isOpen={isRightPanelOpen}
@@ -1613,6 +1616,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
         onClose={() => setIsRulesModalOpen(false)}
         currentWorkspace={currentWorkspace}
       />
+      </Suspense>
 
       {/* Global Toast & Confirm Dialog containers */}
       <ToastContainer />
