@@ -197,7 +197,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                 )}
               </h2>
               <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                Orchestrez l'exécution périodique de tâches en arrière-plan avec Hermes & Antigravity
+                Orchestrez l'exécution périodique de tâches en arrière-plan, directement via Antigravity
               </p>
             </div>
           </div>

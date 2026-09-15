@@ -502,6 +502,29 @@ def is_quota_error(message: str) -> bool:
     return any(p in lower for p in patterns)
 
 
+# Limites DURABLES (compte épuisé, réinitialisation à des heures/jours) —
+# à distinguer des 429 transitoires qui se règlent par backoff.
+_HARD_QUOTA_PATTERNS = [
+    "individual quota reached",
+    "quota reached",
+    "quota exceeded",
+    "exceeded your quota",
+    "out of quota",
+    "insufficient quota",
+    "exhausted your capacity",
+    "resource has been exhausted",
+    "capacity exceeded",
+]
+
+
+def is_hard_quota_error(message: str) -> bool:
+    """Détecte une limite de quota durable (compte épuisé) dans une ligne de log."""
+    if not message:
+        return False
+    lower = message.lower()
+    return any(p in lower for p in _HARD_QUOTA_PATTERNS)
+
+
 def mark_account_exhausted(email: str, duration_seconds: float = 900.0):
     """Mark an account as exhausted for a given duration (default 15 minutes)."""
     _account_exhaustion_tracker[email] = time.time() + duration_seconds

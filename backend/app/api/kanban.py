@@ -8,13 +8,12 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from app.api.auth import require_auth
-from app.config import HOME, DEFAULT_WORKSPACE
+from app.config import GEMINI_DIR, DEFAULT_WORKSPACE
 
 logger = logging.getLogger("antigravity.kanban")
 router = APIRouter(prefix="/api/kanban", tags=["kanban"])
 
-HERMES_ROOT = Path(os.environ.get("HERMES_HOME", str(HOME / ".hermes")))
-KANBAN_DB_PATH = Path(os.environ.get("HERMES_KANBAN_DB", str(HERMES_ROOT / "kanban.db")))
+KANBAN_DB_PATH = Path(os.environ.get("ANTIGRAVITY_KANBAN_DB", str(GEMINI_DIR / "webui_kanban.db")))
 
 from contextlib import contextmanager
 

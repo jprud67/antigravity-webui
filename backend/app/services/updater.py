@@ -1,24 +1,50 @@
-import os
-import json
-import time
-import logging
+"""
+Système de recherche de mise à jour automatique d'Antigravity WebUI.
+
+Implémentation fidèle au principe de Hermes Agent (analyse de référence :
+`hermes_cli/banner.py::check_for_updates()` + endpoint dashboard
+`/api/hermes/update/check` + `hermes update`) :
+
+- détection de la méthode d'installation (ici : git local) ;
+- résultat mis en cache sur disque avec TTL de 6 h, invalidé si le commit
+  installé change (équivalent du garde rev/ver de Hermes) ;
+- vérification non bloquante (thread dédié au démarrage + rafraîchissement
+  périodique toutes les 6 h) et ne levant jamais côté API ;
+- ``force=True`` court-circuite le cache (bouton « Rechercher les mises à jour ») ;
+- marqueur « mise à jour incomplète » posé pendant l'application puis retiré —
+  il survit à une interruption pour signaler un état éventuellement bancal ;
+- application : refus si l'arbre git est modifié, ``git pull --ff-only``,
+  rebuild du frontend, rollback automatique si le build échoue, puis
+  redémarrage du service (systemd sous Linux uniquement).
+
+Tout est local à l'application : cache et marqueur vivent dans le dossier de
+données d'Antigravity WebUI — aucune dépendance à Hermes.
+"""
 import asyncio
+import json
+import logging
+import os
 import subprocess
 import threading
+import time
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-from app.config import HOME
+from typing import Any, Dict, List, Optional
+
+from app.config import GEMINI_DIR
 from app.platform_utils import IS_WINDOWS, IS_MACOS, npm_argv, platform_name
 
 logger = logging.getLogger("antigravity.updater")
 
 REPO_DIR = Path(__file__).resolve().parent.parent.parent.parent
-CACHE_FILE = HOME / ".gemini" / "antigravity_update_cache.json"
+CACHE_FILE = GEMINI_DIR / ".update_check"
+MARKER_FILE = GEMINI_DIR / ".update_incomplete"
 CURRENT_VERSION = "0.1.0"
-CACHE_DURATION_SECONDS = 3600  # 1 hour cache to avoid unnecessary network queries
+
+# Principe Hermes : cache de 6 h + rafraîchissement périodique de 6 h
+CACHE_DURATION_SECONDS = 6 * 3600
+REFRESH_INTERVAL_SECONDS = 6 * 3600
 
 _update_result_cache: Optional[Dict[str, Any]] = None
-_prefetch_thread: Optional[threading.Thread] = None
 
 
 def _git_cmd(args: List[str], timeout: int = 10, cwd: Optional[Path] = None) -> Optional[str]:
@@ -92,27 +118,107 @@ def _recent_upstream_commits(n: int = 20) -> List[Dict[str, Any]]:
     return rows
 
 
+# ---------------------------------------------------------------------------
+# Cache disque (principe Hermes : ~/.hermes/.update_check versionné par commit)
+# ---------------------------------------------------------------------------
+
+def _read_disk_cache() -> Optional[Dict[str, Any]]:
+    if not CACHE_FILE.exists():
+        return None
+    try:
+        return json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.debug(f"Cache de mise à jour illisible: {e}")
+        return None
+
+
+def _write_disk_cache(payload: Dict[str, Any], now: float) -> None:
+    try:
+        CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        CACHE_FILE.write_text(
+            json.dumps(
+                {"ts": now, "commit": payload.get("current_commit"), "payload": payload},
+                indent=2,
+                ensure_ascii=False
+            ),
+            encoding="utf-8"
+        )
+    except Exception as e:
+        logger.debug(f"Impossible d'écrire le cache de mise à jour: {e}")
+
+
+def _bust_cache() -> None:
+    """Invalide le cache mémoire et disque (principe Hermes : _invalidate_update_cache)."""
+    global _update_result_cache
+    _update_result_cache = None
+    try:
+        CACHE_FILE.unlink(missing_ok=True)
+    except OSError as e:
+        logger.debug(f"Impossible de supprimer le cache de mise à jour: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Marqueur « mise à jour incomplète » (principe Hermes : .update-incomplete)
+# ---------------------------------------------------------------------------
+
+def _write_update_marker() -> None:
+    try:
+        MARKER_FILE.parent.mkdir(parents=True, exist_ok=True)
+        MARKER_FILE.write_text(f"started={time.time()}\npid={os.getpid()}\n", encoding="utf-8")
+    except OSError as e:
+        logger.warning(f"Impossible d'écrire le marqueur de mise à jour: {e}")
+
+
+def _clear_update_marker() -> None:
+    try:
+        MARKER_FILE.unlink(missing_ok=True)
+    except OSError as e:
+        logger.warning(f"Impossible de retirer le marqueur de mise à jour: {e}")
+
+
+def _check_incomplete_marker() -> None:
+    """Signale (une fois) qu'une mise à jour précédente a été interrompue."""
+    if not MARKER_FILE.exists():
+        return
+    try:
+        content = MARKER_FILE.read_text(encoding="utf-8").strip().replace("\n", " ")
+    except OSError:
+        content = ""
+    logger.warning(
+        f"Mise à jour précédente interrompue détectée ({content or 'sans détail'}). "
+        "Vérifiez l'état du dépôt (git status / git log) — le marqueur est retiré."
+    )
+    _clear_update_marker()
+
+
+# ---------------------------------------------------------------------------
+# Vérification des mises à jour (cœur du principe Hermes)
+# ---------------------------------------------------------------------------
+
 def check_for_updates(force: bool = False) -> Dict[str, Any]:
     """
-    Checks whether a new Antigravity WebUI update is available on GitHub origin/main.
-    Implements Hermes' robust caching and git inspection architecture.
+    Vérifie si une mise à jour est disponible sur GitHub origin/main.
+
+    - Cache mémoire + disque (TTL 6 h, invalidé si le commit local change).
+    - ``force=True`` : refait un fetch immédiat (bouton « Rechercher »).
+    - Ne lève jamais : en cas d'échec réseau, renvoie un payload explicatif.
     """
     global _update_result_cache
     now = time.time()
 
-    # Read from cache file if not forced
     if not force:
-        if _update_result_cache and (now - _update_result_cache.get("checked_at", 0)) < CACHE_DURATION_SECONDS:
-            return _update_result_cache
+        if _update_result_cache is not None:
+            age = now - _update_result_cache.get("checked_at", 0)
+            if age < CACHE_DURATION_SECONDS:
+                return _update_result_cache
 
-        if CACHE_FILE.exists():
-            try:
-                cached = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
-                if (now - cached.get("checked_at", 0)) < CACHE_DURATION_SECONDS:
-                    _update_result_cache = cached
-                    return cached
-            except Exception:
-                pass
+        cached = _read_disk_cache()
+        if cached and (now - cached.get("ts", 0)) < CACHE_DURATION_SECONDS:
+            payload = cached.get("payload") or {}
+            local_sha = _git_cmd(["rev-parse", "--short=8", "HEAD"], timeout=5)
+            if payload and cached.get("commit") == local_sha:
+                _update_result_cache = payload
+                return payload
 
     version_info = get_local_version_info()
     payload: Dict[str, Any] = {
@@ -130,7 +236,7 @@ def check_for_updates(force: bool = False) -> Dict[str, Any]:
     }
 
     try:
-        # 1. Fetch latest refs from remote
+        # 1. Fetch des dernières références du dépôt distant
         fetch_res = subprocess.run(
             ["git", "fetch", "origin", "main", "--quiet"],
             cwd=str(REPO_DIR),
@@ -144,7 +250,7 @@ def check_for_updates(force: bool = False) -> Dict[str, Any]:
             payload["message"] = "Impossible de joindre le dépôt GitHub distant. Vérifiez la connexion réseau."
             return payload
 
-        # 2. Count commits behind
+        # 2. Nombre de commits de retard
         count_raw = _git_cmd(["rev-list", "--count", "HEAD..origin/main"], timeout=6)
         behind = int(count_raw) if count_raw and count_raw.isdigit() else 0
         payload["behind"] = behind
@@ -156,14 +262,9 @@ def check_for_updates(force: bool = False) -> Dict[str, Any]:
         else:
             payload["message"] = "Vous disposez de la version la plus récente."
 
-        # Write cache
-        try:
-            CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            CACHE_FILE.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-            _update_result_cache = payload
-        except Exception as e:
-            logger.debug(f"Failed to write update cache file: {e}")
-
+        # 3. Cache (mémoire + disque)
+        _write_disk_cache(payload, now)
+        _update_result_cache = payload
         return payload
 
     except Exception as exc:
@@ -173,28 +274,60 @@ def check_for_updates(force: bool = False) -> Dict[str, Any]:
 
 
 def prefetch_update_check():
-    """Starts a non-blocking background update check upon server startup (Hermes pattern)."""
+    """
+    Vérification non bloquante au démarrage + rafraîchissement périodique (6 h),
+    comme le cycle de cache de Hermes.
+    """
     def _worker():
         try:
+            _check_incomplete_marker()
             check_for_updates(force=False)
             logger.info("Background update check completed.")
         except Exception as e:
             logger.debug(f"Background update check encountered an exception: {e}")
 
+        while True:
+            time.sleep(REFRESH_INTERVAL_SECONDS)
+            try:
+                check_for_updates(force=True)
+                logger.info("Periodic update check refreshed.")
+            except Exception as e:
+                logger.debug(f"Periodic update check failed: {e}")
+
     t = threading.Thread(target=_worker, daemon=True, name="antigravity_update_prefetch")
     t.start()
 
 
+# ---------------------------------------------------------------------------
+# Application de la mise à jour (principe Hermes : pull sûr + rollback)
+# ---------------------------------------------------------------------------
+
 async def apply_update() -> Dict[str, Any]:
     """
-    Applies the update by pulling the latest commits from origin/main,
-    rebuilding the frontend if necessary, and triggering a clean service restart.
+    Applique la mise à jour : pull fast-forward, rebuild frontend,
+    rollback automatique si le build échoue, puis redémarrage du service.
     """
     logger.info("Applying Antigravity WebUI update from origin/main...")
 
-    # 1. Pull origin/main
+    # 0. Marqueur anti-interruption
+    _write_update_marker()
+
+    # 1. Refus si l'arbre git contient des modifications locales
+    dirty = _git_cmd(["status", "--porcelain"], timeout=10)
+    if dirty:
+        _clear_update_marker()
+        logger.warning("Update refused: dirty worktree.")
+        return {
+            "ok": False,
+            "error": "dirty_worktree",
+            "message": "Des modifications locales non commitées bloquent la mise à jour. Committez-les d'abord (aucun changement appliqué)."
+        }
+
+    prev_sha = _git_cmd(["rev-parse", "HEAD"], timeout=6)
+
+    # 2. Pull fast-forward uniquement (pas de merge surprise)
     pull_proc = await asyncio.create_subprocess_exec(
-        "git", "pull", "origin", "main",
+        "git", "pull", "--ff-only", "origin", "main",
         cwd=str(REPO_DIR),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
@@ -202,25 +335,20 @@ async def apply_update() -> Dict[str, Any]:
     stdout, stderr = await pull_proc.communicate()
     if pull_proc.returncode != 0:
         err_msg = stderr.decode(errors="replace").strip()
-        logger.error(f"git pull failed: {err_msg}")
+        _clear_update_marker()
+        logger.error(f"git pull --ff-only failed: {err_msg}")
         return {
             "ok": False,
             "error": "git_pull_failed",
-            "message": f"Échec lors de la récupération des modifications Git: {err_msg}"
+            "message": f"Échec lors de la récupération Git : {err_msg}"
         }
 
     pull_output = stdout.decode(errors="replace").strip()
     logger.info(f"git pull success: {pull_output}")
 
-    # Invalidate cache
-    try:
-        CACHE_FILE.unlink(missing_ok=True)
-    except Exception:
-        pass
-
-    # 2. Rebuild frontend if dist or src was affected
+    # 3. Rebuild du frontend
     frontend_dir = REPO_DIR / "frontend"
-    build_success = True
+    build_ok = True
     build_output = ""
     if frontend_dir.exists() and (frontend_dir / "package.json").exists():
         try:
@@ -230,19 +358,59 @@ async def apply_update() -> Dict[str, Any]:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            b_out, b_err = await asyncio.wait_for(build_proc.communicate(), timeout=90.0)
+            b_out, b_err = await asyncio.wait_for(build_proc.communicate(), timeout=120.0)
             if build_proc.returncode != 0:
-                build_success = False
+                build_ok = False
                 build_output = b_err.decode(errors="replace").strip()
-                logger.warning(f"Frontend build warning after update: {build_output}")
+                logger.warning(f"Frontend build failed after update: {build_output}")
             else:
                 build_output = "Frontend compilé avec succès."
         except Exception as e:
-            build_success = False
+            build_ok = False
             build_output = str(e)
             logger.warning(f"Frontend build error after update: {e}")
 
-    # 3. Redémarrage automatique du service (systemd sous Linux uniquement)
+    # 3b. Rollback automatique si le build échoue (ne pas laisser un état bancal)
+    if not build_ok and prev_sha:
+        logger.warning(f"Build en échec après mise à jour — rollback vers {prev_sha[:8]}...")
+        rollback = subprocess.run(
+            ["git", "reset", "--keep", prev_sha],
+            cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20
+        )
+        rolled = rollback.returncode == 0
+        if not rolled:
+            logger.error(f"Rollback --keep impossible ({rollback.stderr.strip()}), tentative --hard...")
+            hard = subprocess.run(
+                ["git", "reset", "--hard", prev_sha],
+                cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20
+            )
+            rolled = hard.returncode == 0
+
+        if rolled:
+            try:
+                rb = subprocess.run(npm_argv("run", "build"), cwd=str(frontend_dir), capture_output=True, timeout=120)
+                hint = "frontend restauré" if rb.returncode == 0 else "relancez un build manuellement"
+            except Exception:
+                hint = "relancez un build manuellement"
+            _clear_update_marker()
+            return {
+                "ok": False,
+                "error": "build_failed_rolled_back",
+                "message": f"Build frontend en échec — mise à jour annulée et code restauré ({hint}). Détail : {build_output[:300]}"
+            }
+
+        _clear_update_marker()
+        return {
+            "ok": False,
+            "error": "build_failed",
+            "message": f"Build frontend en échec et rollback impossible — intervention manuelle requise. Détail : {build_output[:300]}"
+        }
+
+    # 4. Succès : invalider le cache et retirer le marqueur
+    _bust_cache()
+    _clear_update_marker()
+
+    # 5. Redémarrage automatique du service (systemd sous Linux uniquement)
     if IS_WINDOWS or IS_MACOS:
         logger.info(
             f"{platform_name()} : redémarrage automatique du service non pris en charge — "
@@ -270,7 +438,7 @@ async def apply_update() -> Dict[str, Any]:
         "ok": True,
         "message": f"Mise à jour appliquée avec succès ! {restart_hint}",
         "pull_output": pull_output,
-        "frontend_rebuilt": build_success,
+        "frontend_rebuilt": build_ok,
         "build_output": build_output,
         "version_info": get_local_version_info()
     }

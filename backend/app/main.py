@@ -24,6 +24,7 @@ from app.api.events import router as events_router
 from app.api.updater import router as updater_router
 from app.services.fs_watcher import watch_filesystem
 from app.services.updater import prefetch_update_check
+from app.services.cron_ticker import cron_ticker_loop
 from app.config import BRAIN_DIR, CONVERSATION_DB
 import asyncio
 import logging
@@ -33,20 +34,28 @@ logger = logging.getLogger("antigravity.main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start the filesystem watcher background task on startup and prefetch updates."""
+    """Démarre les services d'arrière-plan : watcher FS, ticker des tâches planifiées, prefetch MAJ."""
     prefetch_update_check()
     watcher_task = asyncio.create_task(
         watch_filesystem(BRAIN_DIR, CONVERSATION_DB, poll_interval=1.5),
         name="fs_watcher"
     )
+    cron_task = asyncio.create_task(cron_ticker_loop(), name="cron_ticker")
     logger.info("Filesystem watcher started")
+    logger.info("Cron ticker started (tâches planifiées propres à l'application)")
     yield
     watcher_task.cancel()
+    cron_task.cancel()
     try:
         await watcher_task
     except asyncio.CancelledError:
         pass
+    try:
+        await cron_task
+    except asyncio.CancelledError:
+        pass
     logger.info("Filesystem watcher stopped")
+    logger.info("Cron ticker stopped")
 
 
 app = FastAPI(

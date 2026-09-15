@@ -6,6 +6,7 @@ from typing import AsyncGenerator, Dict, Any, Optional, List, Tuple
 from pathlib import Path
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
 from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
+from app.services.quota_watch import watch_agy_log_for_quota
 
 logger = logging.getLogger("antigravity.driver")
 
@@ -199,6 +200,7 @@ async def stream_turn(
 
     logger.info(f"Spawning agy: {' '.join(cmd)} (cwd={cwd})")
 
+    spawned_at = time.time()
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         cwd=cwd,
@@ -210,6 +212,26 @@ async def stream_turn(
 
     if proc_callback:
         proc_callback(proc)
+
+    quota_detected: Dict[str, Any] = {"line": None}
+
+    async def quota_supervisor():
+        """
+        Détection en direct du quota (journaux agy) → terminaison rapide pour
+        permettre la bascule de compte et la relance, au lieu d'attendre les
+        retries internes du CLI (qui peuvent durer des dizaines de minutes).
+        """
+        line = await watch_agy_log_for_quota(
+            since_ts=spawned_at,
+            should_stop=lambda: proc.returncode is not None
+        )
+        quota_detected["line"] = line
+        if line and proc.returncode is None:
+            logger.warning(f"Quota dur détecté (logs agy): {line[:150]} — terminaison pour bascule de compte.")
+            await terminate_process_group_async(proc, grace=1.5)
+        return line
+
+    quota_task = asyncio.create_task(quota_supervisor())
 
     async def read_stderr():
         err_lines = []
@@ -245,13 +267,24 @@ async def stream_turn(
 
         returncode = await proc.wait()
         stderr_output = await stderr_task
+        # La ligne de quota est disponible même si la terminaison est encore en cours
+        quota_line = quota_detected["line"]
+        if quota_line is None:
+            try:
+                quota_line = await asyncio.wait_for(quota_task, timeout=2.0)
+            except asyncio.TimeoutError:
+                quota_task.cancel()
+                quota_line = None
 
         if returncode != 0:
             logger.error(f"agy process exited with code {returncode}. Stderr: {stderr_output}")
+            message = stderr_output or ""
+            if quota_line:
+                message = f"{message}\n{quota_line}" if message else quota_line
             yield {
                 "event": "error",
                 "code": returncode,
-                "message": stderr_output or f"agy failed with exit code {returncode}"
+                "message": message or f"agy failed with exit code {returncode}"
             }
     except asyncio.CancelledError:
         logger.info(f"stream_turn cancelled: terminating process group {proc.pid}")
@@ -261,6 +294,12 @@ async def stream_turn(
             stderr_task.cancel()
             try:
                 await stderr_task
+            except (asyncio.CancelledError, Exception):
+                pass
+        if quota_task and not quota_task.done():
+            quota_task.cancel()
+            try:
+                await quota_task
             except (asyncio.CancelledError, Exception):
                 pass
 
