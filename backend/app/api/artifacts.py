@@ -16,6 +16,8 @@ def get_artifact_detail(conversation_id: str, filename: str, _ = Depends(require
     try:
         content = read_artifact_content(conversation_id, filename)
         return {"conversation_id": conversation_id, "filename": filename, "content": content}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:

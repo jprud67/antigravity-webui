@@ -50,6 +50,7 @@ _update_result_cache: dict[str, Any] | None = None
 
 def _git_cmd(args: list[str], timeout: int = 10, cwd: Path | None = None) -> str | None:
     target_cwd = cwd or REPO_DIR
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
     try:
         res = subprocess.run(
             ["git", *args],
@@ -57,7 +58,8 @@ def _git_cmd(args: list[str], timeout: int = 10, cwd: Path | None = None) -> str
             capture_output=True,
             text=True,
             timeout=timeout,
-            check=False
+            check=False,
+            env=env
         )
         if res.returncode == 0:
             return (res.stdout or "").strip()
@@ -239,13 +241,15 @@ def check_for_updates(force: bool = False) -> dict[str, Any]:
 
     try:
         # 1. Fetch des dernières références du dépôt distant
+        fetch_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
         fetch_res = subprocess.run(
             ["git", "fetch", "origin", "main", "--quiet"],
             cwd=str(REPO_DIR),
             capture_output=True,
             text=True,
             timeout=15,
-            check=False
+            check=False,
+            env=fetch_env
         )
 
         if fetch_res.returncode != 0:
@@ -329,11 +333,13 @@ async def apply_update() -> dict[str, Any]:
     prev_sha = _git_cmd(["rev-parse", "HEAD"], timeout=6)
 
     # 2. Pull fast-forward uniquement (pas de merge surprise)
+    git_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
     pull_proc = await asyncio.create_subprocess_exec(
         "git", "pull", "--ff-only", "origin", "main",
         cwd=str(REPO_DIR),
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+        stderr=asyncio.subprocess.PIPE,
+        env=git_env
     )
     stdout, stderr = await pull_proc.communicate()
     if pull_proc.returncode != 0:
@@ -379,7 +385,8 @@ async def apply_update() -> dict[str, Any]:
         rollback = await asyncio.to_thread(
             subprocess.run,
             ["git", "reset", "--keep", prev_sha],
-            cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20, check=False
+            cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20, check=False,
+            env=git_env
         )
         rolled = rollback.returncode == 0
         if not rolled:
@@ -387,7 +394,8 @@ async def apply_update() -> dict[str, Any]:
             hard = await asyncio.to_thread(
                 subprocess.run,
                 ["git", "reset", "--hard", prev_sha],
-                cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20, check=False
+                cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20, check=False,
+                env=git_env
             )
             rolled = hard.returncode == 0
 

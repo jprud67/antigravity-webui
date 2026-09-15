@@ -1,4 +1,5 @@
 import logging
+import os
 import subprocess
 from pathlib import Path
 
@@ -48,6 +49,9 @@ def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | 
         "-c", "committer.name=jprud67",
         "-c", "committer.email=jprud67@gmail.com",
     ] + args
+    merged_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    if env:
+        merged_env.update(env)
     try:
         return subprocess.run(
             base_args,
@@ -55,7 +59,7 @@ def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | 
             capture_output=True,
             text=True,
             timeout=timeout,
-            env=env
+            env=merged_env
         )
     except subprocess.TimeoutExpired:
         logger.warning(f"Git timeout ({timeout}s) for {args} in {cwd}")

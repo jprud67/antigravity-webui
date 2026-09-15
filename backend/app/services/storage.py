@@ -1381,7 +1381,9 @@ def export_conversation_html(conversation_id: str) -> str:
 def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
     artifacts = []
     if conversation_id:
-        dirs_to_scan = [BRAIN_DIR / conversation_id]
+        if not is_safe_conversation_id(conversation_id):
+            return []
+        dirs_to_scan = [(BRAIN_DIR / conversation_id).resolve()]
     else:
         dirs_to_scan = [p for p in BRAIN_DIR.iterdir() if p.is_dir()] if BRAIN_DIR.exists() else []
 
@@ -1408,15 +1410,12 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
     return artifacts
 
 def read_artifact_content(conversation_id: str, filename: str) -> str:
-    # Strictly confine path to BRAIN_DIR / conversation_id
+    if not is_safe_conversation_id(conversation_id):
+        raise ValueError("Identifiant de conversation non valide")
     base_dir = (BRAIN_DIR / conversation_id).resolve()
     target_path = (base_dir / filename).resolve()
-    try:
-        if not target_path.is_relative_to(base_dir):
-            raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
-    except AttributeError:
-        if base_dir not in target_path.parents and target_path != base_dir:
-            raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
+    if not target_path.is_relative_to(base_dir):
+        raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
     if not target_path.exists() or not target_path.is_file():
         raise FileNotFoundError(f"Artifact introuvable : {filename}")
     try:
@@ -1426,14 +1425,23 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
         return f"[Fichier binaire : {len(raw)} octets]"
 
 def get_settings() -> dict[str, Any]:
+    defaults: dict[str, Any] = {
+        "agentMode": "accept-edits",
+        "colorScheme": "dark",
+        "model": "Gemini 3.8 Flash (High)",
+        "trustedWorkspaces": [DEFAULT_WORKSPACE]
+    }
     if not SETTINGS_FILE.exists():
-        return {
-            "agentMode": "accept-edits",
-            "colorScheme": "dark",
-            "model": "Gemini 3.8 Flash (High)",
-            "trustedWorkspaces": [DEFAULT_WORKSPACE]
-        }
-    return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+        return defaults
+    try:
+        content = SETTINGS_FILE.read_text(encoding="utf-8")
+        if not content.strip():
+            return defaults
+        data = json.loads(content)
+        return data if isinstance(data, dict) else defaults
+    except Exception as exc:
+        logger.warning(f"Failed to parse settings.json, returning defaults: {exc}")
+        return defaults
 
 def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
     current = get_settings()
@@ -1522,7 +1530,6 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
     atomic_write_jsonl(transcript_path, cloned_steps)
     atomic_write_jsonl(transcript_full_path, cloned_steps)
 
-    from app.services.session_metadata import update_session_meta
     update_session_meta(new_id, {
         "customTitle": title,
         "title": title,

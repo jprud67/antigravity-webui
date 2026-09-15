@@ -8,18 +8,23 @@ from app.config import SESSION_METADATA_FILE
 
 logger = logging.getLogger("antigravity-webui.session_metadata")
 
-# Verrou protégeant l'accès concurrent en lecture/écriture au fichier session_metadata.json
-_meta_lock = threading.Lock()
+# Verrou réentrant protégeant l'accès concurrent en lecture/écriture au fichier session_metadata.json
+_meta_lock = threading.RLock()
 
 
 def get_all_session_metadata() -> dict[str, dict[str, Any]]:
-    if not SESSION_METADATA_FILE.exists():
-        return {}
-    try:
-        return json.loads(SESSION_METADATA_FILE.read_text(encoding="utf-8"))
-    except Exception as e:
-        logger.error(f"Failed to read session metadata: {e}")
-        return {}
+    with _meta_lock:
+        if not SESSION_METADATA_FILE.exists():
+            return {}
+        try:
+            content = SESSION_METADATA_FILE.read_text(encoding="utf-8")
+            if not content.strip():
+                return {}
+            data = json.loads(content)
+            return data if isinstance(data, dict) else {}
+        except Exception as e:
+            logger.error(f"Failed to read session metadata: {e}")
+            return {}
 
 def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
     tmp_file = None

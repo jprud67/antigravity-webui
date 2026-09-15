@@ -6,6 +6,7 @@ import re
 import select
 import shutil
 import subprocess
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -35,6 +36,7 @@ ACCOUNTS_DIR = GEMINI_DIR / "accounts"
 
 # Active login sessions: session_id -> { "proc": subprocess.Popen, "started_at": float, "stash_path": str }
 _LOGIN_SESSIONS: dict[str, dict[str, Any]] = {}
+_login_lock = threading.Lock()
 
 
 def ensure_dirs():
@@ -364,14 +366,15 @@ def start_google_login_flow() -> dict[str, Any]:
             logger.error(f"Failed to capture Google auth URL. agy output: {output!r}")
             raise RuntimeError("Impossible de récupérer l'URL de connexion Google depuis Antigravity.")
 
-        _LOGIN_SESSIONS[session_id] = {
-            "proc": proc,
-            "master_fd": master_fd,
-            "win_pty": win_pty is not None,
-            "started_at": time.time(),
-            "stash_path": str(stash_path),
-            "auth_url": auth_url
-        }
+        with _login_lock:
+            _LOGIN_SESSIONS[session_id] = {
+                "proc": proc,
+                "master_fd": master_fd,
+                "win_pty": win_pty is not None,
+                "started_at": time.time(),
+                "stash_path": str(stash_path),
+                "auth_url": auth_url
+            }
 
         return {
             "session_id": session_id,
@@ -387,7 +390,8 @@ def start_google_login_flow() -> dict[str, Any]:
 
 
 def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
-    session = _LOGIN_SESSIONS.get(session_id)
+    with _login_lock:
+        session = _LOGIN_SESSIONS.get(session_id)
     if not session:
         raise ValueError("Session de connexion expirée ou invalide.")
 
@@ -439,7 +443,8 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
         sync_active_account_to_store()
         active_meta = get_active_account()
 
-        _LOGIN_SESSIONS.pop(session_id, None)
+        with _login_lock:
+            _LOGIN_SESSIONS.pop(session_id, None)
 
         active_email = active_meta.get("email") if active_meta else "Inconnu"
         return {
@@ -451,12 +456,14 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
         _close_login_resources(master_fd, proc)
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
-        _LOGIN_SESSIONS.pop(session_id, None)
+        with _login_lock:
+            _LOGIN_SESSIONS.pop(session_id, None)
         raise
 
 
 def cancel_google_login_flow(session_id: str) -> dict[str, Any]:
-    session = _LOGIN_SESSIONS.pop(session_id, None)
+    with _login_lock:
+        session = _LOGIN_SESSIONS.pop(session_id, None)
     if session:
         _close_login_resources(session.get("master_fd"), session.get("proc"))
         stash_path = Path(session["stash_path"])
@@ -468,9 +475,10 @@ def cancel_google_login_flow(session_id: str) -> dict[str, Any]:
 def cleanup_stale_sessions():
     now = time.time()
     stale_ids = []
-    for sid, sess in _LOGIN_SESSIONS.items():
-        if now - sess["started_at"] > 300:  # 5 minutes
-            stale_ids.append(sid)
+    with _login_lock:
+        for sid, sess in list(_LOGIN_SESSIONS.items()):
+            if now - sess["started_at"] > 300:  # 5 minutes
+                stale_ids.append(sid)
     for sid in stale_ids:
         cancel_google_login_flow(sid)
 

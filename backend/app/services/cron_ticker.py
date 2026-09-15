@@ -49,7 +49,12 @@ _running_jobs: set[str] = set()
 _jobs_write_lock = asyncio.Lock()
 
 
-async def run_agy_task(prompt: str, skills: list[str] | None = None, timeout: int = JOB_TIMEOUT_SECONDS) -> tuple[str, str, int]:
+async def run_agy_task(
+    prompt: str,
+    skills: list[str] | None = None,
+    model: str | None = None,
+    timeout: int = JOB_TIMEOUT_SECONDS
+) -> tuple[str, str, int]:
     """
     Exécute un prompt via `agy` en mode headless. Retourne (stdout, stderr, code).
 
@@ -61,7 +66,10 @@ async def run_agy_task(prompt: str, skills: list[str] | None = None, timeout: in
     if skills:
         skills_prefix = f"[Active skills: {', '.join(skills)}]\n"
         effective_prompt = f"{skills_prefix}{prompt}"
-    cmd = [AGY_BIN, "--dangerously-skip-permissions", "--print-timeout", "20m", "-p", effective_prompt]
+    cmd = [AGY_BIN, "--dangerously-skip-permissions", "--print-timeout", "20m"]
+    if model and model.strip():
+        cmd.extend(["--model", model.strip()])
+    cmd.extend(["-p", effective_prompt])
     spawned_at = time.time()
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -162,9 +170,10 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
     status = "error"
 
     skills = job.get("skills", [])
+    model = job.get("model")
     while attempts < MAX_TASK_FAILOVER:
         attempts += 1
-        out, err, code = await run_agy_task(prompt, skills)
+        out, err, code = await run_agy_task(prompt, skills=skills, model=model)
         combined = f"{out}\n{err}".strip()
         output = combined
 
