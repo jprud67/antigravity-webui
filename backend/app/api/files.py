@@ -63,8 +63,11 @@ def _validate_path_access(file_path: Path) -> Path:
         raise HTTPException(status_code=400, detail=f"Chemin invalide : {e}")
 
     resolved_str = str(resolved)
-    # Prohibit sensitive system directories and secrets
-    blocked_keywords = ["/.ssh", "/.gnupg", "/etc/shadow", "/etc/sudoers", "/proc", "/sys"]
+    # Prohibit sensitive system directories, credentials, and secrets
+    blocked_keywords = [
+        "/.ssh", "/.gnupg", "/etc/shadow", "/etc/sudoers", "/proc", "/sys",
+        "/google_accounts.json", "/webui_auth.json", "id_rsa", "id_ed25519"
+    ]
     if any(kw in resolved_str for kw in blocked_keywords):
         raise HTTPException(status_code=403, detail="Accès refusé : fichier ou répertoire restreint.")
 

@@ -178,7 +178,7 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
             target["enabled"] = True
             target["state"] = "scheduled"
             target["paused_at"] = None
-            target["next_run_at"] = compute_next_run(target.get("schedule", {}))
+            target["next_run_at"] = compute_next_run(target.get("schedule") or target.get("schedule_display")) or now_iso()
 
     save_jobs(data)
     return {"success": True, "job": target}

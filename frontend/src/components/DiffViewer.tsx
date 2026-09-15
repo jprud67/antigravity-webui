@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { GitCommit, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { copyText } from '../utils/codeBlockUtils';
 
 interface DiffViewerProps {
   filename?: string;
@@ -23,7 +24,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   const [copied, setCopied] = useState(false);
 
   // Parse unified diff or snippet
-  const lines = diffText.split('\n');
+  const lines = (diffText || '').replace(/\r/g, '').split('\n');
   const parsedLines: DiffLine[] = [];
   let oldLine = 1;
   let newLine = 1;
@@ -64,24 +65,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   const deletionsCount = parsedLines.filter((l) => l.type === 'del').length;
 
   const copyDiff = async () => {
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(diffText);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = diffText;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
-      console.warn('Clipboard error:', e);
-    }
+    await copyText(diffText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (

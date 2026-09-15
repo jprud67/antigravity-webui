@@ -333,6 +333,21 @@ async def tick_once() -> int:
 async def cron_ticker_loop() -> None:
     """Boucle principale du ticker (démarrée avec le serveur)."""
     ensure_dirs()
+    # Nettoyage préventif des tâches restées en 'running' lors d'un crash ou redémarrage antérieur
+    try:
+        async with _jobs_write_lock:
+            init_data = load_jobs()
+            cleaned = False
+            for j in init_data.get("jobs", []):
+                if j.get("last_status") == "running":
+                    j["last_status"] = "interrupted"
+                    cleaned = True
+            if cleaned:
+                save_jobs(init_data)
+                logger.info("[Cron] Nettoyage des jobs orphelins restés en 'running' effectué.")
+    except Exception as e:
+        logger.warning(f"[Cron] Erreur lors du nettoyage initial des jobs: {e}")
+
     logger.info(f"Cron ticker Antigravity WebUI démarré (tick={TICK_SECONDS}s, dossier={CRON_DIR}).")
     while True:
         try:

@@ -206,6 +206,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
     // Accumulation des appels d'outils
     if (toolCallsRaw.length > 0) {
       for (const tc of toolCallsRaw) {
+        if (!tc || typeof tc !== 'object') continue;
         currentAssistantMsg.toolCalls = currentAssistantMsg.toolCalls || [];
         currentAssistantMsg.toolCalls.push({
           name: tc.name || tc.tool_name || 'tool',

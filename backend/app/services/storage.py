@@ -238,10 +238,21 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
     
     for s in steps:
         raw_c = s.get("content")
-        content = raw_c if isinstance(raw_c, str) else (json.dumps(raw_c, ensure_ascii=False) if raw_c is not None else "")
+        try:
+            content = raw_c if isinstance(raw_c, str) else (json.dumps(raw_c, ensure_ascii=False, default=str) if raw_c is not None else "")
+        except Exception:
+            content = str(raw_c) if raw_c is not None else ""
+
         raw_t = s.get("thinking")
-        thinking = raw_t if isinstance(raw_t, str) else (json.dumps(raw_t, ensure_ascii=False) if raw_t is not None else "")
-        tool_calls = json.dumps(s.get("tool_calls") or []) if s.get("tool_calls") else ""
+        try:
+            thinking = raw_t if isinstance(raw_t, str) else (json.dumps(raw_t, ensure_ascii=False, default=str) if raw_t is not None else "")
+        except Exception:
+            thinking = str(raw_t) if raw_t is not None else ""
+
+        try:
+            tool_calls = json.dumps(s.get("tool_calls") or [], default=str) if s.get("tool_calls") else ""
+        except Exception:
+            tool_calls = str(s.get("tool_calls") or "")
         
         src = s.get("source") or ""
         stype = s.get("type") or ""
@@ -378,7 +389,7 @@ def fork_conversation(
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
         
         last_step = forked_steps[-1]
-        preview = (last_step.get("content") or last_step.get("thinking") or "")[:150]
+        preview = str(last_step.get("content") or last_step.get("thinking") or "")[:150]
 
         cursor.execute(
             """
@@ -743,7 +754,7 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         cursor = conn.cursor()
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
         last_step = remaining_steps[-1] if remaining_steps else {}
-        new_preview = (last_step.get("content") or last_step.get("thinking") or "")[:150]
+        new_preview = str(last_step.get("content") or last_step.get("thinking") or "")[:150]
 
         cursor.execute(
             """
@@ -1592,7 +1603,7 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
     for s in steps:
         c = s.get("content") or s.get("thinking") or ""
         if c:
-            preview = c[:150]
+            preview = str(c)[:150]
             break
 
     conn = get_db_connection()

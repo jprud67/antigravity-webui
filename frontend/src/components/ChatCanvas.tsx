@@ -734,9 +734,16 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
     }
   }, [messages, isStreaming]);
 
-  // Cancel speech synthesis on conversation change or unmount
+  // Cancel speech synthesis on conversation change, unmount, or page navigation
   useEffect(() => {
+    const handleUnload = () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
     return () => {
+      window.removeEventListener('beforeunload', handleUnload);
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }

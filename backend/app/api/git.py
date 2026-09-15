@@ -49,7 +49,14 @@ def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | 
         "-c", "committer.name=jprud67",
         "-c", "committer.email=jprud67@gmail.com",
     ] + args
-    merged_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    merged_env = {
+        **os.environ,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_AUTHOR_NAME": "jprud67",
+        "GIT_AUTHOR_EMAIL": "jprud67@gmail.com",
+        "GIT_COMMITTER_NAME": "jprud67",
+        "GIT_COMMITTER_EMAIL": "jprud67@gmail.com",
+    }
     if env:
         merged_env.update(env)
     try:
@@ -303,7 +310,12 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
     if not tag_name:
         raise HTTPException(status_code=400, detail="Le nom du tag ne peut être vide.")
 
-    tag_args = ["tag", "-a", tag_name, "-m", req.message.strip() if req.message else tag_name]
+    raw_tag_msg = req.message.strip() if req.message else tag_name
+    clean_tag_msg = "\n".join([line for line in raw_tag_msg.split("\n") if "co-authored-by" not in line.lower()]).strip()
+    if not clean_tag_msg:
+        clean_tag_msg = tag_name
+
+    tag_args = ["tag", "-a", tag_name, "-m", clean_tag_msg]
     res_tag = run_git(tag_args, target)
     if res_tag.returncode != 0:
         raise HTTPException(status_code=500, detail=f"Échec de la création du tag : {res_tag.stderr or res_tag.stdout}")

@@ -1465,6 +1465,4 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     </aside>
     </>
   );
-}, (prev, next) => {
-  return prev.conversations === next.conversations && prev.activeConversationId === next.activeConversationId;
 });

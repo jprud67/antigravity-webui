@@ -88,13 +88,15 @@ def save_jobs(data: dict[str, Any]) -> None:
             raise
 
 
-def compute_next_run(schedule: str | dict[str, Any]) -> str | None:
+def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
     """Calcule la prochaine date d'exécution depuis une expression cron ou un intervalle."""
+    if not schedule:
+        return None
     now = datetime.now(timezone.utc)
     expr = ""
     if isinstance(schedule, str):
         expr = schedule.strip()
-    if isinstance(schedule, dict):
+    elif isinstance(schedule, dict):
         if schedule.get("kind") == "interval":
             if "minutes" in schedule and schedule["minutes"] is not None:
                 try:
@@ -102,12 +104,12 @@ def compute_next_run(schedule: str | dict[str, Any]) -> str | None:
                     return (now + timedelta(minutes=mins)).isoformat()
                 except (ValueError, TypeError):
                     pass
-            expr = schedule.get("expr") or schedule.get("display") or ""
+            expr = schedule.get("expr") or schedule.get("display") or schedule.get("schedule_display") or ""
 
         elif schedule.get("kind") == "cron":
-            expr = schedule.get("expr") or schedule.get("display") or ""
+            expr = schedule.get("expr") or schedule.get("display") or schedule.get("schedule_display") or ""
         else:
-            expr = schedule.get("display") or schedule.get("expr") or ""
+            expr = schedule.get("expr") or schedule.get("display") or schedule.get("schedule_display") or ""
 
     if not expr:
         return None
@@ -132,6 +134,8 @@ def compute_next_run(schedule: str | dict[str, Any]) -> str | None:
         if croniter.is_valid(expr):
             iter_cron = croniter(expr, now)
             next_dt = iter_cron.get_next(datetime)
+            if next_dt.tzinfo is None:
+                next_dt = next_dt.replace(tzinfo=timezone.utc)
             return next_dt.isoformat()
     except Exception as e:
         logger.warning(f"Expression cron invalide '{expr}': {e}")

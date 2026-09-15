@@ -201,6 +201,18 @@ function splitHtmlIntoLines(html: string): string[] {
   return lines;
 }
 
+export function extractRawText(children: any): string {
+  if (typeof children === 'string') return children;
+  if (typeof children === 'number') return String(children);
+  if (Array.isArray(children)) {
+    return children.map(extractRawText).join('');
+  }
+  if (children && typeof children === 'object' && 'props' in children) {
+    return extractRawText(children.props?.children);
+  }
+  return children ? String(children) : '';
+}
+
 function parseCodeFenceMeta(className?: string, rawCode: string = '') {
   let rawLang = '';
   let filename = '';
@@ -339,7 +351,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
   onOpenFile,
   onOpenTerminal,
 }) => {
-  const rawCode = String(children || '').replace(/\n$/, '');
+  const rawCode = extractRawText(children).replace(/\n$/, '');
   const { language, filename, cleanedCode } = useMemo(
     () => parseCodeFenceMeta(className, rawCode),
     [className, rawCode]
@@ -674,7 +686,7 @@ export const CodeOrInlineBlock: React.FC<any> = ({
   ...props
 }) => {
   const inPre = useContext(PreContext);
-  const rawText = String(children || '');
+  const rawText = extractRawText(children);
   const isInline = inline === true || (!inPre && inline !== false && !className?.includes('language-') && !rawText.includes('\n'));
 
   if (isInline) {
