@@ -4,7 +4,7 @@ import shutil
 import uuid
 import html
 import re
-from pathlib import Path
+import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from app.config import (
@@ -19,6 +19,9 @@ from app.services.session_metadata import (
     update_session_meta,
     delete_session_meta
 )
+
+logger = logging.getLogger("antigravity.storage")
+
 
 def get_db_connection() -> sqlite3.Connection:
     if not CONVERSATION_DB.exists():

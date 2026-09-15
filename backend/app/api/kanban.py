@@ -4,7 +4,7 @@ import uuid
 import sqlite3
 import logging
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from app.api.auth import require_auth

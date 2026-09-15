@@ -117,13 +117,13 @@ def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
         return {"success": True, "action": action, "count": len(ids), "results": results}
 
     elif action == "project":
-        project = req.payload.get("project", "") if req.payload else ""
-        project_color = req.payload.get("projectColor", "") if req.payload else ""
+        payload = req.payload or {}
         updates: Dict[str, Any] = {}
-        if project is not None:
-            updates["project"] = project
-        if project_color:
-            updates["projectColor"] = project_color
+        if "project" in payload:
+            updates["project"] = payload.get("project") or ""
+        if "projectColor" in payload:
+            # Key-presence based so an empty color can explicitly clear the project color
+            updates["projectColor"] = payload.get("projectColor") or ""
         for cid in ids:
             try:
                 update_session_meta(cid, updates)

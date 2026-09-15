@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Plus, 
   MessageSquare, 
@@ -112,6 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [bulkProjectInput, setBulkProjectInput] = useState('');
   const [bulkProjectColor, setBulkProjectColor] = useState('#3B82F6');
   const importFileInputRef = useRef<HTMLInputElement>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleImportJSON = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -144,9 +145,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleSearchChange = (val: string) => {
     setSearchFilter(val);
     if (onSearchQuery) {
-      onSearchQuery(val);
+      // Debounce the backend search (deep transcript scan) to avoid a request per keystroke
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = setTimeout(() => {
+        onSearchQuery(val);
+      }, 350);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, []);
 
   // Filter conversations
   const filtered = useMemo(() => {

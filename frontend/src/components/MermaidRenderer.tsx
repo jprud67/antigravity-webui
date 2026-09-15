@@ -47,10 +47,20 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
         });
 
         const id = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
-        const { svg } = await mermaid.render(id, chart.trim());
-        if (isMounted) {
-          setSvgContent(svg);
-          setError(null);
+        try {
+          const { svg } = await mermaid.render(id, chart.trim());
+          if (isMounted) {
+            setSvgContent(svg);
+            setError(null);
+          }
+        } catch (renderErr: any) {
+          try {
+            const stray = document.getElementById(id);
+            if (stray) stray.remove();
+            const dStray = document.getElementById(`d${id}`);
+            if (dStray) dStray.remove();
+          } catch {}
+          throw renderErr;
         }
       } catch (err: any) {
         if (isMounted) {

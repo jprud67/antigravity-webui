@@ -1,11 +1,9 @@
 import os
-import signal
-import json
+import time
 import logging
 import psutil
-from pathlib import Path
-from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Query, Depends
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.config import BRAIN_DIR
 from app.api.auth import require_auth
@@ -51,6 +49,13 @@ def list_active_tasks(conversation_id: Optional[str] = None, _ = Depends(require
                     except Exception:
                         preview = ""
 
+                    now_ts = time.time()
+                    is_finished = (
+                        "finished with result" in preview
+                        or "exited with code" in preview
+                        or "Completed At:" in preview
+                        or (now_ts - stat.st_mtime) > 1800
+                    )
                     tasks.append({
                         "id": f"{cid}/{tid}",
                         "task_id": tid,
@@ -59,7 +64,7 @@ def list_active_tasks(conversation_id: Optional[str] = None, _ = Depends(require
                         "size": stat.st_size,
                         "last_modified": stat.st_mtime,
                         "preview": preview,
-                        "status": "completed" if "finished with result" in preview or "exited with code" in preview else "running"
+                        "status": "completed" if is_finished else "running"
                     })
 
             # Subagents

@@ -4,7 +4,6 @@ import hmac
 import hashlib
 import json
 import secrets
-from pathlib import Path
 from typing import Optional, Dict, Any
 from app.config import GEMINI_DIR
 

@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from pydantic import BaseModel
 
 HOME = Path.home()
 GEMINI_DIR = Path(os.environ.get("ANTIGRAVITY_DATA_DIR", HOME / ".gemini" / "antigravity-cli"))

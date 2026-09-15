@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import signal
@@ -30,6 +29,7 @@ class ExecutionSession:
         self.is_running: bool = False
         self.is_steering: bool = False
         self.started_at: float = 0.0
+        self.last_active_at: float = time.time()
 
         # Live state for reconnection and late hydration
         self.live_thought: str = ""
@@ -62,6 +62,7 @@ class ExecutionSession:
         }
 
     async def broadcast(self, event: Dict[str, Any]):
+        self.last_active_at = time.time()
         # Keep ring buffer of recent events
         self.recent_events.append(event)
         if len(self.recent_events) > 100:
@@ -218,7 +219,6 @@ class ExecutionSession:
             while attempt < max_failover_attempts:
                 attempt += 1
                 quota_error_detected = False
-                quota_error_msg = ""
 
                 try:
                     active_cid = self.conversation_id or conv_id
@@ -242,20 +242,16 @@ class ExecutionSession:
                             err_msg = event.get("message", "")
                             if is_quota_error(err_msg):
                                 quota_error_detected = True
-                                quota_error_msg = err_msg
                                 logger.warning(f"[Session {self.conversation_id}] Quota error detected in event: {err_msg}")
                                 break
 
                         await self.broadcast(event)
 
                 except asyncio.CancelledError:
+                    # Note: the canceller (user "interrupt" or steering) is responsible for
+                    # broadcasting the relevant event; avoid duplicating "interrupted" here.
                     if not self.is_steering:
                         logger.info(f"[Session {self.conversation_id}] Turn cancelled by user interruption.")
-                        await self.broadcast({
-                            "event": "interrupted",
-                            "conversation_id": self.conversation_id,
-                            "message": "Exécution interrompue."
-                        })
                     else:
                         logger.info(f"[Session {self.conversation_id}] Turn cancelled for steering directive.")
                     return
@@ -263,7 +259,6 @@ class ExecutionSession:
                     err_text = str(e)
                     if is_quota_error(err_text):
                         quota_error_detected = True
-                        quota_error_msg = err_text
                     else:
                         logger.error(f"[Session {self.conversation_id}] Error during turn execution: {e}")
                         await self.broadcast({
@@ -311,6 +306,14 @@ class ExecutionSession:
                         "queue_size": self.message_queue.qsize()
                     })
                     return
+
+            # All failover attempts were exhausted without a conclusive outcome
+            logger.error(f"[Session {self.conversation_id}] Auto-failover retries exhausted ({max_failover_attempts} attempts).")
+            await self.broadcast({
+                "event": "error",
+                "conversation_id": self.conversation_id,
+                "message": "Basculements automatiques épuisés : impossible de terminer la tâche. Veuillez réessayer ultérieurement."
+            })
 
         finally:
             self.active_proc = None
@@ -361,7 +364,30 @@ class ExecutionManager:
         if cid:
             self.sessions[cid] = session
 
+    def prune_inactive_sessions(self, max_idle_seconds: float = 3600.0):
+        """
+        Prunes idle sessions from memory that are not running, have empty queues,
+        no connected subscribers, and have been inactive for over max_idle_seconds.
+        """
+        now = time.time()
+        to_prune = []
+        for cid, s in list(self.sessions.items()):
+            if (
+                not s.is_running
+                and s.message_queue.empty()
+                and len(s.subscribers) == 0
+                and (now - getattr(s, "last_active_at", 0.0)) > max_idle_seconds
+            ):
+                to_prune.append(cid)
+
+        for cid in to_prune:
+            s = self.sessions.pop(cid, None)
+            if s and s.worker_task and not s.worker_task.done():
+                s.worker_task.cancel()
+            logger.info(f"Pruned inactive execution session for conversation {cid} from memory.")
+
     def get_or_create_session(self, conversation_id: Optional[str], workspace_path: Optional[str] = None) -> ExecutionSession:
+        self.prune_inactive_sessions()
         if conversation_id and conversation_id in self.sessions:
             s = self.sessions[conversation_id]
             if workspace_path:
@@ -534,7 +560,7 @@ class ExecutionManager:
             except Exception as e:
                 logger.error(f"Failed to update settings for approval: {e}")
 
-        if session.active_proc and session.active_proc.stdin:
+        if session.active_proc and session.active_proc.stdin and session.active_proc.returncode is None:
             try:
                 input_char = "y\n" if decision in ["allow-once", "allow-session", "always-allow"] else "n\n"
                 session.active_proc.stdin.write(input_char.encode())

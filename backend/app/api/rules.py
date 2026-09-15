@@ -1,19 +1,42 @@
 import os
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from app.api.auth import require_auth
-from app.config import HOME, SETTINGS_FILE
+from app.config import HOME, SETTINGS_FILE, DEFAULT_WORKSPACE
+from app.services.storage import get_settings
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
 
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(HOME / ".hermes")))
 GLOBAL_AGENTS_FILE = HOME / "AGENTS.md"
 ARCH_STATE_FILE = HERMES_HOME / "memories" / "ARCHITECTURE_STATE.md"
+
+
+def _validate_workspace_path(workspace_path: str) -> Path:
+    """Resolve a workspace path and confine it to the authorized working roots."""
+    try:
+        resolved = Path(workspace_path).resolve()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Chemin de workspace invalide.")
+
+    allowed_roots = [Path(DEFAULT_WORKSPACE).resolve()]
+    try:
+        for ws in get_settings().get("trustedWorkspaces", []) or []:
+            try:
+                allowed_roots.append(Path(ws).resolve())
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    if not any(resolved == root or root in resolved.parents for root in allowed_roots):
+        raise HTTPException(status_code=403, detail="Accès refusé : chemin en dehors des répertoires de travail autorisés.")
+    return resolved
 
 def _get_current_journal_path() -> Path:
     now = datetime.now()
@@ -32,9 +55,9 @@ def _resolve_file_path(file_id: str, workspace_path: Optional[str] = None) -> Op
     elif file_id == "hermes_journal":
         return _get_current_journal_path()
     elif file_id == "workspace_agents" and workspace_path:
-        return Path(workspace_path) / "AGENTS.md"
+        return _validate_workspace_path(workspace_path) / "AGENTS.md"
     elif file_id == "workspace_gemini" and workspace_path:
-        return Path(workspace_path) / "GEMINI.md"
+        return _validate_workspace_path(workspace_path) / "GEMINI.md"
     return None
 
 class SaveRuleRequest(BaseModel):
@@ -88,31 +111,36 @@ def list_rules_files(workspace_path: Optional[str] = Query(None), _ = Depends(re
     ]
 
     if workspace_path:
-        ws_p = Path(workspace_path)
-        ws_agents = ws_p / "AGENTS.md"
-        ws_gemini = ws_p / "GEMINI.md"
+        try:
+            ws_p = _validate_workspace_path(workspace_path)
+        except HTTPException:
+            ws_p = None
 
-        files.append({
-            "id": "workspace_agents",
-            "name": f"AGENTS.md ({ws_p.name})",
-            "description": f"Règles locales du workspace {workspace_path}",
-            "path": str(ws_agents),
-            "syntax": "markdown",
-            "exists": ws_agents.exists(),
-            "size": ws_agents.stat().st_size if ws_agents.exists() else 0,
-            "last_modified": ws_agents.stat().st_mtime if ws_agents.exists() else 0,
-        })
+        if ws_p is not None:
+            ws_agents = ws_p / "AGENTS.md"
+            ws_gemini = ws_p / "GEMINI.md"
 
-        files.append({
-            "id": "workspace_gemini",
-            "name": f"GEMINI.md ({ws_p.name})",
-            "description": f"Instructions contextuelles du workspace {workspace_path}",
-            "path": str(ws_gemini),
-            "syntax": "markdown",
-            "exists": ws_gemini.exists(),
-            "size": ws_gemini.stat().st_size if ws_gemini.exists() else 0,
-            "last_modified": ws_gemini.stat().st_mtime if ws_gemini.exists() else 0,
-        })
+            files.append({
+                "id": "workspace_agents",
+                "name": f"AGENTS.md ({ws_p.name})",
+                "description": f"Règles locales du workspace {workspace_path}",
+                "path": str(ws_agents),
+                "syntax": "markdown",
+                "exists": ws_agents.exists(),
+                "size": ws_agents.stat().st_size if ws_agents.exists() else 0,
+                "last_modified": ws_agents.stat().st_mtime if ws_agents.exists() else 0,
+            })
+
+            files.append({
+                "id": "workspace_gemini",
+                "name": f"GEMINI.md ({ws_p.name})",
+                "description": f"Instructions contextuelles du workspace {workspace_path}",
+                "path": str(ws_gemini),
+                "syntax": "markdown",
+                "exists": ws_gemini.exists(),
+                "size": ws_gemini.stat().st_size if ws_gemini.exists() else 0,
+                "last_modified": ws_gemini.stat().st_mtime if ws_gemini.exists() else 0,
+            })
 
     return {"files": files}
 

@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from app.config import SESSION_METADATA_FILE
 
 logger = logging.getLogger("antigravity-webui.session_metadata")

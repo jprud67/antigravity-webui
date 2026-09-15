@@ -139,6 +139,25 @@ const createMarkdownComponents = (
   ),
 });
 
+// Stable plugin array — avoids re-parsing markdown on every streaming re-render
+const REMARK_PLUGINS = [remarkGfm];
+
+/**
+ * Memoized markdown renderer: only re-parses markdown when its own text changes.
+ * This keeps token-by-token streaming fast on long conversations (unchanged
+ * messages are not re-rendered at all).
+ */
+const MarkdownContent = React.memo(
+  function MarkdownContent({ content, components }: { content: string; components: any }) {
+    return (
+      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components}>
+        {content}
+      </ReactMarkdown>
+    );
+  },
+  (prev, next) => prev.content === next.content && prev.components === next.components
+);
+
 /**
  * GitHub-style Callout & Alert Banner Component ([!NOTE], [!TIP], etc.)
  */
@@ -689,6 +708,14 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
     () => createMarkdownComponents(onOpenFiles, onOpenArtifacts, onOpenTerminal),
     [onOpenFiles, onOpenArtifacts, onOpenTerminal]
   );
+
+  // Index of the last assistant message — computed once per render instead of per message
+  const lastAssistantIdx = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') return i;
+    }
+    return -1;
+  }, [messages]);
 
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
@@ -1354,12 +1381,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                     </div>
 
                     <div className="leading-relaxed markdown-content">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={markdownComponents}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
+                      <MarkdownContent content={msg.content} components={markdownComponents} />
                     </div>
                   </div>
                 </div>
@@ -1530,12 +1552,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                 {/* Assistant Markdown Content */}
                 {msg.content ? (
                   <div className={`hermes-assistant-body w-full markdown-content leading-relaxed${msg.isLive ? ' is-streaming' : ''}`}>
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={markdownComponents}
-                    >
-                      {msg.content}
-                    </ReactMarkdown>
+                    <MarkdownContent content={msg.content} components={markdownComponents} />
                   </div>
                 ) : null}
 
@@ -1589,7 +1606,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
                       </button>
                     )}
 
-                    {onRetry && !isStreaming && (msgIdx === messages.length - 1 || msgIdx === messages.map(m => m.role).lastIndexOf('assistant')) && (
+                    {onRetry && !isStreaming && (msgIdx === messages.length - 1 || msgIdx === lastAssistantIdx) && (
                       <button
                         type="button"
                         onClick={onRetry}

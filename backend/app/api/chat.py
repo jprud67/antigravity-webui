@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.auth import verify_access_token, get_auth_config
 from app.services.execution_manager import execution_manager

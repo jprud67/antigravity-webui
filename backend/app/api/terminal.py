@@ -9,7 +9,8 @@ import json
 import logging
 import time
 from typing import Optional, Dict
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from app.api.auth import require_auth
 from app.services.auth import verify_access_token, get_auth_config
 
 logger = logging.getLogger("antigravity.terminal")
@@ -241,7 +242,7 @@ async def terminal_websocket(
         logger.info(f"Terminal WebSocket detached from session {sid} (process kept running)")
 
 @router.get("/api/terminal/sessions")
-def list_terminal_sessions():
+def list_terminal_sessions(_ = Depends(require_auth)):
     """List active persistent terminal sessions"""
     return [
         {
@@ -257,7 +258,7 @@ def list_terminal_sessions():
     ]
 
 @router.post("/api/terminal/sessions/{session_id}/restart")
-async def restart_terminal_session(session_id: str):
+async def restart_terminal_session(session_id: str, _ = Depends(require_auth)):
     """Explicitly kill and restart a terminal session"""
     await kill_session(session_id)
     return {"success": True, "session_id": session_id}

@@ -12,7 +12,6 @@ import json
 import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
-from app.api.auth import get_current_token
 from app.services.fs_watcher import add_subscriber, remove_subscriber
 
 logger = logging.getLogger("antigravity.events")

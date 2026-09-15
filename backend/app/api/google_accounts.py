@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 from app.api.auth import require_auth
 from app.services.google_auth import (

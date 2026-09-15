@@ -1,10 +1,8 @@
-import os
 import re
 import logging
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
 from app.config import GEMINI_DIR, HOME
 from app.api.auth import require_auth
 

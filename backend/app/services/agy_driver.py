@@ -69,11 +69,27 @@ async def get_available_models() -> List[Dict[str, Any]]:
             models.append(parse_model_metadata(m_id, m_id))
     return models
 
+_models_cache: Dict[str, Any] = {"data": None, "timestamp": 0.0}
+
+
 async def get_model_families() -> List[Dict[str, Any]]:
     """
     Returns unique base model families deduplicated with supported efforts and concrete variant IDs.
+    Cached for 5 minutes to avoid spawning the `agy models` CLI on every settings/model fetch.
     """
-    models_raw = await get_available_models()
+    global _models_cache
+    now = time.time()
+    if _models_cache["data"] is not None and (now - _models_cache["timestamp"]) < 300:
+        return _models_cache["data"]
+
+    try:
+        models_raw = await get_available_models()
+    except Exception as e:
+        if _models_cache["data"] is not None:
+            logger.warning(f"agy models failed ({e}); returning stale cached model families.")
+            return _models_cache["data"]
+        raise
+
     families: Dict[str, Dict[str, Any]] = {}
     for meta in models_raw:
         fid = meta['family_id']
@@ -89,7 +105,10 @@ async def get_model_families() -> List[Dict[str, Any]]:
             families[fid]['variants'][meta['effort']] = meta['id']
         else:
             families[fid]['variants']['default'] = meta['id']
-    return list(families.values())
+
+    result = list(families.values())
+    _models_cache = {"data": result, "timestamp": now}
+    return result
 
 def resolve_model_and_effort(model: Optional[str], effort: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
     """
@@ -277,11 +296,19 @@ async def get_usage_quota() -> Dict[str, Any]:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
-        if proc.returncode == 0 and stdout:
-            data = json.loads(stdout.decode(errors="replace"))
-            _quota_cache = {"data": data, "timestamp": now}
-            return data
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+            if proc.returncode == 0 and stdout:
+                data = json.loads(stdout.decode(errors="replace"))
+                _quota_cache = {"data": data, "timestamp": now}
+                return data
+        except Exception as proc_err:
+            try:
+                proc.kill()
+                await proc.wait()
+            except Exception:
+                pass
+            raise proc_err
     except Exception as e:
         logger.warning(f"Error fetching usage quota: {e}")
 
@@ -301,11 +328,19 @@ async def get_credits() -> Dict[str, Any]:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
-        if proc.returncode == 0 and stdout:
-            data = json.loads(stdout.decode(errors="replace"))
-            _credits_cache = {"data": data, "timestamp": now}
-            return data
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+            if proc.returncode == 0 and stdout:
+                data = json.loads(stdout.decode(errors="replace"))
+                _credits_cache = {"data": data, "timestamp": now}
+                return data
+        except Exception as proc_err:
+            try:
+                proc.kill()
+                await proc.wait()
+            except Exception:
+                pass
+            raise proc_err
     except Exception as e:
         logger.warning(f"Error fetching credits: {e}")
 
@@ -325,11 +360,19 @@ async def get_changelog() -> Dict[str, Any]:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
-        if proc.returncode == 0 and stdout:
-            data = json.loads(stdout.decode(errors="replace"))
-            _changelog_cache = {"data": data, "timestamp": now}
-            return data
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+            if proc.returncode == 0 and stdout:
+                data = json.loads(stdout.decode(errors="replace"))
+                _changelog_cache = {"data": data, "timestamp": now}
+                return data
+        except Exception as proc_err:
+            try:
+                proc.kill()
+                await proc.wait()
+            except Exception:
+                pass
+            raise proc_err
     except Exception as e:
         logger.warning(f"Error fetching changelog: {e}")
 

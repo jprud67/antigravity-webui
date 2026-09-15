@@ -116,10 +116,10 @@ export function App() {
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('files');
 
-  const openRightPanel = (tab: RightPanelTab) => {
+  const openRightPanel = React.useCallback((tab: RightPanelTab) => {
     setRightPanelTab(tab);
     setIsRightPanelOpen(true);
-  };
+  }, []);
 
   useEffect(() => {
     const handleOpenFile = () => {
@@ -825,15 +825,24 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
       setIsStreaming(true);
     }
 
-    chatSocket.sendPrompt({
-      prompt,
-      conversationId: activeConversationId || undefined,
-      workspacePath: currentWorkspace,
-      model: options.model,
-      effort: options.effort,
-      autoApprove: options.autoApprove,
-      mode: options.mode
-    });
+    try {
+      chatSocket.sendPrompt({
+        prompt,
+        conversationId: activeConversationId || undefined,
+        workspacePath: currentWorkspace,
+        model: options.model,
+        effort: options.effort,
+        autoApprove: options.autoApprove,
+        mode: options.mode
+      });
+    } catch (e: any) {
+      // WebSocket not ready (reconnecting) — inform the user instead of silently losing the prompt
+      showToast(e?.message || 'Connexion WebSocket indisponible : message non envoyé.', 'error');
+      setIsStreaming(false);
+      if (mode === 'queue') {
+        setQueueCount((prev) => Math.max(0, prev - 1));
+      }
+    }
   };
 
   const handleStopStreaming = () => {
@@ -880,6 +889,15 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
   const handleInsertPath = (pathWithPrefix: string) => {
     setQuickPrompt((prev) => (prev ? `${prev} ${pathWithPrefix}` : pathWithPrefix));
   };
+
+  // Stable panel-opening callbacks (keeps ChatCanvas markdown components memoized)
+  const handleOpenFilesPanel = React.useCallback(() => openRightPanel('files'), [openRightPanel]);
+  const handleOpenArtifactsPanel = React.useCallback(() => openRightPanel('artifacts'), [openRightPanel]);
+  const handleOpenTerminalPanel = React.useCallback(() => openRightPanel('terminal'), [openRightPanel]);
+  const handleOpenGitPanel = React.useCallback(() => openRightPanel('git'), [openRightPanel]);
+  const handleOpenKanbanPanel = React.useCallback(() => openRightPanel('kanban'), [openRightPanel]);
+  const handleToggleRightPanel = React.useCallback(() => setIsRightPanelOpen((prev) => !prev), []);
+  const handleToggleMobileSidebar = React.useCallback(() => setIsMobileSidebarOpen((prev) => !prev), []);
 
   // Phase 3 Session Handlers (Fork, Pin, Tags, Project, Search)
   const handleTogglePin = async (convId: string, currentPin: boolean) => {
@@ -1224,18 +1242,18 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
               effort: selectedEffort,
             })
           }
-          onOpenFiles={() => openRightPanel('files')}
-          onOpenArtifacts={() => openRightPanel('artifacts')}
-          onOpenTerminal={() => openRightPanel('terminal')}
-          onOpenGit={() => openRightPanel('git')}
-          onOpenKanban={() => openRightPanel('kanban')}
+          onOpenFiles={handleOpenFilesPanel}
+          onOpenArtifacts={handleOpenArtifactsPanel}
+          onOpenTerminal={handleOpenTerminalPanel}
+          onOpenGit={handleOpenGitPanel}
+          onOpenKanban={handleOpenKanbanPanel}
           onOpenCrons={() => setIsCronModalOpen(true)}
           onOpenRules={() => setIsRulesModalOpen(true)}
           onOpenTasks={() => setIsTaskDashboardOpen(true)}
           isRightPanelOpen={isRightPanelOpen}
           activeRightPanelTab={rightPanelTab}
-          onToggleRightPanel={() => setIsRightPanelOpen(!isRightPanelOpen)}
-          onToggleMobileSidebar={() => setIsMobileSidebarOpen((prev) => !prev)}
+          onToggleRightPanel={handleToggleRightPanel}
+          onToggleMobileSidebar={handleToggleMobileSidebar}
           onNewConversation={handleNewConversation}
           pendingApproval={pendingApproval}
           onApprovalResolved={() => setPendingApproval(null)}

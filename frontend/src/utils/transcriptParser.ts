@@ -55,6 +55,13 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
 
   const flushAssistant = () => {
     if (currentAssistantMsg) {
+      if (currentAssistantMsg.toolCalls) {
+        for (const tc of currentAssistantMsg.toolCalls) {
+          if (tc.status === 'running') {
+            tc.status = 'done';
+          }
+        }
+      }
       const hasTools = (currentAssistantMsg.toolCalls?.length || 0) > 0;
       const hasThought = Boolean(currentAssistantMsg.thought?.trim());
       const hasContent = Boolean(currentAssistantMsg.content?.trim());
