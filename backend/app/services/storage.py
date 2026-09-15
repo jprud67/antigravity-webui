@@ -212,9 +212,9 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
     r_tokens = max(1, int(response_chars / 3.8)) if response_chars > 0 else 0
     t_tokens = max(0, int(thinking_chars / 3.8)) if thinking_chars > 0 else 0
     
-    input_tokens = base_sys_tokens + p_tokens + r_tokens + t_tokens
+    input_tokens = base_sys_tokens + p_tokens
     output_tokens = max(0, r_tokens + t_tokens)
-    total_tokens = input_tokens
+    total_tokens = input_tokens + output_tokens
 
     return {
         "input_tokens": input_tokens,
@@ -1333,7 +1333,7 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
                 "relative_path": str(p.relative_to(cdir)),
                 "full_path": str(p),
                 "size": stat.st_size,
-                "last_modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
             })
     artifacts.sort(key=lambda x: x["last_modified"], reverse=True)
     return artifacts
@@ -1382,8 +1382,7 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
     1. Antigravity JSON export format ({ conversation_id, metadata, steps })
     2. Hermes WebUI session format ({ session_id, title, messages, ... })
     """
-    import datetime
-    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    now_iso = datetime.now(timezone.utc).isoformat()
     new_id = str(uuid.uuid4())
 
     title = "Conversation importée"

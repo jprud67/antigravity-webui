@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
+from app.services.storage import get_settings
 
 logger = logging.getLogger("antigravity.files")
 router = APIRouter(prefix="/api/files", tags=["files"])
@@ -53,8 +54,6 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> list
         logger.warning(f"Unable to read dir {dir_path}: {e}")
 
     return items
-
-from app.services.storage import get_settings
 
 
 def _validate_path_access(file_path: Path) -> Path:
@@ -148,8 +147,8 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
             "last_modified": stat.st_mtime
         }
     except Exception as e:
-        if 'tmp_path' in locals() and tmp_path.exists():
-            tmp_path.unlink()
+        if 'tmp_path' in locals():
+            tmp_path.unlink(missing_ok=True)
         logger.error(f"Error saving file {resolved_path}: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement : {e!s}")
 

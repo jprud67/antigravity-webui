@@ -86,10 +86,11 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
     # artifact path → last mtime
     artifact_mtimes: dict[str, float] = {}
 
-    def _scan_transcripts() -> dict[str, float]:
-        result = {}
+    def _scan_brain() -> tuple[dict[str, float], dict[str, float]]:
+        transcripts: dict[str, float] = {}
+        artifacts: dict[str, float] = {}
         if not brain_dir.exists():
-            return result
+            return transcripts, artifacts
         try:
             for child in brain_dir.iterdir():
                 if not child.is_dir() or not _UUID_PATTERN.match(child.name):
@@ -98,42 +99,30 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                 t1 = child / ".system_generated" / "logs" / "transcript.jsonl"
                 try:
                     if t1.exists():
-                        result[str(t1)] = t1.stat().st_mtime
-                        continue
+                        transcripts[str(t1)] = t1.stat().st_mtime
+                    else:
+                        t2 = child / "transcript.jsonl"
+                        if t2.exists():
+                            transcripts[str(t2)] = t2.stat().st_mtime
                 except OSError as e:
-                    logger.debug(f"transcript scan (primaire) : {e}")
-                # Fallback path: brain_dir/<conv_id>/transcript.jsonl
-                t2 = child / "transcript.jsonl"
-                try:
-                    if t2.exists():
-                        result[str(t2)] = t2.stat().st_mtime
-                except OSError as e:
-                    logger.debug(f"transcript scan (fallback) : {e}")
-        except OSError as e:
-            logger.debug(f"scan des transcripts impossible : {e}")
-        return result
+                    logger.debug(f"transcript scan error on {child.name}: {e}")
 
-    def _scan_artifacts() -> dict[str, float]:
-        result = {}
-        if not brain_dir.exists():
-            return result
-        try:
-            for child in brain_dir.iterdir():
-                if not child.is_dir() or not _UUID_PATTERN.match(child.name):
-                    continue
-                for f in child.iterdir():
-                    try:
-                        if f.name not in [".system_generated", "scratch"] and f.is_file():
-                            result[str(f)] = f.stat().st_mtime
-                    except OSError:
-                        continue
+                # Artifacts scan (non-system files directly in session folder)
+                try:
+                    for f in child.iterdir():
+                        try:
+                            if f.name not in [".system_generated", "scratch"] and f.is_file():
+                                artifacts[str(f)] = f.stat().st_mtime
+                        except OSError:
+                            continue
+                except OSError as e:
+                    logger.debug(f"artifacts scan error on {child.name}: {e}")
         except OSError as e:
-            logger.debug(f"scan des artefacts impossible : {e}")
-        return result
+            logger.debug(f"scan des transcripts/artefacts impossible : {e}")
+        return transcripts, artifacts
 
     # Initial scan
-    transcript_mtimes = _scan_transcripts()
-    artifact_mtimes = _scan_artifacts()
+    transcript_mtimes, artifact_mtimes = _scan_brain()
 
     while True:
         await asyncio.sleep(poll_interval)
@@ -150,8 +139,8 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                         "ts": time.time()
                     })
 
-            # --- 2. Check transcript files (ongoing turns from CLI) ---
-            cur_transcripts = _scan_transcripts()
+            # --- 2. Check transcript and artifact files (single traversal) ---
+            cur_transcripts, cur_artifacts = _scan_brain()
 
             # New or modified transcripts
             for path, mtime in cur_transcripts.items():
@@ -171,7 +160,6 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
             transcript_mtimes = cur_transcripts
 
             # --- 3. Check artifact files (new/updated artifacts) ---
-            cur_artifacts = _scan_artifacts()
             for a_path, a_mtime in cur_artifacts.items():
                 prev = artifact_mtimes.get(a_path, 0.0)
                 if a_mtime != prev:

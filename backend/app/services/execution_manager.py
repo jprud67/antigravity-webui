@@ -414,8 +414,11 @@ class ExecutionManager:
 
         for cid in to_prune:
             s = self.sessions.pop(cid, None)
-            if s and s.worker_task and not s.worker_task.done():
-                s.worker_task.cancel()
+            if s:
+                if s is self.active_session:
+                    self.active_session = None
+                if s.worker_task and not s.worker_task.done():
+                    s.worker_task.cancel()
             logger.info(f"Pruned inactive execution session for conversation {cid} from memory.")
 
     def get_or_create_session(self, conversation_id: str | None, workspace_path: str | None = None) -> ExecutionSession:

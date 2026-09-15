@@ -1,7 +1,7 @@
 import json
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -40,7 +40,7 @@ def _validate_workspace_path(workspace_path: str) -> Path:
     return resolved
 
 def _get_current_journal_path() -> Path:
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     month_str = now.strftime("%Y_%m")
     log_dir = HERMES_HOME / "memories" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -101,7 +101,7 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
         },
         {
             "id": "hermes_journal",
-            "name": f"server_actions_{datetime.now().strftime('%Y_%m')}.md (Journal Hermes)",
+            "name": f"server_actions_{datetime.now(timezone.utc).strftime('%Y_%m')}.md (Journal Hermes)",
             "description": "Journal mensuel horodaté des actions et interventions serveur",
             "path": str(_get_current_journal_path()),
             "syntax": "markdown",
@@ -209,8 +209,7 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
             f.write(req.content)
         tmp_path.replace(target_path)
     except Exception as e:
-        if tmp_path.exists():
-            tmp_path.unlink()
+        tmp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Erreur d'écriture: {e}")
 
     # Trigger Hermes IPC event

@@ -372,9 +372,9 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
   const rTokens = Math.max(0, Math.ceil(responseChars / 3.8));
   const tTokens = Math.max(0, Math.ceil(thinkingChars / 3.8));
 
-  const inputTokens = BASE_SYSTEM_TOKENS + pTokens + rTokens;
+  const inputTokens = BASE_SYSTEM_TOKENS + pTokens;
   const outputTokens = rTokens + tTokens;
-  const totalTokens = inputTokens;
+  const totalTokens = inputTokens + outputTokens;
 
   return {
     inputTokens,

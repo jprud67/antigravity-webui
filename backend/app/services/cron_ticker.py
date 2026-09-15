@@ -215,11 +215,11 @@ async def _execute_job(job: dict[str, Any]) -> None:
     # Journal d'exécution (propre à l'application)
     ensure_dirs()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     log_file = OUTPUT_DIR / f"{job_id}_{stamp}.log"
     header = (
         f"Job: {name} ({job_id})\n"
-        f"Début: {datetime.now().isoformat()}\n"
+        f"Début: {datetime.now(timezone.utc).isoformat()}\n"
         f"Durée: {duration}s — Statut: {result['status']} — Tentatives: {result['attempts']}\n"
         f"Basculements: {result['failovers'] or 'aucun'}\n"
         f"{'-' * 60}\n"

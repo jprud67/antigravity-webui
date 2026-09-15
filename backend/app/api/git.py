@@ -7,11 +7,10 @@ from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
+from app.services.storage import get_settings
 
 logger = logging.getLogger("antigravity.git")
 router = APIRouter(prefix="/api/git", tags=["git"])
-
-from app.services.storage import get_settings
 
 GIT_TIMEOUT = 12
 

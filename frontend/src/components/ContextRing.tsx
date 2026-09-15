@@ -50,9 +50,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
 
   // Total input context currently consumed (base + messages history + active typed prompt)
   const totalInput = baseInput + promptTokens;
-  const total = usage?.totalTokens && !promptTokens 
-    ? usage.totalTokens 
-    : (totalInput + rawOutput);
+  const total = totalInput + rawOutput;
 
   const percent = Math.min(100, Math.max(0, (total / contextLimit) * 100));
   const displayPercent = percent < 0.1 && total > 0 ? '<0.1%' : `${percent.toFixed(1)}%`;

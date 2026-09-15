@@ -11,9 +11,10 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from app.services.auth import get_auth_config, verify_access_token
 from app.services.fs_watcher import add_subscriber, remove_subscriber
 
 logger = logging.getLogger("antigravity.events")
@@ -44,14 +45,13 @@ async def _sse_generator(request: Request, q: asyncio.Queue):
 
 
 @router.get("/stream")
-async def event_stream(request: Request, token: str = None):
+async def event_stream(request: Request, token: str | None = None):
     """
     SSE endpoint that streams filesystem change events to the WebUI.
     The WebUI subscribes on load and receives push notifications whenever
     the CLI creates or updates conversations/transcripts.
     """
     # Auth check (same pattern as other endpoints)
-    from app.services.auth import get_auth_config, verify_access_token
     config = get_auth_config()
     if config.get("enabled", True):
         if not token:
@@ -60,7 +60,6 @@ async def event_stream(request: Request, token: str = None):
             if auth_header.startswith("Bearer "):
                 token = auth_header[7:]
         if not verify_access_token(token):
-            from fastapi import HTTPException
             raise HTTPException(status_code=401, detail="Non authentifié")
 
     q: asyncio.Queue = asyncio.Queue(maxsize=50)

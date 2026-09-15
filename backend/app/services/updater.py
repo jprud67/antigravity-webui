@@ -55,7 +55,8 @@ def _git_cmd(args: list[str], timeout: int = 10, cwd: Path | None = None) -> str
             cwd=str(target_cwd),
             capture_output=True,
             text=True,
-            timeout=timeout
+            timeout=timeout,
+            check=False
         )
         if res.returncode == 0:
             return (res.stdout or "").strip()
@@ -242,7 +243,8 @@ def check_for_updates(force: bool = False) -> dict[str, Any]:
             cwd=str(REPO_DIR),
             capture_output=True,
             text=True,
-            timeout=15
+            timeout=15,
+            check=False
         )
 
         if fetch_res.returncode != 0:
@@ -358,7 +360,7 @@ async def apply_update() -> dict[str, Any]:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            b_out, b_err = await asyncio.wait_for(build_proc.communicate(), timeout=120.0)
+            _b_out, b_err = await asyncio.wait_for(build_proc.communicate(), timeout=120.0)
             if build_proc.returncode != 0:
                 build_ok = False
                 build_output = b_err.decode(errors="replace").strip()
@@ -373,22 +375,27 @@ async def apply_update() -> dict[str, Any]:
     # 3b. Rollback automatique si le build échoue (ne pas laisser un état bancal)
     if not build_ok and prev_sha:
         logger.warning(f"Build en échec après mise à jour — rollback vers {prev_sha[:8]}...")
-        rollback = subprocess.run(
+        rollback = await asyncio.to_thread(
+            subprocess.run,
             ["git", "reset", "--keep", prev_sha],
-            cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20
+            cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20, check=False
         )
         rolled = rollback.returncode == 0
         if not rolled:
             logger.error(f"Rollback --keep impossible ({rollback.stderr.strip()}), tentative --hard...")
-            hard = subprocess.run(
+            hard = await asyncio.to_thread(
+                subprocess.run,
                 ["git", "reset", "--hard", prev_sha],
-                cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20
+                cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20, check=False
             )
             rolled = hard.returncode == 0
 
         if rolled:
             try:
-                rb = subprocess.run(npm_argv("run", "build"), cwd=str(frontend_dir), capture_output=True, timeout=120)
+                rb = await asyncio.to_thread(
+                    subprocess.run,
+                    npm_argv("run", "build"), cwd=str(frontend_dir), capture_output=True, timeout=120, check=False
+                )
                 hint = "frontend restauré" if rb.returncode == 0 else "relancez un build manuellement"
             except Exception:
                 hint = "relancez un build manuellement"
@@ -421,7 +428,9 @@ async def apply_update() -> dict[str, Any]:
             await asyncio.sleep(1.5)
             logger.info("Executing graceful systemctl restart antigravity-webui...")
             try:
-                subprocess.run(["systemctl", "restart", "antigravity-webui"], check=False)
+                await asyncio.to_thread(
+                    subprocess.run, ["systemctl", "restart", "antigravity-webui"], check=False
+                )
             except Exception as e:
                 logger.error(f"Service restart trigger error: {e}")
 

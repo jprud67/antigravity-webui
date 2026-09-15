@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
+from app.services.execution_manager import execution_manager
 from app.services.session_metadata import (
     bulk_update_session_meta,
     bulk_update_session_meta_batch,
@@ -50,7 +51,6 @@ class MetadataUpdateRequest(BaseModel):
 
 @router.get("", response_model=list[dict[str, Any]])
 def get_conversations(limit: int = 100, q: str | None = None, _ = Depends(require_auth)):
-    from app.services.execution_manager import execution_manager
     running_set = set(execution_manager.get_running_conversations())
     if q and q.strip():
         items = search_conversations(query=q.strip(), limit=limit)
