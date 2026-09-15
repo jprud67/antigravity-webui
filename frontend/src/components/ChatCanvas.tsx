@@ -47,7 +47,7 @@ import { ApprovalCard } from './ApprovalCard';
 import { getExportHtmlUrl, getExportMarkdownUrl, getExportJsonUrl } from '../services/api';
 import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
-import { showToast } from './Toast';
+import { showToast } from '../services/toast';
 
 interface ChatCanvasProps {
   messages: ChatMessage[];

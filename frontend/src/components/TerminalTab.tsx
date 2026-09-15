@@ -4,7 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { RefreshCw, Trash2, Terminal as TerminalIcon, ShieldAlert } from 'lucide-react';
 import { getAuthToken } from '../services/api';
-import { showConfirm } from './AppDialog';
+import { showConfirm } from '../services/dialog';
 
 interface TerminalTabProps {
   currentWorkspace: string;
@@ -80,7 +80,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
 
     try {
       fitAddon.fit();
-    } catch (e) {}
+    } catch {}
 
     // Connect WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Tag, Folder, Palette, Pin, Check, Trash2, Archive, Download, FileText } from 'lucide-react';
 import type { Conversation } from '../types';
 import { updateConversationMetadata, deleteConversation, exportConversationMarkdown, exportConversationJSON } from '../services/api';
-import { showConfirm } from './AppDialog';
-import { showToast } from './Toast';
+import { showConfirm } from '../services/dialog';
+import { showToast } from '../services/toast';
 
 interface SessionMetaModalProps {
   isOpen: boolean;
@@ -31,6 +31,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
   onUpdated,
   onDeleted
 }) => {
+  const [prevConvId, setPrevConvId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [project, setProject] = useState('');
   const [projectColor, setProjectColor] = useState(PALETTE[0]);
@@ -41,17 +42,16 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (conversation) {
-      setTitle(conversation.customTitle || conversation.title || '');
-      setProject(conversation.project || '');
-      setProjectColor(conversation.projectColor || PALETTE[0]);
-      setTagsStr((conversation.tags || []).join(', '));
-      setPinned(!!conversation.pinned);
-      setArchived(!!conversation.archived);
-      setError(null);
-    }
-  }, [conversation]);
+  if (conversation && conversation.conversation_id !== prevConvId) {
+    setPrevConvId(conversation.conversation_id);
+    setTitle(conversation.customTitle || conversation.title || '');
+    setProject(conversation.project || '');
+    setProjectColor(conversation.projectColor || PALETTE[0]);
+    setTagsStr((conversation.tags || []).join(', '));
+    setPinned(!!conversation.pinned);
+    setArchived(!!conversation.archived);
+    setError(null);
+  }
 
   if (!isOpen || !conversation) return null;
 

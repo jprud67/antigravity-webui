@@ -18,8 +18,8 @@ import {
   fetchRuleContent, 
   saveRuleContent 
 } from '../services/api';
-import { showToast } from './Toast';
-import { showConfirm } from './AppDialog';
+import { showToast } from '../services/toast';
+import { showConfirm } from '../services/dialog';
 
 interface RulesEditorModalProps {
   isOpen: boolean;
@@ -76,16 +76,43 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
   }, [currentWorkspace]);
 
   useEffect(() => {
-    if (isOpen) {
-      loadFiles();
-    }
-  }, [isOpen, loadFiles]);
+    if (!isOpen) return;
+    let active = true;
+    fetchRulesFiles(currentWorkspace)
+      .then((res) => {
+        if (active) {
+          setFileList(res.files);
+          if (res.files.length > 0 && !res.files.some(f => f.id === selectedFileId)) {
+            setSelectedFileId(res.files[0].id);
+          }
+        }
+      })
+      .catch((e) => console.error('Failed to load rules files list', e));
+    return () => { active = false; };
+  }, [isOpen, currentWorkspace, selectedFileId]);
 
   useEffect(() => {
-    if (isOpen && selectedFileId) {
-      loadContent(selectedFileId);
-    }
-  }, [isOpen, selectedFileId, loadContent]);
+    if (!isOpen || !selectedFileId) return;
+    let active = true;
+    fetchRuleContent(selectedFileId, currentWorkspace)
+      .then((data) => {
+        if (active) {
+          setFileContent(data.content);
+          setOriginalContent(data.content);
+          setCurrentFileMeta(data);
+          setLoadingContent(false);
+          setJsonError(null);
+          setSaveSuccess(false);
+        }
+      })
+      .catch((e: any) => {
+        if (active) {
+          showToast(e.message || 'Erreur lors du chargement du fichier', 'error');
+          setLoadingContent(false);
+        }
+      });
+    return () => { active = false; };
+  }, [isOpen, selectedFileId, currentWorkspace]);
 
   if (!isOpen) return null;
 

@@ -25,9 +25,7 @@ export default defineConfig({
           if (id.includes('node_modules/@xterm')) {
             return 'xterm';
           }
-          if (id.includes('node_modules/prismjs')) {
-            return 'prismjs';
-          }
+
           if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark-gfm') || id.includes('node_modules/micromark')) {
             return 'markdown';
           }

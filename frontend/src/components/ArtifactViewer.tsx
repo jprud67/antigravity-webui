@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { 
@@ -34,29 +34,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
   const [copied, setCopied] = useState(false);
   const [showMobileList, setShowMobileList] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadArtifacts();
-    }
-  }, [isOpen, conversationId]);
-
-  const loadArtifacts = async () => {
-    setLoading(true);
-    try {
-      const items = await fetchArtifacts(conversationId || undefined);
-      setArtifacts(items);
-      if (items.length > 0) {
-        selectArtifact(items[0]);
-      } else {
-        setSelectedArtifact(null);
-        setContent('');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const selectArtifact = async (art: ArtifactItem) => {
+  const selectArtifact = useCallback(async (art: ArtifactItem) => {
     setSelectedArtifact(art);
     setLoading(true);
     try {
@@ -65,7 +43,28 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetchArtifacts(conversationId || undefined).then((items) => {
+      if (active) {
+        setArtifacts(items);
+        setLoading(false);
+        if (items.length > 0) {
+          selectArtifact(items[0]);
+        } else {
+          setSelectedArtifact(null);
+          setContent('');
+        }
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, conversationId, selectArtifact]);
 
   const copyContent = async () => {
     try {

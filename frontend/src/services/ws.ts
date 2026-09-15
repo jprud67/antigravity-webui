@@ -149,7 +149,7 @@ export class ChatWebSocketClient {
     if (this.ws) {
       try {
         this.ws.close();
-      } catch (e) {}
+      } catch {}
       this.ws = null;
     }
     this.connect();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, 
   FolderTree, 
@@ -26,8 +26,8 @@ import { KanbanTab } from './KanbanTab';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
 import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent, fetchGitStatus, getAuthToken } from '../services/api';
-import { showToast } from './Toast';
-import { showConfirm } from './AppDialog';
+import { showToast } from '../services/toast';
+import { showConfirm } from '../services/dialog';
 import type { ArtifactItem } from '../types';
 
 export type RightPanelTab = 'files' | 'artifacts' | 'terminal' | 'git' | 'kanban';
@@ -101,8 +101,76 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     window.addEventListener('mouseup', handleMouseUp);
   };
 
+  // Unsaved changes guard
+  const checkUnsavedChanges = useCallback(async (): Promise<boolean> => {
+    if (isEditingFile && editedFileContent !== fileContent) {
+      return await showConfirm('Vous avez des modifications non enregistrées. Voulez-vous continuer sans sauvegarder ?', {
+        title: 'Modifications non enregistrées',
+        confirmLabel: 'Abandonner les modifications',
+        cancelLabel: 'Continuer l\'édition',
+        destructive: true
+      });
+    }
+    return true;
+  }, [isEditingFile, editedFileContent, fileContent]);
+
+  const handleClose = useCallback(async () => {
+    if (await checkUnsavedChanges()) {
+      onClose();
+    }
+  }, [checkUnsavedChanges, onClose]);
+
+  const handleTabClick = useCallback(async (tab: RightPanelTab) => {
+    if (await checkUnsavedChanges()) {
+      onTabChange(tab);
+    }
+  }, [checkUnsavedChanges, onTabChange]);
+
+  const handleSelectFile = useCallback(async (path: string) => {
+    if (!(await checkUnsavedChanges())) return;
+    setSelectedFilePath(path);
+    setIsEditingFile(false);
+    setSaveSuccess(false);
+    setLoadingContent(true);
+    try {
+      const res = await fetchFileContent(path);
+      setFileContent(res.content);
+      setEditedFileContent(res.content);
+    } catch {
+      setFileContent('Erreur lors du chargement du fichier.');
+      setEditedFileContent('');
+    } finally {
+      setLoadingContent(false);
+    }
+  }, [checkUnsavedChanges]);
+
+  const handleSaveFile = useCallback(async () => {
+    if (!selectedFilePath) return;
+    setSavingFile(true);
+    try {
+      await saveFileContent(selectedFilePath, editedFileContent);
+      setFileContent(editedFileContent);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+    } catch {
+      showToast('Erreur lors de la sauvegarde du fichier.', 'error');
+    } finally {
+      setSavingFile(false);
+    }
+  }, [selectedFilePath, editedFileContent]);
+
+  const handleSelectArtifact = useCallback(async (art: ArtifactItem) => {
+    setSelectedArtifact(art);
+    try {
+      const content = await fetchArtifactContent(art.conversation_id, art.filename);
+      setArtifactMarkdown(content);
+    } catch {
+      setArtifactMarkdown('Impossible de charger le contenu de cet artifact.');
+    }
+  }, []);
+
   // Load file tree when files tab is active
-  const loadTree = async () => {
+  const loadTree = useCallback(async () => {
     setLoadingTree(true);
     try {
       const data = await fetchFileTree(currentWorkspace, 3);
@@ -112,16 +180,27 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } finally {
       setLoadingTree(false);
     }
-  };
+  }, [currentWorkspace]);
 
   useEffect(() => {
-    if (isOpen && activeTab === 'files') {
-      loadTree();
-    }
+    if (!isOpen || activeTab !== 'files') return;
+    let active = true;
+    fetchFileTree(currentWorkspace, 3)
+      .then((data) => {
+        if (active) {
+          setFileTree(data);
+          setLoadingTree(false);
+        }
+      })
+      .catch((e) => {
+        console.error('Failed to load file tree', e);
+        if (active) setLoadingTree(false);
+      });
+    return () => { active = false; };
   }, [isOpen, activeTab, currentWorkspace]);
 
   // Load artifacts when artifacts tab is active
-  const loadArtifactsList = async () => {
+  const loadArtifactsList = useCallback(async () => {
     setLoadingArtifacts(true);
     try {
       const items = await fetchArtifacts(conversationId);
@@ -134,13 +213,27 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } finally {
       setLoadingArtifacts(false);
     }
-  };
+  }, [conversationId, selectedArtifact, handleSelectArtifact]);
 
   useEffect(() => {
-    if (isOpen && activeTab === 'artifacts') {
-      loadArtifactsList();
-    }
-  }, [isOpen, activeTab, conversationId]);
+    if (!isOpen || activeTab !== 'artifacts') return;
+    let active = true;
+    fetchArtifacts(conversationId)
+      .then((items) => {
+        if (active) {
+          setArtifacts(items);
+          setLoadingArtifacts(false);
+          if (items.length > 0 && !selectedArtifact) {
+            handleSelectArtifact(items[0]);
+          }
+        }
+      })
+      .catch((e) => {
+        console.error('Failed to load artifacts', e);
+        if (active) setLoadingArtifacts(false);
+      });
+    return () => { active = false; };
+  }, [isOpen, activeTab, conversationId, selectedArtifact, handleSelectArtifact]);
 
   // Git status & preview mode state
   const [gitStatus, setGitStatus] = useState<any>(null);
@@ -155,31 +248,6 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     }
   }, [isOpen, currentWorkspace]);
 
-  // Unsaved changes guard
-  const checkUnsavedChanges = async (): Promise<boolean> => {
-    if (isEditingFile && editedFileContent !== fileContent) {
-      return await showConfirm('Vous avez des modifications non enregistrées. Voulez-vous continuer sans sauvegarder ?', {
-        title: 'Modifications non enregistrées',
-        confirmLabel: 'Abandonner les modifications',
-        cancelLabel: 'Continuer l\'édition',
-        destructive: true
-      });
-    }
-    return true;
-  };
-
-  const handleClose = async () => {
-    if (await checkUnsavedChanges()) {
-      onClose();
-    }
-  };
-
-  const handleTabClick = async (tab: RightPanelTab) => {
-    if (await checkUnsavedChanges()) {
-      onTabChange(tab);
-    }
-  };
-
   useEffect(() => {
     const handleOpenFile = (e: any) => {
       const path = e.detail?.path;
@@ -189,50 +257,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     };
     window.addEventListener('open-workspace-file', handleOpenFile);
     return () => window.removeEventListener('open-workspace-file', handleOpenFile);
-  }, [isEditingFile, editedFileContent, fileContent]);
-
-  const handleSelectFile = async (path: string) => {
-    if (!(await checkUnsavedChanges())) return;
-    setSelectedFilePath(path);
-    setIsEditingFile(false);
-    setSaveSuccess(false);
-    setLoadingContent(true);
-    try {
-      const res = await fetchFileContent(path);
-      setFileContent(res.content);
-      setEditedFileContent(res.content);
-    } catch (err) {
-      setFileContent('Erreur lors du chargement du fichier.');
-      setEditedFileContent('');
-    } finally {
-      setLoadingContent(false);
-    }
-  };
-
-  const handleSaveFile = async () => {
-    if (!selectedFilePath) return;
-    setSavingFile(true);
-    try {
-      await saveFileContent(selectedFilePath, editedFileContent);
-      setFileContent(editedFileContent);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
-    } catch (err) {
-      showToast('Erreur lors de la sauvegarde du fichier.', 'error');
-    } finally {
-      setSavingFile(false);
-    }
-  };
-
-  const handleSelectArtifact = async (art: ArtifactItem) => {
-    setSelectedArtifact(art);
-    try {
-      const content = await fetchArtifactContent(art.conversation_id, art.filename);
-      setArtifactMarkdown(content);
-    } catch (e) {
-      setArtifactMarkdown('Impossible de charger le contenu de cet artifact.');
-    }
-  };
+  }, [handleSelectFile]);
 
   const toggleFolder = (folderPath: string) => {
     setExpandedFolders((prev) => ({ ...prev, [folderPath]: !prev[folderPath] }));

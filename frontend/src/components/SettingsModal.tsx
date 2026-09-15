@@ -74,8 +74,8 @@ import {
   type FontSizeOption 
 } from '../services/theme';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
-import { showConfirm } from './AppDialog';
-import { showToast } from './Toast';
+import { showConfirm } from '../services/dialog';
+import { showToast } from '../services/toast';
 
 export const GoogleIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24">
@@ -86,13 +86,15 @@ export const GoogleIcon = ({ className = "w-4 h-4" }: { className?: string }) =>
   </svg>
 );
 
+export type SettingsTab = 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates';
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   models: ModelOption[];
   currentModel: string;
   onModelSaved: (modelId: string) => void;
-  initialTab?: 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates';
+  initialTab?: SettingsTab;
   onGoogleAccountChanged?: (account: GoogleAccountInfo | null) => void;
   activeConversation?: Conversation | null;
   onClearHistory?: () => void;
@@ -126,7 +128,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onConversationUpdated
 }) => {
   const { lang, setLanguage } = useI18n();
-  const [activeTab, setActiveTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates'>(initialTab || 'models');
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || 'models');
   const [settings, setSettings] = useState<AppSettings>({});
   const [selectedModelId, setSelectedModelId] = useState(currentModel);
   const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
@@ -167,7 +169,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     showToast(`Raccourci d'envoi réglé sur : ${mode === 'ctrlEnter' ? 'Ctrl/Cmd+Entrée' : 'Entrée'}`, 'info');
   };
 
-  useEffect(() => {
+  const [prevConvId, setPrevConvId] = useState<string | null>(null);
+  const currentConvId = isOpen ? (activeConversation?.conversation_id || 'active') : null;
+  if (currentConvId !== prevConvId) {
+    setPrevConvId(currentConvId);
     if (activeConversation) {
       setConvTitle(activeConversation.customTitle || activeConversation.title || '');
       setConvProject(activeConversation.project || '');
@@ -183,7 +188,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setConvPinned(false);
       setConvArchived(false);
     }
-  }, [activeConversation, isOpen]);
+  }
 
   const handleSaveConvMeta = async () => {
     if (!activeConversation) return;
@@ -501,12 +506,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const [prevOpenState, setPrevOpenState] = useState<{ open: boolean; tab?: SettingsTab }>({ open: false });
+  if (isOpen && (!prevOpenState.open || prevOpenState.tab !== initialTab)) {
+    setPrevOpenState({ open: true, tab: initialTab });
+    if (initialTab) setActiveTab(initialTab);
+    setSelectedModelId(currentModel);
+    setSkillsLoading(true);
+    setGoogleLoading(true);
+  } else if (!isOpen && prevOpenState.open) {
+    setPrevOpenState({ open: false });
+  }
+
   useEffect(() => {
     if (isOpen) {
-      if (initialTab) {
-        setActiveTab(initialTab);
-      }
-      setSelectedModelId(currentModel);
       fetchSettings().then((s) => {
         setSettings(s);
         if (s.model) {
@@ -530,16 +542,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       });
 
       // Load skills
-      setSkillsLoading(true);
       fetchSkills()
         .then((items) => setSkills(items))
         .catch((err) => console.error('Error loading skills:', err))
         .finally(() => setSkillsLoading(false));
 
       // Load Google accounts
-      loadGoogleAccounts();
+      fetchGoogleAccounts()
+        .then((data) => {
+          setGoogleData(data);
+          if (onGoogleAccountChanged) {
+            onGoogleAccountChanged(data.active_account);
+          }
+        })
+        .catch((err) => console.error('Failed to load Google accounts:', err))
+        .finally(() => setGoogleLoading(false));
     }
-  }, [isOpen, currentModel, models, initialTab, loadGoogleAccounts]);
+  }, [isOpen, currentModel, models, initialTab, onGoogleAccountChanged]);
 
   const activeModelObj = models.find((m) => m.id === selectedModelId);
   const supportedEfforts = activeModelObj ? activeModelObj.supported_efforts : [];

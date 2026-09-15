@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Folder, FolderPlus, Check, ArrowUp } from 'lucide-react';
 import type { WorkspaceFolder } from '../types';
 import { fetchWorkspaces, exploreDirectory, addWorkspace } from '../services/api';
@@ -20,19 +20,12 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
   const [browserData, setBrowserData] = useState<WorkspaceFolder | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadWorkspaces();
-      explore(currentWorkspace || '/root');
-    }
-  }, [isOpen, currentWorkspace]);
-
-  const loadWorkspaces = async () => {
+  const loadWorkspaces = useCallback(async () => {
     const list = await fetchWorkspaces();
     setTrustedList(list);
-  };
+  }, []);
 
-  const explore = async (path: string) => {
+  const explore = useCallback(async (path: string) => {
     setLoading(true);
     try {
       const data = await exploreDirectory(path);
@@ -40,7 +33,24 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetchWorkspaces().then((list) => {
+      if (active) setTrustedList(list);
+    });
+    exploreDirectory(currentWorkspace || '/root').then((data) => {
+      if (active) {
+        setBrowserData(data);
+        setLoading(false);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, currentWorkspace]);
 
   const handleAddWorkspace = async (pathToAdd: string) => {
     await addWorkspace(pathToAdd);

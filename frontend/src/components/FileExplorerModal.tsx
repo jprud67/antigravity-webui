@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
    X, 
    Folder, 
@@ -49,13 +49,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
   const [contentLoading, setContentLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadTree();
-    }
-  }, [isOpen, currentWorkspace]);
-
-  const loadTree = async () => {
+  const loadTree = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchFileTree(currentWorkspace, 3);
@@ -71,7 +65,33 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentWorkspace]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetchFileTree(currentWorkspace, 3)
+      .then((data) => {
+        if (active) {
+          setTree(data.items || []);
+          const initialExp: Record<string, boolean> = {};
+          (data.items || []).forEach((item: FileNode) => {
+            if (item.is_dir) initialExp[item.path] = true;
+          });
+          setExpandedPaths(initialExp);
+          setLoading(false);
+        }
+      })
+      .catch((e) => {
+        if (active) {
+          console.error('Error loading file tree:', e);
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, currentWorkspace]);
 
   const toggleFolder = (path: string, e: React.MouseEvent) => {
     e.stopPropagation();

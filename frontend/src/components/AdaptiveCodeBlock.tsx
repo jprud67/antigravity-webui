@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext, useMemo } from 'react';
+import React, { useState, useContext, useMemo } from 'react';
 import Prism from 'prismjs';
 
 // Load Prism Language Grammars
@@ -52,15 +52,11 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { DiffViewer } from './DiffViewer';
+import { PreContext, copyText } from '../utils/codeBlockUtils';
 
 const MermaidRenderer = React.lazy(() =>
   import('./MermaidRenderer').then((m) => ({ default: m.MermaidRenderer }))
 );
-
-/**
- * Context to distinguish fenced code blocks (<pre><code>) from inline code (<code>)
- */
-export const PreContext = createContext(false);
 
 export const PreBlock = ({ children }: any) => {
   return <PreContext.Provider value={true}>{children}</PreContext.Provider>;
@@ -300,31 +296,6 @@ function getLanguageDisplay(lang: string) {
 }
 
 /**
- * Universal clipboard copy helper
- */
-export const copyText = async (text: string): Promise<boolean> => {
-  try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch (e) {}
-  try {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(ta);
-    return ok;
-  } catch (e) {
-    return false;
-  }
-};
-
-/**
  * Clean inline code component. Never breaks line or paragraph layout.
  */
 export const InlineCode: React.FC<any> = ({ children, ...props }) => {
@@ -393,7 +364,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
     if (grammar) {
       try {
         highlighted = Prism.highlight(cleanedCode, grammar, language);
-      } catch (e) {
+      } catch {
         highlighted = escapeHtml(cleanedCode);
       }
     } else {

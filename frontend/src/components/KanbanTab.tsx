@@ -6,8 +6,8 @@ import {
   updateKanbanTask, 
   deleteKanbanTask 
 } from '../services/api';
-import { showToast } from './Toast';
-import { showConfirm } from './AppDialog';
+import { showToast } from '../services/toast';
+import { showConfirm } from '../services/dialog';
 import { 
   Plus, 
   RefreshCw, 
@@ -67,7 +67,25 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
   };
 
   useEffect(() => {
-    loadTasks();
+    let active = true;
+    fetchKanbanTasks()
+      .then((data) => {
+        if (active) {
+          setTasks(data.tasks);
+          setColumns(data.columns);
+          setLoading(false);
+        }
+      })
+      .catch((e: any) => {
+        if (active) {
+          console.error('Failed to load kanban tasks', e);
+          setError(e.message || 'Erreur de chargement du Kanban');
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [currentWorkspace]);
 
   const openCreateModal = () => {

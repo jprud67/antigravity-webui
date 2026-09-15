@@ -264,9 +264,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  useEffect(() => {
+  const [prevInitialPrompt, setPrevInitialPrompt] = useState(initialPrompt);
+  if (initialPrompt !== prevInitialPrompt) {
+    setPrevInitialPrompt(initialPrompt);
     if (initialPrompt) {
       setPrompt(initialPrompt);
+    }
+  }
+
+  useEffect(() => {
+    if (initialPrompt) {
       textareaRef.current?.focus();
     }
   }, [initialPrompt]);
@@ -400,9 +407,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     c.cmd.toLowerCase().includes(slashFilter) || c.desc.toLowerCase().includes(slashFilter)
   );
 
-  useEffect(() => {
+  const [prevFilter, setPrevFilter] = useState(slashFilter);
+  if (slashFilter !== prevFilter) {
+    setPrevFilter(slashFilter);
     setSelectedIndex(0);
-  }, [slashFilter]);
+  }
 
   // Execute or dispatch Slash Command
   const executeSlashAction = (cmdText: string): boolean => {

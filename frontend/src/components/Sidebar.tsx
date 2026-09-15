@@ -34,8 +34,8 @@ import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 import type { GoogleAccountInfo } from '../services/api';
 import { bulkConversationAction, bulkConversationExport, importConversation } from '../services/api';
-import { showToast } from './Toast';
-import { showConfirm } from './AppDialog';
+import { showToast } from '../services/toast';
+import { showConfirm } from '../services/dialog';
 
 function parseSafeDate(dateVal: any): Date {
   if (!dateVal) return new Date();

@@ -1,68 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
-
-// ─── Types ───────────────────────────────────────────────────────
-interface ConfirmRequest {
-  id: string;
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  destructive?: boolean;
-  resolve: (confirmed: boolean) => void;
-}
-
-// ─── Global Confirm API ──────────────────────────────────────────
-let _pushConfirm: ((req: ConfirmRequest) => void) | null = null;
-
-/**
- * In-app replacement for native `confirm()`.
- * Returns a Promise<boolean> — true if user clicked confirm, false if cancelled.
- *
- * Usage:
- *   if (await showConfirm('Supprimer ?', { destructive: true })) { ... }
- */
-export function showConfirm(
-  messageOrOpts: string | {
-    title?: string;
-    message: string;
-    confirmText?: string;
-    confirmLabel?: string;
-    cancelLabel?: string;
-    destructive?: boolean;
-  },
-  opts?: {
-    title?: string;
-    confirmLabel?: string;
-    cancelLabel?: string;
-    destructive?: boolean;
-  }
-): Promise<boolean> {
-  const isObj = typeof messageOrOpts === 'object';
-  const message = isObj ? messageOrOpts.message : messageOrOpts;
-  const title = isObj ? (messageOrOpts.title || 'Confirmation') : (opts?.title || 'Confirmation');
-  const confirmLabel = isObj ? (messageOrOpts.confirmLabel || messageOrOpts.confirmText) : opts?.confirmLabel;
-  const cancelLabel = isObj ? messageOrOpts.cancelLabel : opts?.cancelLabel;
-  const destructive = isObj ? (messageOrOpts.destructive ?? false) : (opts?.destructive ?? false);
-
-  return new Promise<boolean>((resolve) => {
-    const id = `confirm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    if (_pushConfirm) {
-      _pushConfirm({
-        id,
-        title,
-        message,
-        confirmLabel,
-        cancelLabel,
-        destructive,
-        resolve,
-      });
-    } else {
-      // Fallback if container not mounted
-      resolve(window.confirm(message));
-    }
-  });
-}
+import { type ConfirmRequest, registerConfirmListener } from '../services/dialog';
 
 // ─── Confirm Dialog Container (mount once in App.tsx) ────────────
 export const ConfirmDialogContainer: React.FC = () => {
@@ -74,8 +12,8 @@ export const ConfirmDialogContainer: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    _pushConfirm = pushConfirm;
-    return () => { _pushConfirm = null; };
+    registerConfirmListener(pushConfirm);
+    return () => { registerConfirmListener(null); };
   }, [pushConfirm]);
 
   const current = queue[0];

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   GitBranch, 
   RefreshCw, 
@@ -35,7 +35,29 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
   const [pushing, setPushing] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-  const loadStatus = async () => {
+  const diffRequestIdRef = React.useRef(0);
+
+  const handleSelectFile = useCallback(async (filePath: string) => {
+    setSelectedFile(filePath);
+    setLoadingDiff(true);
+    const reqId = ++diffRequestIdRef.current;
+    try {
+      const res = await fetchGitDiff(currentWorkspace, filePath);
+      if (reqId === diffRequestIdRef.current) {
+        setActiveDiff(res.diff);
+      }
+    } catch {
+      if (reqId === diffRequestIdRef.current) {
+        setActiveDiff(null);
+      }
+    } finally {
+      if (reqId === diffRequestIdRef.current) {
+        setLoadingDiff(false);
+      }
+    }
+  }, [currentWorkspace]);
+
+  const loadStatus = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -51,33 +73,32 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentWorkspace, selectedFile, handleSelectFile]);
 
   useEffect(() => {
-    loadStatus();
-  }, [currentWorkspace]);
-
-  const diffRequestIdRef = React.useRef(0);
-
-  const handleSelectFile = async (filePath: string) => {
-    setSelectedFile(filePath);
-    setLoadingDiff(true);
-    const reqId = ++diffRequestIdRef.current;
-    try {
-      const res = await fetchGitDiff(currentWorkspace, filePath);
-      if (reqId === diffRequestIdRef.current) {
-        setActiveDiff(res.diff);
-      }
-    } catch (err: any) {
-      if (reqId === diffRequestIdRef.current) {
-        setActiveDiff(null);
-      }
-    } finally {
-      if (reqId === diffRequestIdRef.current) {
-        setLoadingDiff(false);
-      }
-    }
-  };
+    let active = true;
+    fetchGitStatus(currentWorkspace)
+      .then((data) => {
+        if (active) {
+          setStatus(data);
+          setLoading(false);
+          if (data.modified.length > 0 && !selectedFile) {
+            handleSelectFile(data.modified[0]);
+          } else if (data.untracked.length > 0 && !selectedFile) {
+            handleSelectFile(data.untracked[0]);
+          }
+        }
+      })
+      .catch((err: any) => {
+        if (active) {
+          setError(err.message || 'Impossible de récupérer le statut Git');
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [currentWorkspace, selectedFile, handleSelectFile]);
 
   const handleCommit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,31 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, CheckCircle, AlertTriangle, Info, AlertCircle } from 'lucide-react';
-
-export type ToastType = 'success' | 'error' | 'warning' | 'info';
-
-interface ToastItem {
-  id: string;
-  message: string;
-  type: ToastType;
-  duration: number;
-}
-
-// ─── Global Toast API ────────────────────────────────────────────
-let _addToast: ((item: ToastItem) => void) | null = null;
-
-/**
- * Show a transient toast notification (bottom-center, auto-dismiss).
- * Drop-in replacement for `alert()`.
- */
-export function showToast(message: string, type: ToastType = 'info', duration = 3000): void {
-  const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  if (_addToast) {
-    _addToast({ id, message, type, duration });
-  } else {
-    // Fallback if ToastContainer not mounted yet (should never happen in practice)
-    console.warn('[Toast] container not mounted, message:', message);
-  }
-}
+import { type ToastType, type ToastItem, registerToastListener } from '../services/toast';
 
 // ─── Icons per type ──────────────────────────────────────────────
 const ICON_MAP: Record<ToastType, React.FC<{ className?: string }>> = {
@@ -98,8 +73,8 @@ export const ToastContainer: React.FC = () => {
 
   // Register global callback
   useEffect(() => {
-    _addToast = addToast;
-    return () => { _addToast = null; };
+    registerToastListener(addToast);
+    return () => { registerToastListener(null); };
   }, [addToast]);
 
   if (toasts.length === 0) return null;

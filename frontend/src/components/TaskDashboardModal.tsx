@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   X, 
   Activity, 
@@ -11,8 +11,8 @@ import {
   Clock 
 } from 'lucide-react';
 import { fetchTasksList, killTask } from '../services/api';
-import { showToast } from './Toast';
-import { showConfirm } from './AppDialog';
+import { showToast } from '../services/toast';
+import { showConfirm } from '../services/dialog';
 
 interface TaskDashboardModalProps {
   isOpen: boolean;
@@ -34,13 +34,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [killingPid, setKillingPid] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadData();
-    }
-  }, [isOpen, conversationId]);
-
-  const loadData = async () => {
+  const refreshData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetchTasksList(conversationId || undefined);
@@ -50,14 +44,33 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetchTasksList(conversationId || undefined)
+      .then((res) => {
+        if (active) {
+          setData(res);
+          setLoading(false);
+        }
+      })
+      .catch((e) => {
+        console.error('Error fetching tasks list:', e);
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, conversationId]);
 
   const handleKillProcess = async (pid: number) => {
     if (!(await showConfirm(`Confirmer l'arrêt forcé du processus PID ${pid} ?`, { destructive: true }))) return;
     setKillingPid(pid);
     try {
       await killTask(pid);
-      await loadData();
+      await refreshData();
     } catch (err: any) {
       showToast(err.message || 'Erreur lors de l\'arrêt du processus', 'error');
     } finally {
@@ -104,7 +117,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
 
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={loadData}
+              onClick={refreshData}
               className="p-1.5 rounded-lg transition-colors cursor-pointer hover:opacity-100 opacity-70"
               style={{ color: 'var(--muted)' }}
               title="Rafraîchir"

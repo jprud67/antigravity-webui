@@ -20,8 +20,8 @@ import {
   deleteCronJob, 
   triggerCronJob 
 } from '../services/api';
-import { showToast } from './Toast';
-import { showConfirm } from './AppDialog';
+import { showToast } from '../services/toast';
+import { showConfirm } from '../services/dialog';
 
 interface CronSchedulerModalProps {
   isOpen: boolean;
@@ -70,9 +70,25 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen) {
-      loadCrons();
-    }
+    if (!isOpen) return;
+    let active = true;
+    fetchCronJobs()
+      .then((data) => {
+        if (active) {
+          setCronData(data);
+          setLoading(false);
+        }
+      })
+      .catch((e: any) => {
+        if (active) {
+          console.error('Failed to load cron jobs', e);
+          setError(e.message || 'Erreur lors du chargement des tâches planifiées');
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;

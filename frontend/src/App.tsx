@@ -41,26 +41,55 @@ import {
 import { chatSocket } from './services/ws';
 import { syncClient } from './services/sync';
 import { getStoredTheme, getStoredSkin, applyAppearance } from './services/theme';
-import { ToastContainer, showToast } from './components/Toast';
+import { ToastContainer } from './components/Toast';
+import { showToast } from './services/toast';
 import { ConfirmDialogContainer } from './components/AppDialog';
+import { getConvIdFromPath, navigateToConversation } from './utils/navigation';
 
-export const getConvIdFromPath = (pathname: string): string | null => {
-  const match = pathname.match(/^\/(?:c|chat)\/([a-zA-Z0-9_-]+)/);
-  if (match && match[1] && match[1] !== 'new') {
-    return match[1];
+const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
+  if (!msgs || msgs.length === 0) {
+    return {
+      inputTokens: 0,
+      outputTokens: 0,
+      thinkingTokens: 0,
+      totalTokens: 0,
+      isEstimated: true
+    };
   }
-  return null;
-};
 
-export const navigateToConversation = (convId: string | null, replace = false) => {
-  const targetPath = convId ? `/c/${convId}` : '/';
-  if (window.location.pathname !== targetPath) {
-    if (replace) {
-      window.history.replaceState({ convId }, '', targetPath);
+  // Antigravity base system context (system prompt, tools schemas, skills)
+  const BASE_SYSTEM_TOKENS = 13370;
+  let promptChars = 0;
+  let responseChars = 0;
+  let thinkingChars = 0;
+
+  for (const m of msgs) {
+    if (m.role === 'user') {
+      promptChars += (m.content || '').length;
     } else {
-      window.history.pushState({ convId }, '', targetPath);
+      responseChars += (m.content || '').length;
+      if (m.thought) thinkingChars += m.thought.length;
+      if (m.toolCalls && m.toolCalls.length > 0) {
+        responseChars += JSON.stringify(m.toolCalls).length;
+      }
     }
   }
+
+  const pTokens = Math.max(1, Math.ceil(promptChars / 3.8));
+  const rTokens = Math.max(0, Math.ceil(responseChars / 3.8));
+  const tTokens = Math.max(0, Math.ceil(thinkingChars / 3.8));
+
+  const inputTokens = BASE_SYSTEM_TOKENS + pTokens;
+  const outputTokens = rTokens + tTokens;
+  const totalTokens = inputTokens + outputTokens;
+
+  return {
+    inputTokens,
+    outputTokens,
+    thinkingTokens: tTokens,
+    totalTokens,
+    isEstimated: true
+  };
 };
 
 export function App() {
@@ -74,8 +103,11 @@ export function App() {
   // Stable refs — used in effects with empty deps to avoid stale closures
   const activeConversationIdRef = React.useRef<string | null>(null);
   const isStreamingRef = React.useRef<boolean>(false);
-  activeConversationIdRef.current = activeConversationId;
-  isStreamingRef.current = isStreaming;
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+    isStreamingRef.current = isStreaming;
+  }, [activeConversationId, isStreaming]);
 
 
   // Telemetry, Queue & Approval States (Phase 2)
@@ -169,10 +201,126 @@ export function App() {
     setIsSettingsOpen(true);
   };
 
+  // Switch Conversation
+  const handleSelectConversation = async (convId: string, updateUrl = true) => {
+    setIsMobileSidebarOpen(false);
+    if (updateUrl) {
+      navigateToConversation(convId);
+    }
+    setActiveConversationId(convId);
+    chatSocket.setCurrentConversation(convId);
+    try {
+      const data = await fetchConversationTranscript(convId);
+      const chatMsgs = parseStepsToMessages(data.steps || []);
+      setMessages(chatMsgs);
+
+      // Instantly set accurate token usage for selected conversation
+      if (data.usage && data.usage.total_tokens > 0) {
+        setTokenUsage({
+          inputTokens: data.usage.input_tokens || 0,
+          outputTokens: data.usage.output_tokens || 0,
+          thinkingTokens: data.usage.thinking_tokens || 0,
+          totalTokens: data.usage.total_tokens || 0,
+          isEstimated: data.usage.is_estimated ?? true
+        });
+      } else {
+        setTokenUsage(estimateUsageFromMessages(chatMsgs));
+      }
+
+      // Check if task is actively running in background on server
+      if ((data as any).is_running) {
+        setIsStreaming(true);
+        chatSocket.sendAttach(convId);
+      } else {
+        setIsStreaming(false);
+      }
+    } catch (err) {
+      console.error('Failed to load transcript:', err);
+    }
+  };
+
+  const loadInitialData = async () => {
+    try {
+      const auth = await checkAuthStatus();
+      if (auth.enabled && !auth.authenticated) {
+        setIsAuthenticated(false);
+        setIsAuthModalOpen(true);
+        return;
+      }
+      setIsAuthenticated(true);
+      setIsAuthModalOpen(false);
+
+      const [convs, mods, settings, googleRes] = await Promise.all([
+        fetchConversations(50),
+        fetchModels(),
+        fetchSettings(),
+        fetchGoogleAccounts().catch(() => ({ active_account: null, accounts: [] }))
+      ]);
+      setConversations(convs);
+      setModels(mods);
+      if (googleRes?.active_account) {
+        setActiveGoogleAccount(googleRes.active_account);
+      }
+
+      // Harmonize model selection from settings
+      if (settings.model && mods.length > 0) {
+        const found = mods.find(
+          (m) =>
+            m.name === settings.model ||
+            m.id === settings.model ||
+            (settings.model ? settings.model.includes(m.name) || settings.model.includes(m.id) : false)
+        );
+        if (found) {
+          setSelectedModel(found.id);
+          const lowerModel = settings.model.toLowerCase();
+          if (lowerModel.includes('low')) {
+            setSelectedEffort('low');
+          } else if (lowerModel.includes('medium') || lowerModel.includes('med')) {
+            setSelectedEffort('medium');
+          } else {
+            setSelectedEffort((found.default_effort as any) || 'high');
+          }
+        } else {
+          setSelectedModel(mods[0].id);
+          setSelectedEffort((mods[0].default_effort as any) || 'high');
+        }
+      } else if (mods.length > 0) {
+        setSelectedModel(mods[0].id);
+        setSelectedEffort((mods[0].default_effort as any) || 'high');
+      }
+
+      if (settings.trustedWorkspaces && settings.trustedWorkspaces.length > 0) {
+        setCurrentWorkspace(settings.trustedWorkspaces[0]);
+      }
+
+      // Check if URL matches a conversation route (/c/:id or /chat/:id)
+      const routeConvId = getConvIdFromPath(window.location.pathname);
+      if (routeConvId) {
+        await handleSelectConversation(routeConvId, false);
+      }
+    } catch (e) {
+      console.error('Error loading initial data:', e);
+    }
+  };
+
+  const handleLoginSuccess = () => {
+    setIsAuthenticated(true);
+    setIsAuthModalOpen(false);
+    loadInitialData();
+  };
+
+  const handleLogout = () => {
+    clearAuthToken();
+    setIsAuthenticated(false);
+    setIsAuthModalOpen(true);
+  };
+
   // Initialize
   useEffect(() => {
     applyAppearance(getStoredTheme(), getStoredSkin());
-    loadInitialData();
+    Promise.resolve().then(() => {
+      loadInitialData();
+    });
 
     // Hermes background update check pattern: non-blocking, cached
     checkSystemUpdate(false).then((res) => {
@@ -264,166 +412,6 @@ export function App() {
     }
   }, [activeConversationId, conversations]);
 
-
-  const loadInitialData = async () => {
-    try {
-      const auth = await checkAuthStatus();
-      if (auth.enabled && !auth.authenticated) {
-        setIsAuthenticated(false);
-        setIsAuthModalOpen(true);
-        return;
-      }
-      setIsAuthenticated(true);
-      setIsAuthModalOpen(false);
-
-      const [convs, mods, settings, googleRes] = await Promise.all([
-        fetchConversations(50),
-        fetchModels(),
-        fetchSettings(),
-        fetchGoogleAccounts().catch(() => ({ active_account: null, accounts: [] }))
-      ]);
-      setConversations(convs);
-      setModels(mods);
-      if (googleRes?.active_account) {
-        setActiveGoogleAccount(googleRes.active_account);
-      }
-
-      // Harmonize model selection from settings
-      if (settings.model && mods.length > 0) {
-        const found = mods.find(
-          (m) =>
-            m.name === settings.model ||
-            m.id === settings.model ||
-            (settings.model ? settings.model.includes(m.name) || settings.model.includes(m.id) : false)
-        );
-        if (found) {
-          setSelectedModel(found.id);
-          const lowerModel = settings.model.toLowerCase();
-          if (lowerModel.includes('low')) {
-            setSelectedEffort('low');
-          } else if (lowerModel.includes('medium') || lowerModel.includes('med')) {
-            setSelectedEffort('medium');
-          } else {
-            setSelectedEffort((found.default_effort as any) || 'high');
-          }
-        } else {
-          setSelectedModel(mods[0].id);
-          setSelectedEffort((mods[0].default_effort as any) || 'high');
-        }
-      } else if (mods.length > 0) {
-        setSelectedModel(mods[0].id);
-        setSelectedEffort((mods[0].default_effort as any) || 'high');
-      }
-
-      if (settings.trustedWorkspaces && settings.trustedWorkspaces.length > 0) {
-        setCurrentWorkspace(settings.trustedWorkspaces[0]);
-      }
-
-      // Check if URL matches a conversation route (/c/:id or /chat/:id)
-      const routeConvId = getConvIdFromPath(window.location.pathname);
-      if (routeConvId) {
-        await handleSelectConversation(routeConvId, false);
-      }
-    } catch (e) {
-      console.error('Error loading initial data:', e);
-    }
-  };
-
-  const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
-    setIsAuthModalOpen(false);
-    loadInitialData();
-  };
-
-  const handleLogout = () => {
-    clearAuthToken();
-    setIsAuthenticated(false);
-    setIsAuthModalOpen(true);
-  };
-
-const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
-  if (!msgs || msgs.length === 0) {
-    return {
-      inputTokens: 0,
-      outputTokens: 0,
-      thinkingTokens: 0,
-      totalTokens: 0,
-      isEstimated: true
-    };
-  }
-
-  // Antigravity base system context (system prompt, tools schemas, skills)
-  const BASE_SYSTEM_TOKENS = 13370;
-  let promptChars = 0;
-  let responseChars = 0;
-  let thinkingChars = 0;
-
-  for (const m of msgs) {
-    if (m.role === 'user') {
-      promptChars += (m.content || '').length;
-    } else {
-      responseChars += (m.content || '').length;
-      if (m.thought) thinkingChars += m.thought.length;
-      if (m.toolCalls && m.toolCalls.length > 0) {
-        responseChars += JSON.stringify(m.toolCalls).length;
-      }
-    }
-  }
-
-  const pTokens = Math.max(1, Math.ceil(promptChars / 3.8));
-  const rTokens = Math.max(0, Math.ceil(responseChars / 3.8));
-  const tTokens = Math.max(0, Math.ceil(thinkingChars / 3.8));
-
-  const inputTokens = BASE_SYSTEM_TOKENS + pTokens;
-  const outputTokens = rTokens + tTokens;
-  const totalTokens = inputTokens + outputTokens;
-
-  return {
-    inputTokens,
-    outputTokens,
-    thinkingTokens: tTokens,
-    totalTokens,
-    isEstimated: true
-  };
-};
-
-  // Switch Conversation
-  const handleSelectConversation = async (convId: string, updateUrl = true) => {
-    setIsMobileSidebarOpen(false);
-    if (updateUrl) {
-      navigateToConversation(convId);
-    }
-    setActiveConversationId(convId);
-    chatSocket.setCurrentConversation(convId);
-    try {
-      const data = await fetchConversationTranscript(convId);
-      const chatMsgs = parseStepsToMessages(data.steps || []);
-      setMessages(chatMsgs);
-
-      // Instantly set accurate token usage for selected conversation
-      if (data.usage && data.usage.total_tokens > 0) {
-        setTokenUsage({
-          inputTokens: data.usage.input_tokens || 0,
-          outputTokens: data.usage.output_tokens || 0,
-          thinkingTokens: data.usage.thinking_tokens || 0,
-          totalTokens: data.usage.total_tokens || 0,
-          isEstimated: data.usage.is_estimated ?? true
-        });
-      } else {
-        setTokenUsage(estimateUsageFromMessages(chatMsgs));
-      }
-
-      // Check if task is actively running in background on server
-      if ((data as any).is_running) {
-        setIsStreaming(true);
-        chatSocket.sendAttach(convId);
-      } else {
-        setIsStreaming(false);
-      }
-    } catch (err) {
-      console.error('Failed to load transcript:', err);
-    }
-  };
 
   const handleNewConversation = () => {
     setIsMobileSidebarOpen(false);
@@ -1205,7 +1193,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
       setMessages((prev) =>
         prev.map((m) => (m.id === loadingId ? { ...m, content, isLive: false } : m))
       );
-    } catch (err: any) {
+    } catch {
       const totalTok = tokenUsage?.totalTokens ? tokenUsage.totalTokens.toLocaleString() : '0';
       const inTok = tokenUsage?.inputTokens ? tokenUsage.inputTokens.toLocaleString() : '0';
       const outTok = tokenUsage?.outputTokens ? tokenUsage.outputTokens.toLocaleString() : '0';

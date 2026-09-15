@@ -827,7 +827,7 @@ function detectInitialLocale(): string {
         return opt.code;
       }
     }
-  } catch (_) {}
+  } catch {}
   return 'fr'; // Default to French
 }
 
@@ -843,7 +843,7 @@ export function setLanguage(lang: string) {
   try {
     localStorage.setItem(STORAGE_KEY, resolved);
     localStorage.setItem('hermes-lang', resolved);
-  } catch (_) {}
+  } catch {}
   document.documentElement.lang = resolved;
   LISTENERS.forEach((fn) => fn(resolved));
 }
