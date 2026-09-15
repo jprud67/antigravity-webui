@@ -62,14 +62,20 @@ antigravity-webui/
 ### 1. Prérequis
 - Python 3.10+
 - Node.js 18+
-- Antigravity CLI installé (`agy` dans le PATH ou `/root/.local/bin/agy`)
+- Antigravity CLI installé (`agy` dans le PATH ou `AGY_BIN` défini)
+
+> **Plateformes supportées** : Linux, macOS et Windows — voir [`docs/platform-support.md`](docs/platform-support.md).
 
 ### 2. Lancement
 
 Exécutez simplement :
 
 ```bash
-./start.sh
+./start.sh      # Linux / macOS
+```
+
+```bat
+start.bat       :: Windows
 ```
 
 Le script configure l'environnement virtuel Python, compile le frontend si nécessaire et démarre le serveur web sur **`http://localhost:8000`**.

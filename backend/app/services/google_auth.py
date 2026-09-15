@@ -4,14 +4,26 @@ import base64
 import shutil
 import time
 import re
-import pty
 import select
+
+try:
+    import pty
+    HAS_PTY = True
+except ImportError:  # Windows : pty absent
+    HAS_PTY = False
+
+try:
+    import winpty  # paquet « pywinpty » (Windows uniquement)
+    HAS_WINPTY = True
+except ImportError:
+    HAS_WINPTY = False
 import subprocess
 import logging
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse, parse_qs
 from pathlib import Path
 from app.config import AGY_BIN, HOME, GEMINI_DIR
+from app.platform_utils import IS_WINDOWS, restrict_file_permissions
 
 logger = logging.getLogger("antigravity.google_auth")
 
@@ -145,7 +157,7 @@ def switch_google_account(target_email: str) -> Dict[str, Any]:
 
     # Copy target account to active
     shutil.copy2(target_file, TOKEN_FILE)
-    os.chmod(TOKEN_FILE, 0o600)
+    restrict_file_permissions(TOKEN_FILE)
 
     active_meta = get_active_account()
     logger.info(f"Switched Google account to {target_email}")
@@ -171,6 +183,131 @@ def delete_google_account(email: str) -> Dict[str, Any]:
     return {"success": True, "message": f"Compte {email} supprimé"}
 
 
+
+def _proc_running(proc) -> bool:
+    """Vrai si le processus de connexion tourne encore (Popen ou PtyProcess winpty)."""
+    if proc is None:
+        return False
+    isalive = getattr(proc, "isalive", None)
+    if callable(isalive):
+        return bool(isalive())
+    return proc.poll() is None
+
+
+def _terminate_login_proc(proc) -> None:
+    """Arrête le processus de connexion (Popen ou winpty), sans lever d'exception."""
+    if proc is None:
+        return
+    try:
+        terminate = getattr(proc, "terminate", None)
+        if callable(terminate) and callable(getattr(proc, "isalive", None)):
+            terminate(force=True)
+        else:
+            proc.kill()
+    except Exception as e:
+        logger.debug(f"Arrêt du processus de connexion impossible: {e}")
+
+
+def _close_login_resources(master_fd, proc) -> None:
+    """Ferme le descripteur PTY et arrête le processus de connexion."""
+    if master_fd is not None:
+        try:
+            os.close(master_fd)
+        except OSError:
+            pass
+    _terminate_login_proc(proc)
+
+
+def _spawn_login_process(env):
+    """
+    Démarre `agy -p auth_login_init` en mode PTY.
+    POSIX : pty.openpty() ; Windows : pywinpty.
+    Retourne (proc, master_fd, win_pty).
+    """
+    if IS_WINDOWS:
+        if not HAS_WINPTY:
+            raise RuntimeError(
+                "La connexion Google nécessite le paquet « pywinpty » sous Windows "
+                "(pip install pywinpty)."
+            )
+        win_pty = winpty.PtyProcess.spawn([AGY_BIN, "-p", "auth_login_init"], cwd=str(HOME), env=env)
+        return win_pty, None, win_pty
+
+    if not HAS_PTY:
+        raise RuntimeError("La connexion Google nécessite les modules POSIX pty/select.")
+    master_fd, slave_fd = pty.openpty()
+    proc = subprocess.Popen(
+        [AGY_BIN, "-p", "auth_login_init"],
+        stdin=slave_fd,
+        stdout=slave_fd,
+        stderr=slave_fd,
+        close_fds=True,
+        env=env,
+        cwd=str(HOME)
+    )
+    os.close(slave_fd)
+    return proc, master_fd, None
+
+
+def _read_auth_url(proc, master_fd, win_pty, timeout: float = 12.0):
+    """Lit la sortie du CLI jusqu'à capturer l'URL OAuth Google."""
+    import queue
+    import threading
+
+    pattern = re.compile(r"https://accounts\.google\.com/o/oauth2/auth[^\s\r\n]+")
+    output = ""
+
+    if IS_WINDOWS:
+        chunks: "queue.Queue" = queue.Queue()
+
+        def reader():
+            try:
+                while True:
+                    data = win_pty.read(4096)
+                    if not data:
+                        break
+                    chunks.put(str(data))
+            except Exception as e:
+                logger.debug(f"winpty reader stopped: {e}")
+            finally:
+                chunks.put(None)
+
+        threading.Thread(target=reader, daemon=True, name="gauth-reader").start()
+
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                chunk = chunks.get(timeout=0.2)
+            except queue.Empty:
+                if not win_pty.isalive():
+                    break
+                continue
+            if chunk is None:
+                break
+            output += chunk
+            match = pattern.search(output)
+            if match:
+                return match.group(0), output
+        return None, output
+
+    # POSIX : lecture non bloquante via select
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        r, _, _ = select.select([master_fd], [], [], 0.2)
+        if master_fd in r:
+            try:
+                chunk = os.read(master_fd, 4096).decode("utf-8", errors="ignore")
+            except OSError:
+                break
+            if not chunk:
+                break
+            output += chunk
+            match = pattern.search(output)
+            if match:
+                return match.group(0), output
+    return None, output
+
+
 def start_google_login_flow() -> Dict[str, Any]:
     ensure_dirs()
     cleanup_stale_sessions()
@@ -182,62 +319,24 @@ def start_google_login_flow() -> Dict[str, Any]:
     if TOKEN_FILE.exists():
         shutil.move(TOKEN_FILE, stash_path)
 
+    proc = None
     master_fd = None
+    win_pty = None
     try:
-        master_fd, slave_fd = pty.openpty()
         env = os.environ.copy()
         env["HOME"] = str(HOME)
 
-        proc = subprocess.Popen(
-            [AGY_BIN, "-p", "auth_login_init"],
-            stdin=slave_fd,
-            stdout=slave_fd,
-            stderr=slave_fd,
-            close_fds=True,
-            env=env,
-            cwd=str(HOME)
-        )
-        os.close(slave_fd)
-
-        auth_url = None
-        output = ""
-        start_time = time.time()
-
-        # Read master_fd with select to catch the auth URL
-        while time.time() - start_time < 12:
-            r, _, _ = select.select([master_fd], [], [], 0.2)
-            if master_fd in r:
-                try:
-                    chunk = os.read(master_fd, 4096).decode("utf-8", errors="ignore")
-                except OSError:
-                    break
-                if not chunk:
-                    break
-                output += chunk
-                match = re.search(r"https://accounts\.google\.com/o/oauth2/auth[^\s\r\n]+", output)
-                if match:
-                    auth_url = match.group(0)
-                    break
+        proc, master_fd, win_pty = _spawn_login_process(env)
+        auth_url, output = _read_auth_url(proc, master_fd, win_pty, timeout=12.0)
 
         if not auth_url:
             logger.error(f"Failed to capture Google auth URL. agy output: {output!r}")
-            if master_fd is not None:
-                try:
-                    os.close(master_fd)
-                except Exception:
-                    pass
-            # Restore token on failure
-            if stash_path.exists():
-                shutil.move(stash_path, TOKEN_FILE)
-            try:
-                proc.kill()
-            except Exception:
-                pass
             raise RuntimeError("Impossible de récupérer l'URL de connexion Google depuis Antigravity.")
 
         _LOGIN_SESSIONS[session_id] = {
             "proc": proc,
             "master_fd": master_fd,
+            "win_pty": win_pty is not None,
             "started_at": time.time(),
             "stash_path": str(stash_path),
             "auth_url": auth_url
@@ -250,11 +349,7 @@ def start_google_login_flow() -> Dict[str, Any]:
             "timeout_seconds": 180
         }
     except Exception as e:
-        if master_fd is not None:
-            try:
-                os.close(master_fd)
-            except Exception:
-                pass
+        _close_login_resources(master_fd, proc)
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
         raise e
@@ -265,7 +360,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
     if not session:
         raise ValueError("Session de connexion expirée ou invalide.")
 
-    proc: subprocess.Popen = session["proc"]
+    proc = session["proc"]
     master_fd = session.get("master_fd")
     stash_path = Path(session["stash_path"])
 
@@ -284,13 +379,15 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
         raise ValueError("Code d'autorisation vide.")
 
     try:
-        if master_fd is not None:
+        if IS_WINDOWS and proc is not None:
+            proc.write(f"{code}\n")
+        elif master_fd is not None:
             os.write(master_fd, f"{code}\n".encode("utf-8"))
 
         # Wait for agy to complete token exchange
         start_wait = time.time()
         while time.time() - start_wait < 20:
-            if proc.poll() is not None:
+            if not _proc_running(proc):
                 break
             time.sleep(0.3)
 
@@ -310,7 +407,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
         if stash_path.exists():
             stash_path.unlink(missing_ok=True)
 
-        os.chmod(TOKEN_FILE, 0o600)
+        restrict_file_permissions(TOKEN_FILE)
         sync_active_account_to_store()
         active_meta = get_active_account()
 
@@ -322,15 +419,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
             "message": f"Nouveau compte Google connecté avec succès : {active_meta.get('email')}"
         }
     except Exception as e:
-        try:
-            proc.kill()
-        except Exception:
-            pass
-        if master_fd is not None:
-            try:
-                os.close(master_fd)
-            except Exception:
-                pass
+        _close_login_resources(master_fd, proc)
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
         if session_id in _LOGIN_SESSIONS:
@@ -341,16 +430,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> Dict[str, Any]:
 def cancel_google_login_flow(session_id: str) -> Dict[str, Any]:
     session = _LOGIN_SESSIONS.pop(session_id, None)
     if session:
-        master_fd = session.get("master_fd")
-        if master_fd is not None:
-            try:
-                os.close(master_fd)
-            except Exception:
-                pass
-        try:
-            session["proc"].kill()
-        except Exception:
-            pass
+        _close_login_resources(session.get("master_fd"), session.get("proc"))
         stash_path = Path(session["stash_path"])
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
@@ -380,7 +460,7 @@ def import_raw_token(token_data: Dict[str, Any]) -> Dict[str, Any]:
 
     with open(TOKEN_FILE, "w") as f:
         json.dump(token_data, f, indent=2)
-    os.chmod(TOKEN_FILE, 0o600)
+    restrict_file_permissions(TOKEN_FILE)
 
     return {
         "success": True,

@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from app.api.auth import require_auth
-from app.config import HOME
+from app.config import HOME, DEFAULT_WORKSPACE
 
 logger = logging.getLogger("antigravity.kanban")
 router = APIRouter(prefix="/api/kanban", tags=["kanban"])
@@ -86,7 +86,7 @@ class CreateTaskRequest(BaseModel):
     assignee: Optional[str] = "antigravity"
     status: Optional[str] = "todo"
     priority: Optional[int] = 0
-    workspace_path: Optional[str] = "/root"
+    workspace_path: Optional[str] = None
     project_id: Optional[str] = "default"
 
 class UpdateTaskRequest(BaseModel):
@@ -179,7 +179,7 @@ def create_task(req: CreateTaskRequest, _ = Depends(require_auth)):
                 "antigravity-webui",
                 now,
                 "scratch",
-                req.workspace_path or "/root",
+                req.workspace_path or DEFAULT_WORKSPACE,
                 req.project_id or "default"
             ))
             conn.commit()

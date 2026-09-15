@@ -6,6 +6,7 @@ import json
 import secrets
 from typing import Optional, Dict, Any
 from app.config import GEMINI_DIR
+from app.platform_utils import restrict_file_permissions
 
 AUTH_CONFIG_FILE = GEMINI_DIR / "webui_auth.json"
 
@@ -41,10 +42,7 @@ def save_auth_config(config: Dict[str, Any]):
     with open(temp_file, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
     temp_file.replace(AUTH_CONFIG_FILE)
-    try:
-        os.chmod(AUTH_CONFIG_FILE, 0o600)
-    except Exception:
-        pass
+    restrict_file_permissions(AUTH_CONFIG_FILE)
 
 def verify_password(input_password: str) -> bool:
     config = get_auth_config()

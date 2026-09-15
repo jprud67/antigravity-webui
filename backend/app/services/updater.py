@@ -8,6 +8,7 @@ import threading
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from app.config import HOME
+from app.platform_utils import IS_WINDOWS, IS_MACOS, npm_argv, platform_name
 
 logger = logging.getLogger("antigravity.updater")
 
@@ -224,7 +225,7 @@ async def apply_update() -> Dict[str, Any]:
     if frontend_dir.exists() and (frontend_dir / "package.json").exists():
         try:
             build_proc = await asyncio.create_subprocess_exec(
-                "npm", "run", "build",
+                *npm_argv("run", "build"),
                 cwd=str(frontend_dir),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
@@ -241,20 +242,33 @@ async def apply_update() -> Dict[str, Any]:
             build_output = str(e)
             logger.warning(f"Frontend build error after update: {e}")
 
-    # 3. Schedule background restart of systemd service
-    async def _restart_service_soon():
-        await asyncio.sleep(1.5)
-        logger.info("Executing graceful systemctl restart antigravity-webui...")
-        try:
-            subprocess.run(["systemctl", "restart", "antigravity-webui"], check=False)
-        except Exception as e:
-            logger.error(f"Service restart trigger error: {e}")
+    # 3. Redémarrage automatique du service (systemd sous Linux uniquement)
+    if IS_WINDOWS or IS_MACOS:
+        logger.info(
+            f"{platform_name()} : redémarrage automatique du service non pris en charge — "
+            "relancez le script de démarrage après la mise à jour."
+        )
+    else:
+        async def _restart_service_soon():
+            await asyncio.sleep(1.5)
+            logger.info("Executing graceful systemctl restart antigravity-webui...")
+            try:
+                subprocess.run(["systemctl", "restart", "antigravity-webui"], check=False)
+            except Exception as e:
+                logger.error(f"Service restart trigger error: {e}")
 
-    asyncio.create_task(_restart_service_soon())
+        asyncio.create_task(_restart_service_soon())
+
+    if IS_WINDOWS:
+        restart_hint = "Relancez start.bat pour redémarrer le serveur."
+    elif IS_MACOS:
+        restart_hint = "Relancez start.sh (ou votre service launchd) pour redémarrer le serveur."
+    else:
+        restart_hint = "Le service WebUI redémarre..."
 
     return {
         "ok": True,
-        "message": "Mise à jour appliquée avec succès ! Le service WebUI redémarre...",
+        "message": f"Mise à jour appliquée avec succès ! {restart_hint}",
         "pull_output": pull_output,
         "frontend_rebuilt": build_success,
         "build_output": build_output,

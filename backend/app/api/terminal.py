@@ -1,22 +1,41 @@
 import os
-import pty
-import fcntl
-import termios
 import struct
-import signal
 import asyncio
 import json
 import logging
+import threading
 import time
+from pathlib import Path
 from typing import Optional, Dict
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from app.api.auth import require_auth
 from app.services.auth import verify_access_token, get_auth_config
+from app.platform_utils import IS_WINDOWS, IS_MACOS, spawn_group_kwargs, terminate_process_group_async
+
+# Modules POSIX uniquement — absents de Windows (import conditionnel obligatoire).
+try:
+    import pty
+    import fcntl
+    import termios
+    HAS_PTY = True
+except ImportError:  # Windows
+    HAS_PTY = False
+
+# Backend terminal sous Windows : pywinpty (optionnel — dégradation propre sinon).
+try:
+    import winpty  # paquet « pywinpty » (Windows uniquement)
+    HAS_WINPTY = True
+except ImportError:
+    HAS_WINPTY = False
 
 logger = logging.getLogger("antigravity.terminal")
 router = APIRouter(tags=["terminal"])
 
+
 def set_winsize(fd: int, rows: int, cols: int):
+    """Redimensionne le PTY (POSIX)."""
+    if not HAS_PTY:
+        return
     try:
         rows = max(4, min(int(rows or 24), 200))
         cols = max(10, min(int(cols or 80), 300))
@@ -25,12 +44,23 @@ def set_winsize(fd: int, rows: int, cols: int):
     except Exception as e:
         logger.warning(f"Error setting winsize: {e}")
 
+
+async def _safe_send_bytes(ws: WebSocket, data: bytes):
+    try:
+        await ws.send_bytes(data)
+    except Exception as e:
+        logger.debug(f"terminal send failed: {e}")
+
+
 class PersistentTerminalSession:
     def __init__(self, session_id: str, cwd: str):
         self.session_id = session_id
         self.cwd = cwd
         self.master_fd: int = -1
         self.proc: Optional[asyncio.subprocess.Process] = None
+        self.win_pty = None  # winpty.PtyProcess (Windows)
+        self._win_reader: Optional[threading.Thread] = None
+        self._closing = False
         self.scrollback: bytearray = bytearray()
         self.max_scrollback = 1024 * 1024  # 1 MB memory buffer
         self.active_websocket: Optional[WebSocket] = None
@@ -40,10 +70,23 @@ class PersistentTerminalSession:
         self.loop: Optional[asyncio.AbstractEventLoop] = None
 
     def is_alive(self) -> bool:
+        if IS_WINDOWS:
+            return self.win_pty is not None and not self._closing and self.win_pty.isalive()
         return self.proc is not None and self.proc.returncode is None and self.master_fd > 0
+
+    # ----------------------------- Démarrage -----------------------------
 
     async def start(self):
         self.loop = asyncio.get_running_loop()
+        self._closing = False
+        if IS_WINDOWS:
+            await self._start_windows()
+        else:
+            await self._start_posix()
+
+    async def _start_posix(self):
+        if not HAS_PTY:
+            raise RuntimeError("Le terminal persistant requiert les modules POSIX pty/fcntl/termios.")
         master_fd, slave_fd = pty.openpty()
         flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
         fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
@@ -60,7 +103,7 @@ class PersistentTerminalSession:
             stderr=slave_fd,
             cwd=self.cwd,
             env=env,
-            preexec_fn=os.setsid
+            **spawn_group_kwargs()
         )
         os.close(slave_fd)
 
@@ -78,13 +121,8 @@ class PersistentTerminalSession:
                         self.scrollback = self.scrollback[-self.max_scrollback:]
 
                     ws = self.active_websocket
-                    if ws:
-                        async def send():
-                            try:
-                                await ws.send_bytes(data)
-                            except Exception:
-                                pass
-                        asyncio.create_task(send())
+                    if ws and self.loop:
+                        asyncio.create_task(_safe_send_bytes(ws, data))
                 else:
                     if self.loop and self.master_fd > 0:
                         try:
@@ -103,8 +141,61 @@ class PersistentTerminalSession:
         self.loop.add_reader(self.master_fd, on_master_read)
         logger.info(f"Persistent PTY session started: {self.session_id} (pid={proc.pid}, cwd={self.cwd})")
 
+    async def _start_windows(self):
+        if not HAS_WINPTY:
+            raise RuntimeError(
+                "Le terminal intégré nécessite le paquet « pywinpty » sous Windows "
+                "(pip install pywinpty)."
+            )
+        shell = os.environ.get("COMSPEC") or "cmd.exe"
+        env = os.environ.copy()
+
+        def _spawn():
+            return winpty.PtyProcess.spawn([shell], cwd=self.cwd, env=env)
+
+        self.win_pty = await asyncio.to_thread(_spawn)
+        self._win_reader = threading.Thread(
+            target=self._windows_read_loop,
+            name=f"term-{self.session_id}",
+            daemon=True
+        )
+        self._win_reader.start()
+        logger.info(f"Persistent winpty session started: {self.session_id} (pid={self.win_pty.pid}, cwd={self.cwd})")
+
+    def _windows_read_loop(self):
+        """Boucle de lecture bloquante winpty (thread dédié) — relaie vers la WebSocket."""
+        p = self.win_pty
+        while not self._closing and p is not None:
+            try:
+                data = p.read(4096)
+            except (EOFError, OSError):
+                break
+            if not data:
+                break
+            raw = data if isinstance(data, (bytes, bytearray)) else str(data).encode("utf-8", errors="replace")
+            self.last_active = time.time()
+            self.scrollback.extend(raw)
+            if len(self.scrollback) > self.max_scrollback:
+                self.scrollback = self.scrollback[-self.max_scrollback:]
+
+            ws = self.active_websocket
+            if ws and self.loop:
+                try:
+                    asyncio.run_coroutine_threadsafe(_safe_send_bytes(ws, bytes(raw)), self.loop)
+                except RuntimeError as e:
+                    logger.debug(f"terminal relay failed: {e}")
+        logger.info(f"winpty reader loop ended for {self.session_id}")
+
+    # ----------------------------- Entrées / sorties -----------------------------
+
     async def write(self, data: bytes):
         if not self.is_alive():
+            return
+        if IS_WINDOWS:
+            try:
+                await asyncio.to_thread(self.win_pty.write, data.decode("utf-8", errors="replace"))
+            except (OSError, EOFError) as e:
+                logger.debug(f"terminal write failed: {e}")
             return
         offset = 0
         total = len(data)
@@ -118,10 +209,30 @@ class PersistentTerminalSession:
     async def resize(self, rows: int, cols: int):
         self.rows = rows
         self.cols = cols
-        if self.is_alive():
-            set_winsize(self.master_fd, rows, cols)
+        if not self.is_alive():
+            return
+        if IS_WINDOWS:
+            try:
+                await asyncio.to_thread(self.win_pty.setwinsize, rows, cols)
+            except Exception as e:
+                logger.debug(f"terminal resize failed: {e}")
+            return
+        set_winsize(self.master_fd, rows, cols)
 
     async def close(self):
+        self._closing = True
+        if IS_WINDOWS:
+            p = self.win_pty
+            self.win_pty = None
+            if p is not None:
+                try:
+                    if p.isalive():
+                        p.terminate(force=True)
+                except Exception as e:
+                    logger.debug(f"winpty terminate failed: {e}")
+            logger.info(f"Persistent winpty session terminated: {self.session_id}")
+            return
+
         if self.loop and self.master_fd > 0:
             try:
                 self.loop.remove_reader(self.master_fd)
@@ -134,15 +245,7 @@ class PersistentTerminalSession:
             self.master_fd = -1
 
         if self.proc:
-            try:
-                pgid = os.getpgid(self.proc.pid)
-                os.killpg(pgid, signal.SIGTERM)
-                await asyncio.sleep(0.1)
-                if self.proc.returncode is None:
-                    os.killpg(pgid, signal.SIGKILL)
-                await asyncio.wait_for(self.proc.wait(), timeout=1.0)
-            except Exception:
-                pass
+            await terminate_process_group_async(self.proc, grace=0.1)
             self.proc = None
         logger.info(f"Persistent PTY session terminated: {self.session_id}")
 
@@ -186,11 +289,22 @@ async def terminal_websocket(
 
     await websocket.accept()
 
-    cwd = workspace if workspace and os.path.isdir(workspace) else os.environ.get("HOME", "/root")
+    default_home = os.environ.get("HOME") or os.environ.get("USERPROFILE") or str(Path.home())
+    cwd = workspace if workspace and os.path.isdir(workspace) else default_home
     # Identify session (default to global persistent session for workspace)
     sid = session_id or f"ws_{abs(hash(cwd)) % 1000000}"
 
-    session, is_new = await get_or_create_session(sid, cwd)
+    try:
+        session, is_new = await get_or_create_session(sid, cwd)
+    except RuntimeError as e:
+        # Terminal indisponible sur cette plateforme (ex. Windows sans pywinpty)
+        try:
+            await websocket.send_text(f"\r\n\x1b[31m✖ {e}\x1b[0m\r\n")
+        except Exception as send_err:
+            logger.debug(f"terminal error message failed: {send_err}")
+        await websocket.close(code=1011)
+        return
+
     session.active_websocket = websocket
     session.last_active = time.time()
 
@@ -226,7 +340,8 @@ async def terminal_websocket(
                             await kill_session(sid)
                             session, _ = await get_or_create_session(sid, cwd)
                             session.active_websocket = websocket
-                            await websocket.send_text("\r\n\x1b[32m✔ Interpréteur bash réinitialisé.\x1b[0m\r\n")
+                            reset_label = "✔ Interpréteur bash réinitialisé." if not IS_WINDOWS and not IS_MACOS else "✔ Console réinitialisée."
+                            await websocket.send_text(f"\r\n\x1b[32m{reset_label}\x1b[0m\r\n")
                             continue
                     except json.JSONDecodeError:
                         pass

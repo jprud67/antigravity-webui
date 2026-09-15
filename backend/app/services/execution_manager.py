@@ -1,11 +1,10 @@
 import asyncio
 import logging
-import os
-import signal
 import time
 from typing import Optional, Dict, Any, Set, List
 from fastapi import WebSocket
 from app.services.agy_driver import stream_turn
+from app.platform_utils import terminate_process_group_async
 from app.services.storage import get_settings, save_settings
 from app.services.google_auth import is_quota_error, switch_to_next_healthy_account, get_active_account
 
@@ -524,14 +523,9 @@ class ExecutionManager:
             except asyncio.QueueEmpty:
                 break
 
-        # 2. Terminate active CLI process group
+        # 2. Terminate active CLI process group (multiplateforme POSIX/Windows)
         if session.active_proc and session.active_proc.returncode is None:
-            try:
-                pgid = os.getpgid(session.active_proc.pid)
-                os.killpg(pgid, signal.SIGTERM)
-                logger.info(f"Sent SIGTERM to process group {pgid}")
-            except Exception as e:
-                logger.debug(f"Error terminating proc group: {e}")
+            await terminate_process_group_async(session.active_proc, grace=0.5)
 
         # 3. Cancel active task
         if session.active_task and not session.active_task.done():

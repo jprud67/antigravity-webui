@@ -5,6 +5,7 @@ import time
 from typing import AsyncGenerator, Dict, Any, Optional, List, Tuple
 from pathlib import Path
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
+from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
 
 logger = logging.getLogger("antigravity.driver")
 
@@ -169,9 +170,6 @@ async def stream_turn(
     Executes a turn using `agy --output-format stream-json` and yields parsed NDJSON events.
     Supports cancellation, process group termination, agent_mode, and proc_callback.
     """
-    import os
-    import signal
-
     cwd = workspace_path if workspace_path and Path(workspace_path).is_dir() else DEFAULT_WORKSPACE
     
     resolved_model, resolved_effort = resolve_model_and_effort(model, effort)
@@ -193,7 +191,7 @@ async def stream_turn(
     if resolved_effort:
         cmd.extend(["--effort", resolved_effort])
 
-    if workspace_path and workspace_path != "/root":
+    if workspace_path and workspace_path != DEFAULT_WORKSPACE:
         cmd.extend(["--add-dir", workspace_path])
 
     # Prompt parameter
@@ -207,7 +205,7 @@ async def stream_turn(
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        preexec_fn=os.setsid
+        **spawn_group_kwargs()
     )
 
     if proc_callback:
@@ -266,20 +264,10 @@ async def stream_turn(
             except (asyncio.CancelledError, Exception):
                 pass
 
-        # Robustly terminate process group if still running (handles GeneratorExit, break, errors)
+        # Terminaison robuste du groupe de processus si encore actif
+        # (couvre GeneratorExit, break et erreurs) — multiplateforme.
         if proc.returncode is None:
-            try:
-                pgid = os.getpgid(proc.pid)
-                os.killpg(pgid, signal.SIGTERM)
-                try:
-                    await asyncio.wait_for(proc.wait(), timeout=0.8)
-                except (asyncio.TimeoutError, asyncio.CancelledError):
-                    os.killpg(pgid, signal.SIGKILL)
-                    await proc.wait()
-            except ProcessLookupError:
-                pass
-            except Exception as e:
-                logger.debug(f"Error terminating proc group in finally: {e}")
+            await terminate_process_group_async(proc, grace=0.8)
 
 
 _quota_cache: Dict[str, Any] = {"data": None, "timestamp": 0.0}
