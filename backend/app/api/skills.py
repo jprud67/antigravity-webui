@@ -34,11 +34,27 @@ def parse_skill_md(skill_file: Path) -> dict[str, Any]:
         if fm_match:
             fm_text = fm_match.group(1)
             body = fm_match.group(2)
-            for line in fm_text.splitlines():
+            lines = fm_text.splitlines()
+            i = 0
+            while i < len(lines):
+                line = lines[i]
                 if line.startswith("name:"):
                     name = line.split(":", 1)[1].strip().strip('"').strip("'")
                 elif line.startswith("description:"):
-                    description = line.split(":", 1)[1].strip().strip('"').strip("'")
+                    val = line.split(":", 1)[1].strip()
+                    if val in (">-", ">", "|", "|-"):
+                        desc_parts = []
+                        i += 1
+                        while i < len(lines) and (lines[i].startswith("  ") or lines[i].startswith("\t") or not lines[i].strip()):
+                            stripped = lines[i].strip()
+                            if stripped:
+                                desc_parts.append(stripped)
+                            i += 1
+                        description = " ".join(desc_parts).strip()
+                        continue
+                    else:
+                        description = val.strip('"').strip("'")
+                i += 1
             if not description and body:
                 description = body.strip().split("\n")[0][:160]
         else:

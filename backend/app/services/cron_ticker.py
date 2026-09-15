@@ -57,11 +57,11 @@ async def run_agy_task(prompt: str, skills: list[str] | None = None, timeout: in
     (compte épuisé), le processus est terminé immédiatement afin que la
     bascule de compte + relance s'opère sans attendre les retries internes.
     """
-    cmd = [AGY_BIN, "--dangerously-skip-permissions", "--print-timeout", "20m"]
+    effective_prompt = prompt
     if skills:
-        for sk in skills:
-            cmd.extend(["--skill", sk])
-    cmd.extend(["-p", prompt])
+        skills_prefix = f"[Active skills: {', '.join(skills)}]\n"
+        effective_prompt = f"{skills_prefix}{prompt}"
+    cmd = [AGY_BIN, "--dangerously-skip-permissions", "--print-timeout", "20m", "-p", effective_prompt]
     spawned_at = time.time()
     proc = await asyncio.create_subprocess_exec(
         *cmd,

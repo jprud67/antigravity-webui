@@ -418,15 +418,12 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
         # Wait for agy to complete token exchange
         start_wait = time.time()
         while time.time() - start_wait < 20:
-            if not _proc_running(proc):
+            if TOKEN_FILE.exists() or not _proc_running(proc):
                 break
             time.sleep(0.3)
 
-        if master_fd is not None:
-            try:
-                os.close(master_fd)
-            except Exception:
-                pass
+        # Ensure login resources (PTY fd and child process) are fully closed
+        _close_login_resources(master_fd, proc)
 
         if not TOKEN_FILE.exists():
             # Auth failed, restore previous token
@@ -442,7 +439,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
         sync_active_account_to_store()
         active_meta = get_active_account()
 
-        del _LOGIN_SESSIONS[session_id]
+        _LOGIN_SESSIONS.pop(session_id, None)
 
         active_email = active_meta.get("email") if active_meta else "Inconnu"
         return {

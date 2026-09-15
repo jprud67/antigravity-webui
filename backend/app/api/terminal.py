@@ -9,7 +9,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.api.auth import require_auth
@@ -376,9 +375,25 @@ async def terminal_websocket(
             session.active_websocket = None
         logger.info(f"Terminal WebSocket detached from session {sid} (process kept running)")
 
+async def prune_dead_sessions() -> None:
+    """Removes dead sessions (process exited and no client attached) from _sessions dictionary."""
+    async with _sessions_lock:
+        dead_sids = [
+            sid for sid, s in _sessions.items()
+            if not s.is_alive() and s.active_websocket is None
+        ]
+        for sid in dead_sids:
+            s = _sessions.pop(sid, None)
+            if s:
+                try:
+                    await s.close()
+                except Exception:
+                    pass
+
 @router.get("/api/terminal/sessions")
-def list_terminal_sessions(_ = Depends(require_auth)):
+async def list_terminal_sessions(_ = Depends(require_auth)):
     """List active persistent terminal sessions"""
+    await prune_dead_sessions()
     return [
         {
             "session_id": sid,

@@ -17,7 +17,6 @@ import logging
 import time
 from collections.abc import Callable
 from datetime import datetime, timezone
-
 from pathlib import Path
 
 from app.config import LOG_DIR
@@ -59,21 +58,31 @@ def _expected_log_candidates(since_ts: float, window: float = 5.0) -> list[Path]
     locale de démarrage de la session (vérifié empiriquement). On cible donc
     précisément les fichiers dont le nom correspond à la seconde du spawn
     (± quelques secondes) — ce qui lève l'ambiguïté entre runs concurrents.
+    On vérifie à la fois l'heure locale et UTC pour supporter toute configuration.
     """
     out: list[Path] = []
+    seen: set[Path] = set()
     base = int(since_ts) - 1
     for t in range(base, base + int(window) + 2):
+        names: list[str] = []
         try:
-            name = "cli-" + datetime.fromtimestamp(t, tz=timezone.utc).strftime("%Y%m%d_%H%M%S") + ".log"
+            # Heure locale (défaut CLI)
+            names.append("cli-" + datetime.fromtimestamp(t).strftime("%Y%m%d_%H%M%S") + ".log")
+            # Heure UTC (au cas où le système/CLI est en UTC)
+            names.append("cli-" + datetime.fromtimestamp(t, tz=timezone.utc).strftime("%Y%m%d_%H%M%S") + ".log")
         except (OverflowError, OSError, ValueError):
             continue
 
-        p = LOG_DIR / name
-        try:
-            if p.exists():
-                out.append(p)
-        except OSError:
-            continue
+        for name in names:
+            p = LOG_DIR / name
+            if p in seen:
+                continue
+            seen.add(p)
+            try:
+                if p.exists():
+                    out.append(p)
+            except OSError:
+                continue
     return out
 
 

@@ -124,51 +124,60 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
     """
     Safely reconciles model and effort parameters for agy CLI.
     Prevents CLI errors like 'invalid model selection' or 'model conflicts with --effort'.
+    Ensures model identifiers are normalized to valid CLI model slugs.
     """
     if not model:
         return None, effort
 
-    model = model.strip()
+    raw = model.strip()
+    norm = raw.lower().replace(" ", "-").replace("(", "").replace(")", "").strip()
 
     # Claude models do NOT accept --effort flag and must not have -high/-medium/-low suffix
-    if "claude" in model.lower():
-        for sfx in ["-high", "-medium", "-low"]:
-            model = model.removesuffix(sfx)
-        return model, None
+    if "claude" in norm:
+        for sfx in ["-high", "-medium", "-low", "-thinking"]:
+            norm = norm.removesuffix(sfx)
+        if "opus" in norm:
+            return "claude-opus-4-6-thinking", None
+        return "claude-sonnet-4-6", None
 
     # GPT-OSS only supports medium
-    if "gpt-oss" in model.lower():
+    if "gpt-oss" in norm:
         return "gpt-oss-120b-medium", None
 
-    # Detect base model and current suffix
-    base_model = model
+    # Extract any existing suffix
     model_suffix = None
     for sfx in ["-high", "-medium", "-low"]:
-        if model.endswith(sfx):
+        if norm.endswith(sfx):
             model_suffix = sfx[1:]
-            base_model = model[:-len(sfx)]
+            norm = norm[:-len(sfx)]
             break
 
     eff = (effort or model_suffix or "high").lower().strip()
 
-    if "gemini" in base_model.lower():
-        # Gemini 3.1 Pro only supports high and low
-        if "gemini-3.1-pro" in base_model:
+    if "gemini" in norm:
+        if "3.1" in norm and "pro" in norm:
             if eff not in ["high", "low"]:
                 eff = "high"
             return f"gemini-3.1-pro-{eff}", None
 
-        # For Gemini 3.6, 3.7, 3.8: support high, medium, low
+        # Determine version: 3.6, 3.7, 3.8 (or future)
         if eff not in ["high", "medium", "low"]:
             eff = "high"
 
-        target_model = f"{base_model}-{eff}"
-        return target_model, None
+        if "3.6" in norm:
+            return f"gemini-3.6-flash-{eff}", None
+        elif "3.7" in norm:
+            return f"gemini-3.7-flash-{eff}", None
+        elif "3.8" in norm:
+            return f"gemini-3.8-flash-{eff}", None
+        else:
+            base = norm.removesuffix(f"-{eff}")
+            return f"{base}-{eff}", None
 
-    # For other models, preserve base model
+    # For other models, preserve suffix or raw
     if model_suffix:
-        return f"{base_model}-{model_suffix}", None
-    return base_model, None
+        return f"{norm}-{model_suffix}", None
+    return raw, None
 
 async def stream_turn(
     prompt: str,
