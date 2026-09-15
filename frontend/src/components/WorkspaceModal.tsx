@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Folder, FolderPlus, Check, ArrowUp } from 'lucide-react';
+import { X, Folder, FolderPlus, Check, ArrowUp, Trash2 } from 'lucide-react';
 import type { WorkspaceFolder } from '../types';
-import { fetchWorkspaces, exploreDirectory, addWorkspace } from '../services/api';
+import { fetchWorkspaces, exploreDirectory, addWorkspace, deleteWorkspace } from '../services/api';
 
 interface WorkspaceModalProps {
   isOpen: boolean;
@@ -56,6 +56,20 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
     await addWorkspace(pathToAdd);
     await loadWorkspaces();
     onSelectWorkspace(pathToAdd);
+  };
+
+  const handleDeleteWorkspace = async (e: React.MouseEvent, pathToDel: string) => {
+    e.stopPropagation();
+    try {
+      const res = await deleteWorkspace(pathToDel);
+      if (res?.workspaces) {
+        setTrustedList(res.workspaces);
+      } else {
+        await loadWorkspaces();
+      }
+    } catch (err) {
+      console.error('Failed to delete workspace:', err);
+    }
   };
 
   if (!isOpen) return null;
@@ -123,20 +137,32 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
                         <Check className="w-3 h-3" /> Actif
                       </span>
                     ) : (
-                      <button
-                        onClick={() => {
-                          onSelectWorkspace(ws);
-                          onClose();
-                        }}
-                        className="text-[11px] px-3 py-1 rounded-lg border transition-colors font-sans font-medium shrink-0 cursor-pointer"
-                        style={{
-                          backgroundColor: 'var(--surface)',
-                          borderColor: 'var(--border)',
-                          color: 'var(--text)'
-                        }}
-                      >
-                        Sélectionner
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => {
+                            onSelectWorkspace(ws);
+                            onClose();
+                          }}
+                          className="text-[11px] px-3 py-1 rounded-lg border transition-colors font-sans font-medium shrink-0 cursor-pointer"
+                          style={{
+                            backgroundColor: 'var(--surface)',
+                            borderColor: 'var(--border)',
+                            color: 'var(--text)'
+                          }}
+                        >
+                          Sélectionner
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteWorkspace(e, ws)}
+                          title="Retirer des workspaces"
+                          className="p-1.5 rounded-lg border transition-colors cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          style={{
+                            borderColor: 'var(--border)',
+                          }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 );

@@ -101,16 +101,19 @@ def verify_access_token(token: str | None) -> bool:
         return False
     
     user, exp_str, sig = parts
+    payload = f"{user}:{exp_str}"
+    expected_sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected_sig):
+        return False
+
     try:
         exp = int(exp_str)
         if time.time() > exp:
             return False
     except ValueError:
         return False
-        
-    payload = f"{user}:{exp_str}"
-    expected_sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
-    return hmac.compare_digest(sig, expected_sig)
+
+    return True
 
 def update_password(new_password: str):
     config = get_auth_config()

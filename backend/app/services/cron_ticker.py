@@ -179,7 +179,13 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
     effort = job.get("effort")
     while attempts < MAX_TASK_FAILOVER:
         attempts += 1
-        out, err, code = await run_agy_task(prompt, skills=skills, model=model, effort=effort)
+        try:
+            out, err, code = await run_agy_task(prompt, skills=skills, model=model, effort=effort)
+        except Exception as exc:
+            logger.error(f"[Cron] Exception levée pendant run_agy_task: {exc}", exc_info=True)
+            output = f"Exception: {exc}"
+            status = "failed"
+            break
         combined = f"{out}\n{err}".strip()
         output = combined
 
@@ -276,12 +282,24 @@ async def _execute_job(job: dict[str, Any]) -> None:
 
 
 async def _guarded_execute(job: dict[str, Any]) -> None:
+    job_id = job.get("id")
     try:
         await _execute_job(job)
     except Exception as e:
-        logger.error(f"[Cron] Erreur pendant l'exécution du job {job.get('id')}: {e}", exc_info=True)
+        logger.error(f"[Cron] Erreur pendant l'exécution du job {job_id}: {e}", exc_info=True)
+        try:
+            async with _jobs_write_lock:
+                data = load_jobs()
+                for j in data.get("jobs", []):
+                    if j.get("id") == job_id and j.get("last_status") == "running":
+                        j["last_status"] = "failed"
+                        j["last_run_at"] = now_iso()
+                        break
+                save_jobs(data)
+        except Exception as save_err:
+            logger.error(f"[Cron] Impossible de mettre à jour le statut d'échec pour {job_id}: {save_err}")
     finally:
-        _running_jobs.discard(job.get("id"))
+        _running_jobs.discard(job_id)
 
 
 async def tick_once() -> int:

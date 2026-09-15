@@ -4,6 +4,7 @@ import logging
 import re
 import shutil
 import sqlite3
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1468,6 +1469,8 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
     artifacts.sort(key=lambda x: str(x["last_modified"]), reverse=True)
     return artifacts
 
+_settings_lock = threading.RLock()
+
 def read_artifact_content(conversation_id: str, filename: str) -> str:
     if not is_safe_conversation_id(conversation_id):
         raise ValueError("Identifiant de conversation non valide")
@@ -1475,6 +1478,9 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
     target_path = (base_dir / filename).resolve()
     if not target_path.is_relative_to(base_dir):
         raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
+    rel_parts = target_path.relative_to(base_dir).parts
+    if ".system_generated" in rel_parts or "scratch" in rel_parts:
+        raise PermissionError("Accès refusé : les fichiers système internes ou temporaires ne sont pas accessibles via les artefacts.")
     if not target_path.exists() or not target_path.is_file():
         raise FileNotFoundError(f"Artifact introuvable : {filename}")
     try:
@@ -1490,34 +1496,36 @@ def get_settings() -> dict[str, Any]:
         "model": "Gemini 3.8 Flash (High)",
         "trustedWorkspaces": [DEFAULT_WORKSPACE]
     }
-    if not SETTINGS_FILE.exists():
-        return defaults
-    try:
-        content = SETTINGS_FILE.read_text(encoding="utf-8")
-        if not content.strip():
+    with _settings_lock:
+        if not SETTINGS_FILE.exists():
             return defaults
-        data = json.loads(content)
-        return data if isinstance(data, dict) else defaults
-    except Exception as exc:
-        logger.warning(f"Failed to parse settings.json, returning defaults: {exc}")
-        return defaults
+        try:
+            content = SETTINGS_FILE.read_text(encoding="utf-8")
+            if not content.strip():
+                return defaults
+            data = json.loads(content)
+            return data if isinstance(data, dict) else defaults
+        except Exception as exc:
+            logger.warning(f"Failed to parse settings.json, returning defaults: {exc}")
+            return defaults
 
 def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
-    current = get_settings()
-    current.update(new_settings)
-    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp_file = SETTINGS_FILE.parent / f".settings.json.tmp.{uuid.uuid4().hex[:8]}"
-    try:
-        tmp_file.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
-        tmp_file.replace(SETTINGS_FILE)
-    except Exception:
-        if tmp_file.exists():
-            try:
-                tmp_file.unlink()
-            except Exception:
-                pass
-        raise
-    return current
+    with _settings_lock:
+        current = get_settings()
+        current.update(new_settings)
+        SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp_file = SETTINGS_FILE.parent / f".settings.json.tmp.{uuid.uuid4().hex[:8]}"
+        try:
+            tmp_file.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
+            tmp_file.replace(SETTINGS_FILE)
+        except Exception:
+            if tmp_file.exists():
+                try:
+                    tmp_file.unlink()
+                except Exception:
+                    pass
+            raise
+        return current
 
 def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
     """

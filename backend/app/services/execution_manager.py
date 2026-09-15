@@ -521,6 +521,10 @@ class ExecutionManager:
                     await terminate_process_group_async(session.active_proc, grace=0.5)
                 if session.active_task and not session.active_task.done():
                     session.active_task.cancel()
+                    try:
+                        await asyncio.wait_for(asyncio.shield(session.active_task), timeout=2.0)
+                    except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                        pass
                 # Purge obsolete pending messages in the queue so the steering directive executes immediately
                 while not session.message_queue.empty():
                     try:
@@ -569,6 +573,10 @@ class ExecutionManager:
         # 3. Cancel active task
         if session.active_task and not session.active_task.done():
             session.active_task.cancel()
+            try:
+                await asyncio.wait_for(asyncio.shield(session.active_task), timeout=2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                pass
 
         session.is_running = False
         await session.broadcast({

@@ -114,8 +114,15 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
     if not expr:
         return None
 
-    # Syntaxes rapides : "every 10m", "toutes les 30 min", "chaque 2 h"...
+    # Syntaxes rapides : "every 10m", "hourly", "daily", "toutes les 30 min", "chaque 2 h"...
     lower = expr.lower().strip()
+    if lower in ("every hour", "hourly", "chaque heure", "toutes les heures"):
+        return (now + timedelta(hours=1)).isoformat()
+    if lower in ("every day", "daily", "chaque jour", "tous les jours"):
+        return (now + timedelta(days=1)).isoformat()
+    if lower in ("every week", "weekly", "chaque semaine", "toutes les semaines"):
+        return (now + timedelta(weeks=1)).isoformat()
+
     match = re.match(r"^(?:every|toutes les|chaque)\s+(\d+)\s*(m|min|minutes?|h|hours?|heures?|d|days?|jours?)?$", lower)
     if match:
         try:

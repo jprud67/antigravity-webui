@@ -31,6 +31,20 @@ def add_workspace(path: str = Query(...), _ = Depends(require_auth)):
         save_settings(settings)
     return {"status": "ok", "workspaces": workspaces}
 
+@router.delete("")
+def delete_workspace(path: str = Query(...), _ = Depends(require_auth)):
+    p = str(Path(path).resolve())
+    if p == str(Path(DEFAULT_WORKSPACE).resolve()):
+        raise HTTPException(status_code=400, detail="Cannot delete default workspace")
+    settings = get_settings()
+    workspaces = settings.get("trustedWorkspaces", [])
+    workspaces = [w for w in workspaces if str(Path(w).resolve()) != p]
+    if DEFAULT_WORKSPACE not in workspaces:
+        workspaces.insert(0, DEFAULT_WORKSPACE)
+    settings["trustedWorkspaces"] = workspaces
+    save_settings(settings)
+    return {"status": "ok", "workspaces": workspaces}
+
 @router.get("/explore")
 def explore_dir(path: str = Query(DEFAULT_WORKSPACE), _ = Depends(require_auth)) -> dict[str, Any]:
     p = Path(path).resolve()

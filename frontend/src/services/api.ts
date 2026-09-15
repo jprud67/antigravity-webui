@@ -297,6 +297,15 @@ export async function addWorkspace(path: string): Promise<any> {
   return res.json();
 }
 
+export async function deleteWorkspace(path: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/workspaces?path=${encodeURIComponent(path)}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(`Failed to delete workspace: ${res.statusText}`);
+  return res.json();
+}
+
 export async function exploreDirectory(path?: string): Promise<WorkspaceFolder> {
   const url = path ? `${API_BASE}/workspaces/explore?path=${encodeURIComponent(path)}` : `${API_BASE}/workspaces/explore`;
   const res = await fetch(url, {
