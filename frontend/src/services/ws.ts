@@ -98,11 +98,11 @@ export class ChatWebSocketClient {
       };
     } catch (e) {
       console.error('[WS] Connection exception:', e);
-      this.setStatus('disconnected');
       if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
       this.setStatus('reconnecting');
       this.reconnectTimer = setTimeout(() => this.connect(), 3000);
     }
+
   }
 
   // ─── Heartbeat ───────────────────────────────────────────────

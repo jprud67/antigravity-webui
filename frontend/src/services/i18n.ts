@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import localesData from './locales.json';
 
 export interface LanguageOption {
   code: string;
@@ -26,7 +25,23 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
   { code: 'vi', label: 'Tiếng Việt', speech: 'vi-VN', flag: '🇻🇳' },
 ];
 
-const LOCALES: Record<string, Record<string, string>> = localesData as any;
+let LOCALES: Record<string, Record<string, string>> = {};
+
+// Asynchronously load the 1.5MB locales file to avoid blocking HMR and main bundle load
+fetch('/locales.json')
+  .then(res => res.json())
+  .then(data => {
+    LOCALES = data;
+    // Trigger re-render for active listeners once loaded
+    if (typeof window !== 'undefined') {
+      // Small timeout to avoid immediate re-render thrashing on mount
+      setTimeout(() => {
+        LISTENERS.forEach((fn) => fn(currentLanguage));
+      }, 100);
+    }
+  })
+  .catch(err => console.error('Failed to load locales.json:', err));
+
 
 export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
   new_conversation: {

@@ -10,7 +10,9 @@ import {
   RefreshCw,
   Sparkles,
   Timer,
-  AlertCircle
+  AlertCircle,
+  Pencil,
+  Check
 } from 'lucide-react';
 import type { CronJobItem, CronListResponse } from '../services/api';
 import { 
@@ -47,13 +49,21 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
+  // Form state (création)
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
   const [preset, setPreset] = useState(SCHEDULE_PRESETS[1].expr);
   const [customExpr, setCustomExpr] = useState('*/15 * * * *');
   const [submitting, setSubmitting] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  // Form state (édition)
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPrompt, setEditPrompt] = useState('');
+  const [editPreset, setEditPreset] = useState(SCHEDULE_PRESETS[1].expr);
+  const [editCustomExpr, setEditCustomExpr] = useState('*/15 * * * *');
+  const [editSaving, setEditSaving] = useState(false);
 
   const loadCrons = async () => {
     setLoading(true);
@@ -151,6 +161,46 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
       await loadCrons();
     } catch (e: any) {
       showToast(e.message || 'Erreur déclenchement', 'error');
+    }
+  };
+
+  const handleStartEdit = (job: CronJobItem) => {
+    const expr = job.schedule_display || job.schedule?.expr || job.schedule?.display || '';
+    const matchedPreset = SCHEDULE_PRESETS.find(p => p.expr !== 'custom' && p.expr === expr);
+    setEditingJobId(job.id);
+    setEditName(job.name);
+    setEditPrompt(job.prompt);
+    if (matchedPreset) {
+      setEditPreset(matchedPreset.expr);
+      setEditCustomExpr(matchedPreset.expr);
+    } else {
+      setEditPreset('custom');
+      setEditCustomExpr(expr);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingJobId(null);
+  };
+
+  const handleSaveEdit = async (jobId: string) => {
+    const finalExpr = editPreset === 'custom' ? editCustomExpr.trim() : editPreset;
+    if (!editName.trim() || !editPrompt.trim() || !finalExpr) return;
+    setEditSaving(true);
+    try {
+      await updateCronJob(jobId, {
+        name: editName.trim(),
+        prompt: editPrompt.trim(),
+        schedule: finalExpr,
+      });
+      setEditingJobId(null);
+      setActionNotice('Tâche mise à jour avec succès ✓');
+      setTimeout(() => setActionNotice(null), 3000);
+      await loadCrons();
+    } catch (e: any) {
+      showToast(e.message || 'Erreur mise à jour', 'error');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -474,6 +524,19 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                           </button>
 
                           <button
+                            onClick={() => editingJobId === job.id ? handleCancelEdit() : handleStartEdit(job)}
+                            className="p-1.5 rounded-lg border transition-colors cursor-pointer hover:opacity-100 opacity-70"
+                            style={{
+                              backgroundColor: editingJobId === job.id ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                              borderColor: editingJobId === job.id ? 'var(--accent)' : 'var(--border)',
+                              color: editingJobId === job.id ? 'var(--accent)' : 'var(--text)'
+                            }}
+                            title={editingJobId === job.id ? 'Annuler l\'édition' : 'Modifier la tâche'}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
                             onClick={() => handleDelete(job.id)}
                             className="p-1.5 rounded-lg hover:bg-rose-500/20 text-rose-500 transition-colors cursor-pointer"
                             title="Supprimer"
@@ -498,6 +561,113 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                           <span className="capitalize">Statut : <strong style={{ color: 'var(--accent)' }}>{job.last_status}</strong></span>
                         )}
                       </div>
+
+                      {/* Formulaire d'édition inline */}
+                      {editingJobId === job.id && (
+                        <div
+                          className="mt-3 pt-3 border-t space-y-3"
+                          style={{ borderColor: 'var(--border)' }}
+                        >
+                          <p className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--accent)' }}>
+                            <Pencil className="w-3 h-3" /> Modifier la tâche
+                          </p>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>Nom</label>
+                              <input
+                                type="text"
+                                value={editName}
+                                onChange={e => setEditName(e.target.value)}
+                                className="w-full border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1"
+                                style={{
+                                  backgroundColor: 'var(--surface)',
+                                  borderColor: 'var(--border)',
+                                  color: 'var(--text)'
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>Fréquence</label>
+                              <select
+                                value={editPreset}
+                                onChange={e => {
+                                  setEditPreset(e.target.value);
+                                  if (e.target.value !== 'custom') setEditCustomExpr(e.target.value);
+                                }}
+                                className="w-full border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 cursor-pointer"
+                                style={{
+                                  backgroundColor: 'var(--surface)',
+                                  borderColor: 'var(--border)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                {SCHEDULE_PRESETS.map((p, idx) => (
+                                  <option key={idx} value={p.expr} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
+                                    {p.label} {p.expr !== 'custom' ? `(${p.expr})` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          {editPreset === 'custom' && (
+                            <div>
+                              <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>Expression Cron personnalisée</label>
+                              <input
+                                type="text"
+                                value={editCustomExpr}
+                                onChange={e => setEditCustomExpr(e.target.value)}
+                                placeholder="*/15 * * * *"
+                                className="w-full border rounded-lg px-3 py-1.5 text-xs font-mono focus:outline-none"
+                                style={{
+                                  backgroundColor: 'var(--surface)',
+                                  borderColor: 'var(--border)',
+                                  color: 'var(--accent)'
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>Prompt</label>
+                            <textarea
+                              rows={3}
+                              value={editPrompt}
+                              onChange={e => setEditPrompt(e.target.value)}
+                              className="w-full border rounded-lg p-2 text-xs font-mono focus:outline-none focus:ring-1"
+                              style={{
+                                backgroundColor: 'var(--surface)',
+                                borderColor: 'var(--border)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={handleCancelEdit}
+                              className="px-3 py-1.5 rounded-lg border text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                              style={{
+                                backgroundColor: 'var(--surface-subtle)',
+                                borderColor: 'var(--border)',
+                                color: 'var(--text)'
+                              }}
+                            >
+                              Annuler
+                            </button>
+                            <button
+                              onClick={() => handleSaveEdit(job.id)}
+                              disabled={editSaving || !editName.trim() || !editPrompt.trim()}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold cursor-pointer transition-all disabled:opacity-50"
+                              style={{ backgroundColor: 'var(--accent)' }}
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              {editSaving ? 'Sauvegarde...' : 'Enregistrer'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

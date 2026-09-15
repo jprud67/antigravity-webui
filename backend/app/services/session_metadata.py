@@ -1,11 +1,16 @@
 import json
 import logging
+import threading
 import uuid
 from typing import Any
 
 from app.config import SESSION_METADATA_FILE
 
 logger = logging.getLogger("antigravity-webui.session_metadata")
+
+# Verrou protégeant l'accès concurrent en lecture/écriture au fichier session_metadata.json
+_meta_lock = threading.Lock()
+
 
 def get_all_session_metadata() -> dict[str, dict[str, Any]]:
     if not SESSION_METADATA_FILE.exists():
@@ -49,33 +54,36 @@ def bulk_update_session_meta(conversation_ids: list[str], updates: dict[str, Any
     return bulk_update_session_meta_batch({cid: updates for cid in conversation_ids})
 
 def bulk_update_session_meta_batch(updates_per_id: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    all_meta = get_all_session_metadata()
-    results = {}
-    for cid, updates in updates_per_id.items():
-        current = all_meta.get(cid, {
-            "pinned": False,
-            "archived": False,
-            "tags": [],
-            "project": "",
-            "projectColor": "",
-            "customTitle": ""
-        })
-        current.update(updates)
-        all_meta[cid] = current
-        results[cid] = current
-    if updates_per_id:
-        save_all_session_metadata(all_meta)
+    with _meta_lock:
+        all_meta = get_all_session_metadata()
+        results = {}
+        for cid, updates in updates_per_id.items():
+            current = all_meta.get(cid, {
+                "pinned": False,
+                "archived": False,
+                "tags": [],
+                "project": "",
+                "projectColor": "",
+                "customTitle": ""
+            })
+            current.update(updates)
+            all_meta[cid] = current
+            results[cid] = current
+        if updates_per_id:
+            save_all_session_metadata(all_meta)
     return results
 
 def delete_session_meta(conversation_id: str) -> None:
     bulk_delete_session_meta([conversation_id])
 
 def bulk_delete_session_meta(conversation_ids: list[str]) -> None:
-    all_meta = get_all_session_metadata()
-    changed = False
-    for cid in conversation_ids:
-        if cid in all_meta:
-            del all_meta[cid]
-            changed = True
-    if changed:
-        save_all_session_metadata(all_meta)
+    with _meta_lock:
+        all_meta = get_all_session_metadata()
+        changed = False
+        for cid in conversation_ids:
+            if cid in all_meta:
+                del all_meta[cid]
+                changed = True
+        if changed:
+            save_all_session_metadata(all_meta)
+

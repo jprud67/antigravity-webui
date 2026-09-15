@@ -267,7 +267,9 @@ async def stream_turn(
 
         stderr_task = asyncio.create_task(read_stderr())
 
-        assert proc.stdout is not None
+        if proc.stdout is None:
+            raise RuntimeError("agy process stdout is unexpectedly None — impossible de lire la sortie.")
+
         while True:
             line = await proc.stdout.readline()
             if not line:

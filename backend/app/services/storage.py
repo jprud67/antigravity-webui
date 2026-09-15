@@ -22,11 +22,39 @@ logger = logging.getLogger("antigravity.storage")
 
 
 def get_db_connection() -> sqlite3.Connection:
-    if not CONVERSATION_DB.exists():
-        raise FileNotFoundError(f"Database {CONVERSATION_DB} not found")
-    conn = sqlite3.connect(str(CONVERSATION_DB))
+    # Crée le dossier parent si nécessaire (premier démarrage) ; sqlite3.connect crée la DB si absente.
+    CONVERSATION_DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(CONVERSATION_DB), timeout=15.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
     return conn
+
+def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
+    """Construit le dict conversation à partir d'une ligne SQLite et des métadonnées session."""
+    cid = r["conversation_id"]
+    custom_title = (meta.get("customTitle") or "").strip()
+    display_title = custom_title or r["title"] or "Nouvelle session"
+    return {
+        "conversation_id": cid,
+        "title": display_title,
+        "raw_title": r["title"] or "Nouvelle session",
+        "preview": r["preview"],
+        "step_count": r["step_count"],
+        "last_modified_time": r["last_modified_time"],
+        "workspace_uris": r["workspace_uris"],
+        "status": r["status"],
+        "agent_name": r["agent_name"],
+        "parent_conversation_id": dict(r).get("parent_conversation_id"),
+        "pinned": meta.get("pinned", False),
+        "archived": meta.get("archived", False),
+        "tags": meta.get("tags", []),
+        "project": meta.get("project", ""),
+        "projectColor": meta.get("projectColor", ""),
+        "customTitle": custom_title,
+    }
+
+
 
 def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
     if not CONVERSATION_DB.exists():
@@ -85,27 +113,8 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
         for r in rows:
             cid = r["conversation_id"]
             meta = all_meta.get(cid, {})
-            custom_title = meta.get("customTitle", "").strip()
-            display_title = custom_title or r["title"] or "Nouvelle session"
+            result.append(_build_conversation_dict(r, meta))
 
-            result.append({
-                "conversation_id": cid,
-                "title": display_title,
-                "raw_title": r["title"] or "Nouvelle session",
-                "preview": r["preview"],
-                "step_count": r["step_count"],
-                "last_modified_time": r["last_modified_time"],
-                "workspace_uris": r["workspace_uris"],
-                "status": r["status"],
-                "agent_name": r["agent_name"],
-                "parent_conversation_id": dict(r).get("parent_conversation_id"),
-                "pinned": meta.get("pinned", False),
-                "archived": meta.get("archived", False),
-                "tags": meta.get("tags", []),
-                "project": meta.get("project", ""),
-                "projectColor": meta.get("projectColor", ""),
-                "customTitle": custom_title
-            })
 
         # Sort pinned conversations first, then by last_modified_time descending (newest first)
         result.sort(key=lambda x: (1 if x["pinned"] else 0, x["last_modified_time"] or ""), reverse=True)
@@ -141,28 +150,10 @@ def get_conversation_by_id(conversation_id: str) -> dict[str, Any] | None:
         if not r:
             return None
         meta = get_session_meta(conversation_id)
-        custom_title = meta.get("customTitle", "").strip()
-        display_title = custom_title or r["title"] or "Nouvelle session"
-        return {
-            "conversation_id": r["conversation_id"],
-            "title": display_title,
-            "raw_title": r["title"] or "Nouvelle session",
-            "preview": r["preview"],
-            "step_count": r["step_count"],
-            "last_modified_time": r["last_modified_time"],
-            "workspace_uris": r["workspace_uris"],
-            "status": r["status"],
-            "agent_name": r["agent_name"],
-            "parent_conversation_id": dict(r).get("parent_conversation_id"),
-            "pinned": meta.get("pinned", False),
-            "archived": meta.get("archived", False),
-            "tags": meta.get("tags", []),
-            "project": meta.get("project", ""),
-            "projectColor": meta.get("projectColor", ""),
-            "customTitle": custom_title
-        }
+        return _build_conversation_dict(r, meta)
     finally:
         conn.close()
+
 
 def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
     conv_dir = BRAIN_DIR / conversation_id
@@ -517,16 +508,14 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
         "conversation_id": new_id
     }
 
+    # Définir les chemins de transcripts
     transcript_path = new_logs_dir / "transcript.jsonl"
     transcript_full_path = new_logs_dir / "transcript_full.jsonl"
 
-    with open(transcript_path, "w", encoding="utf-8") as f:
-        f.write(json.dumps(step_summary, ensure_ascii=False) + "\n")
-        f.write(json.dumps(step_assistant, ensure_ascii=False) + "\n")
+    # Écriture atomique des transcripts (protège contre la corruption en cas de crash)
+    atomic_write_jsonl(transcript_path, [step_summary, step_assistant])
+    atomic_write_jsonl(transcript_full_path, [step_summary, step_assistant])
 
-    with open(transcript_full_path, "w", encoding="utf-8") as f:
-        f.write(json.dumps(step_summary, ensure_ascii=False) + "\n")
-        f.write(json.dumps(step_assistant, ensure_ascii=False) + "\n")
 
     title = new_title or f"[Suite] {source_title}"
     preview = f"Nouvelle section avec mémoire transférée de « {source_title} »"
@@ -665,6 +654,7 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         atomic_write_jsonl(transcript_file, remaining_steps)
 
     # Persist updated full transcript file independently to avoid degrading unabridged history
+    remaining_full_steps = remaining_steps  # valeur de repli sûre si le fichier est absent
     if transcript_full_file.exists():
         full_steps = []
         try:
@@ -692,6 +682,7 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
             remaining_full_steps = remaining_steps
 
         atomic_write_jsonl(transcript_full_file, remaining_full_steps)
+
 
     # Update summary in SQLite database
     conn = get_db_connection()

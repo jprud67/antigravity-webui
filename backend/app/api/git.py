@@ -38,7 +38,7 @@ def _validate_workspace(workspace: str | None) -> Path:
 
     return resolved
 
-def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT) -> subprocess.CompletedProcess:
+def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | None = None) -> subprocess.CompletedProcess:
     base_args = [
         "git",
         "-c", "user.name=jprud67",
@@ -54,11 +54,13 @@ def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT) -> subproces
             cwd=str(cwd),
             capture_output=True,
             text=True,
-            timeout=timeout
+            timeout=timeout,
+            env=env
         )
     except subprocess.TimeoutExpired:
         logger.warning(f"Git timeout ({timeout}s) for {args} in {cwd}")
         raise HTTPException(status_code=504, detail=f"Délai d'attente Git dépassé ({timeout}s) pour l'opération.")
+
 
 @router.get("/status")
 def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth)):
@@ -248,13 +250,20 @@ class PushRequest(BaseModel):
 
 @router.post("/push")
 def git_push(req: PushRequest, _ = Depends(require_auth)):
+    import os as _os
     target = _validate_workspace(req.workspace)
     branch = req.branch
     if not branch:
         res_br = run_git(["branch", "--show-current"], target)
         branch = res_br.stdout.strip() or "main"
 
-    push_res = run_git(["push", req.remote, branch], target, timeout=35)
+    # Préparer l'environnement avec désactivation du prompt interactif
+    # Le token peut être injecté via GIT_TOKEN dans l'environnement du serveur,
+    # ou le remote peut être préconfiguré avec le token dans son URL.
+    git_env = _os.environ.copy()
+    git_env["GIT_TERMINAL_PROMPT"] = "0"  # Désactive tout prompt interactif git
+
+    push_res = run_git(["push", req.remote, branch], target, timeout=35, env=git_env)
     if push_res.returncode != 0:
         raise HTTPException(status_code=500, detail=f"Échec du push : {push_res.stderr or push_res.stdout}")
 

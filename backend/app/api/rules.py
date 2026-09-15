@@ -68,6 +68,8 @@ class SaveRuleRequest(BaseModel):
 
 @router.get("/files")
 def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(require_auth)):
+    journal_path = _get_current_journal_path()
+    journal_month = datetime.now(timezone.utc).strftime('%Y_%m')
     files = [
         {
             "id": "agents_global",
@@ -101,15 +103,16 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
         },
         {
             "id": "hermes_journal",
-            "name": f"server_actions_{datetime.now(timezone.utc).strftime('%Y_%m')}.md (Journal Hermes)",
+            "name": f"server_actions_{journal_month}.md (Journal Hermes)",
             "description": "Journal mensuel horodaté des actions et interventions serveur",
-            "path": str(_get_current_journal_path()),
+            "path": str(journal_path),
             "syntax": "markdown",
-            "exists": _get_current_journal_path().exists(),
-            "size": _get_current_journal_path().stat().st_size if _get_current_journal_path().exists() else 0,
-            "last_modified": _get_current_journal_path().stat().st_mtime if _get_current_journal_path().exists() else 0,
+            "exists": journal_path.exists(),
+            "size": journal_path.stat().st_size if journal_path.exists() else 0,
+            "last_modified": journal_path.stat().st_mtime if journal_path.exists() else 0,
         }
     ]
+
 
     if workspace_path:
         try:
@@ -202,8 +205,9 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
         except Exception:
             pass
 
-    # Save content atomically
-    tmp_path = target_path.with_suffix(target_path.suffix + ".tmp")
+    # Save content atomically with unique temp name to prevent concurrent write collisions
+    import uuid as _uuid
+    tmp_path = target_path.parent / f".{target_path.name}.tmp.{_uuid.uuid4().hex[:8]}"
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(req.content)
@@ -211,6 +215,7 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
     except Exception as e:
         tmp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Erreur d'écriture: {e}")
+
 
     # Trigger Hermes IPC event
     try:

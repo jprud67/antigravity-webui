@@ -1,11 +1,16 @@
 import base64
 import json
+import logging
 import os
 import re
 import select
 import shutil
+import subprocess
 import time
 import uuid
+from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 try:
     import pty
@@ -18,16 +23,12 @@ try:
     HAS_WINPTY = True
 except ImportError:
     HAS_WINPTY = False
-import logging
-import subprocess
-from pathlib import Path
-from typing import Any
-from urllib.parse import parse_qs, urlparse
 
 from app.config import AGY_BIN, GEMINI_DIR, HOME
 from app.platform_utils import IS_WINDOWS, restrict_file_permissions
 
 logger = logging.getLogger("antigravity.google_auth")
+
 
 TOKEN_FILE = GEMINI_DIR / "antigravity-oauth-token"
 ACCOUNTS_DIR = GEMINI_DIR / "accounts"

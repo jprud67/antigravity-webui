@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from collections import deque
 from typing import Any
 
 from fastapi import WebSocket
@@ -42,7 +43,7 @@ class ExecutionSession:
         self.live_tool_calls: list[dict[str, Any]] = []
         self.live_usage: dict[str, Any] | None = None
         self.pending_approval: dict[str, Any] | None = None
-        self.recent_events: list[dict[str, Any]] = []
+        self.recent_events: deque[dict[str, Any]] = deque(maxlen=50)
 
     def add_subscriber(self, ws: WebSocket):
         self.subscribers.add(ws)
@@ -63,7 +64,7 @@ class ExecutionSession:
                 "usage": self.live_usage,
                 "pending_approval": self.pending_approval,
             },
-            "recent_events": self.recent_events[-30:]
+            "recent_events": list(self.recent_events)[-30:]
         }
 
     async def broadcast(self, event: dict[str, Any]):
@@ -73,8 +74,6 @@ class ExecutionSession:
         evt_type = event.get("event")
         if evt_type not in ("step_update", "raw_output"):
             self.recent_events.append(event)
-            if len(self.recent_events) > 50:
-                self.recent_events.pop(0)
 
         # Update live state from event
         self._update_live_state(event)
@@ -360,7 +359,9 @@ class ExecutionSession:
                 # proprement) vs la tâche active annulée par steer/interrupt
                 # (l'erreur remonte de la tâche attendue → continuer la boucle).
                 current = asyncio.current_task()
-                if current is not None and current.cancelling() > 0:
+                # Task.cancelling() est disponible uniquement à partir de Python 3.11.
+                cancelling = getattr(current, "cancelling", None)
+                if current is not None and callable(cancelling) and cancelling() > 0:
                     raise
             except Exception as e:
                 logger.error(f"[Session {self.conversation_id}] Worker task error: {e}")

@@ -80,10 +80,12 @@ def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             bulk_delete_conversations(ids)
             for cid in ids:
                 results[cid] = True
+            return {"success": True, "action": action, "count": len(ids), "results": results}
         except Exception:
             for cid in ids:
                 results[cid] = False
-        return {"success": True, "action": action, "count": len(ids), "results": results}
+            return {"success": False, "action": action, "count": len(ids), "results": results}
+
 
     elif action in ("pin", "unpin"):
         pinned = (action == "pin")

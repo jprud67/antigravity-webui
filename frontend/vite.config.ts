@@ -19,9 +19,6 @@ export default defineConfig({
           ) {
             return 'mermaid';
           }
-          if (id.includes('locales.json')) {
-            return 'i18n-locales';
-          }
           if (id.includes('node_modules/@xterm')) {
             return 'xterm';
           }

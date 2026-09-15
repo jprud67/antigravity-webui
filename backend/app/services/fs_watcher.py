@@ -172,7 +172,20 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                         "filename": p.name,
                         "ts": time.time()
                     })
+            # Nettoyer les entrées obsolètes (fichiers supprimés) pour éviter une fuite mémoire
+            removed_artifacts = set(artifact_mtimes) - set(cur_artifacts)
+            for old_path in removed_artifacts:
+                p = Path(old_path)
+                conv_id = p.parent.name
+                logger.debug(f"Artifact supprimé pour conv {conv_id} ({p.name}) → broadcasting artifacts_updated")
+                await _broadcast({
+                    "type": "artifacts_updated",
+                    "conversation_id": conv_id,
+                    "filename": p.name,
+                    "ts": time.time()
+                })
             artifact_mtimes = cur_artifacts
+
 
         except Exception as e:
             logger.warning(f"Watcher error: {e}")

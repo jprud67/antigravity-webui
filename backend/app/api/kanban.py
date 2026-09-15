@@ -17,16 +17,21 @@ logger = logging.getLogger("antigravity.kanban")
 router = APIRouter(prefix="/api/kanban", tags=["kanban"])
 
 KANBAN_DB_PATH = Path(os.environ.get("ANTIGRAVITY_KANBAN_DB", str(GEMINI_DIR / "webui_kanban.db")))
+_schema_initialized = False
 
 
 def get_db_connection() -> sqlite3.Connection:
+    global _schema_initialized
     KANBAN_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(KANBAN_DB_PATH), timeout=15.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
-    _ensure_schema(conn)
+    if not _schema_initialized:
+        _ensure_schema(conn)
+        _schema_initialized = True
     return conn
+
 
 @contextmanager
 def get_db():

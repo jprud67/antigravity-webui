@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -7,6 +8,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
@@ -129,7 +131,7 @@ class PersistentTerminalSession:
 
                     ws = self.active_websocket
                     if ws and self.loop:
-                        asyncio.create_task(_safe_send_bytes(ws, data))
+                        self.loop.create_task(_safe_send_bytes(ws, data))
                 else:
                     if self.loop and self.master_fd > 0:
                         try:
@@ -307,7 +309,8 @@ async def terminal_websocket(
     default_home = os.environ.get("HOME") or os.environ.get("USERPROFILE") or str(Path.home())
     cwd = workspace if workspace and os.path.isdir(workspace) else default_home
     # Identify session (default to global persistent session for workspace)
-    sid = session_id or f"ws_{abs(hash(cwd)) % 1000000}"
+    # hash() est non-déterministe entre redémarrages (PYTHONHASHSEED) → utiliser hashlib pour un ID stable
+    sid = session_id or f"ws_{hashlib.md5(cwd.encode()).hexdigest()[:8]}"
 
     session: PersistentTerminalSession | None = None
     try:

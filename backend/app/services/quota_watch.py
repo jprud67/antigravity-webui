@@ -16,7 +16,8 @@ import asyncio
 import logging
 import time
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timezone
+
 from pathlib import Path
 
 from app.config import LOG_DIR
@@ -63,9 +64,10 @@ def _expected_log_candidates(since_ts: float, window: float = 5.0) -> list[Path]
     base = int(since_ts) - 1
     for t in range(base, base + int(window) + 2):
         try:
-            name = "cli-" + datetime.fromtimestamp(t).strftime("%Y%m%d_%H%M%S") + ".log"
+            name = "cli-" + datetime.fromtimestamp(t, tz=timezone.utc).strftime("%Y%m%d_%H%M%S") + ".log"
         except (OverflowError, OSError, ValueError):
             continue
+
         p = LOG_DIR / name
         try:
             if p.exists():

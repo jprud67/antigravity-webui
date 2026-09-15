@@ -61,6 +61,7 @@ def auth_status(token: str | None = Depends(get_current_token)):
 
 @router.post("/login")
 def login(req: LoginRequest):
+    import time as _time
     if verify_password(req.password):
         token = create_access_token(expires_in_days=14)
         logger.info("Successful authentication login")
@@ -70,8 +71,11 @@ def login(req: LoginRequest):
             "message": "Connexion réussie"
         }
     else:
+        # Délai constant anti-bruteforce (0.5s) — indépendant du temps de vérification
+        _time.sleep(0.5)
         logger.warning("Failed authentication login attempt")
         raise HTTPException(status_code=401, detail="Mot de passe incorrect.")
+
 
 @router.post("/update-password")
 def change_pwd(req: PasswordChangeRequest, _ = Depends(require_auth)):
