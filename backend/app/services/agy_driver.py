@@ -215,7 +215,7 @@ async def stream_turn(
     if resolved_effort:
         cmd.extend(["--effort", resolved_effort])
 
-    if workspace_path and workspace_path != DEFAULT_WORKSPACE:
+    if workspace_path and workspace_path != DEFAULT_WORKSPACE and Path(workspace_path).is_dir():
         cmd.extend(["--add-dir", workspace_path])
 
     # Prompt parameter

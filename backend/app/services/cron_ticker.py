@@ -186,7 +186,7 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
         if is_quota_error(combined):
             current = get_active_account()
             current_email = (current or {}).get("email") or "inconnu"
-            new_account = switch_to_next_healthy_account(exclude_email=current_email)
+            new_account = switch_to_next_healthy_account(exclude_email=current_email, model=model)
             if new_account:
                 failovers.append({"from": current_email, "to": new_account, "attempt": attempts})
                 logger.warning(

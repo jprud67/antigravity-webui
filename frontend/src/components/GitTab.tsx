@@ -36,6 +36,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   const diffRequestIdRef = React.useRef(0);
+  const selectedFileRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    selectedFileRef.current = selectedFile;
+  }, [selectedFile]);
 
   const handleSelectFile = useCallback(async (filePath: string) => {
     setSelectedFile(filePath);
@@ -57,23 +61,27 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     }
   }, [currentWorkspace]);
 
-  const loadStatus = useCallback(async () => {
+  const loadStatus = useCallback(async (autoSelect: boolean = false) => {
     setLoading(true);
     setError(null);
     try {
       const data = await fetchGitStatus(currentWorkspace);
       setStatus(data);
-      if (data.modified.length > 0 && !selectedFile) {
-        handleSelectFile(data.modified[0]);
-      } else if (data.untracked.length > 0 && !selectedFile) {
-        handleSelectFile(data.untracked[0]);
+      if (autoSelect || !selectedFileRef.current) {
+        if (data.modified.length > 0) {
+          handleSelectFile(data.modified[0]);
+        } else if (data.untracked.length > 0) {
+          handleSelectFile(data.untracked[0]);
+        }
       }
+      return data;
     } catch (err: any) {
       setError(err.message || 'Impossible de récupérer le statut Git');
+      return null;
     } finally {
       setLoading(false);
     }
-  }, [currentWorkspace, selectedFile, handleSelectFile]);
+  }, [currentWorkspace, handleSelectFile]);
 
   useEffect(() => {
     let active = true;
@@ -81,24 +89,29 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
       .then((data) => {
         if (active) {
           setStatus(data);
-          setLoading(false);
-          if (data.modified.length > 0 && !selectedFile) {
-            handleSelectFile(data.modified[0]);
-          } else if (data.untracked.length > 0 && !selectedFile) {
-            handleSelectFile(data.untracked[0]);
+          if (!selectedFileRef.current) {
+            if (data.modified.length > 0) {
+              handleSelectFile(data.modified[0]);
+            } else if (data.untracked.length > 0) {
+              handleSelectFile(data.untracked[0]);
+            }
           }
         }
       })
       .catch((err: any) => {
         if (active) {
           setError(err.message || 'Impossible de récupérer le statut Git');
+        }
+      })
+      .finally(() => {
+        if (active) {
           setLoading(false);
         }
       });
     return () => {
       active = false;
     };
-  }, [currentWorkspace, selectedFile, handleSelectFile]);
+  }, [currentWorkspace, handleSelectFile]);
 
   const handleCommit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,7 +213,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
         </div>
 
         <button
-          onClick={loadStatus}
+          onClick={() => { void loadStatus(); }}
           disabled={loading}
           title="Actualiser"
           className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"

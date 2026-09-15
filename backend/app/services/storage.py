@@ -35,6 +35,17 @@ def is_safe_conversation_id(conversation_id: str) -> bool:
         return False
 
 
+def get_default_workspace_uri() -> str:
+    """Safely return the default workspace as a file URI."""
+    try:
+        return Path(DEFAULT_WORKSPACE).resolve().as_uri()
+    except Exception:
+        resolved = str(Path(DEFAULT_WORKSPACE).resolve()).replace("\\", "/")
+        if not resolved.startswith("/"):
+            resolved = "/" + resolved
+        return f"file://{resolved}"
+
+
 def get_db_connection() -> sqlite3.Connection:
     # Crée le dossier parent si nécessaire (premier démarrage) ; sqlite3.connect crée la DB si absente.
     CONVERSATION_DB.parent.mkdir(parents=True, exist_ok=True)
@@ -239,6 +250,15 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
             response_chars += len(content) + len(tool_calls)
             thinking_chars += len(thinking)
 
+    if prompt_chars == 0 and response_chars == 0 and thinking_chars == 0:
+        return {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "thinking_tokens": 0,
+            "total_tokens": 0,
+            "is_estimated": True
+        }
+
     p_tokens = max(1, int(prompt_chars / 3.8)) if prompt_chars > 0 else 0
     r_tokens = max(1, int(response_chars / 3.8)) if response_chars > 0 else 0
     t_tokens = max(0, int(thinking_chars / 3.8)) if thinking_chars > 0 else 0
@@ -330,12 +350,16 @@ def fork_conversation(
     source_dir = BRAIN_DIR / source_conversation_id
     if source_dir.exists():
         for item in source_dir.iterdir():
-            if item.name not in [".system_generated", "scratch"]:
-                target = new_conv_dir / item.name
-                if item.is_file():
-                    shutil.copy2(item, target)
-                elif item.is_dir():
-                    shutil.copytree(item, target, dirs_exist_ok=True)
+            # Exclude internal system folders, scratch, and temp/lock files
+            if item.name not in [".system_generated", "scratch"] and not item.name.startswith((".tmp", ".lock")):
+                try:
+                    target = new_conv_dir / item.name
+                    if item.is_file():
+                        shutil.copy2(item, target)
+                    elif item.is_dir():
+                        shutil.copytree(item, target, dirs_exist_ok=True)
+                except Exception as e:
+                    logger.warning(f"Failed to copy artifact {item.name}: {e}")
 
     # Fetch source record from SQLite
     conn = get_db_connection()
@@ -344,7 +368,7 @@ def fork_conversation(
         cursor.execute("SELECT * FROM conversation_summaries WHERE conversation_id = ?", (source_conversation_id,))
         source_row = cursor.fetchone()
         source_title = source_row["title"] if source_row and source_row["title"] else "Session"
-        default_workspace_uri = json.dumps([Path(DEFAULT_WORKSPACE).resolve().as_uri()])
+        default_workspace_uri = json.dumps([get_default_workspace_uri()])
         source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else default_workspace_uri
         agent_name = source_row["agent_name"] if source_row and source_row["agent_name"] else ""
 
@@ -421,7 +445,7 @@ def create_conversation_handoff(
         cursor.execute("SELECT * FROM conversation_summaries WHERE conversation_id = ?", (source_conversation_id,))
         source_row = cursor.fetchone()
         source_title = source_row["title"] if source_row and source_row["title"] else "Session"
-        default_workspace_uri = json.dumps([Path(DEFAULT_WORKSPACE).resolve().as_uri()])
+        default_workspace_uri = json.dumps([get_default_workspace_uri()])
         source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else default_workspace_uri
         agent_name = source_row["agent_name"] if source_row and source_row["agent_name"] else ""
     finally:
@@ -1574,10 +1598,10 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
                 preview,
                 len(steps),
                 now_iso,
-                json.dumps([Path(DEFAULT_WORKSPACE).resolve().as_uri()]),
+                json.dumps([get_default_workspace_uri()]),
                 "DONE",
                 "import",
-                "",
+                None,
                 now_iso,
                 0
             )

@@ -51,7 +51,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
   const [taskStatus, setTaskStatus] = useState('todo');
   const [submitting, setSubmitting] = useState(false);
 
-  const loadTasks = async () => {
+  const loadTasks = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -64,7 +64,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -73,13 +73,16 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
         if (active) {
           setTasks(data.tasks);
           setColumns(data.columns);
-          setLoading(false);
         }
       })
       .catch((e: any) => {
         if (active) {
           console.error('Failed to load kanban tasks', e);
           setError(e.message || 'Erreur de chargement du Kanban');
+        }
+      })
+      .finally(() => {
+        if (active) {
           setLoading(false);
         }
       });

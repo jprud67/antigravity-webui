@@ -551,7 +551,7 @@ class ExecutionManager:
             try:
                 session.message_queue.get_nowait()
                 session.message_queue.task_done()
-            except asyncio.QueueEmpty:
+            except (asyncio.QueueEmpty, ValueError):
                 break
 
         # 2. Terminate active CLI process group (multiplateforme POSIX/Windows)
@@ -578,7 +578,7 @@ class ExecutionManager:
             try:
                 session.message_queue.get_nowait()
                 session.message_queue.task_done()
-            except asyncio.QueueEmpty:
+            except (asyncio.QueueEmpty, ValueError):
                 break
         await session.broadcast({
             "event": "queue_cleared",

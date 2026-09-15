@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Send, 
   Square, 
@@ -389,7 +389,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const currentModelObj = models.find((m) => m.id === selectedModel) || models[0];
-  const supportedEfforts = currentModelObj?.supported_efforts ?? [];
+  const isCurrentClaude = (currentModelObj?.id || selectedModel || '').toLowerCase().includes('claude');
+  const supportedEfforts = isCurrentClaude ? [] : (currentModelObj?.supported_efforts ?? []);
   const hasEffortSupport = supportedEfforts.length > 0;
 
   const handleModelChange = (newModelId: string) => {
@@ -403,15 +404,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     showToast(`Modèle appliqué : ${newModelObj?.name || newModelId}`, 'success');
   };
 
-  const filteredCommands = ALL_SLASH_COMMANDS.filter((c) =>
-    c.cmd.toLowerCase().includes(slashFilter) || c.desc.toLowerCase().includes(slashFilter)
-  );
-
-  const [prevFilter, setPrevFilter] = useState(slashFilter);
-  if (slashFilter !== prevFilter) {
-    setPrevFilter(slashFilter);
-    setSelectedIndex(0);
-  }
+  const filteredCommands = useMemo(() => {
+    return ALL_SLASH_COMMANDS.filter((c) =>
+      c.cmd.toLowerCase().includes(slashFilter) || c.desc.toLowerCase().includes(slashFilter)
+    );
+  }, [slashFilter]);
 
   // Execute or dispatch Slash Command
   const executeSlashAction = (cmdText: string): boolean => {
@@ -881,6 +878,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setShowSlashMenu(isCommandTyping);
     if (isCommandTyping) {
       setSlashFilter(val.slice(1).toLowerCase());
+      setSelectedIndex(0);
     }
   };
 
@@ -937,7 +935,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     // Resolve concrete model variant ID
     const targetModelObj = models.find((m) => m.id === selectedModel) || models[0];
-    const targetEfforts = targetModelObj?.supported_efforts ?? [];
+    const isClaude = (targetModelObj?.id || selectedModel || '').toLowerCase().includes('claude');
+    const targetEfforts = isClaude ? [] : (targetModelObj?.supported_efforts ?? []);
     const hasEfforts = targetEfforts.length > 0;
     const resolvedEffort = hasEfforts
       ? (targetEfforts.includes(selectedEffort) ? selectedEffort : (targetModelObj?.default_effort as any) || targetEfforts[0] || 'high')
