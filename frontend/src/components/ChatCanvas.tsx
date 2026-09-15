@@ -175,8 +175,11 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
       cleanHref = 'file://' + cleanHref;
     }
     const filePath = cleanHref.replace(/^file:\/\/\/?/, '/');
-    const [cleanPath, anchor] = filePath.split('#');
-    const filename = cleanPath.split('/').pop() || cleanPath;
+    let [cleanPath, anchor] = filePath.split('#');
+    if (/^\/[a-zA-Z]:/.test(cleanPath)) {
+      cleanPath = cleanPath.slice(1);
+    }
+    const filename = cleanPath.split(/[/\\]/).pop() || cleanPath;
     const isArtifact = cleanPath.includes('/brain/') && cleanPath.endsWith('.md');
 
     if (isArtifact) {

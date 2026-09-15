@@ -573,7 +573,17 @@ export interface CronJobItem {
   next_run_at?: string | null;
   last_run_at?: string | null;
   last_status?: string | null;
+  last_duration_seconds?: number | null;
+  last_log?: string | null;
   deliver?: string;
+}
+
+export interface CronJobLogResponse {
+  job_id: string;
+  has_log: boolean;
+  file?: string | null;
+  mtime?: number | null;
+  content: string;
 }
 
 export interface CronListResponse {
@@ -654,6 +664,17 @@ export async function triggerCronJob(jobId: string): Promise<{ success: boolean;
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Échec déclenchement job cron' }));
     throw new Error(err.detail || 'Erreur déclenchement cron');
+  }
+  return res.json();
+}
+
+export async function fetchCronJobLog(jobId: string): Promise<CronJobLogResponse> {
+  const res = await fetch(`${API_BASE}/crons/${encodeURIComponent(jobId)}/log`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec récupération du journal' }));
+    throw new Error(err.detail || 'Erreur récupération journal');
   }
   return res.json();
 }

@@ -12,7 +12,9 @@ import {
   Timer,
   AlertCircle,
   Pencil,
-  Check
+  Check,
+  FileText,
+  MessageSquare
 } from 'lucide-react';
 import type { CronJobItem, CronListResponse } from '../services/api';
 import { 
@@ -20,7 +22,8 @@ import {
   createCronJob, 
   updateCronJob, 
   deleteCronJob, 
-  triggerCronJob 
+  triggerCronJob,
+  fetchCronJobLog
 } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
@@ -64,6 +67,11 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
   const [editPreset, setEditPreset] = useState(SCHEDULE_PRESETS[1].expr);
   const [editCustomExpr, setEditCustomExpr] = useState('*/15 * * * *');
   const [editSaving, setEditSaving] = useState(false);
+
+  // Log viewer state
+  const [selectedLogJobId, setSelectedLogJobId] = useState<string | null>(null);
+  const [selectedLogContent, setSelectedLogContent] = useState<string | null>(null);
+  const [loadingLog, setLoadingLog] = useState(false);
 
   const loadCrons = async () => {
     setLoading(true);
@@ -153,14 +161,37 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
   const handleTriggerNow = async (job: CronJobItem) => {
     try {
       await triggerCronJob(job.id);
-      setActionNotice(`⚡ Exécution immédiate déclenchée pour "${job.name}"`);
+      setActionNotice(`⚡ Exécution en tâche de fond lancée pour "${job.name}"`);
       setTimeout(() => setActionNotice(null), 3500);
-      if (onExecutePrompt && job.prompt) {
-        onExecutePrompt(`[EXÉCUTION CRON: ${job.name}]\n\n${job.prompt}`);
-      }
       await loadCrons();
     } catch (e: any) {
       showToast(e.message || 'Erreur déclenchement', 'error');
+    }
+  };
+
+  const handleTestInChat = (job: CronJobItem) => {
+    if (onExecutePrompt && job.prompt) {
+      onExecutePrompt(`[TEST MANUEL CRON: ${job.name}]\n\n${job.prompt}`);
+      onClose();
+    }
+  };
+
+  const handleToggleLog = async (job: CronJobItem) => {
+    if (selectedLogJobId === job.id) {
+      setSelectedLogJobId(null);
+      setSelectedLogContent(null);
+      return;
+    }
+    setSelectedLogJobId(job.id);
+    setLoadingLog(true);
+    setSelectedLogContent(null);
+    try {
+      const res = await fetchCronJobLog(job.id);
+      setSelectedLogContent(res.content || 'Aucun contenu de journal disponible.');
+    } catch (err: any) {
+      setSelectedLogContent(`Erreur lors de la récupération du journal: ${err.message || err}`);
+    } finally {
+      setLoadingLog(false);
     }
   };
 
@@ -504,10 +535,40 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                               borderColor: 'var(--accent)',
                               color: 'var(--accent-text)'
                             }}
-                            title="Lancer immédiatement"
+                            title="Lancer en tâche de fond immédiatement"
                           >
                             <Play className="w-3.5 h-3.5" />
                             <span className="text-[10px] font-semibold hidden sm:inline">Exécuter</span>
+                          </button>
+
+                          {onExecutePrompt && (
+                            <button
+                              onClick={() => handleTestInChat(job)}
+                              className="p-1.5 rounded-lg border transition-colors cursor-pointer text-xs flex items-center gap-1 hover:opacity-100 opacity-70"
+                              style={{
+                                backgroundColor: 'var(--surface-subtle)',
+                                borderColor: 'var(--border)',
+                                color: 'var(--text)'
+                              }}
+                              title="Tester le prompt dans le chat actif"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              <span className="text-[10px] font-medium hidden md:inline">Tester</span>
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => handleToggleLog(job)}
+                            className="p-1.5 rounded-lg border transition-colors cursor-pointer text-xs flex items-center gap-1 hover:opacity-100 opacity-70"
+                            style={{
+                              backgroundColor: selectedLogJobId === job.id ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                              borderColor: selectedLogJobId === job.id ? 'var(--accent)' : 'var(--border)',
+                              color: selectedLogJobId === job.id ? 'var(--accent)' : 'var(--text)'
+                            }}
+                            title="Consulter le journal d'exécution"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span className="text-[10px] font-medium hidden md:inline">Logs</span>
                           </button>
 
                           <button
@@ -547,7 +608,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                       </div>
 
                       <div
-                        className="flex items-center gap-4 text-[10px] pt-2 border-t"
+                        className="flex items-center gap-4 text-[10px] pt-2 border-t flex-wrap"
                         style={{
                           borderColor: 'var(--border-subtle)',
                           color: 'var(--muted)'
@@ -560,7 +621,41 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                         {job.last_status && (
                           <span className="capitalize">Statut : <strong style={{ color: 'var(--accent)' }}>{job.last_status}</strong></span>
                         )}
+                        {job.last_duration_seconds != null && (
+                          <span>Durée : <strong style={{ color: 'var(--strong)' }}>{job.last_duration_seconds}s</strong></span>
+                        )}
                       </div>
+
+                      {/* Affichage du journal d'exécution */}
+                      {selectedLogJobId === job.id && (
+                        <div
+                          className="mt-3 p-3 rounded-xl border text-xs font-mono"
+                          style={{
+                            backgroundColor: 'var(--surface-subtle)',
+                            borderColor: 'var(--border)',
+                            color: 'var(--text)'
+                          }}
+                        >
+                          <div className="flex items-center justify-between pb-2 mb-2 border-b text-[10px] font-sans" style={{ borderColor: 'var(--border-subtle)', color: 'var(--muted)' }}>
+                            <span className="font-semibold flex items-center gap-1.5" style={{ color: 'var(--strong)' }}>
+                              <FileText className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} /> Journal de la tâche ({job.name})
+                            </span>
+                            <button
+                              onClick={() => setSelectedLogJobId(null)}
+                              className="text-[10px] hover:underline cursor-pointer opacity-70 hover:opacity-100"
+                            >
+                              Fermer
+                            </button>
+                          </div>
+                          {loadingLog ? (
+                            <p className="text-muted text-[11px] animate-pulse">Chargement du journal d'exécution...</p>
+                          ) : (
+                            <pre className="whitespace-pre-wrap overflow-x-auto max-h-52 text-[11px] leading-relaxed select-text p-2 rounded-lg bg-black/20" style={{ color: 'var(--text)' }}>
+                              {selectedLogContent}
+                            </pre>
+                          )}
+                        </div>
+                      )}
 
                       {/* Formulaire d'édition inline */}
                       {editingJobId === job.id && (

@@ -615,23 +615,26 @@ def is_hard_quota_error(message: str) -> bool:
     return any(p in lower for p in _HARD_QUOTA_PATTERNS)
 
 
-def mark_account_exhausted(email: str, duration_seconds: float = 900.0):
+def mark_account_exhausted(email: str, duration_seconds: float = 900.0) -> None:
     """Mark an account as exhausted for a given duration (default 15 minutes)."""
-    _account_exhaustion_tracker[email] = time.time() + duration_seconds
-    logger.warning(f"Google account {email} marked as quota-exhausted for {duration_seconds}s")
+    norm_email = email.strip().lower()
+    _account_exhaustion_tracker[norm_email] = time.time() + duration_seconds
+    logger.warning(f"Google account {norm_email} marked as quota-exhausted for {duration_seconds}s")
 
 
 def is_account_marked_exhausted(email: str) -> bool:
-    exp = _account_exhaustion_tracker.get(email, 0.0)
+    norm_email = email.strip().lower()
+    exp = _account_exhaustion_tracker.get(norm_email, 0.0)
     return time.time() < exp
 
 
 def get_candidate_accounts(exclude_email: str | None = None) -> list[str]:
     ensure_dirs()
     candidates = []
+    norm_exclude = exclude_email.strip().lower() if exclude_email else None
     for p in ACCOUNTS_DIR.glob("*.json"):
         email = p.stem
-        if exclude_email and email.lower() == exclude_email.lower():
+        if norm_exclude and email.strip().lower() == norm_exclude:
             continue
         candidates.append(email)
 

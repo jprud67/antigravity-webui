@@ -80,45 +80,52 @@ async def get_available_models() -> list[dict[str, Any]]:
     return models
 
 _models_cache: dict[str, Any] = {"data": None, "timestamp": 0.0}
+_models_family_lock = asyncio.Lock()
 
 
 async def get_model_families() -> list[dict[str, Any]]:
     """
     Returns unique base model families deduplicated with supported efforts and concrete variant IDs.
     Cached for 5 minutes to avoid spawning the `agy models` CLI on every settings/model fetch.
+    Uses asyncio.Lock to prevent concurrent stampedes spawning parallel CLI subprocesses.
     """
     global _models_cache
     now = time.time()
     if _models_cache["data"] is not None and (now - _models_cache["timestamp"]) < 300:
         return _models_cache["data"]
 
-    try:
-        models_raw = await get_available_models()
-    except Exception as e:
-        if _models_cache["data"] is not None:
-            logger.warning(f"agy models failed ({e}); returning stale cached model families.")
+    async with _models_family_lock:
+        now = time.time()
+        if _models_cache["data"] is not None and (now - _models_cache["timestamp"]) < 300:
             return _models_cache["data"]
-        raise
 
-    families: dict[str, dict[str, Any]] = {}
-    for meta in models_raw:
-        fid = meta['family_id']
-        if fid not in families:
-            families[fid] = {
-                'id': fid,
-                'name': meta['family_name'],
-                'default_effort': meta['effort'] or ('high' if meta['supported_efforts'] else None),
-                'supported_efforts': meta['supported_efforts'],
-                'variants': {}
-            }
-        if meta['effort']:
-            families[fid]['variants'][meta['effort']] = meta['id']
-        else:
-            families[fid]['variants']['default'] = meta['id']
+        try:
+            models_raw = await get_available_models()
+        except Exception as e:
+            if _models_cache["data"] is not None:
+                logger.warning(f"agy models failed ({e}); returning stale cached model families.")
+                return _models_cache["data"]
+            raise
 
-    result = list(families.values())
-    _models_cache = {"data": result, "timestamp": now}
-    return result
+        families: dict[str, dict[str, Any]] = {}
+        for meta in models_raw:
+            fid = meta['family_id']
+            if fid not in families:
+                families[fid] = {
+                    'id': fid,
+                    'name': meta['family_name'],
+                    'default_effort': meta['effort'] or ('high' if meta['supported_efforts'] else None),
+                    'supported_efforts': meta['supported_efforts'],
+                    'variants': {}
+                }
+            if meta['effort']:
+                families[fid]['variants'][meta['effort']] = meta['id']
+            else:
+                families[fid]['variants']['default'] = meta['id']
+
+        result = list(families.values())
+        _models_cache = {"data": result, "timestamp": now}
+        return result
 
 def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str | None, str | None]:
     """

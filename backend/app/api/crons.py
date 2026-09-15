@@ -10,6 +10,7 @@ L'exécution des jobs est assurée par le ticker interne
 import logging
 import time
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -18,6 +19,7 @@ from app.api.auth import require_auth
 from app.services.cron_store import (
     HEARTBEAT_FILE,
     JOBS_FILE,
+    OUTPUT_DIR,
     compute_next_run,
     load_jobs,
     now_iso,
@@ -227,3 +229,47 @@ def trigger_cron_job_now(job_id: str, _ = Depends(require_auth)):
         "job": target,
         "prompt": target.get("prompt")
     }
+
+
+@router.get("/{job_id}/log")
+def get_cron_job_log(job_id: str, _ = Depends(require_auth)):
+    data = load_jobs()
+    jobs = data.get("jobs", [])
+    target = next((j for j in jobs if j.get("id") == job_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Job cron introuvable")
+
+    log_path: Path | None = None
+    if target.get("last_log"):
+        p = Path(target["last_log"])
+        if p.exists() and p.is_file():
+            log_path = p
+
+    if not log_path and OUTPUT_DIR.exists():
+        matching = sorted(OUTPUT_DIR.glob(f"{job_id}_*.log"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if matching:
+            log_path = matching[0]
+
+    if not log_path:
+        return {
+            "job_id": job_id,
+            "has_log": False,
+            "file": None,
+            "mtime": None,
+            "content": "Aucun journal d'exécution disponible pour ce job."
+        }
+
+    try:
+        content = log_path.read_text(encoding="utf-8", errors="replace")
+        if len(content) > 50_000:
+            content = content[-50_000:]
+        return {
+            "job_id": job_id,
+            "has_log": True,
+            "file": log_path.name,
+            "mtime": log_path.stat().st_mtime,
+            "content": content
+        }
+    except Exception as e:
+        logger.error(f"Erreur lors de la lecture du log pour {job_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur de lecture du journal : {e}")

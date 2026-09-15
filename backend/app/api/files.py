@@ -58,11 +58,13 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> list
 
 def _validate_path_access(file_path: Path) -> Path:
     try:
+        if not file_path.is_absolute():
+            file_path = Path(DEFAULT_WORKSPACE) / file_path
         resolved = file_path.resolve()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Chemin invalide : {e}")
 
-    resolved_str = str(resolved)
+    resolved_str = str(resolved).replace("\\", "/")
     # Prohibit sensitive system directories, credentials, and secrets
     blocked_keywords = [
         "/.ssh", "/.gnupg", "/etc/shadow", "/etc/sudoers", "/proc", "/sys",
