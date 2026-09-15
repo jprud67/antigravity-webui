@@ -73,7 +73,7 @@ interface SidebarProps {
   onOpenUpdates?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
+export const Sidebar: React.FC<SidebarProps> = React.memo(({
   conversations,
   activeConversationId,
   onSelectConversation,
@@ -1465,4 +1465,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
     </>
   );
-};
+}, (prev, next) => {
+  return prev.conversations === next.conversations && prev.activeConversationId === next.activeConversationId;
+});

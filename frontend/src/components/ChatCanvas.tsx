@@ -658,7 +658,7 @@ const CheckpointDivider: React.FC<{ content: string; stepIndex?: number }> = ({ 
   );
 };
 
-export const ChatCanvas: React.FC<ChatCanvasProps> = ({
+export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   messages,
   isStreaming,
   conversationId,
@@ -1644,4 +1644,4 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       </div>
     </div>
   );
-};
+});

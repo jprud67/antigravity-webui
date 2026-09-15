@@ -68,10 +68,13 @@ class ExecutionSession:
 
     async def broadcast(self, event: dict[str, Any]):
         self.last_active_at = time.time()
-        # Keep ring buffer of recent events
-        self.recent_events.append(event)
-        if len(self.recent_events) > 100:
-            self.recent_events.pop(0)
+        
+        # Keep ring buffer of recent events (filter out high-frequency stream chunks)
+        evt_type = event.get("event")
+        if evt_type not in ("step_update", "raw_output"):
+            self.recent_events.append(event)
+            if len(self.recent_events) > 50:
+                self.recent_events.pop(0)
 
         # Update live state from event
         self._update_live_state(event)
