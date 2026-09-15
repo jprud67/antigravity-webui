@@ -344,7 +344,8 @@ def fork_conversation(
         cursor.execute("SELECT * FROM conversation_summaries WHERE conversation_id = ?", (source_conversation_id,))
         source_row = cursor.fetchone()
         source_title = source_row["title"] if source_row and source_row["title"] else "Session"
-        source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else f'["file://{DEFAULT_WORKSPACE}"]'
+        default_workspace_uri = json.dumps([Path(DEFAULT_WORKSPACE).resolve().as_uri()])
+        source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else default_workspace_uri
         agent_name = source_row["agent_name"] if source_row and source_row["agent_name"] else ""
 
         title = new_title or f"{source_title} (Branche #{up_to_step_index})"
@@ -420,7 +421,8 @@ def create_conversation_handoff(
         cursor.execute("SELECT * FROM conversation_summaries WHERE conversation_id = ?", (source_conversation_id,))
         source_row = cursor.fetchone()
         source_title = source_row["title"] if source_row and source_row["title"] else "Session"
-        source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else f'["file://{DEFAULT_WORKSPACE}"]'
+        default_workspace_uri = json.dumps([Path(DEFAULT_WORKSPACE).resolve().as_uri()])
+        source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else default_workspace_uri
         agent_name = source_row["agent_name"] if source_row and source_row["agent_name"] else ""
     finally:
         conn.close()
@@ -1572,7 +1574,7 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
                 preview,
                 len(steps),
                 now_iso,
-                f'["file://{DEFAULT_WORKSPACE}"]',
+                json.dumps([Path(DEFAULT_WORKSPACE).resolve().as_uri()]),
                 "DONE",
                 "import",
                 "",

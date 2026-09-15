@@ -386,6 +386,7 @@ def start_google_login_flow() -> dict[str, Any]:
         _close_login_resources(master_fd, proc)
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
+            restrict_file_permissions(TOKEN_FILE)
         raise
 
 
@@ -433,6 +434,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
             # Auth failed, restore previous token
             if stash_path.exists():
                 shutil.move(stash_path, TOKEN_FILE)
+                restrict_file_permissions(TOKEN_FILE)
             raise RuntimeError("Échec de l'échange du jeton avec Google: le token n'a pas été généré.")
 
         # Auth succeeded! Clean up stash
@@ -456,6 +458,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
         _close_login_resources(master_fd, proc)
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
+            restrict_file_permissions(TOKEN_FILE)
         with _login_lock:
             _LOGIN_SESSIONS.pop(session_id, None)
         raise
@@ -469,6 +472,7 @@ def cancel_google_login_flow(session_id: str) -> dict[str, Any]:
         stash_path = Path(session["stash_path"])
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
+            restrict_file_permissions(TOKEN_FILE)
     return {"success": True, "message": "Session annulée"}
 
 

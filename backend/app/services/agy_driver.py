@@ -164,12 +164,13 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
         if eff not in ["high", "medium", "low"]:
             eff = "high"
 
+        tier = "pro" if "pro" in norm else "flash"
         if "3.6" in norm:
-            return f"gemini-3.6-flash-{eff}", None
+            return f"gemini-3.6-{tier}-{eff}", None
         elif "3.7" in norm:
-            return f"gemini-3.7-flash-{eff}", None
+            return f"gemini-3.7-{tier}-{eff}", None
         elif "3.8" in norm:
-            return f"gemini-3.8-flash-{eff}", None
+            return f"gemini-3.8-{tier}-{eff}", None
         else:
             base = norm.removesuffix(f"-{eff}")
             return f"{base}-{eff}", None

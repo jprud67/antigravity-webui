@@ -565,6 +565,8 @@ export interface CronJobItem {
   };
   schedule_display?: string;
   skills?: string[];
+  model?: string | null;
+  effort?: string | null;
   enabled: boolean;
   state: 'scheduled' | 'paused';
   created_at: string;
@@ -593,6 +595,8 @@ export async function createCronJob(job: {
   schedule: string;
   deliver?: string;
   skills?: string[];
+  model?: string | null;
+  effort?: string | null;
 }): Promise<{ success: boolean; job: CronJobItem }> {
   const res = await fetch(`${API_BASE}/crons`, {
     method: 'POST',
@@ -614,6 +618,8 @@ export async function updateCronJob(
     schedule?: string;
     state?: string;
     skills?: string[];
+    model?: string | null;
+    effort?: string | null;
   }
 ): Promise<{ success: boolean; job: CronJobItem }> {
   const res = await fetch(`${API_BASE}/crons/${encodeURIComponent(jobId)}`, {

@@ -21,6 +21,7 @@ from typing import Any
 
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
 from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
+from app.services.agy_driver import resolve_model_and_effort
 from app.services.cron_store import (
     CRON_DIR,
     OUTPUT_DIR,
@@ -53,6 +54,7 @@ async def run_agy_task(
     prompt: str,
     skills: list[str] | None = None,
     model: str | None = None,
+    effort: str | None = None,
     timeout: int = JOB_TIMEOUT_SECONDS
 ) -> tuple[str, str, int]:
     """
@@ -67,8 +69,11 @@ async def run_agy_task(
         skills_prefix = f"[Active skills: {', '.join(skills)}]\n"
         effective_prompt = f"{skills_prefix}{prompt}"
     cmd = [AGY_BIN, "--dangerously-skip-permissions", "--print-timeout", "20m"]
-    if model and model.strip():
-        cmd.extend(["--model", model.strip()])
+    resolved_model, resolved_effort = resolve_model_and_effort(model, effort)
+    if resolved_model and resolved_model.strip():
+        cmd.extend(["--model", resolved_model.strip()])
+    if resolved_effort and resolved_effort.strip():
+        cmd.extend(["--effort", resolved_effort.strip()])
     cmd.extend(["-p", effective_prompt])
     spawned_at = time.time()
     proc = await asyncio.create_subprocess_exec(
@@ -171,9 +176,10 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
 
     skills = job.get("skills", [])
     model = job.get("model")
+    effort = job.get("effort")
     while attempts < MAX_TASK_FAILOVER:
         attempts += 1
-        out, err, code = await run_agy_task(prompt, skills=skills, model=model)
+        out, err, code = await run_agy_task(prompt, skills=skills, model=model, effort=effort)
         combined = f"{out}\n{err}".strip()
         output = combined
 

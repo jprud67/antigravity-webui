@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Antigravity WebUI",
     description="Web Interface to orchestrate Antigravity CLI without touching the terminal",
-    version="0.1.4",
+    version="0.1.5",
     lifespan=lifespan
 )
 
@@ -133,8 +133,9 @@ if FRONTEND_DIST.exists():
             return FileResponse(FRONTEND_DIST / "index.html")
 
         try:
-            file_candidate = (FRONTEND_DIST / full_path).resolve()
-            if FRONTEND_DIST.resolve() in file_candidate.parents and file_candidate.is_file():
+            dist_resolved = FRONTEND_DIST.resolve()
+            file_candidate = (dist_resolved / full_path).resolve()
+            if file_candidate.is_relative_to(dist_resolved) and file_candidate.is_file():
                 return FileResponse(file_candidate)
         except Exception:
             pass
