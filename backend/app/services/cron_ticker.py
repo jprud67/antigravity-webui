@@ -176,6 +176,13 @@ async def run_job_with_failover(job: Dict[str, Any]) -> Dict[str, Any]:
             logger.error("[Cron] Quota atteint et aucun compte alternatif disponible.")
             break
 
+        # agy s'auto-limite à son print-timeout en sortant code 0 avec une sortie
+        # partielle — ne pas présenter cela comme un succès complet.
+        if code == 0 and "print timeout" in combined.lower():
+            status = "timeout"
+            logger.warning("[Cron] agy a atteint son print-timeout (sortie partielle) — job marqué 'timeout'.")
+            break
+
         if code == 0:
             status = "ok"
         else:
