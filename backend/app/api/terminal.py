@@ -6,6 +6,7 @@ import struct
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
@@ -29,7 +30,7 @@ except ImportError:  # Windows
 
 # Backend terminal sous Windows : pywinpty (optionnel — dégradation propre sinon).
 try:
-    import winpty  # paquet « pywinpty » (Windows uniquement)
+    import winpty  # type: ignore[import-not-found]  # paquet « pywinpty » (Windows uniquement)
     HAS_WINPTY = True
 except ImportError:
     HAS_WINPTY = False
@@ -144,7 +145,8 @@ class PersistentTerminalSession:
                     except Exception:
                         pass
 
-        self.loop.add_reader(self.master_fd, on_master_read)
+        if self.loop:
+            self.loop.add_reader(self.master_fd, on_master_read)
         logger.info(f"Persistent PTY session started: {self.session_id} (pid={proc.pid}, cwd={self.cwd})")
 
     async def _start_windows(self):
@@ -156,17 +158,18 @@ class PersistentTerminalSession:
         shell = os.environ.get("COMSPEC") or "cmd.exe"
         env = os.environ.copy()
 
-        def _spawn():
+        def _spawn() -> Any:
             return winpty.PtyProcess.spawn([shell], cwd=self.cwd, env=env)
 
-        self.win_pty = await asyncio.to_thread(_spawn)
+        self.win_pty = await asyncio.to_thread(_spawn)  # type: ignore[func-returns-value]
         self._win_reader = threading.Thread(
             target=self._windows_read_loop,
             name=f"term-{self.session_id}",
             daemon=True
         )
         self._win_reader.start()
-        logger.info(f"Persistent winpty session started: {self.session_id} (pid={self.win_pty.pid}, cwd={self.cwd})")
+        pid = getattr(self.win_pty, "pid", None)
+        logger.info(f"Persistent winpty session started: {self.session_id} (pid={pid}, cwd={self.cwd})")
 
     def _windows_read_loop(self):
         """Boucle de lecture bloquante winpty (thread dédié) — relaie vers la WebSocket."""
@@ -198,10 +201,11 @@ class PersistentTerminalSession:
         if not self.is_alive():
             return
         if IS_WINDOWS:
-            try:
-                await asyncio.to_thread(self.win_pty.write, data.decode("utf-8", errors="replace"))
-            except (OSError, EOFError) as e:
-                logger.debug(f"terminal write failed: {e}")
+            if self.win_pty is not None:
+                try:
+                    await asyncio.to_thread(self.win_pty.write, data.decode("utf-8", errors="replace"))
+                except (OSError, EOFError) as e:
+                    logger.debug(f"terminal write failed: {e}")
             return
         offset = 0
         total = len(data)
@@ -222,10 +226,11 @@ class PersistentTerminalSession:
         if not self.is_alive():
             return
         if IS_WINDOWS:
-            try:
-                await asyncio.to_thread(self.win_pty.setwinsize, rows, cols)
-            except Exception as e:
-                logger.debug(f"terminal resize failed: {e}")
+            if self.win_pty is not None:
+                try:
+                    await asyncio.to_thread(self.win_pty.setwinsize, rows, cols)
+                except Exception as e:
+                    logger.debug(f"terminal resize failed: {e}")
             return
         set_winsize(self.master_fd, rows, cols)
 

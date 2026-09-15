@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from typing import Any
 
 import psutil
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,8 +19,8 @@ class KillTaskRequest(BaseModel):
 
 @router.get("/list")
 def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_auth)):
-    tasks = []
-    subagents = []
+    tasks: list[dict[str, Any]] = []
+    subagents: list[dict[str, Any]] = []
 
     # 1. Scan background tasks from brain
     if BRAIN_DIR.exists():
@@ -106,7 +107,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
         logger.warning(f"Error scanning psutil processes: {e}")
 
     # Sort recent first
-    tasks.sort(key=lambda x: x["last_modified"], reverse=True)
+    tasks.sort(key=lambda x: float(x.get("last_modified") or 0.0), reverse=True)
 
     return {
         "tasks": tasks[:20],

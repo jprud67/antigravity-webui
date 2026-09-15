@@ -5,6 +5,7 @@ import logging
 import os
 import secrets
 import time
+import uuid
 from typing import Any
 
 from app.config import GEMINI_DIR
@@ -42,11 +43,19 @@ def get_auth_config() -> dict[str, Any]:
 
 def save_auth_config(config: dict[str, Any]):
     AUTH_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    temp_file = AUTH_CONFIG_FILE.with_suffix(".tmp")
-    with open(temp_file, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2)
-    temp_file.replace(AUTH_CONFIG_FILE)
-    restrict_file_permissions(AUTH_CONFIG_FILE)
+    temp_file = AUTH_CONFIG_FILE.parent / f".{AUTH_CONFIG_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
+    try:
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2)
+        restrict_file_permissions(temp_file)
+        temp_file.replace(AUTH_CONFIG_FILE)
+        restrict_file_permissions(AUTH_CONFIG_FILE)
+    finally:
+        if temp_file.exists():
+            try:
+                temp_file.unlink()
+            except Exception:
+                pass
 
 def verify_password(input_password: str) -> bool:
     config = get_auth_config()

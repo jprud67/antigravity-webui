@@ -6,6 +6,7 @@ import shutil
 import sqlite3
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from app.config import BRAIN_DIR, CONVERSATION_DB, DEFAULT_WORKSPACE, SETTINGS_FILE
@@ -97,7 +98,7 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
                 "workspace_uris": r["workspace_uris"],
                 "status": r["status"],
                 "agent_name": r["agent_name"],
-                "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
+                "parent_conversation_id": dict(r).get("parent_conversation_id"),
                 "pinned": meta.get("pinned", False),
                 "archived": meta.get("archived", False),
                 "tags": meta.get("tags", []),
@@ -152,7 +153,7 @@ def get_conversation_by_id(conversation_id: str) -> dict[str, Any] | None:
             "workspace_uris": r["workspace_uris"],
             "status": r["status"],
             "agent_name": r["agent_name"],
-            "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
+            "parent_conversation_id": dict(r).get("parent_conversation_id"),
             "pinned": meta.get("pinned", False),
             "archived": meta.get("archived", False),
             "tags": meta.get("tags", []),
@@ -168,9 +169,7 @@ def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
     transcript_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
     transcript_full_file = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
 
-    target_file = transcript_file if transcript_file.exists() else None
-    if not target_file and transcript_full_file.exists():
-        target_file = transcript_full_file
+    target_file = transcript_full_file if transcript_full_file.exists() else (transcript_file if transcript_file.exists() else None)
 
     if not target_file:
         return []
@@ -249,6 +248,21 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
         "is_estimated": True
     }
 
+def atomic_write_jsonl(target_path: Path, items: list[dict[str, Any]]) -> None:
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_file = target_path.parent / f".{target_path.name}.tmp.{uuid.uuid4().hex[:8]}"
+    try:
+        with open(tmp_file, "w", encoding="utf-8") as f:
+            f.writelines(json.dumps(item, ensure_ascii=False) + "\n" for item in items)
+        tmp_file.replace(target_path)
+    except Exception:
+        if tmp_file.exists():
+            try:
+                tmp_file.unlink()
+            except Exception:
+                pass
+        raise
+
 def fork_conversation(
     source_conversation_id: str,
     up_to_step_index: int,
@@ -289,19 +303,21 @@ def fork_conversation(
     if not forked_full_steps:
         forked_full_steps = forked_steps
 
-    with open(transcript_path, "w", encoding="utf-8") as f:
-        for step in forked_steps:
-            cloned = dict(step)
-            if "conversation_id" in cloned:
-                cloned["conversation_id"] = new_id
-            f.write(json.dumps(cloned, ensure_ascii=False) + "\n")
+    forked_transcripts = []
+    for step in forked_steps:
+        cloned = dict(step)
+        if "conversation_id" in cloned:
+            cloned["conversation_id"] = new_id
+        forked_transcripts.append(cloned)
+    atomic_write_jsonl(transcript_path, forked_transcripts)
 
-    with open(transcript_full_path, "w", encoding="utf-8") as f:
-        for step in forked_full_steps:
-            cloned = dict(step)
-            if "conversation_id" in cloned:
-                cloned["conversation_id"] = new_id
-            f.write(json.dumps(cloned, ensure_ascii=False) + "\n")
+    forked_full_transcripts = []
+    for step in forked_full_steps:
+        cloned = dict(step)
+        if "conversation_id" in cloned:
+            cloned["conversation_id"] = new_id
+        forked_full_transcripts.append(cloned)
+    atomic_write_jsonl(transcript_full_path, forked_full_transcripts)
 
     # Copy artifacts if present
     source_dir = BRAIN_DIR / source_conversation_id
@@ -644,11 +660,9 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
     else:
         remaining_steps = steps[:-1]
 
-    # Persist updated compact transcript file
+    # Persist updated compact transcript file atomically
     if transcript_file.exists():
-        with open(transcript_file, "w", encoding="utf-8") as f:
-            for s in remaining_steps:
-                f.write(json.dumps(s, ensure_ascii=False) + "\n")
+        atomic_write_jsonl(transcript_file, remaining_steps)
 
     # Persist updated full transcript file independently to avoid degrading unabridged history
     if transcript_full_file.exists():
@@ -677,9 +691,7 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         else:
             remaining_full_steps = remaining_steps
 
-        with open(transcript_full_file, "w", encoding="utf-8") as f:
-            for s in remaining_full_steps:
-                f.write(json.dumps(s, ensure_ascii=False) + "\n")
+        atomic_write_jsonl(transcript_full_file, remaining_full_steps)
 
     # Update summary in SQLite database
     conn = get_db_connection()
@@ -757,7 +769,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 "workspace_uris": r["workspace_uris"],
                 "status": r["status"],
                 "agent_name": r["agent_name"],
-                "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
+                "parent_conversation_id": dict(r).get("parent_conversation_id"),
                 "pinned": meta.get("pinned", False),
                 "archived": meta.get("archived", False),
                 "tags": meta.get("tags", []),

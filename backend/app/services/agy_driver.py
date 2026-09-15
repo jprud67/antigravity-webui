@@ -50,9 +50,15 @@ async def get_available_models() -> list[dict[str, Any]]:
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+        stderr=asyncio.subprocess.PIPE,
+        **spawn_group_kwargs()
     )
-    stdout, stderr = await proc.communicate()
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=12.0)
+    except asyncio.TimeoutError:
+        await terminate_process_group_async(proc, grace=1.0)
+        logger.error("Timeout fetching models via agy CLI")
+        raise TimeoutError("agy models timed out after 12s")
     if proc.returncode != 0:
         logger.error(f"Error fetching models: {stderr.decode()}")
         raise RuntimeError(f"agy models failed: {stderr.decode()}")
@@ -145,18 +151,24 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
 
     eff = (effort or model_suffix or "high").lower().strip()
 
-    # Gemini 3.1 Pro only supports high and low
-    if "gemini-3.1-pro" in base_model:
-        if eff not in ["high", "low"]:
+    if "gemini" in base_model.lower():
+        # Gemini 3.1 Pro only supports high and low
+        if "gemini-3.1-pro" in base_model:
+            if eff not in ["high", "low"]:
+                eff = "high"
+            return f"gemini-3.1-pro-{eff}", None
+
+        # For Gemini 3.6, 3.7, 3.8: support high, medium, low
+        if eff not in ["high", "medium", "low"]:
             eff = "high"
-        return f"gemini-3.1-pro-{eff}", None
 
-    # For Gemini 3.6, 3.7, 3.8: support high, medium, low
-    if eff not in ["high", "medium", "low"]:
-        eff = "high"
+        target_model = f"{base_model}-{eff}"
+        return target_model, None
 
-    target_model = f"{base_model}-{eff}"
-    return target_model, None
+    # For other models, preserve base model
+    if model_suffix:
+        return f"{base_model}-{model_suffix}", None
+    return base_model, None
 
 async def stream_turn(
     prompt: str,

@@ -24,6 +24,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import subprocess
 import threading
 import time
@@ -215,11 +216,11 @@ def check_for_updates(force: bool = False) -> dict[str, Any]:
 
         cached = _read_disk_cache()
         if cached and (now - cached.get("ts", 0)) < CACHE_DURATION_SECONDS:
-            payload = cached.get("payload") or {}
+            cached_payload = cached.get("payload") or {}
             local_sha = _git_cmd(["rev-parse", "--short=8", "HEAD"], timeout=5)
-            if payload and cached.get("commit") == local_sha:
-                _update_result_cache = payload
-                return payload
+            if cached_payload and cached.get("commit") == local_sha:
+                _update_result_cache = cached_payload
+                return cached_payload
 
     version_info = get_local_version_info()
     payload: dict[str, Any] = {
@@ -426,13 +427,16 @@ async def apply_update() -> dict[str, Any]:
     else:
         async def _restart_service_soon():
             await asyncio.sleep(1.5)
-            logger.info("Executing graceful systemctl restart antigravity-webui...")
-            try:
-                await asyncio.to_thread(
-                    subprocess.run, ["systemctl", "restart", "antigravity-webui"], check=False
-                )
-            except Exception as e:
-                logger.error(f"Service restart trigger error: {e}")
+            if shutil.which("systemctl"):
+                logger.info("Executing graceful systemctl restart antigravity-webui...")
+                try:
+                    await asyncio.to_thread(
+                        subprocess.run, ["systemctl", "restart", "antigravity-webui"], check=False
+                    )
+                except Exception as e:
+                    logger.error(f"Service restart trigger error: {e}")
+            else:
+                logger.info("systemctl not found; skipping automatic service restart.")
 
         asyncio.create_task(_restart_service_soon())
 

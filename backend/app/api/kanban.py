@@ -5,6 +5,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -123,7 +124,7 @@ def list_tasks(
             tasks = [dict(row) for row in rows]
 
         # Grouping helper
-        columns = {
+        columns: dict[str, list[dict[str, Any]]] = {
             "todo": [],
             "running": [],
             "blocked": [],

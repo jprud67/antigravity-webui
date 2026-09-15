@@ -45,7 +45,7 @@ TICK_SECONDS = 20
 JOB_TIMEOUT_SECONDS = 20 * 60
 MAX_TASK_FAILOVER = 5
 
-_running_jobs: set = set()
+_running_jobs: set[str] = set()
 _jobs_write_lock = asyncio.Lock()
 
 
@@ -122,7 +122,7 @@ async def run_agy_task(prompt: str, skills: list[str] | None = None, timeout: in
     for t in pumps:
         try:
             await asyncio.wait_for(t, timeout=3.0)
-        except asyncio.TimeoutError:
+        except Exception:
             t.cancel()
 
     if quota_seen["line"] is None:
@@ -130,10 +130,13 @@ async def run_agy_task(prompt: str, skills: list[str] | None = None, timeout: in
             quota_line = await asyncio.wait_for(quota_task, timeout=2.0)
             if quota_line:
                 quota_seen["line"] = quota_line
-        except asyncio.TimeoutError:
+        except Exception:
             quota_task.cancel()
     elif not quota_task.done():
         quota_task.cancel()
+
+    # Reaping all background tasks to avoid unhandled CancelledError or dangling coroutines
+    await asyncio.gather(*pumps, quota_task, return_exceptions=True)
 
     out = "".join(stdout_chunks)
     err = "".join(stderr_chunks)
@@ -238,7 +241,20 @@ async def _execute_job(job: dict[str, Any]) -> None:
                 j["last_log"] = str(log_file)
                 if result["failovers"]:
                     j["last_failover"] = result["failovers"][-1]
-                j["next_run_at"] = compute_next_run(j.get("schedule"))
+                # Ne recalculer next_run_at que s'il n'est pas déjà planifié dans le futur (évite la dérive de timing)
+                current_next = j.get("next_run_at")
+                is_future = False
+                if current_next:
+                    try:
+                        due = datetime.fromisoformat(str(current_next))
+                        if due.tzinfo is None:
+                            due = due.replace(tzinfo=timezone.utc)
+                        if due > datetime.now(timezone.utc):
+                            is_future = True
+                    except ValueError:
+                        pass
+                if not is_future:
+                    j["next_run_at"] = compute_next_run(j.get("schedule"))
                 break
         save_jobs(data)
     logger.info(f"[Cron] Job « {name} » terminé: {result['status']} ({duration}s).")

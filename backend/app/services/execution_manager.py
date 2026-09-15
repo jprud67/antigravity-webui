@@ -217,7 +217,6 @@ class ExecutionSession:
         agent_mode = params.get("agent_mode")
         if not agent_mode:
             try:
-                from app.services.storage import get_settings
                 settings = get_settings()
                 agent_mode = settings.get("agentMode")
             except Exception:
@@ -373,7 +372,7 @@ class ExecutionManager:
     Server-level singleton managing all active background turns across conversations.
     Guarantees tasks never abort on accidental client reload or network drops.
     """
-    def __init__(self):
+    def __init__(self) -> None:
         self.sessions: dict[str, ExecutionSession] = {}
         self.active_session: ExecutionSession | None = None
         self.connected_sockets: set[WebSocket] = set()
@@ -413,12 +412,12 @@ class ExecutionManager:
                 to_prune.append(cid)
 
         for cid in to_prune:
-            s = self.sessions.pop(cid, None)
-            if s:
-                if s is self.active_session:
+            target_session = self.sessions.pop(cid) if cid in self.sessions else None
+            if target_session:
+                if target_session is self.active_session:
                     self.active_session = None
-                if s.worker_task and not s.worker_task.done():
-                    s.worker_task.cancel()
+                if target_session.worker_task and not target_session.worker_task.done():
+                    target_session.worker_task.cancel()
             logger.info(f"Pruned inactive execution session for conversation {cid} from memory.")
 
     def get_or_create_session(self, conversation_id: str | None, workspace_path: str | None = None) -> ExecutionSession:
@@ -434,6 +433,10 @@ class ExecutionManager:
 
         if not conversation_id and self.active_session and self.active_session.is_running and not self.active_session.conversation_id:
             return self.active_session
+
+        if self.active_session and (not self.active_session.conversation_id or self.active_session.conversation_id not in self.sessions):
+            if not self.active_session.is_running and self.active_session.worker_task and not self.active_session.worker_task.done():
+                self.active_session.worker_task.cancel()
 
         session = ExecutionSession(conversation_id=conversation_id, workspace_path=workspace_path)
         session.worker_task = asyncio.create_task(session.queue_worker())

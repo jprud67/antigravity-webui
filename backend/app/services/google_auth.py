@@ -5,6 +5,7 @@ import re
 import select
 import shutil
 import time
+import uuid
 
 try:
     import pty
@@ -13,7 +14,7 @@ except ImportError:  # Windows : pty absent
     HAS_PTY = False
 
 try:
-    import winpty  # paquet « pywinpty » (Windows uniquement)
+    import winpty  # type: ignore[import-not-found]  # paquet « pywinpty » (Windows uniquement)
     HAS_WINPTY = True
 except ImportError:
     HAS_WINPTY = False
@@ -87,11 +88,19 @@ def sync_active_account_to_store():
         if email and "@" in email:
             # Validation anti-traversée + écriture atomique + permissions 0600
             dest = _validate_account_file(email)
-            temp = Path(str(dest) + ".tmp")
-            with open(temp, "w") as f:
-                json.dump(data, f, indent=2)
-            temp.replace(dest)
-            restrict_file_permissions(dest)
+            temp = dest.parent / f".{dest.name}.tmp.{uuid.uuid4().hex[:8]}"
+            try:
+                with open(temp, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                restrict_file_permissions(temp)
+                temp.replace(dest)
+                restrict_file_permissions(dest)
+            finally:
+                if temp.exists():
+                    try:
+                        temp.unlink()
+                    except Exception:
+                        pass
     except Exception as e:
         logger.error(f"Error syncing active account: {e}")
 
@@ -167,10 +176,18 @@ def switch_google_account(target_email: str) -> dict[str, Any]:
 
     # Copy target account to active
     # Écriture atomique (tmp + replace) : évite toute lecture partielle par agy
-    temp_file = Path(str(TOKEN_FILE) + ".tmp")
-    shutil.copy2(target_file, temp_file)
-    temp_file.replace(TOKEN_FILE)
-    restrict_file_permissions(TOKEN_FILE)
+    temp_file = TOKEN_FILE.parent / f".{TOKEN_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
+    try:
+        shutil.copy2(target_file, temp_file)
+        restrict_file_permissions(temp_file)
+        temp_file.replace(TOKEN_FILE)
+        restrict_file_permissions(TOKEN_FILE)
+    finally:
+        if temp_file.exists():
+            try:
+                temp_file.unlink()
+            except Exception:
+                pass
 
     active_meta = get_active_account()
     logger.info(f"Switched Google account to {target_email}")
@@ -426,10 +443,11 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
 
         del _LOGIN_SESSIONS[session_id]
 
+        active_email = active_meta.get("email") if active_meta else "Inconnu"
         return {
             "success": True,
             "active_account": active_meta,
-            "message": f"Nouveau compte Google connecté avec succès : {active_meta.get('email')}"
+            "message": f"Nouveau compte Google connecté avec succès : {active_email}"
         }
     except Exception:
         _close_login_resources(master_fd, proc)
@@ -466,17 +484,34 @@ def import_raw_token(token_data: dict[str, Any]) -> dict[str, Any]:
     if not email or "@" not in email:
         raise ValueError("Données de jeton invalides : adresse email introuvable.")
 
-    account_file = ACCOUNTS_DIR / f"{email}.json"
-    temp_acc = Path(str(account_file) + ".tmp")
-    with open(temp_acc, "w") as f:
-        json.dump(token_data, f, indent=2)
-    temp_acc.replace(account_file)
+    account_file = _validate_account_file(email)
+    temp_acc = account_file.parent / f".{account_file.name}.tmp.{uuid.uuid4().hex[:8]}"
+    try:
+        with open(temp_acc, "w", encoding="utf-8") as f:
+            json.dump(token_data, f, indent=2)
+        restrict_file_permissions(temp_acc)
+        temp_acc.replace(account_file)
+        restrict_file_permissions(account_file)
+    finally:
+        if temp_acc.exists():
+            try:
+                temp_acc.unlink()
+            except Exception:
+                pass
 
-    temp_file = Path(str(TOKEN_FILE) + ".tmp")
-    with open(temp_file, "w") as f:
-        json.dump(token_data, f, indent=2)
-    temp_file.replace(TOKEN_FILE)
-    restrict_file_permissions(TOKEN_FILE)
+    temp_file = TOKEN_FILE.parent / f".{TOKEN_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
+    try:
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(token_data, f, indent=2)
+        restrict_file_permissions(temp_file)
+        temp_file.replace(TOKEN_FILE)
+        restrict_file_permissions(TOKEN_FILE)
+    finally:
+        if temp_file.exists():
+            try:
+                temp_file.unlink()
+            except Exception:
+                pass
 
     return {
         "success": True,

@@ -1,7 +1,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -11,7 +11,11 @@ from app.config import GEMINI_DIR, HOME
 logger = logging.getLogger("antigravity.skills")
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
-SKILL_DIRS = [
+class SkillDirInfo(TypedDict):
+    type: str
+    dir: Path
+
+SKILL_DIRS: list[SkillDirInfo] = [
     {"type": "user", "dir": HOME / ".gemini" / "config" / "skills"},
     {"type": "hermes", "dir": HOME / ".hermes" / "skills"},
     {"type": "builtin", "dir": GEMINI_DIR / "builtin" / "skills"},
@@ -95,7 +99,7 @@ def get_skill_detail(skill_id: str, _ = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Identifiant de skill non valide")
 
     for s_info in SKILL_DIRS:
-        base_dir = s_info["dir"]
+        base_dir = Path(s_info["dir"])
         target = base_dir / safe_id / "SKILL.md"
         if target.exists():
             meta = parse_skill_md(target)
