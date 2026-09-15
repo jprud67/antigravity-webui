@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatCanvas } from './components/ChatCanvas';
 import { ChatInput } from './components/ChatInput';
@@ -89,6 +89,25 @@ export function App() {
   const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash-high');
   const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
   const [quickPrompt, setQuickPrompt] = useState('');
+
+  // Memoized prompt history of active discussion for terminal-like navigation
+  const pastUserPrompts = useMemo(() => {
+    return messages
+      .filter((m) => m.role === 'user' && m.content)
+      .map((m) => {
+        let text = m.content;
+        text = text.replace(/<\/?USER_REQUEST>/g, '');
+        text = text.replace(/^(⚡ \[Guidage\] |📥 \[En attente\] )/, '');
+        if (text.includes('\n\n[Image attachée :')) {
+          text = text.split('\n\n[Image attachée :')[0];
+        }
+        if (text.includes('\n\n[Fichier attaché :')) {
+          text = text.split('\n\n[Fichier attaché :')[0];
+        }
+        return text.trim();
+      })
+      .filter(Boolean);
+  }, [messages]);
 
   // 3-Panel Demand-Driven Workspace Panel
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
@@ -999,6 +1018,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
           selectedEffort={selectedEffort}
           onSelectEffort={handleSelectEffort}
           initialPrompt={quickPrompt}
+          pastUserPrompts={pastUserPrompts}
           usage={tokenUsage}
           queueCount={queueCount}
           onClearQueue={handleClearQueue}
