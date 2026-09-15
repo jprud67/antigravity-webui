@@ -54,8 +54,13 @@ import {
   exportConversationMarkdown,
   exportConversationJSON,
   importConversation,
+  fetchSystemVersion,
+  checkSystemUpdate,
+  applySystemUpdate,
   type GoogleAccountInfo,
-  type GoogleAccountsResponse
+  type GoogleAccountsResponse,
+  type SystemVersionInfo,
+  type UpdateCheckResult
 } from '../services/api';
 import { 
   AVAILABLE_THEMES, 
@@ -87,7 +92,7 @@ interface SettingsModalProps {
   models: ModelOption[];
   currentModel: string;
   onModelSaved: (modelId: string) => void;
-  initialTab?: 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation';
+  initialTab?: 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates';
   onGoogleAccountChanged?: (account: GoogleAccountInfo | null) => void;
   activeConversation?: Conversation | null;
   onClearHistory?: () => void;
@@ -119,7 +124,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onConversationUpdated
 }) => {
   const { lang, setLanguage } = useI18n();
-  const [activeTab, setActiveTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation'>(initialTab || 'models');
+  const [activeTab, setActiveTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates'>(initialTab || 'models');
   const [settings, setSettings] = useState<AppSettings>({});
   const [selectedModelId, setSelectedModelId] = useState(currentModel);
   const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
@@ -128,6 +133,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [currentFontSize, setCurrentFontSize] = useState<FontSizeOption>(getStoredFontSize());
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // System Update state (Hermes architecture)
+  const [systemVersion, setSystemVersion] = useState<SystemVersionInfo | null>(null);
+  const [updateCheck, setUpdateCheck] = useState<UpdateCheckResult | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [applyingUpdate, setApplyingUpdate] = useState(false);
+  const [updateProgressMsg, setUpdateProgressMsg] = useState<string | null>(null);
 
   // Conversation state
   const CONV_PALETTE = ['#0ea5e9', '#10b981', '#f59e0b', '#f43f5e', '#6366f1', '#a855f7', '#ec4899', '#06b6d4'];
@@ -261,6 +273,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (onClearHistory) onClearHistory();
       showToast('Historique des messages effacé.', 'success');
       onClose();
+    }
+  };
+
+  const loadUpdateInfo = async (force: boolean = false) => {
+    setCheckingUpdate(true);
+    try {
+      const [ver, upd] = await Promise.all([
+        fetchSystemVersion(),
+        checkSystemUpdate(force)
+      ]);
+      setSystemVersion(ver);
+      setUpdateCheck(upd);
+      if (force) {
+        if (upd.update_available) {
+          showToast(`Mise à jour disponible : ${upd.behind} nouveau(x) commit(s)`, 'info');
+        } else {
+          showToast('Antigravity WebUI est parfaitement à jour !', 'success');
+        }
+      }
+    } catch (err: any) {
+      showToast(`Erreur lors de la vérification : ${err.message}`, 'error');
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const handleTriggerApplyUpdate = async () => {
+    const ok = await showConfirm({
+      title: 'Mettre à jour Antigravity WebUI',
+      message: 'Voulez-vous installer la mise à jour depuis GitHub (origin/main) ? Le serveur récupérera les modifications, recompilera le frontend et redémarrera automatiquement le service.',
+      confirmText: 'Installer la mise à jour',
+      destructive: false
+    });
+    if (!ok) return;
+
+    setApplyingUpdate(true);
+    setUpdateProgressMsg('Téléchargement des modifications depuis GitHub et compilation...');
+    try {
+      const res = await applySystemUpdate();
+      setUpdateProgressMsg(res.message || 'Mise à jour réussie ! Redémarrage du serveur...');
+      showToast('Mise à jour appliquée avec succès ! Rechargement...', 'success');
+      setTimeout(() => {
+        window.location.reload();
+      }, 4000);
+    } catch (err: any) {
+      showToast(`Échec de la mise à jour : ${err.message}`, 'error');
+      setUpdateProgressMsg(null);
+    } finally {
+      setApplyingUpdate(false);
     }
   };
 
@@ -768,6 +829,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               <Globe className="w-4 h-4" />
               <span>Langues ({SUPPORTED_LANGUAGES.find(l => l.code === lang)?.flag || '🌐'})</span>
+            </button>
+
+            <button
+              onClick={(e) => {
+                handleTabClick('updates', e);
+                loadUpdateInfo(false);
+              }}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'updates'
+                  ? 'border-sky-500 text-sky-600 dark:text-sky-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <RefreshCw className={`w-4 h-4 ${checkingUpdate ? 'animate-spin text-sky-500' : ''}`} />
+              <span>Mises à jour</span>
+              {updateCheck?.update_available ? (
+                <span className="text-[10px] bg-amber-500/20 text-amber-500 border border-amber-500/30 px-1.5 py-0.2 rounded-full font-mono font-bold animate-pulse">
+                  MàJ dispo
+                </span>
+              ) : (
+                <span className="text-[10px] opacity-60 font-mono">
+                  v0.1.0
+                </span>
+              )}
             </button>
           </div>
 
@@ -2257,6 +2342,218 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
           )}
+
+          {activeTab === 'updates' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
+                    <RefreshCw className="w-4 h-4 text-sky-500" />
+                    <span>Mises à jour Antigravity WebUI (Système Hermes)</span>
+                  </h3>
+                  <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                    Recherche asynchrone et déploiement instantané des dernières améliorations du dépôt GitHub officiel.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => loadUpdateInfo(true)}
+                  disabled={checkingUpdate || applyingUpdate}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all border shadow-xs cursor-pointer hover:border-sky-500 shrink-0 disabled:opacity-50"
+                  style={{
+                    backgroundColor: 'var(--surface-subtle)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text)'
+                  }}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${checkingUpdate ? 'animate-spin text-sky-500' : ''}`} />
+                  <span>{checkingUpdate ? 'Vérification...' : 'Rechercher les mises à jour'}</span>
+                </button>
+              </div>
+
+              {/* Version & Git Status Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div
+                  className="p-3.5 rounded-xl border flex flex-col justify-between"
+                  style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}
+                >
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-semibold opacity-60">Version Actuelle</span>
+                  <div className="mt-2 flex items-baseline gap-1.5">
+                    <span className="text-base font-bold font-mono text-sky-500">v{systemVersion?.version || '0.1.0'}</span>
+                    <span className="text-[10px] font-mono opacity-50">{systemVersion?.tag || 'v0.1.0'}</span>
+                  </div>
+                </div>
+
+                <div
+                  className="p-3.5 rounded-xl border flex flex-col justify-between"
+                  style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}
+                >
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-semibold opacity-60">Dernier Commit (HEAD)</span>
+                  <div className="mt-2">
+                    <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-black/10 dark:bg-white/10 border" style={{ borderColor: 'var(--border)' }}>
+                      {systemVersion?.commit || 'local'}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="p-3.5 rounded-xl border flex flex-col justify-between"
+                  style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}
+                >
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-semibold opacity-60">Branche Active</span>
+                  <div className="mt-2">
+                    <span className="text-xs font-bold font-mono text-emerald-500">
+                      {systemVersion?.branch || 'main'}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="p-3.5 rounded-xl border flex flex-col justify-between"
+                  style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}
+                >
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-semibold opacity-60">Statut MàJ</span>
+                  <div className="mt-2">
+                    {checkingUpdate ? (
+                      <span className="text-xs font-mono text-sky-400 animate-pulse">Vérification...</span>
+                    ) : updateCheck?.update_available ? (
+                      <span className="text-xs font-bold text-amber-500">
+                        {updateCheck.behind} commit(s) dispo
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> À jour
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Notice if Applying */}
+              {applyingUpdate && (
+                <div className="p-4 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-400 text-xs flex items-center gap-3 animate-pulse">
+                  <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                  <div>
+                    <div className="font-bold">Mise à jour en cours d'installation...</div>
+                    <div className="text-[11px] opacity-80">{updateProgressMsg || 'Téléchargement des modifications depuis GitHub...'}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Update Available Banner */}
+              {updateCheck?.update_available && !applyingUpdate && (
+                <div
+                  className="p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm"
+                  style={{
+                    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                    borderColor: 'rgba(245, 158, 11, 0.3)'
+                  }}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-500 shrink-0 mt-0.5">
+                      <AlertCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-500">
+                        Une nouvelle version est disponible sur GitHub !
+                      </h4>
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400/90 mt-0.5">
+                        Votre environnement a {updateCheck.behind} commit(s) de retard. Vous pouvez mettre à jour et redémarrer la plateforme en 1 clic.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleTriggerApplyUpdate}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-amber-500/20 cursor-pointer shrink-0"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Installer la mise à jour</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Upstream Commits / Changelog Preview */}
+              {updateCheck?.commits && updateCheck.commits.length > 0 && (
+                <div
+                  className="p-4 rounded-2xl border"
+                  style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--strong)' }}>
+                      <FileText className="w-3.5 h-3.5 text-sky-500" />
+                      <span>Nouveautés et correctifs en attente ({updateCheck.commits.length})</span>
+                    </span>
+                    <span className="text-[10px] font-mono opacity-50">origin/main</span>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {updateCheck.commits.map((c) => (
+                      <div
+                        key={c.sha}
+                        className="p-2.5 rounded-xl border flex items-start justify-between gap-3 text-xs transition-colors"
+                        style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-subtle)' }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded font-bold bg-sky-500/10 text-sky-500 border border-sky-500/20 shrink-0">
+                              {c.sha}
+                            </span>
+                            <span className="font-medium truncate" style={{ color: 'var(--text)' }}>
+                              {c.summary}
+                            </span>
+                          </div>
+                          <div className="text-[10px] mt-1 opacity-50 flex items-center gap-2">
+                            <span>Auteur : {c.author}</span>
+                            {c.timestamp > 0 && (
+                              <span>• {new Date(c.timestamp * 1000).toLocaleString()}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Up to date Banner */}
+              {updateCheck && !updateCheck.update_available && !checkingUpdate && (
+                <div
+                  className="p-4 rounded-xl border flex items-center gap-3 text-xs"
+                  style={{
+                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                    borderColor: 'rgba(16, 185, 129, 0.25)',
+                    color: 'var(--text)'
+                  }}
+                >
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <div>
+                    <div className="font-bold text-emerald-600 dark:text-emerald-400">
+                      Antigravity WebUI est parfaitement à jour.
+                    </div>
+                    <div className="text-[11px] opacity-70 mt-0.5">
+                      Tous les derniers correctifs, optimisations et fonctionnalités d'orchestration sont installés.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Architecture info */}
+              <div
+                className="p-3.5 rounded-xl border flex items-start gap-2.5 text-[11px] leading-relaxed"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border-subtle)',
+                  color: 'var(--muted)'
+                }}
+              >
+                <Terminal className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-sky-400">Architecture de mise à jour synchronisée : </span>
+                  Ce module reprend le protocole d'Hermes Agent : les vérifications s'exécutent de façon asynchrone en arrière-plan sans bloquer l'UI, avec un cache local de 1 heure pour préserver le réseau. La mise à jour effectue un pull sécurisé, recompile le frontend Vite et relance le service systemd.
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -2286,7 +2583,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               Fermer
             </button>
-            {activeTab !== 'skills' && activeTab !== 'security' && (
+            {activeTab !== 'skills' && activeTab !== 'security' && activeTab !== 'updates' && (
               <button
                 onClick={handleSave}
                 disabled={saving}

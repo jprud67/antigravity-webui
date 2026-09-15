@@ -1,6 +1,6 @@
 # Matrice de Parité : Hermes WebUI → Antigravity WebUI
 
-> **Dernière mise à jour** : 2026-09-14
+> **Dernière mise à jour** : 2026-09-15 (ajout Phase H — Auto-Update)
 > **Méthode** : analyse et alignement du code source réel (référence `/root/hermes-webui-ref`, cible `/root/antigravity-webui`)
 > **Légende** : ✅ Complet | ⚠️ Partiel | ❌ Absent | N/A Non applicable
 
@@ -74,3 +74,8 @@
   - Composant `Toast.tsx` avec conteneur global et méthode `showToast(message, type, duration)`.
   - Composant `AppDialog.tsx` avec conteneur global et méthode `showConfirm({ title, message, confirmText, destructive })`.
   - Éradication de 100% des 26 appels `alert()` et `confirm()` natifs du projet. ✅
+
+### Phase H — Auto-Update « Hermes » (Système)
+- **H1 — Vérification asynchrone :** contrôle non-bloquant au démarrage (thread dédié, cache 1 h dans `~/.gemini/antigravity_update_cache.json`) + vérification périodique côté client (30 min). ✅
+- **H2 — Badge & commandes :** badge « MàJ » dans la sidebar, onglet « Mises à jour » des Paramètres (version, commit HEAD, branche, tag, liste des commits en attente) et commandes slash `/update` et `/check-update`. ✅
+- **H3 — Application en 1 clic :** `git pull origin main` + rebuild frontend Vite + redémarrage du service systemd, avec confirmation in-app et rechargement automatique. ✅

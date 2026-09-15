@@ -70,6 +70,8 @@ interface ChatInputProps {
   onShowStatus?: () => void;
   onShowUsage?: (type?: 'usage' | 'quota' | 'credits' | 'changelog') => void;
   onOpenGoogleAccount?: () => void;
+  onOpenUpdates?: () => void;
+  onShowUpdateCard?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -107,7 +109,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onUndo,
   onShowStatus,
   onShowUsage,
-  onOpenGoogleAccount
+  onOpenGoogleAccount,
+  onOpenUpdates,
+  onShowUpdateCard
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -615,6 +619,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         } else {
           const statText = `🟢 Serveur actif | Modèle: ${currentModelObj?.name || selectedModel} | Workspace: ${currentWorkspace || '/root'}`;
           showToast(statText, 'info');
+        }
+        return true;
+
+      case '/update':
+      case '/check-update':
+        if (onShowUpdateCard) {
+          onShowUpdateCard();
+        } else if (onOpenUpdates) {
+          onOpenUpdates();
+        } else {
+          showToast('Vérification des mises à jour...', 'info');
         }
         return true;
 

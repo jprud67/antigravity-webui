@@ -69,6 +69,8 @@ interface SidebarProps {
   activeGoogleAccount?: GoogleAccountInfo | null;
   onOpenGoogleAccount?: () => void;
   onRefreshConversations?: () => Promise<void> | void;
+  updateAvailable?: boolean;
+  onOpenUpdates?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -94,7 +96,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSearchQuery,
   activeGoogleAccount,
   onOpenGoogleAccount,
-  onRefreshConversations
+  onRefreshConversations,
+  updateAvailable,
+  onOpenUpdates
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -1124,15 +1128,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="pt-1.5 flex items-center justify-between text-xs shrink-0">
           <button
-            onClick={onOpenSettings}
-            className="p-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+            onClick={updateAvailable && onOpenUpdates ? onOpenUpdates : onOpenSettings}
+            className="p-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 relative"
             style={{ color: 'var(--muted)' }}
-            title={t('settings', 'Paramètres Antigravity')}
+            title={updateAvailable ? 'Mise à jour disponible ! Cliquez pour voir.' : t('settings', 'Paramètres Antigravity')}
           >
             <SettingsIcon className="w-4 h-4" />
             <span className="text-[11px] font-medium" style={{ color: 'var(--text)' }}>
               {t('settings', 'Paramètres')}
             </span>
+            {updateAvailable && (
+              <span
+                className="ml-0.5 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-500 text-black leading-none animate-pulse shrink-0"
+                title="Mise à jour disponible"
+              >
+                MàJ
+              </span>
+            )}
           </button>
 
           <div className="flex items-center gap-1">

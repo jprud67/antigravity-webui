@@ -32,7 +32,9 @@ import {
   fetchUsageQuota,
   fetchCredits,
   fetchChangelog,
-  type GoogleAccountInfo
+  checkSystemUpdate,
+  type GoogleAccountInfo,
+  type UpdateCheckResult
 } from './services/api';
 import { chatSocket } from './services/ws';
 import { syncClient } from './services/sync';
@@ -141,8 +143,9 @@ export function App() {
   const [isCronModalOpen, setIsCronModalOpen] = useState(false);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation'>('models');
+  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates'>('models');
   const [activeGoogleAccount, setActiveGoogleAccount] = useState<GoogleAccountInfo | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
 
   const handleOpenSkills = () => {
     setSettingsTab('skills');
@@ -159,10 +162,29 @@ export function App() {
     setIsSettingsOpen(true);
   };
 
+  const handleOpenUpdates = () => {
+    setSettingsTab('updates');
+    setIsSettingsOpen(true);
+  };
+
   // Initialize
   useEffect(() => {
     applyAppearance(getStoredTheme(), getStoredSkin());
     loadInitialData();
+
+    // Hermes background update check pattern: non-blocking, cached
+    checkSystemUpdate(false).then((res) => {
+      setUpdateInfo(res);
+    }).catch(() => {});
+
+    // Periodic check every 30 minutes
+    const updateInterval = setInterval(() => {
+      checkSystemUpdate(false).then((res) => {
+        setUpdateInfo(res);
+      }).catch(() => {});
+    }, 30 * 60 * 1000);
+
+    return () => clearInterval(updateInterval);
   }, []);
 
   // Track WebSocket connection status for reconnection banner
@@ -1088,6 +1110,67 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
     }
   };
 
+  const handleShowUpdateCard = async () => {
+    const userMsg: ChatMessage = {
+      id: `usr-${Date.now()}`,
+      role: 'user',
+      content: '/update',
+      timestamp: new Date().toISOString()
+    };
+
+    const loadingId = `upd-${Date.now()}`;
+    const loadingMsg: ChatMessage = {
+      id: loadingId,
+      role: 'assistant',
+      content: '🔄 **Recherche de mises à jour Antigravity WebUI (Protocole Git Hermes)...**',
+      isLive: true,
+      timestamp: new Date().toISOString()
+    };
+
+    setMessages((prev) => [...prev, userMsg, loadingMsg]);
+
+    try {
+      const data = await checkSystemUpdate(true);
+      setUpdateInfo(data);
+
+      const lines: string[] = ['### 🔄 État des Mises à Jour Antigravity WebUI\n'];
+      lines.push(`- **Version locale :** \`${data.current_version}\` (\`${data.current_commit}\` sur \`${data.branch}\`)`);
+      lines.push(`- **Tag Git :** \`${data.tag || 'aucun'}\``);
+      lines.push(`- **Dépôt local :** Git Clone (\`main\`)`);
+      lines.push(`- **Dernière vérification :** ${new Date(data.checked_at * 1000).toLocaleTimeString()}`);
+      lines.push('');
+
+      if (data.update_available && data.behind > 0) {
+        lines.push(`> 🚀 **${data.behind} nouvelle(s) mise(s) à jour disponible(s)** sur le dépôt officiel (\`origin/${data.branch}\`) !\n`);
+        lines.push('#### 📦 Commits en attente :');
+        data.commits.forEach((c) => {
+          const dateStr = c.timestamp ? new Date(c.timestamp * 1000).toLocaleDateString() : '';
+          lines.push(`- \`${c.sha}\` **${c.summary}** *(par ${c.author}${dateStr ? ' le ' + dateStr : ''})*`);
+        });
+        lines.push('');
+        lines.push('👉 *Pour appliquer la mise à jour en un clic, ouvrez les **Paramètres > Mises à jour** ou cliquez sur le badge dans la barre latérale.*');
+      } else {
+        lines.push('✅ **Antigravity WebUI est parfaitement à jour.** Tous les derniers correctifs, optimisations et fonctionnalités sont appliqués.');
+      }
+
+      setMessages((prev) =>
+        prev.map((m) => (m.id === loadingId ? { ...m, content: lines.join('\n'), isLive: false } : m))
+      );
+    } catch (err: any) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === loadingId
+            ? {
+                ...m,
+                content: `⚠️ **Échec de la recherche de mise à jour :** ${err.message || 'Erreur inconnue'}`,
+                isLive: false
+              }
+            : m
+        )
+      );
+    }
+  };
+
   const handleRetry = () => {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUserMsg && lastUserMsg.content) {
@@ -1192,6 +1275,8 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
         activeEffort={displayEffort}
         activeGoogleAccount={activeGoogleAccount}
         onOpenGoogleAccount={handleOpenGoogleAccount}
+        updateAvailable={!!updateInfo?.update_available}
+        onOpenUpdates={handleOpenUpdates}
       />
 
       {/* Main Chat Area */}
@@ -1310,6 +1395,8 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
           onShowStatus={handleShowStatusCard}
           onShowUsage={handleShowUsageCard}
           onOpenGoogleAccount={handleOpenGoogleAccount}
+          onOpenUpdates={handleOpenUpdates}
+          onShowUpdateCard={handleShowUpdateCard}
         />
       </main>
 

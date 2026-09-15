@@ -21,7 +21,9 @@ from app.api.crons import router as crons_router
 from app.api.rules import router as rules_router
 from app.api.google_accounts import router as google_router
 from app.api.events import router as events_router
+from app.api.updater import router as updater_router
 from app.services.fs_watcher import watch_filesystem
+from app.services.updater import prefetch_update_check
 from app.config import BRAIN_DIR, CONVERSATION_DB
 import asyncio
 import logging
@@ -31,7 +33,8 @@ logger = logging.getLogger("antigravity.main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start the filesystem watcher background task on startup."""
+    """Start the filesystem watcher background task on startup and prefetch updates."""
+    prefetch_update_check()
     watcher_task = asyncio.create_task(
         watch_filesystem(BRAIN_DIR, CONVERSATION_DB, poll_interval=1.5),
         name="fs_watcher"
@@ -77,6 +80,7 @@ app.include_router(crons_router)
 app.include_router(rules_router)
 app.include_router(google_router)
 app.include_router(events_router)  # SSE real-time sync CLI ↔ WebUI
+app.include_router(updater_router)  # Hermes-style update check & apply
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])

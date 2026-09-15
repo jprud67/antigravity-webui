@@ -821,4 +821,66 @@ export async function fetchChangelog(): Promise<any> {
   return res.json();
 }
 
+export interface SystemVersionInfo {
+  version: string;
+  commit: string;
+  branch: string;
+  tag: string;
+  commit_date: string;
+  commit_message: string;
+  repo_path: string;
+}
+
+export interface UpstreamCommit {
+  sha: string;
+  full_sha: string;
+  summary: string;
+  author: string;
+  timestamp: number;
+}
+
+export interface UpdateCheckResult {
+  install_method: string;
+  current_version: string;
+  current_commit: string;
+  branch: string;
+  tag: string;
+  behind: number;
+  update_available: boolean;
+  can_apply: boolean;
+  commits: UpstreamCommit[];
+  checked_at: number;
+  message: string;
+}
+
+export async function fetchSystemVersion(): Promise<SystemVersionInfo> {
+  const res = await fetch(`${API_BASE}/system/version`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error("Impossible de récupérer les informations de version");
+  return res.json();
+}
+
+export async function checkSystemUpdate(force: boolean = false): Promise<UpdateCheckResult> {
+  const url = `${API_BASE}/system/update/check${force ? '?force=true' : ''}`;
+  const res = await fetch(url, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error("Impossible de vérifier les mises à jour");
+  return res.json();
+}
+
+export async function applySystemUpdate(): Promise<any> {
+  const res = await fetch(`${API_BASE}/system/update/apply`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la mise à jour' }));
+    throw new Error(err.detail || 'Erreur lors de la mise à jour');
+  }
+  return res.json();
+}
+
+
 

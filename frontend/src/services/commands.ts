@@ -39,7 +39,8 @@ import {
   KeyRound,
   UserCheck,
   Coins,
-  History
+  History,
+  RefreshCw
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -376,6 +377,22 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'system',
     icon: Activity,
     color: 'text-emerald-400',
+    isAction: true
+  },
+  {
+    cmd: '/update',
+    desc: 'Vérifier et installer les mises à jour Antigravity WebUI (Système Hermes)',
+    category: 'system',
+    icon: RefreshCw,
+    color: 'text-sky-400',
+    isAction: true
+  },
+  {
+    cmd: '/check-update',
+    desc: 'Vérifier la disponibilité d\'une nouvelle version sur GitHub origin/main',
+    category: 'system',
+    icon: RefreshCw,
+    color: 'text-cyan-400',
     isAction: true
   },
 
