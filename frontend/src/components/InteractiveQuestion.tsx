@@ -62,7 +62,7 @@ export const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({
 
     const summaryParts: string[] = [];
     questions.forEach((_q, idx) => {
-      const chosen = selectedAnswers[idx] || [];
+      const chosen = (selectedAnswers[idx] || []).filter((opt) => Boolean(opt && opt.trim()));
       const custom = customInputs[idx]?.trim();
       const allForQ = [...chosen];
       if (custom) allForQ.push(custom);

@@ -241,9 +241,15 @@ def update_task(task_id: str, req: UpdateTaskRequest, _ = Depends(require_auth))
                 if new_st in ["running", "in_progress"] and not current.get("started_at"):
                     updates.append("started_at = ?")
                     params.append(now)
-                elif new_st in ["done", "completed"] and not current.get("completed_at"):
-                    updates.append("completed_at = ?")
-                    params.append(now)
+                elif new_st in ["done", "completed"]:
+                    if not current.get("completed_at"):
+                        updates.append("completed_at = ?")
+                        params.append(now)
+                else:
+                    # If moved away from done (e.g. reopened to todo or blocked), reset completed_at
+                    if current.get("completed_at"):
+                        updates.append("completed_at = ?")
+                        params.append(None)
 
             if updates:
                 params.append(task_id)

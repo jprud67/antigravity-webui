@@ -477,6 +477,14 @@ class ExecutionManager:
 
     async def attach(self, conversation_id: str | None, ws: WebSocket) -> dict[str, Any]:
         session = self.get_session(conversation_id)
+
+        # Detach WebSocket from all other sessions to prevent event cross-talk across conversations
+        for s in list(self.sessions.values()):
+            if s is not session:
+                s.remove_subscriber(ws)
+        if self.active_session and self.active_session is not session:
+            self.active_session.remove_subscriber(ws)
+
         if session:
             session.add_subscriber(ws)
             if session.conversation_id and session.conversation_id not in self.sessions:

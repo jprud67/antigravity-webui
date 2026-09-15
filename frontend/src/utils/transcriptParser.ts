@@ -4,17 +4,18 @@ import type { ChatMessage } from '../types';
  * Nettoie le texte utilisateur pour extraire la requête réelle en retirant
  * les balises XML internes injectées par agy (<USER_REQUEST>, <ADDITIONAL_METADATA>, etc.)
  */
-export function cleanUserPrompt(raw: string): string {
+export function cleanUserPrompt(raw: any): string {
   if (!raw) return '';
+  const str = typeof raw === 'string' ? raw : (typeof raw === 'object' ? JSON.stringify(raw) : String(raw));
 
   // 1. Extraire le contenu spécifique de <USER_REQUEST> s'il est présent
-  const requestMatch = /<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i.exec(raw);
+  const requestMatch = /<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i.exec(str);
   if (requestMatch) {
     return requestMatch[1].trim();
   }
 
   // 2. Retirer les blocs de métadonnées et paramètres système
-  let cleaned = raw.replace(/<ADDITIONAL_METADATA>[\s\S]*?<\/ADDITIONAL_METADATA>/gi, '');
+  let cleaned = str.replace(/<ADDITIONAL_METADATA>[\s\S]*?<\/ADDITIONAL_METADATA>/gi, '');
   cleaned = cleaned.replace(/<USER_SETTINGS_CHANGE>[\s\S]*?<\/USER_SETTINGS_CHANGE>/gi, '');
   cleaned = cleaned.replace(/<CONTEXT_SUMMARY>[\s\S]*?<\/CONTEXT_SUMMARY>/gi, '');
   cleaned = cleaned.replace(/<\/?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE)>/gi, '');
@@ -26,9 +27,9 @@ export function cleanUserPrompt(raw: string): string {
  * Détecte si une chaîne de contenu correspond à une sortie brute d'outil
  * pour éviter qu'elle ne fuite en tant que texte de dialogue de l'assistant.
  */
-export function isToolOutputContent(content: string): boolean {
+export function isToolOutputContent(content: any): boolean {
   if (!content) return false;
-  const c = content.trim();
+  const c = typeof content === 'string' ? content.trim() : (typeof content === 'object' ? JSON.stringify(content) : String(content).trim());
   return (
     c.startsWith('Created At:') ||
     c.startsWith('Completed At:') ||
@@ -80,12 +81,15 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
 
     const src = s.source || '';
     const stype = s.type || '';
-    const content = s.content || '';
-    const thinking = s.thinking || '';
+    const rawContent = s.content;
+    const content = typeof rawContent === 'string' ? rawContent : (rawContent != null ? (typeof rawContent === 'object' ? JSON.stringify(rawContent, null, 2) : String(rawContent)) : '');
+    const rawThinking = s.thinking;
+    const thinking = typeof rawThinking === 'string' ? rawThinking : (rawThinking != null ? (typeof rawThinking === 'object' ? JSON.stringify(rawThinking, null, 2) : String(rawThinking)) : '');
     const toolCallsRaw = s.tool_calls || [];
     const stepIndex = s.step_index !== undefined ? s.step_index : idx;
     const createdAt = s.created_at || s.timestamp;
-    const error = s.error || '';
+    const rawError = s.error;
+    const error = typeof rawError === 'string' ? rawError : (rawError != null ? String(rawError) : '');
 
     // Ignorer les historiques internes redondants
     if (stype === 'CONVERSATION_HISTORY' || stype === 'DIRECTORY_RULES') {

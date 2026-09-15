@@ -97,9 +97,12 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                     continue
                 # Primary Antigravity path: brain_dir/<conv_id>/.system_generated/logs/transcript.jsonl
                 t1 = child / ".system_generated" / "logs" / "transcript.jsonl"
+                t_full = child / ".system_generated" / "logs" / "transcript_full.jsonl"
                 try:
-                    if t1.exists():
-                        transcripts[str(t1)] = t1.stat().st_mtime
+                    mtime_t1 = t1.stat().st_mtime if t1.exists() else None
+                    mtime_t_full = t_full.stat().st_mtime if t_full.exists() else None
+                    if mtime_t1 is not None or mtime_t_full is not None:
+                        transcripts[str(t1)] = max(mtime_t1 or 0.0, mtime_t_full or 0.0)
                     else:
                         t2 = child / "transcript.jsonl"
                         if t2.exists():

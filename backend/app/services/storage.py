@@ -237,8 +237,10 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
     thinking_chars = 0
     
     for s in steps:
-        content = s.get("content") or ""
-        thinking = s.get("thinking") or ""
+        raw_c = s.get("content")
+        content = raw_c if isinstance(raw_c, str) else (json.dumps(raw_c, ensure_ascii=False) if raw_c is not None else "")
+        raw_t = s.get("thinking")
+        thinking = raw_t if isinstance(raw_t, str) else (json.dumps(raw_t, ensure_ascii=False) if raw_t is not None else "")
         tool_calls = json.dumps(s.get("tool_calls") or []) if s.get("tool_calls") else ""
         
         src = s.get("source") or ""
@@ -927,8 +929,28 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
     for idx, s in enumerate(steps):
         stype = s.get("type", "")
         source = s.get("source", "")
-        content = s.get("content", "") or ""
-        thinking = s.get("thinking", "") or ""
+        raw_c = s.get("content")
+        if isinstance(raw_c, str):
+            content = raw_c
+        elif raw_c is None:
+            content = ""
+        else:
+            try:
+                content = json.dumps(raw_c, ensure_ascii=False, indent=2)
+            except Exception:
+                content = str(raw_c)
+
+        raw_t = s.get("thinking")
+        if isinstance(raw_t, str):
+            thinking = raw_t
+        elif raw_t is None:
+            thinking = ""
+        else:
+            try:
+                thinking = json.dumps(raw_t, ensure_ascii=False, indent=2)
+            except Exception:
+                thinking = str(raw_t)
+
         step_index = s.get("step_index", idx)
         ts = s.get("created_at", "")
 

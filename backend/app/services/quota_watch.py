@@ -83,6 +83,8 @@ def _expected_log_candidates(since_ts: float, window: float = 5.0) -> list[Path]
                     out.append(p)
             except OSError:
                 continue
+    # Sort candidates by mtime descending so candidates[0] is the most recently created/written log
+    out.sort(key=lambda item: item.stat().st_mtime if item.exists() else 0.0, reverse=True)
     return out
 
 
