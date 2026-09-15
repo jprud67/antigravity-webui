@@ -19,6 +19,8 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
+import aiofiles
+
 from app.config import LOG_DIR
 from app.services.google_auth import is_hard_quota_error
 
@@ -109,10 +111,10 @@ async def watch_agy_log_for_quota(
             continue
 
         try:
-            with open(log_file, "r", encoding="utf-8", errors="replace") as f:
-                f.seek(offset)
-                chunk = f.read()
-                offset = f.tell()
+            async with aiofiles.open(log_file, "r", encoding="utf-8", errors="replace") as f:
+                await f.seek(offset)
+                chunk = await f.read()
+                offset = await f.tell()
         except (OSError, ValueError) as exc:
             logger.debug(f"quota_watch: lecture impossible ({log_file}): {exc}")
             continue

@@ -27,7 +27,7 @@ def remove_subscriber(q: asyncio.Queue) -> None:
 
 async def _broadcast(event: dict[str, Any]) -> None:
     dead = set()
-    for q in _subscribers:
+    for q in list(_subscribers):
         try:
             q.put_nowait(event)
         except asyncio.QueueFull:

@@ -106,7 +106,7 @@ def compute_next_run(schedule: str | dict[str, Any]) -> str | None:
             unit = match.group(2) or "m"
             if unit.startswith("h"):
                 return (now + timedelta(hours=val)).isoformat()
-            elif unit.startswith("d") or unit.startswith("j"):
+            elif unit.startswith(("d", "j")):
                 return (now + timedelta(days=val)).isoformat()
             else:
                 return (now + timedelta(minutes=val)).isoformat()

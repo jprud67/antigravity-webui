@@ -52,9 +52,34 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
             """,
             (limit * 2,)  # fetch more to allow sorting pinned items
         )
-        rows = cursor.fetchall()
+        rows = list(cursor.fetchall())
         all_meta = get_all_session_metadata()
-        
+
+        # Guarantee all pinned conversations are fetched even if older than limit * 2
+        pinned_ids = [cid for cid, m in all_meta.items() if m.get("pinned")]
+        fetched_ids = {r["conversation_id"] for r in rows}
+        missing_pinned = [cid for cid in pinned_ids if cid not in fetched_ids]
+        if missing_pinned:
+            placeholders = ",".join("?" * len(missing_pinned))
+            cursor.execute(
+                f"""
+                SELECT 
+                    conversation_id,
+                    title,
+                    preview,
+                    step_count,
+                    last_modified_time,
+                    workspace_uris,
+                    status,
+                    agent_name,
+                    parent_conversation_id
+                FROM conversation_summaries
+                WHERE conversation_id IN ({placeholders})
+                """,
+                tuple(missing_pinned)
+            )
+            rows.extend(cursor.fetchall())
+
         result = []
         for r in rows:
             cid = r["conversation_id"]
@@ -72,7 +97,7 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
                 "workspace_uris": r["workspace_uris"],
                 "status": r["status"],
                 "agent_name": r["agent_name"],
-                "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
+                "parent_conversation_id": r.get("parent_conversation_id", None),
                 "pinned": meta.get("pinned", False),
                 "archived": meta.get("archived", False),
                 "tags": meta.get("tags", []),
@@ -127,7 +152,7 @@ def get_conversation_by_id(conversation_id: str) -> dict[str, Any] | None:
             "workspace_uris": r["workspace_uris"],
             "status": r["status"],
             "agent_name": r["agent_name"],
-            "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
+            "parent_conversation_id": r.get("parent_conversation_id", None),
             "pinned": meta.get("pinned", False),
             "archived": meta.get("archived", False),
             "tags": meta.get("tags", []),
@@ -732,7 +757,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 "workspace_uris": r["workspace_uris"],
                 "status": r["status"],
                 "agent_name": r["agent_name"],
-                "parent_conversation_id": r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None,
+                "parent_conversation_id": r.get("parent_conversation_id", None),
                 "pinned": meta.get("pinned", False),
                 "archived": meta.get("archived", False),
                 "tags": meta.get("tags", []),

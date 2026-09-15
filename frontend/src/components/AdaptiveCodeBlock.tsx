@@ -51,8 +51,11 @@ import {
   BrainCircuit,
   ExternalLink
 } from 'lucide-react';
-import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
+
+const MermaidRenderer = React.lazy(() =>
+  import('./MermaidRenderer').then((m) => ({ default: m.MermaidRenderer }))
+);
 
 /**
  * Context to distinguish fenced code blocks (<pre><code>) from inline code (<code>)
@@ -401,7 +404,17 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
 
   // Intercept special engines
   if (language === 'mermaid') {
-    return <MermaidRenderer chart={rawCode} />;
+    return (
+      <React.Suspense
+        fallback={
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-xs text-slate-500 font-mono animate-pulse flex items-center justify-center">
+            Chargement du diagramme Mermaid...
+          </div>
+        }
+      >
+        <MermaidRenderer chart={rawCode} />
+      </React.Suspense>
+    );
   }
   if (language === 'diff' || language === 'patch') {
     return <DiffViewer diffText={rawCode} filename={filename} />;

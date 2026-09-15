@@ -131,15 +131,28 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
         cmdline = " ".join(proc.cmdline()).lower()
 
         # Disallow killing systemd or uvicorn backend
-        if "systemd" in proc_name or "uvicorn" in cmdline and "backend" in cmdline:
+        if "systemd" in proc_name or ("uvicorn" in cmdline and "backend" in cmdline):
             raise HTTPException(status_code=403, detail="Arrêt non autorisé pour les services principaux du serveur")
 
-        # Terminate cleanly
-        proc.terminate()
+        # Terminate process and its children cleanly
         try:
-            proc.wait(timeout=1.5)
-        except psutil.TimeoutExpired:
-            proc.kill()
+            children = proc.children(recursive=True)
+        except (psutil.NoSuchProcess, Exception):
+            children = []
+
+        for child in children:
+            try:
+                child.terminate()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+
+        proc.terminate()
+        _, alive = psutil.wait_procs([proc] + children, timeout=1.5)
+        for p in alive:
+            try:
+                p.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
 
         logger.info(f"Terminated process PID {target_pid} ({proc_name})")
         return {"success": True, "message": f"Processus {target_pid} ({proc_name}) arrêté avec succès"}

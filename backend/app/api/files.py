@@ -25,7 +25,7 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> list
 
     items = []
     try:
-        entries = sorted(list(dir_path.iterdir()), key=lambda e: (not e.is_dir(), e.name.lower()))
+        entries = sorted(dir_path.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
         for entry in entries:
             name = entry.name
             if name.startswith(".") and name not in [".env", ".gitignore"]:

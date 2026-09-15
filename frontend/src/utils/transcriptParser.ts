@@ -235,7 +235,15 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
           status: 'done'
         });
       }
-    } else if (stype === 'PLANNER_RESPONSE' || stype === 'MODEL') {
+    } else if (
+      stype === 'PLANNER_RESPONSE' ||
+      stype === 'MODEL' ||
+      stype === 'AGENT_RESPONSE' ||
+      stype === 'MESSAGE' ||
+      stype === 'TEXT' ||
+      src === 'MODEL' ||
+      src === 'ASSISTANT'
+    ) {
       // N'accumuler que du vrai contenu de dialogue
       if (content && !isToolOutputContent(content)) {
         currentAssistantMsg.content = currentAssistantMsg.content

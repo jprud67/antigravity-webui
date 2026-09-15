@@ -50,13 +50,9 @@ def require_auth(token: str | None = Depends(get_current_token)):
     return True
 
 @router.get("/status")
-def auth_status(authorization: str | None = Header(None)):
+def auth_status(token: str | None = Depends(get_current_token)):
     config = get_auth_config()
     enabled = config.get("enabled", True)
-    token = None
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization[7:].strip()
-    
     is_valid = verify_access_token(token) if enabled else True
     return {
         "enabled": enabled,

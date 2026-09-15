@@ -202,53 +202,59 @@ async def stream_turn(
     logger.info(f"Spawning agy: {' '.join(cmd)} (cwd={cwd})")
 
     spawned_at = time.time()
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        cwd=cwd,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        **spawn_group_kwargs()
-    )
-
-    if proc_callback:
-        proc_callback(proc)
-
-    quota_detected: dict[str, Any] = {"line": None}
-
-    async def quota_supervisor():
-        """
-        Détection en direct du quota (journaux agy) → terminaison rapide pour
-        permettre la bascule de compte et la relance, au lieu d'attendre les
-        retries internes du CLI (qui peuvent durer des dizaines de minutes).
-        """
-        line = await watch_agy_log_for_quota(
-            since_ts=spawned_at,
-            should_stop=lambda: proc.returncode is not None
-        )
-        quota_detected["line"] = line
-        if line and proc.returncode is None:
-            logger.warning(f"Quota dur détecté (logs agy): {line[:150]} — terminaison pour bascule de compte.")
-            await terminate_process_group_async(proc, grace=1.5)
-        return line
-
-    quota_task = asyncio.create_task(quota_supervisor())
-
-    async def read_stderr():
-        err_lines = []
-        while True:
-            line = await proc.stderr.readline()
-            if not line:
-                break
-            text = line.decode(errors="replace").strip()
-            if text:
-                logger.warning(f"[agy stderr] {text}")
-                err_lines.append(text)
-        return "\n".join(err_lines)
-
-    stderr_task = asyncio.create_task(read_stderr())
+    proc: asyncio.subprocess.Process | None = None
+    stderr_task: asyncio.Task | None = None
+    quota_task: asyncio.Task | None = None
 
     try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=cwd,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            **spawn_group_kwargs()
+        )
+
+        if proc_callback:
+            proc_callback(proc)
+
+        quota_detected: dict[str, Any] = {"line": None}
+
+        async def quota_supervisor():
+            """
+            Détection en direct du quota (journaux agy) → terminaison rapide pour
+            permettre la bascule de compte et la relance, au lieu d'attendre les
+            retries internes du CLI (qui peuvent durer des dizaines de minutes).
+            """
+            line = await watch_agy_log_for_quota(
+                since_ts=spawned_at,
+                should_stop=lambda: proc is None or proc.returncode is not None
+            )
+            quota_detected["line"] = line
+            if line and proc and proc.returncode is None:
+                logger.warning(f"Quota dur détecté (logs agy): {line[:150]} — terminaison pour bascule de compte.")
+                await terminate_process_group_async(proc, grace=1.5)
+            return line
+
+        quota_task = asyncio.create_task(quota_supervisor())
+
+        async def read_stderr():
+            err_lines = []
+            if not proc or not proc.stderr:
+                return ""
+            while True:
+                line = await proc.stderr.readline()
+                if not line:
+                    break
+                text = line.decode(errors="replace").strip()
+                if text:
+                    logger.warning(f"[agy stderr] {text}")
+                    err_lines.append(text)
+            return "\n".join(err_lines)
+
+        stderr_task = asyncio.create_task(read_stderr())
+
         while True:
             line = await proc.stdout.readline()
             if not line:
@@ -267,10 +273,10 @@ async def stream_turn(
                 }
 
         returncode = await proc.wait()
-        stderr_output = await stderr_task
+        stderr_output = await stderr_task if stderr_task else ""
         # La ligne de quota est disponible même si la terminaison est encore en cours
         quota_line = quota_detected["line"]
-        if quota_line is None:
+        if quota_line is None and quota_task:
             try:
                 quota_line = await asyncio.wait_for(quota_task, timeout=2.0)
             except asyncio.TimeoutError:
@@ -288,7 +294,8 @@ async def stream_turn(
                 "message": message or f"agy failed with exit code {returncode}"
             }
     except asyncio.CancelledError:
-        logger.info(f"stream_turn cancelled: terminating process group {proc.pid}")
+        pid_str = proc.pid if proc else "none"
+        logger.info(f"stream_turn cancelled: terminating process group {pid_str}")
         raise
     finally:
         if stderr_task and not stderr_task.done():
@@ -306,7 +313,7 @@ async def stream_turn(
 
         # Terminaison robuste du groupe de processus si encore actif
         # (couvre GeneratorExit, break et erreurs) — multiplateforme.
-        if proc.returncode is None:
+        if proc and proc.returncode is None:
             await terminate_process_group_async(proc, grace=0.8)
 
 
@@ -329,18 +336,18 @@ async def get_usage_quota() -> dict[str, Any]:
             stderr=asyncio.subprocess.PIPE
         )
         try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+            stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
             if proc.returncode == 0 and stdout:
                 data = json.loads(stdout.decode(errors="replace"))
                 _quota_cache = {"data": data, "timestamp": now}
                 return data
-        except Exception as proc_err:
+        except Exception:
             try:
                 proc.kill()
                 await proc.wait()
             except Exception:
                 pass
-            raise proc_err
+            raise
     except Exception as e:
         logger.warning(f"Error fetching usage quota: {e}")
 
@@ -361,18 +368,18 @@ async def get_credits() -> dict[str, Any]:
             stderr=asyncio.subprocess.PIPE
         )
         try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+            stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
             if proc.returncode == 0 and stdout:
                 data = json.loads(stdout.decode(errors="replace"))
                 _credits_cache = {"data": data, "timestamp": now}
                 return data
-        except Exception as proc_err:
+        except Exception:
             try:
                 proc.kill()
                 await proc.wait()
             except Exception:
                 pass
-            raise proc_err
+            raise
     except Exception as e:
         logger.warning(f"Error fetching credits: {e}")
 
@@ -393,18 +400,18 @@ async def get_changelog() -> dict[str, Any]:
             stderr=asyncio.subprocess.PIPE
         )
         try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+            stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
             if proc.returncode == 0 and stdout:
                 data = json.loads(stdout.decode(errors="replace"))
                 _changelog_cache = {"data": data, "timestamp": now}
                 return data
-        except Exception as proc_err:
+        except Exception:
             try:
                 proc.kill()
                 await proc.wait()
             except Exception:
                 pass
-            raise proc_err
+            raise
     except Exception as e:
         logger.warning(f"Error fetching changelog: {e}")
 

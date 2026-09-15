@@ -147,6 +147,11 @@ def _validate_account_file(email: str) -> Path:
     target_file = (ACCOUNTS_DIR / f"{cleaned}.json").resolve()
     if target_file.parent != ACCOUNTS_DIR.resolve():
         raise ValueError("Tentative de traversée de répertoire non autorisée.")
+    if not target_file.exists() and ACCOUNTS_DIR.exists():
+        cleaned_lower = cleaned.lower()
+        for p in ACCOUNTS_DIR.glob("*.json"):
+            if p.stem.lower() == cleaned_lower:
+                return p.resolve()
     return target_file
 
 
@@ -183,7 +188,7 @@ def delete_google_account(email: str) -> dict[str, Any]:
         raise FileNotFoundError(f"Le compte {email} est introuvable.")
 
     active_meta = get_active_account()
-    if active_meta and active_meta.get("email") == email:
+    if active_meta and active_meta.get("email", "").lower() == email.strip().lower():
         raise ValueError("Impossible de supprimer le compte Google actuellement actif. Veuillez d'abord basculer sur un autre compte.")
 
     target_file.unlink(missing_ok=True)
@@ -356,11 +361,11 @@ def start_google_login_flow() -> dict[str, Any]:
             "instructions": "Ouvrez l'URL dans votre navigateur, connectez-vous avec votre compte Google, puis copiez-collez le code d'autorisation obtenu.",
             "timeout_seconds": 180
         }
-    except Exception as e:
+    except Exception:
         _close_login_resources(master_fd, proc)
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
-        raise e
+        raise
 
 
 def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
@@ -426,12 +431,12 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
             "active_account": active_meta,
             "message": f"Nouveau compte Google connecté avec succès : {active_meta.get('email')}"
         }
-    except Exception as e:
+    except Exception:
         _close_login_resources(master_fd, proc)
         if stash_path.exists():
             shutil.move(stash_path, TOKEN_FILE)
         _LOGIN_SESSIONS.pop(session_id, None)
-        raise e
+        raise
 
 
 def cancel_google_login_flow(session_id: str) -> dict[str, Any]:

@@ -8,7 +8,15 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/mermaid')) {
+          if (
+            id.includes('node_modules/mermaid') ||
+            id.includes('node_modules/elkjs') ||
+            id.includes('node_modules/d3') ||
+            id.includes('node_modules/dagre') ||
+            id.includes('node_modules/khroma') ||
+            id.includes('node_modules/stylis') ||
+            id.includes('node_modules/cytoscape')
+          ) {
             return 'mermaid';
           }
           if (id.includes('node_modules/@xterm')) {

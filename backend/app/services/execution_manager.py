@@ -157,7 +157,7 @@ class ExecutionSession:
                     lines.append("| Limite | Restant | Réinitialisation |")
                     lines.append("| :--- | :---: | :--- |")
                     for b in g.get("buckets", []):
-                        pct = int(round(b.get("remaining_fraction", 0) * 100))
+                        pct = round(b.get("remaining_fraction", 0) * 100)
                         reset = b.get("reset_time", "N/A")
                         lines.append(f"| **{b.get('name')}** | `{pct}%` | `{reset}` |")
                     lines.append("")
@@ -502,6 +502,8 @@ class ExecutionManager:
             if mode == "steer":
                 logger.info(f"Steering session {session.conversation_id}")
                 session.is_steering = True
+                if session.active_proc and session.active_proc.returncode is None:
+                    await terminate_process_group_async(session.active_proc, grace=0.5)
                 if session.active_task and not session.active_task.done():
                     session.active_task.cancel()
                 data["prompt"] = f"[Instruction Prioritaire de Guidage] : {prompt}"

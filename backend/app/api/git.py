@@ -39,11 +39,14 @@ def _validate_workspace(workspace: str | None) -> Path:
     return resolved
 
 def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT) -> subprocess.CompletedProcess:
-    # Always enforce strict author and committer for jprud67
     base_args = [
         "git",
         "-c", "user.name=jprud67",
-        "-c", "user.email=jprud67@gmail.com"
+        "-c", "user.email=jprud67@gmail.com",
+        "-c", "author.name=jprud67",
+        "-c", "author.email=jprud67@gmail.com",
+        "-c", "committer.name=jprud67",
+        "-c", "committer.email=jprud67@gmail.com",
     ] + args
     try:
         return subprocess.run(
@@ -215,7 +218,9 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Le message de commit ne peut être vide.")
 
     # Never allow Co-Authored-By
-    clean_msg = "\n".join([line for line in req.message.strip().split("\n") if "Co-Authored-By" not in line])
+    clean_msg = "\n".join([line for line in req.message.strip().split("\n") if "co-authored-by" not in line.lower()]).strip()
+    if not clean_msg:
+        raise HTTPException(status_code=400, detail="Le message de commit ne peut être vide après nettoyage.")
 
     if req.stage_all:
         add_res = run_git(["add", "-A"], target)
