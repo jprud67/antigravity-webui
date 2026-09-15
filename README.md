@@ -75,52 +75,6 @@
 
 ---
 
-## 🏗️ Architecture
-
-```
-antigravity-webui/
-├── backend/
-│   ├── app/
-│   │   ├── api/                  # REST : conversations, artifacts, settings, workspaces,
-│   │   │                         #        crons, kanban, terminal, google, updater…
-│   │   ├── services/
-│   │   │   ├── agy_driver.py         # Spawn agy CLI stream-json (+ supervision quota)
-│   │   │   ├── execution_manager.py  # Tours persistants, files d'attente, failover comptes
-│   │   │   ├── cron_store.py         # Stockage des tâches planifiées (100 % interne)
-│   │   │   ├── cron_ticker.py        # Ticker interne : exécution des jobs + bascule quota
-│   │   │   ├── quota_watch.py        # Détection quota en direct dans les journaux agy
-│   │   │   ├── updater.py            # Vérification & application des MAJ (principe Hermes)
-│   │   │   ├── google_auth.py        # Multi-comptes, bascule atomique, OAuth
-│   │   │   ├── storage.py            # SQLite & parser de transcripts ~/.gemini/antigravity-cli/
-│   │   │   ├── fs_watcher.py         # Synchronisation temps réel (SSE)
-│   │   │   └── platform_utils.py     # Différences Linux / macOS / Windows
-│   │   ├── config.py
-│   │   └── main.py               # Serveur FastAPI & service SPA
-│   ├── requirements.txt
-│   └── run.py
-├── frontend/
-│   ├── src/
-│   │   ├── components/           # Sidebar, ChatCanvas, ChatInput, ArtifactViewer, Modals…
-│   │   ├── services/             # Client REST & WebSocket, i18n, commandes
-│   │   └── types/                # Modèles TypeScript
-│   ├── package.json
-│   └── vite.config.ts
-├── scripts/
-│   └── antigravity_audit.sh      # Audit automatique autonome (optionnel)
-├── docs/
-│   ├── automation.md             # Crons, maj, bascule : tout est propre à l'app
-│   ├── platform-support.md       # Linux / macOS / Windows
-│   └── parity-hermes-webui.md    # Journal de parité & évolutions
-├── start.sh                      # Démarrage Linux / macOS
-├── start.bat                     # Démarrage Windows
-└── README.md
-```
-
-**Données de l'application** (100 % locales, aucune dépendance externe) :
-`~/.gemini/antigravity-cli/` — jobs planifiés, heartbeat du ticker, journaux d'exécution, base kanban, cache de mise à jour. Surchargeable via `ANTIGRAVITY_DATA_DIR`.
-
----
-
 ## 🚀 Démarrage Rapide
 
 ### 1. Prérequis
