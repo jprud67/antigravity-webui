@@ -9,7 +9,7 @@ const WorkspaceModal = lazy(() => import('./components/WorkspaceModal').then(m =
 const LoginModal = lazy(() => import('./components/LoginModal').then(m => ({ default: m.LoginModal })));
 const FileExplorerModal = lazy(() => import('./components/FileExplorerModal').then(m => ({ default: m.FileExplorerModal })));
 const TaskDashboardModal = lazy(() => import('./components/TaskDashboardModal').then(m => ({ default: m.TaskDashboardModal })));
-import { type RightPanelTab } from './components/WorkspacePanel';
+import type { RightPanelTab } from './components/WorkspacePanel';
 const WorkspacePanel = lazy(() => import('./components/WorkspacePanel').then(m => ({ default: m.WorkspacePanel })));
 const SessionMetaModal = lazy(() => import('./components/SessionMetaModal').then(m => ({ default: m.SessionMetaModal })));
 const CronSchedulerModal = lazy(() => import('./components/CronSchedulerModal').then(m => ({ default: m.CronSchedulerModal })));
