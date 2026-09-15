@@ -402,6 +402,7 @@ def is_quota_error(message: str) -> bool:
         "429",
         "quota reached",
         "quota exceeded",
+        "quota limit",
         "individual quota reached",
         "exceeded your quota",
         "exhausted your capacity",
@@ -410,7 +411,13 @@ def is_quota_error(message: str) -> bool:
         "increase your limits",
         "free tier quota",
         "out of quota",
-        "too many requests"
+        "too many requests",
+        "insufficient quota",
+        "credit balance",
+        "capacity exceeded",
+        "quota_exceeded",
+        "resource has been exhausted",
+        "quota_error"
     ]
     return any(p in lower for p in patterns)
 

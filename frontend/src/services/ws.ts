@@ -70,7 +70,9 @@ export class ChatWebSocketClient {
           // Pong responses reset the heartbeat timeout (server is alive)
           if (data.event === 'pong') {
             this.resetHeartbeatTimeout();
-            return; // Don't forward internal pong to app listeners
+            // Forward pong telemetry so the application can sync running state and active tasks
+            this.listeners.forEach((cb) => cb(data));
+            return;
           }
           this.listeners.forEach((cb) => cb(data));
         } catch (err) {
@@ -109,7 +111,10 @@ export class ChatWebSocketClient {
     this.heartbeatTimer = setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         try {
-          this.ws.send(JSON.stringify({ action: 'ping' }));
+          this.ws.send(JSON.stringify({ 
+            action: 'ping',
+            conversation_id: this.currentConversationId 
+          }));
           // Set timeout — if no pong arrives, consider connection dead
           if (this.heartbeatTimeout) clearTimeout(this.heartbeatTimeout);
           this.heartbeatTimeout = setTimeout(() => {

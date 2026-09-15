@@ -462,6 +462,40 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
             if (live) {
               if (live.pending_approval) setPendingApproval(live.pending_approval);
               if (live.usage) setTokenUsage(live.usage);
+              const hasContent = live.content || live.thought || (live.tool_calls && live.tool_calls.length > 0);
+              if (hasContent) {
+                setMessages((prev) => {
+                  const last = prev[prev.length - 1];
+                  if (last && last.role === 'assistant') {
+                    return [
+                      ...prev.slice(0, -1),
+                      {
+                        ...last,
+                        thought: live.thought || last.thought,
+                        content: live.content || last.content,
+                        toolCalls: (live.tool_calls && live.tool_calls.length > 0) ? live.tool_calls : last.toolCalls,
+                        isLive: true
+                      }
+                    ];
+                  } else {
+                    return [
+                      ...prev,
+                      {
+                        id: `live-assistant-${Date.now()}`,
+                        role: 'assistant',
+                        content: live.content || '',
+                        thought: live.thought || '',
+                        toolCalls: live.tool_calls || [],
+                        isLive: true,
+                        timestamp: new Date().toISOString()
+                      }
+                    ];
+                  }
+                });
+              }
+            }
+            if (turnCid) {
+              chatSocket.sendAttach(turnCid);
             }
           }
         }
@@ -687,11 +721,75 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
                 isLive: false
               }
             ];
+          } else {
+            return [
+              ...prev,
+              {
+                id: `res-${Date.now()}`,
+                role: 'assistant',
+                content: res?.response || '',
+                thought: '',
+                toolCalls: [],
+                isLive: false,
+                timestamp: new Date().toISOString()
+              }
+            ];
           }
-          return prev;
         });
         // Refresh conversations in sidebar
         fetchConversations(50).then((c) => setConversations(c));
+      } else if (event.event === 'command_result') {
+        const cmd = event.command || {};
+        const cName = cmd.name;
+        const cData = cmd.data || {};
+        let formatted = '';
+
+        if (cName === 'usage') {
+          const lines = ['### 📊 Quotas & Limites Antigravity (Google Cloud)\n'];
+          if (cData.description) lines.push(`> ${cData.description}\n`);
+          for (const g of cData.groups || []) {
+            lines.push(`#### ${g.name || 'Groupe'}`);
+            lines.push('| Limite | Restant | Réinitialisation |');
+            lines.push('| :--- | :---: | :--- |');
+            for (const b of g.buckets || []) {
+              const pct = Math.round((b.remaining_fraction || 0) * 100);
+              lines.push(`| **${b.name || 'Quota'}** | \`${pct}%\` | \`${b.reset_time || 'N/A'}\` |`);
+            }
+            lines.push('');
+          }
+          formatted = lines.join('\n');
+        } else if (cName === 'credits') {
+          const rem = cData.remaining_credits ?? 0;
+          const uri = cData.upgrade_uri || 'https://antigravity.google/g1-upgrade';
+          formatted = `### 💳 Crédits Antigravity G1\n\n- **Crédits restants :** \`${rem}\`\n- **Lien de recharge :** [Portail G1](${uri})`;
+        } else if (cName === 'changelog') {
+          formatted = `### 📜 Journal des Modifications\n\n${cData.changelog || 'Aucun journal disponible.'}`;
+        } else {
+          formatted = `\`\`\`json\n${JSON.stringify(cmd, null, 2)}\n\`\`\``;
+        }
+
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant') {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, content: formatted, isLive: false }
+            ];
+          } else {
+            return [
+              ...prev,
+              {
+                id: `cmd-${Date.now()}`,
+                role: 'assistant',
+                content: formatted,
+                thought: '',
+                toolCalls: [],
+                isLive: false,
+                timestamp: new Date().toISOString()
+              }
+            ];
+          }
+        });
       } else if (event.event === 'approval_request') {
         setPendingApproval({
           toolName: event.tool_name || 'Action système',
@@ -787,6 +885,21 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
           }
           return prev;
         });
+      } else if (event.event === 'pong') {
+        if (event.active_conversations && Array.isArray(event.active_conversations)) {
+          const runningSet = new Set(event.active_conversations);
+          setConversations((prev) =>
+            prev.map((c) => ({ ...c, is_running: runningSet.has(c.conversation_id) }))
+          );
+        }
+        if (typeof event.queue_size === 'number' && event.conversation_id === activeConversationIdRef.current) {
+          setQueueCount(event.queue_size);
+        }
+        if (typeof event.is_running === 'boolean' && event.conversation_id === activeConversationIdRef.current) {
+          if (!event.is_running && isStreamingRef.current === false) {
+            setIsStreaming(false);
+          }
+        }
       }
     });
 

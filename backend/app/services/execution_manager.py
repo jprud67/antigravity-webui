@@ -227,6 +227,10 @@ class ExecutionSession:
             while attempt < max_failover_attempts:
                 attempt += 1
                 quota_error_detected = False
+                self.live_thought = ""
+                self.live_content = ""
+                self.live_tool_calls = []
+                self.pending_approval = None
 
                 try:
                     active_cid = self.conversation_id or conv_id
@@ -248,11 +252,19 @@ class ExecutionSession:
 
                         # Check for quota error in event
                         if event.get("event") == "error":
-                            err_msg = event.get("message", "")
+                            err_msg = event.get("message") or event.get("error") or ""
                             if is_quota_error(err_msg):
                                 quota_error_detected = True
                                 logger.warning(f"[Session {self.conversation_id}] Quota error detected in event: {err_msg}")
                                 break
+                        elif event.get("event") == "step_update":
+                            su = event.get("step_update", {})
+                            if su.get("step_type") in ("error", "ERROR_MESSAGE") or su.get("status") == "ERROR":
+                                su_msg = su.get("error") or su.get("content") or ""
+                                if is_quota_error(su_msg):
+                                    quota_error_detected = True
+                                    logger.warning(f"[Session {self.conversation_id}] Quota error detected in step_update: {su_msg}")
+                                    break
 
                         await self.broadcast(event)
 
