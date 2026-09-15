@@ -850,7 +850,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </span>
               ) : (
                 <span className="text-[10px] opacity-60 font-mono">
-                  v0.1.0
+                  v0.1.1
                 </span>
               )}
             </button>
@@ -2379,8 +2379,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 >
                   <span className="text-[10px] uppercase font-mono tracking-wider font-semibold opacity-60">Version Actuelle</span>
                   <div className="mt-2 flex items-baseline gap-1.5">
-                    <span className="text-base font-bold font-mono text-sky-500">v{systemVersion?.version || '0.1.0'}</span>
-                    <span className="text-[10px] font-mono opacity-50">{systemVersion?.tag || 'v0.1.0'}</span>
+                    <span className="text-base font-bold font-mono text-sky-500">v{systemVersion?.version || '0.1.1'}</span>
+                    <span className="text-[10px] font-mono opacity-50">{systemVersion?.tag || 'v0.1.1'}</span>
                   </div>
                 </div>
 
