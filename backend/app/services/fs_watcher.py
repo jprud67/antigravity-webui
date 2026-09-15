@@ -35,8 +35,8 @@ async def _broadcast(event: Dict[str, Any]) -> None:
             try:
                 q.get_nowait()
                 q.task_done()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"SSE queue drain failed: {e}")
             try:
                 q.put_nowait(event)
             except Exception:
@@ -100,17 +100,17 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                     if t1.exists():
                         result[str(t1)] = t1.stat().st_mtime
                         continue
-                except OSError:
-                    pass
+                except OSError as e:
+                    logger.debug(f"transcript scan (primaire) : {e}")
                 # Fallback path: brain_dir/<conv_id>/transcript.jsonl
                 t2 = child / "transcript.jsonl"
                 try:
                     if t2.exists():
                         result[str(t2)] = t2.stat().st_mtime
-                except OSError:
-                    pass
-        except OSError:
-            pass
+                except OSError as e:
+                    logger.debug(f"transcript scan (fallback) : {e}")
+        except OSError as e:
+            logger.debug(f"scan des transcripts impossible : {e}")
         return result
 
     def _scan_artifacts() -> Dict[str, float]:
@@ -127,8 +127,8 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                             result[str(f)] = f.stat().st_mtime
                     except OSError:
                         continue
-        except OSError:
-            pass
+        except OSError as e:
+            logger.debug(f"scan des artefacts impossible : {e}")
         return result
 
     # Initial scan

@@ -32,10 +32,24 @@ import logging
 logger = logging.getLogger("antigravity.main")
 
 
+def _warn_if_default_password() -> None:
+    """Avertit (une fois par démarrage) si le mot de passe WebUI par défaut est encore actif."""
+    try:
+        from app.services.auth import DEFAULT_PASSWORD, get_auth_config, verify_password
+        if get_auth_config().get("enabled", True) and verify_password(DEFAULT_PASSWORD):
+            logger.warning(
+                "⚠ SÉCURITÉ : le mot de passe WebUI par défaut est actif — "
+                "changez-le dès que possible dans les Paramètres de l'interface."
+            )
+    except Exception as e:
+        logger.debug(f"Vérification du mot de passe par défaut impossible : {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Démarre les services d'arrière-plan : watcher FS, ticker des tâches planifiées, prefetch MAJ."""
     prefetch_update_check()
+    _warn_if_default_password()
     watcher_task = asyncio.create_task(
         watch_filesystem(BRAIN_DIR, CONVERSATION_DB, poll_interval=1.5),
         name="fs_watcher"

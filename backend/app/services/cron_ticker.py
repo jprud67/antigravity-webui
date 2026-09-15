@@ -17,7 +17,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
 from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
@@ -136,7 +136,7 @@ async def run_agy_task(prompt: str, timeout: int = JOB_TIMEOUT_SECONDS) -> Tuple
     if quota_seen["line"]:
         err = (err + "\n" if err else "") + f"[quota] {quota_seen['line']}"
     if timed_out:
-        err = (err + "\n" if err else "") + f"Timeout : tâche interrompue après {timeout}s"
+        err = (err + "\n" if err else "") + f"[timeout] Tâche interrompue après {timeout}s"
 
     code = proc.returncode if proc.returncode is not None else -1
     return out, err, code
@@ -181,6 +181,11 @@ async def run_job_with_failover(job: Dict[str, Any]) -> Dict[str, Any]:
         if code == 0 and "print timeout" in combined.lower():
             status = "timeout"
             logger.warning("[Cron] agy a atteint son print-timeout (sortie partielle) — job marqué 'timeout'.")
+            break
+
+        if code != 0 and "[timeout]" in combined:
+            status = "timeout"
+            logger.warning("[Cron] Job interrompu par le timeout du ticker — marqué 'timeout'.")
             break
 
         if code == 0:

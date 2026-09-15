@@ -350,7 +350,12 @@ class ExecutionSession:
             try:
                 await self.active_task
             except asyncio.CancelledError:
-                pass
+                # Distinguer : le worker lui-même est annulé (pruning → sortir
+                # proprement) vs la tâche active annulée par steer/interrupt
+                # (l'erreur remonte de la tâche attendue → continuer la boucle).
+                current = asyncio.current_task()
+                if current is not None and current.cancelling() > 0:
+                    raise
             except Exception as e:
                 logger.error(f"[Session {self.conversation_id}] Worker task error: {e}")
             self.message_queue.task_done()

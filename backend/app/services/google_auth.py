@@ -84,9 +84,13 @@ def sync_active_account_to_store():
         meta = get_account_meta_from_token_data(data)
         email = meta.get("email")
         if email and "@" in email:
-            dest = ACCOUNTS_DIR / f"{email}.json"
-            with open(dest, "w") as f:
+            # Validation anti-traversée + écriture atomique + permissions 0600
+            dest = _validate_account_file(email)
+            temp = Path(str(dest) + ".tmp")
+            with open(temp, "w") as f:
                 json.dump(data, f, indent=2)
+            temp.replace(dest)
+            restrict_file_permissions(dest)
     except Exception as e:
         logger.error(f"Error syncing active account: {e}")
 
@@ -156,7 +160,10 @@ def switch_google_account(target_email: str) -> Dict[str, Any]:
         shutil.copy2(TOKEN_FILE, GEMINI_DIR / "antigravity-oauth-token.bak")
 
     # Copy target account to active
-    shutil.copy2(target_file, TOKEN_FILE)
+    # Écriture atomique (tmp + replace) : évite toute lecture partielle par agy
+    temp_file = Path(str(TOKEN_FILE) + ".tmp")
+    shutil.copy2(target_file, temp_file)
+    temp_file.replace(TOKEN_FILE)
     restrict_file_permissions(TOKEN_FILE)
 
     active_meta = get_active_account()

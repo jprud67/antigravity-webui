@@ -10,7 +10,7 @@ L'exécution des jobs est assurée par le ticker interne
 import logging
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel

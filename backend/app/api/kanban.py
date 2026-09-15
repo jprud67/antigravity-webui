@@ -34,8 +34,8 @@ def get_db():
     finally:
         try:
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Fermeture DB kanban : {e}")
 
 def _ensure_schema(conn: sqlite3.Connection):
     conn.execute("""

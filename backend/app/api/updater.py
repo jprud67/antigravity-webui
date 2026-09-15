@@ -1,6 +1,6 @@
 import logging
 from fastapi import APIRouter, HTTPException, Query, Depends
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from app.api.auth import require_auth
 from app.services.updater import (

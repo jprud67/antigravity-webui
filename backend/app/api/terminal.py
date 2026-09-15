@@ -205,6 +205,10 @@ class PersistentTerminalSession:
                 offset += written
             except (BlockingIOError, InterruptedError):
                 await asyncio.sleep(0.01)
+            except OSError as e:
+                # PTY fermé de l'autre côté (EPIPE/EIO) — abandonner proprement
+                logger.debug(f"terminal write interrompu (PTY fermé ?) : {e}")
+                return
 
     async def resize(self, rows: int, cols: int):
         self.rows = rows

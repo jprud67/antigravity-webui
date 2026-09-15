@@ -15,8 +15,9 @@ dans le dossier de données de l'application.
 import asyncio
 import logging
 import time
+from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 from app.config import LOG_DIR
 from app.services.google_auth import is_hard_quota_error
@@ -44,6 +45,29 @@ def _newest_log_after(since_ts: float) -> Optional[Path]:
     return candidates[-1][1]
 
 
+def _expected_log_candidates(since_ts: float, window: float = 5.0) -> List[Path]:
+    """
+    Le CLI agy nomme son journal ``cli-AAAAMMJJ_HHMMSS.log`` avec l'heure
+    locale de démarrage de la session (vérifié empiriquement). On cible donc
+    précisément les fichiers dont le nom correspond à la seconde du spawn
+    (± quelques secondes) — ce qui lève l'ambiguïté entre runs concurrents.
+    """
+    out: List[Path] = []
+    base = int(since_ts) - 1
+    for t in range(base, base + int(window) + 2):
+        try:
+            name = "cli-" + datetime.fromtimestamp(t).strftime("%Y%m%d_%H%M%S") + ".log"
+        except (OverflowError, OSError, ValueError):
+            continue
+        p = LOG_DIR / name
+        try:
+            if p.exists():
+                out.append(p)
+        except OSError:
+            continue
+    return out
+
+
 async def watch_agy_log_for_quota(
     since_ts: float,
     should_stop: Callable[[], bool],
@@ -54,7 +78,8 @@ async def watch_agy_log_for_quota(
     Surveille le journal CLI créé par un run agy et retourne la première ligne
     signalant un quota DUR (compte épuisé), ou None si le run se termine avant.
 
-    - `since_ts` : timestamp de départ du run (pour cibler le bon journal).
+    - `since_ts` : timestamp de départ du run (ciblage par nom horodaté, avec
+      repli sur le journal le plus récent en cas de nom inattendu).
     - `should_stop` : callback vérifié à chaque tour (ex: processus terminé).
     """
     start = time.time()
@@ -65,7 +90,12 @@ async def watch_agy_log_for_quota(
         await asyncio.sleep(poll_interval)
 
         if log_file is None:
-            log_file = _newest_log_after(since_ts)
+            candidates = _expected_log_candidates(since_ts)
+            if candidates:
+                log_file = candidates[0]
+            elif (time.time() - start) > 8.0:
+                # Repli : nom de journal inattendu (version différente du CLI)
+                log_file = _newest_log_after(since_ts)
             if log_file is None:
                 continue
 

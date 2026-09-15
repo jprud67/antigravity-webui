@@ -4,9 +4,12 @@ import hmac
 import hashlib
 import json
 import secrets
+import logging
 from typing import Optional, Dict, Any
 from app.config import GEMINI_DIR
 from app.platform_utils import restrict_file_permissions
+
+logger = logging.getLogger("antigravity.auth")
 
 AUTH_CONFIG_FILE = GEMINI_DIR / "webui_auth.json"
 
@@ -24,8 +27,8 @@ def get_auth_config() -> Dict[str, Any]:
         try:
             with open(AUTH_CONFIG_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Configuration d'authentification illisible — régénération : {e}")
     
     # Default config
     config = {
@@ -63,8 +66,8 @@ def verify_password(input_password: str) -> bool:
         try:
             config["password"] = hash_password(input_password.strip())
             save_auth_config(config)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Mise à niveau du hash du mot de passe impossible : {e}")
     return matched
 
 def create_access_token(expires_in_days: int = 7) -> str:
