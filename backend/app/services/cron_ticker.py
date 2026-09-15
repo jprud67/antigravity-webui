@@ -49,7 +49,7 @@ _running_jobs: set = set()
 _jobs_write_lock = asyncio.Lock()
 
 
-async def run_agy_task(prompt: str, timeout: int = JOB_TIMEOUT_SECONDS) -> tuple[str, str, int]:
+async def run_agy_task(prompt: str, skills: list[str] | None = None, timeout: int = JOB_TIMEOUT_SECONDS) -> tuple[str, str, int]:
     """
     Exécute un prompt via `agy` en mode headless. Retourne (stdout, stderr, code).
 
@@ -57,7 +57,11 @@ async def run_agy_task(prompt: str, timeout: int = JOB_TIMEOUT_SECONDS) -> tuple
     (compte épuisé), le processus est terminé immédiatement afin que la
     bascule de compte + relance s'opère sans attendre les retries internes.
     """
-    cmd = [AGY_BIN, "--dangerously-skip-permissions", "--print-timeout", "20m", "-p", prompt]
+    cmd = [AGY_BIN, "--dangerously-skip-permissions", "--print-timeout", "20m"]
+    if skills:
+        for sk in skills:
+            cmd.extend(["--skill", sk])
+    cmd.extend(["-p", prompt])
     spawned_at = time.time()
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -154,9 +158,10 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
     output = ""
     status = "error"
 
+    skills = job.get("skills", [])
     while attempts < MAX_TASK_FAILOVER:
         attempts += 1
-        out, err, code = await run_agy_task(prompt)
+        out, err, code = await run_agy_task(prompt, skills)
         combined = f"{out}\n{err}".strip()
         output = combined
 
@@ -280,6 +285,7 @@ async def tick_once() -> int:
             if due <= now:
                 job["last_status"] = "running"
                 job["last_started_at"] = now_iso()
+                job["next_run_at"] = compute_next_run(job.get("schedule"))
                 changed = True
                 _running_jobs.add(job.get("id"))
                 to_launch.append(dict(job))

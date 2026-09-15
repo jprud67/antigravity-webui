@@ -142,6 +142,12 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
 
     if req.schedule is not None:
         sched_raw = req.schedule.strip()
+        next_run = compute_next_run(sched_raw)
+        if next_run is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Expression de planification invalide : '{sched_raw}'."
+            )
         from croniter import croniter
         target["schedule"] = {
             "kind": "cron" if croniter.is_valid(sched_raw) else "interval",
@@ -149,7 +155,7 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
             "display": sched_raw
         }
         target["schedule_display"] = sched_raw
-        target["next_run_at"] = compute_next_run(sched_raw)
+        target["next_run_at"] = next_run
 
     if req.state is not None:
         new_state = req.state.lower()
