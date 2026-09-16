@@ -44,14 +44,17 @@ def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
 
 def get_session_meta(conversation_id: str) -> dict[str, Any]:
     all_meta = get_all_session_metadata()
-    return all_meta.get(conversation_id, {
+    existing = all_meta.get(conversation_id)
+    if existing:
+        return dict(existing)
+    return {
         "pinned": False,
         "archived": False,
         "tags": [],
         "project": "",
         "projectColor": "",
         "customTitle": ""
-    })
+    }
 
 def update_session_meta(conversation_id: str, updates: dict[str, Any]) -> dict[str, Any]:
     return bulk_update_session_meta([conversation_id], updates)[conversation_id]

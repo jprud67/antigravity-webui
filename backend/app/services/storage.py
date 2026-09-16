@@ -135,7 +135,7 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
         "workspace_uris": r["workspace_uris"],
         "status": r["status"],
         "agent_name": r["agent_name"],
-        "parent_conversation_id": dict(r).get("parent_conversation_id"),
+        "parent_conversation_id": dict(r).get("parent_conversation_id") or None,
         "pinned": meta.get("pinned", False),
         "archived": meta.get("archived", False),
         "tags": meta.get("tags", []),
@@ -834,11 +834,12 @@ def delete_conversation(conversation_id: str) -> bool:
 def update_conversation_title(conversation_id: str, new_title: str) -> bool:
     if not is_safe_conversation_id(conversation_id):
         return False
-    update_session_meta(conversation_id, {"customTitle": new_title})
+    clean_title = new_title.strip() if new_title else ""
+    update_session_meta(conversation_id, {"customTitle": clean_title})
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("UPDATE conversation_summaries SET title = ? WHERE conversation_id = ?", (new_title, conversation_id))
+        cursor.execute("UPDATE conversation_summaries SET title = ? WHERE conversation_id = ?", (clean_title or "Nouvelle session", conversation_id))
         conn.commit()
     finally:
         conn.close()
@@ -1975,6 +1976,8 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
             preview = str(c)[:150]
             break
 
+    parent_conv_id = payload.get("parent_conversation_id") or meta_payload.get("parent_conversation_id") or None
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -2003,7 +2006,7 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
                 json.dumps([get_default_workspace_uri()]),
                 "DONE",
                 "import",
-                "",
+                parent_conv_id,
                 now_db,
                 0
             )

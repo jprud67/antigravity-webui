@@ -310,6 +310,7 @@ class ExecutionSession:
                             if isinstance(tc, dict) and tc.get("status") == "running":
                                 tc["status"] = "error"
                         logger.error(f"[Session {self.conversation_id}] Error during turn execution: {e}")
+                        self.is_running = False
                         await self.broadcast({
                             "event": "error",
                             "conversation_id": self.conversation_id,
@@ -349,6 +350,7 @@ class ExecutionSession:
                             if isinstance(tc, dict) and tc.get("status") == "running":
                                 tc["status"] = "error"
                         logger.error(f"[Session {self.conversation_id}] Auto-failover failed: No alternative healthy accounts.")
+                        self.is_running = False
                         await self.broadcast({
                             "event": "error",
                             "conversation_id": self.conversation_id,
@@ -360,12 +362,14 @@ class ExecutionSession:
                     for tc in self.live_tool_calls:
                         if isinstance(tc, dict) and tc.get("status") == "running":
                             tc["status"] = "done"
+                    queue_sz = self.message_queue.qsize()
+                    if queue_sz == 0:
+                        self.is_running = False
                     await self.broadcast({
                         "event": "done",
                         "conversation_id": self.conversation_id,
-                        "queue_size": self.message_queue.qsize()
+                        "queue_size": queue_sz
                     })
-                    self.is_running = False
                     return
 
             # All failover attempts were exhausted without a conclusive outcome
@@ -373,6 +377,7 @@ class ExecutionSession:
                 if isinstance(tc, dict) and tc.get("status") == "running":
                     tc["status"] = "error"
             logger.error(f"[Session {self.conversation_id}] Auto-failover retries exhausted ({max_failover_attempts} attempts).")
+            self.is_running = False
             await self.broadcast({
                 "event": "error",
                 "conversation_id": self.conversation_id,
