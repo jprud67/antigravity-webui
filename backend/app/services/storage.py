@@ -537,12 +537,16 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
     # Copy artifacts if present
     if source_dir.exists():
         for item in source_dir.iterdir():
-            if item.name not in [".system_generated", "scratch"]:
-                target = new_conv_dir / item.name
-                if item.is_file():
-                    shutil.copy2(item, target)
-                elif item.is_dir():
-                    shutil.copytree(item, target, dirs_exist_ok=True)
+            # Exclude internal system folders, scratch, and temp/lock files
+            if item.name not in [".system_generated", "scratch"] and not item.name.startswith((".tmp", ".lock")):
+                try:
+                    target = new_conv_dir / item.name
+                    if item.is_file():
+                        shutil.copy2(item, target)
+                    elif item.is_dir():
+                        shutil.copytree(item, target, dirs_exist_ok=True)
+                except Exception as e:
+                    logger.warning(f"Failed to copy artifact {item.name} during handoff: {e}")
 
     # Prepare initial steps:
     # Step 0: System Context Summary

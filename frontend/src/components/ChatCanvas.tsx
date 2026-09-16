@@ -175,7 +175,18 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
       cleanHref = 'file://' + cleanHref;
     }
     const filePath = cleanHref.replace(/^file:\/\/\/?/, '/');
-    let [cleanPath, anchor] = filePath.split('#');
+    let cleanPath = filePath;
+    let anchor: string | undefined;
+    const hashIdx = filePath.indexOf('#');
+    if (hashIdx !== -1) {
+      anchor = filePath.substring(hashIdx + 1);
+      cleanPath = filePath.substring(0, hashIdx);
+    }
+    try {
+      cleanPath = decodeURIComponent(cleanPath);
+    } catch {
+      // Keep original if URI decoding fails
+    }
     if (/^\/[a-zA-Z]:/.test(cleanPath)) {
       cleanPath = cleanPath.slice(1);
     }

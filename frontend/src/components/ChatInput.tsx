@@ -408,9 +408,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   const handleModelChange = (newModelId: string) => {
     const newModelObj = models.find((m) => m.id === newModelId);
-    if (newModelObj && newModelObj.supported_efforts && newModelObj.supported_efforts.length > 0) {
-      if (!newModelObj.supported_efforts.includes(selectedEffort)) {
-        onSelectEffort((newModelObj.default_effort as any) || (newModelObj.supported_efforts[0] as any) || 'high');
+    const isClaude = (newModelObj?.id || newModelId || '').toLowerCase().includes('claude');
+    const efforts = isClaude ? [] : (newModelObj?.supported_efforts ?? []);
+    if (efforts.length > 0) {
+      if (!efforts.includes(selectedEffort)) {
+        onSelectEffort((newModelObj?.default_effort as any) || (efforts[0] as any) || 'high');
       }
     }
     onSelectModel(newModelId);

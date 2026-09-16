@@ -16,7 +16,7 @@ Fonctionnement :
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
@@ -275,7 +275,11 @@ async def _execute_job(job: dict[str, Any]) -> None:
                     except ValueError:
                         pass
                 if not is_future:
-                    j["next_run_at"] = compute_next_run(j.get("schedule"))
+                    computed_next = compute_next_run(j.get("schedule"))
+                    if not computed_next:
+                        logger.warning(f"[Cron] Impossible de recalculer le prochain run pour {j.get('id')}, repli sur +1h.")
+                        computed_next = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+                    j["next_run_at"] = computed_next
                 break
         save_jobs(data)
     logger.info(f"[Cron] Job « {name} » terminé: {result['status']} ({duration}s).")
@@ -334,7 +338,11 @@ async def tick_once() -> int:
             if due <= now:
                 job["last_status"] = "running"
                 job["last_started_at"] = now_iso()
-                job["next_run_at"] = compute_next_run(job.get("schedule"))
+                computed_next = compute_next_run(job.get("schedule"))
+                if not computed_next:
+                    logger.warning(f"[Cron] Impossible de calculer le prochain run pour {job.get('id')}, repli sur +1h.")
+                    computed_next = (now + timedelta(hours=1)).isoformat()
+                job["next_run_at"] = computed_next
                 changed = True
                 _running_jobs.add(job.get("id"))
                 to_launch.append(dict(job))
