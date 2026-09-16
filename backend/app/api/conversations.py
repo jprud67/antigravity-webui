@@ -74,6 +74,9 @@ class BulkActionRequest(BaseModel):
 async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
     action = req.action
     ids = req.conversation_ids
+    for cid in ids:
+        if not is_safe_conversation_id(cid):
+            raise HTTPException(status_code=400, detail=f"Identifiant de conversation non valide : {cid}")
     results = {}
 
     if action == "delete":
@@ -161,7 +164,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
 def bulk_export(req: BulkActionRequest, _ = Depends(require_auth)):
     import json
     import time
-    ids = req.conversation_ids
+    ids = [cid for cid in req.conversation_ids if is_safe_conversation_id(cid)]
     exported = []
     for cid in ids:
         try:
@@ -191,6 +194,8 @@ def get_all_metadata(_ = Depends(require_auth)):
 
 @router.get("/{conversation_id}")
 def get_conversation(conversation_id: str, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     transcript = get_conversation_transcript(conversation_id)
     meta = get_conversation_by_id(conversation_id) or get_session_meta(conversation_id)
     usage = calculate_conversation_tokens(transcript)
@@ -205,6 +210,8 @@ def get_conversation(conversation_id: str, _ = Depends(require_auth)):
 
 @router.post("/{conversation_id}/fork")
 def fork(conversation_id: str, req: ForkRequest, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     try:
         result = fork_conversation(
             source_conversation_id=conversation_id,
@@ -217,6 +224,8 @@ def fork(conversation_id: str, req: ForkRequest, _ = Depends(require_auth)):
 
 @router.post("/{conversation_id}/handoff")
 def handoff(conversation_id: str, req: HandoffRequest | None = None, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     try:
         new_title = req.new_title if req else None
         result = create_conversation_handoff(
@@ -229,6 +238,8 @@ def handoff(conversation_id: str, req: HandoffRequest | None = None, _ = Depends
 
 @router.put("/{conversation_id}/title")
 def rename_conversation(conversation_id: str, req: TitleUpdateRequest, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     if not req.title.strip():
         raise HTTPException(status_code=400, detail="Le titre ne peut pas être vide")
     success = update_conversation_title(conversation_id, req.title.strip())
@@ -236,12 +247,16 @@ def rename_conversation(conversation_id: str, req: TitleUpdateRequest, _ = Depen
 
 @router.put("/{conversation_id}/metadata")
 def update_metadata(conversation_id: str, req: MetadataUpdateRequest, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     updates = req.model_dump(exclude_unset=True)
     updated = update_session_meta(conversation_id, updates)
     return {"success": True, "conversation_id": conversation_id, "metadata": updated}
 
 @router.delete("/{conversation_id}")
 async def remove_conversation(conversation_id: str, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     try:
         await execution_manager.interrupt(conversation_id)
     except Exception:
@@ -251,6 +266,8 @@ async def remove_conversation(conversation_id: str, _ = Depends(require_auth)):
 
 @router.post("/{conversation_id}/undo")
 def undo_turn(conversation_id: str, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     try:
         res = undo_conversation_turn(conversation_id)
         return res

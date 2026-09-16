@@ -10,15 +10,14 @@ export function cleanUserPrompt(raw: any): string {
 
   // 1. Extraire le contenu spécifique de <USER_REQUEST> s'il est présent
   const requestMatch = /<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i.exec(str);
-  if (requestMatch) {
-    return requestMatch[1].trim();
-  }
+  let cleaned = requestMatch ? requestMatch[1] : str;
 
-  // 2. Retirer les blocs de métadonnées et paramètres système
-  let cleaned = str.replace(/<ADDITIONAL_METADATA>[\s\S]*?<\/ADDITIONAL_METADATA>/gi, '');
-  cleaned = cleaned.replace(/<USER_SETTINGS_CHANGE>[\s\S]*?<\/USER_SETTINGS_CHANGE>/gi, '');
-  cleaned = cleaned.replace(/<CONTEXT_SUMMARY>[\s\S]*?<\/CONTEXT_SUMMARY>/gi, '');
-  cleaned = cleaned.replace(/<\/?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE)>/gi, '');
+  // 2. Retirer les blocs de métadonnées, contexte et paramètres système
+  cleaned = cleaned.replace(/<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>[\s\S]*?<\/(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>/gi, '');
+  cleaned = cleaned.replace(/<\/?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>/gi, '');
+
+  // 3. Retirer les préfixes de guidage/file d'attente
+  cleaned = cleaned.replace(/^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+/g, '');
 
   return cleaned.trim();
 }
@@ -114,13 +113,16 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
     if (src === 'USER_EXPLICIT' || stype === 'USER_INPUT') {
       flushAssistant();
       const cleanContent = cleanUserPrompt(content);
-      messages.push({
-        id: `step-user-${idx}`,
-        role: 'user',
-        content: cleanContent || content,
-        stepIndex,
-        timestamp: createdAt
-      });
+      const displayContent = cleanContent || (/<(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>/i.test(content) ? '' : content.trim());
+      if (displayContent) {
+        messages.push({
+          id: `step-user-${idx}`,
+          role: 'user',
+          content: displayContent,
+          stepIndex,
+          timestamp: createdAt
+        });
+      }
       continue;
     }
 

@@ -1029,9 +1029,9 @@ def clean_user_prompt(raw: str) -> str:
     if m:
         text = m.group(1).strip()
     else:
-        text = re.sub(r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>', '', raw, flags=re.IGNORECASE)
-        text = re.sub(r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>', '', text, flags=re.IGNORECASE)
-        text = text.strip()
+        text = raw
+    text = re.sub(r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>', '', text, flags=re.IGNORECASE)
     # Strip steering/queued instruction prefixes so history stays pure and clean
     text = re.sub(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+', '', text)
     return text.strip()
@@ -1091,12 +1091,18 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
         # 2. User input
         if source == "USER_EXPLICIT" or stype == "USER_INPUT":
             flush_asst()
-            turns.append({
-                "role": "user",
-                "step_index": step_index,
-                "timestamp": ts,
-                "content": clean_user_prompt(content) or content,
-            })
+            clean_c = clean_user_prompt(content)
+            display_c = clean_c or (
+                "" if re.search(r'<(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>', content, flags=re.IGNORECASE)
+                else content.strip()
+            )
+            if display_c:
+                turns.append({
+                    "role": "user",
+                    "step_index": step_index,
+                    "timestamp": ts,
+                    "content": display_c,
+                })
             continue
 
         # 3. Tool outputs (GENERIC / SYSTEM steps following a tool call)

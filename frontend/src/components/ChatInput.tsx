@@ -1297,7 +1297,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             value={prompt}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Envoyez une instruction à Antigravity (ou tapez /)..."
+            placeholder={t('composer_placeholder', 'Posez une question ou tapez / pour les commandes...')}
             rows={1}
             className="w-full bg-transparent text-[15px] sm:text-xs resize-none outline-none leading-relaxed min-h-[44px] max-h-[160px] sm:max-h-[200px]"
             style={{ color: 'var(--text)' }}
@@ -1448,17 +1448,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 >
                   {supportedEfforts.includes('high') && (
                     <option value="high" style={{ backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
-                      Effort: Haut
+                      {t('effort_high', 'Effort : Haut')}
                     </option>
                   )}
                   {supportedEfforts.includes('medium') && (
                     <option value="medium" style={{ backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
-                      Effort: Moyen
+                      {t('effort_medium', 'Effort : Moyen')}
                     </option>
                   )}
                   {supportedEfforts.includes('low') && (
                     <option value="low" style={{ backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
-                      Effort: Faible
+                      {t('effort_low', 'Effort : Faible')}
                     </option>
                   )}
                 </select>
@@ -1515,7 +1515,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                       title="Interrompre l'étape en cours et réorienter immédiatement"
                     >
                       <Zap className="w-3.5 h-3.5 fill-current" />
-                      <span>Orienter</span>
+                      <span>{t('steer', 'Orienter')}</span>
                     </button>
 
                     {/* Queue Button */}
@@ -1531,7 +1531,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                       title="Placer dans la file d'attente pour le prochain tour"
                     >
                       <Layers className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
-                      <span>En attente</span>
+                      <span>{t('queue', 'En attente')}</span>
                     </button>
                   </>
                 )}
@@ -1544,7 +1544,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   title="Interrompre l'exécution"
                 >
                   <Square className="w-3.5 h-3.5 fill-current" />
-                  <span>Arrêter</span>
+                  <span>{t('stop', 'Arrêter')}</span>
                 </button>
               </div>
             ) : (
@@ -1558,7 +1558,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   color: '#ffffff'
                 }}
               >
-                <span>Envoyer</span>
+                <span>{t('send', 'Envoyer')}</span>
                 <Send className="w-3.5 h-3.5" />
               </button>
             )}

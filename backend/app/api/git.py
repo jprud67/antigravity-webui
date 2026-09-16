@@ -330,7 +330,10 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
     tag_args = ["tag", "-a", tag_name, "-m", clean_tag_msg]
     res_tag = run_git(tag_args, target)
     if res_tag.returncode != 0:
-        raise HTTPException(status_code=500, detail=f"Échec de la création du tag : {res_tag.stderr or res_tag.stdout}")
+        err_out = res_tag.stderr or res_tag.stdout or ""
+        if "already exists" in err_out.lower():
+            raise HTTPException(status_code=409, detail=f"Le tag '{tag_name}' existe déjà.")
+        raise HTTPException(status_code=400, detail=f"Échec de la création du tag : {err_out.strip()}")
 
     push_output = None
     if req.push:
@@ -338,7 +341,7 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
         git_env["GIT_TERMINAL_PROMPT"] = "0"
         push_res = run_git(["push", req.remote, tag_name], target, timeout=35, env=git_env)
         if push_res.returncode != 0:
-            raise HTTPException(status_code=500, detail=f"Tag créé mais échec du push : {push_res.stderr or push_res.stdout}")
+            raise HTTPException(status_code=400, detail=f"Tag créé mais échec du push : {(push_res.stderr or push_res.stdout or '').strip()}")
         push_output = push_res.stdout.strip() or push_res.stderr.strip()
 
     return {
