@@ -155,8 +155,19 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
 
     window.addEventListener('resize', handleResize);
 
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && terminalRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        handleResize();
+      });
+      resizeObserver.observe(terminalRef.current);
+    }
+
     return () => {
       window.removeEventListener('resize', handleResize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       if (wsRef.current) {
         try {
           wsRef.current.onclose = null;

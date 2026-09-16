@@ -17,6 +17,9 @@ import shutil
 import signal
 import subprocess
 import sys
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger("antigravity.platform")
 
@@ -131,13 +134,12 @@ def npm_argv(*args: str) -> list[str]:
     return [npm, *args]
 
 
-def is_safe_path(target: os.PathLike | str, allowed_roots: list[os.PathLike | str]) -> bool:
+def is_safe_path(target: os.PathLike[Any] | str, allowed_roots: Sequence[os.PathLike[Any] | str]) -> bool:
     """
     Vérifie de manière robuste qu'un chemin cible est confiné sous l'un des répertoires autorisés.
     Prend en charge la résolution de liens symboliques et la compatibilité cross-platform.
     """
     try:
-        from pathlib import Path
         t = Path(target).resolve()
         for root in allowed_roots:
             try:
