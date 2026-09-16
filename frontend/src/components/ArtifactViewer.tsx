@@ -12,7 +12,7 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import type { ArtifactItem } from '../types';
-import { fetchArtifacts, fetchArtifactContent } from '../services/api';
+import { fetchArtifacts, fetchArtifactContent, triggerFileDownload } from '../services/api';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
 
@@ -90,12 +90,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
   const downloadContent = () => {
     if (!selectedArtifact) return;
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = selectedArtifact.filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerFileDownload(blob, selectedArtifact.filename);
   };
 
   if (!isOpen) return null;

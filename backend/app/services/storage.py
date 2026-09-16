@@ -865,6 +865,7 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         new_preview = str(last_step.get("content") or last_step.get("thinking") or "")[:150]
 
         new_last_user_idx = -1
+        new_last_user_time = None
         for i in range(len(remaining_steps) - 1, -1, -1):
             s = remaining_steps[i]
             if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
@@ -872,16 +873,27 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
                     new_last_user_idx = int(s.get("step_index", i))
                 except (ValueError, TypeError):
                     new_last_user_idx = i
+                new_last_user_time = s.get("created_at") or s.get("timestamp")
                 break
 
-        cursor.execute(
-            """
-            UPDATE conversation_summaries
-            SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?
-            WHERE conversation_id = ?
-            """,
-            (len(remaining_steps), new_preview, now_str, new_last_user_idx, conversation_id)
-        )
+        if new_last_user_time:
+            cursor.execute(
+                """
+                UPDATE conversation_summaries
+                SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = ?
+                WHERE conversation_id = ?
+                """,
+                (len(remaining_steps), new_preview, now_str, new_last_user_idx, new_last_user_time, conversation_id)
+            )
+        else:
+            cursor.execute(
+                """
+                UPDATE conversation_summaries
+                SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?
+                WHERE conversation_id = ?
+                """,
+                (len(remaining_steps), new_preview, now_str, new_last_user_idx, conversation_id)
+            )
         conn.commit()
     finally:
         conn.close()
@@ -1298,10 +1310,10 @@ def export_conversation_html(conversation_id: str) -> str:
 
         thought_html = ""
         if thinking:
-            escaped_thought = html.escape(thinking, quote=True)
+            escaped_thought = html.escape(str(thinking or ""), quote=True)
             thought_html = f"""
             <details class="thought-block">
-                <summary>🧠 Raisonnement interne ({len(thinking)} car.)</summary>
+                <summary>🧠 Raisonnement interne ({len(str(thinking))} car.)</summary>
                 <pre class="thought-content">{escaped_thought}</pre>
             </details>
             """
@@ -1310,12 +1322,13 @@ def export_conversation_html(conversation_id: str) -> str:
         if tool_activities:
             tools_rendered = []
             for act in tool_activities:
-                tname = html.escape(act.get("name", "tool"), quote=True)
-                targs = html.escape(json.dumps(act.get("args", {}), indent=2, ensure_ascii=False, default=str), quote=True)
+                tname = html.escape(str(act.get("name") or "tool"), quote=True)
+                targs = html.escape(json.dumps(act.get("args") or {}, indent=2, ensure_ascii=False, default=str), quote=True)
                 res = act.get("result", "")
                 res_html = ""
-                if res:
-                    escaped_res = html.escape(res[:2000] + ("..." if len(res) > 2000 else ""), quote=True)
+                if res is not None and str(res):
+                    res_str = str(res)
+                    escaped_res = html.escape(res_str[:2000] + ("..." if len(res_str) > 2000 else ""), quote=True)
                     res_html = f'<div class="tool-result-header">Résultat :</div><pre class="tool-result">{escaped_res}</pre>'
 
                 tools_rendered.append(f"""
@@ -1335,7 +1348,7 @@ def export_conversation_html(conversation_id: str) -> str:
             </details>
             """
 
-        escaped_content = html.escape(content, quote=True)
+        escaped_content = html.escape(str(content or ""), quote=True)
 
         messages_html.append(f"""
         <div class="message-row {'row-user' if is_user else 'row-assistant'}">

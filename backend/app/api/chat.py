@@ -70,7 +70,7 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
                     "event": "pong",
                     "conversation_id": conv_id,
                     "queue_size": session.message_queue.qsize() if session else 0,
-                    "is_running": session.is_running if session else False,
+                    "is_running": execution_manager.is_running(conv_id),
                     "active_conversations": execution_manager.get_running_conversations()
                 })
 

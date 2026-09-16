@@ -10,6 +10,7 @@ L'exécution des jobs est assurée par le ticker interne
 import logging
 import time
 import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -218,7 +219,7 @@ def trigger_cron_job_now(job_id: str, _ = Depends(require_auth)):
     target["enabled"] = True
     target["state"] = "scheduled"
     target["paused_at"] = None
-    target["next_run_at"] = now_iso()
+    target["next_run_at"] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
     target["last_run_at"] = now_iso()
     target["last_status"] = "triggered"
     save_jobs(data)

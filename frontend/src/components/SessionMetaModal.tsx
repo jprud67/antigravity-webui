@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Tag, Folder, Palette, Pin, Check, Trash2, Archive, Download, FileText } from 'lucide-react';
 import type { Conversation } from '../types';
-import { updateConversationMetadata, deleteConversation, exportConversationMarkdown, exportConversationJSON } from '../services/api';
+import { updateConversationMetadata, deleteConversation, exportConversationMarkdown, exportConversationJSON, triggerFileDownload } from '../services/api';
 import { showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
 
@@ -66,20 +66,10 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
       setExporting(true);
       if (format === 'markdown') {
         const blob = await exportConversationMarkdown(conversation.conversation_id);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `session_${conversation.conversation_id.slice(0, 8)}.md`;
-        a.click();
-        URL.revokeObjectURL(url);
+        triggerFileDownload(blob, `session_${conversation.conversation_id.slice(0, 8)}.md`);
       } else {
         const blob = await exportConversationJSON(conversation.conversation_id);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `session_${conversation.conversation_id.slice(0, 8)}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+        triggerFileDownload(blob, `session_${conversation.conversation_id.slice(0, 8)}.json`);
       }
       showToast(`Export ${format.toUpperCase()} téléchargé`, 'success');
     } catch (e: any) {

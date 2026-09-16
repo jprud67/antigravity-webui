@@ -52,10 +52,18 @@ class ExecutionSession:
     def remove_subscriber(self, ws: WebSocket):
         self.subscribers.discard(ws)
 
+    @property
+    def is_busy(self) -> bool:
+        return bool(
+            self.is_running
+            or (self.active_task is not None and not self.active_task.done())
+            or not self.message_queue.empty()
+        )
+
     def get_live_state(self) -> dict[str, Any]:
         return {
             "conversation_id": self.conversation_id,
-            "is_running": self.is_running,
+            "is_running": self.is_busy,
             "queue_size": self.message_queue.qsize(),
             "started_at": self.started_at,
             "live_state": {
@@ -380,6 +388,7 @@ class ExecutionSession:
             except asyncio.CancelledError:
                 break
             self.is_steering = False
+            self.is_running = True
             try:
                 self.active_task = asyncio.create_task(self.run_turn(item))
                 try:
@@ -461,8 +470,7 @@ class ExecutionManager:
         to_prune = []
         for cid, s in list(self.sessions.items()):
             if (
-                not s.is_running
-                and s.message_queue.empty()
+                not s.is_busy
                 and len(s.subscribers) == 0
                 and (now - getattr(s, "last_active_at", 0.0)) > max_idle_seconds
             ):
@@ -511,14 +519,14 @@ class ExecutionManager:
                     self.active_session.worker_task = asyncio.create_task(self.active_session.queue_worker())
                 return self.active_session
 
-        if not conversation_id and self.active_session and self.active_session.conversation_id is None and self.active_session.is_running:
+        if not conversation_id and self.active_session and self.active_session.conversation_id is None and self.active_session.is_busy:
             if ws is None or ws in self.active_session.subscribers:
                 if workspace_path and not self.active_session.workspace_path:
                     self.active_session.workspace_path = workspace_path
                 return self.active_session
 
         if self.active_session and (not self.active_session.conversation_id or self.active_session.conversation_id not in self.sessions):
-            if not self.active_session.is_running and self.active_session.worker_task and not self.active_session.worker_task.done():
+            if not self.active_session.is_busy and self.active_session.worker_task and not self.active_session.worker_task.done():
                 self.active_session.worker_task.cancel()
 
         session = ExecutionSession(conversation_id=conversation_id, workspace_path=workspace_path)
@@ -540,20 +548,20 @@ class ExecutionManager:
                 self.sessions[conversation_id] = self.active_session
                 return self.active_session
         else:
-            if self.active_session and self.active_session.is_running:
+            if self.active_session and self.active_session.is_busy:
                 return self.active_session
-            running = [s for s in self.sessions.values() if s.is_running]
+            running = [s for s in self.sessions.values() if s.is_busy]
             if running:
                 return running[0]
         return None
 
     def is_running(self, conversation_id: str | None) -> bool:
         session = self.get_session(conversation_id)
-        return bool(session and session.is_running)
+        return bool(session and session.is_busy)
 
     def get_running_conversations(self) -> list[str]:
-        cids = {cid for cid, s in self.sessions.items() if s.is_running and cid}
-        if self.active_session and self.active_session.is_running and self.active_session.conversation_id:
+        cids = {cid for cid, s in self.sessions.items() if s.is_busy and cid}
+        if self.active_session and self.active_session.is_busy and self.active_session.conversation_id:
             cids.add(self.active_session.conversation_id)
         return list(cids)
 
@@ -611,7 +619,7 @@ class ExecutionManager:
         session.last_active_at = time.time()
         self.active_session = session
 
-        if session.is_running:
+        if session.is_busy:
             if mode == "steer":
                 logger.info(f"Steering session {session.conversation_id}")
                 session.is_steering = True

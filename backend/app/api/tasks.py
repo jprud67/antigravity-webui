@@ -101,18 +101,23 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
     try:
         for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'create_time', 'cpu_percent', 'memory_info']):
             try:
-                cmdline = proc.info.get('cmdline') or []
+                info = proc.info
+                if not info or not info.get('pid'):
+                    continue
+                cmdline = info.get('cmdline') or []
                 cmd_str = " ".join(cmdline)
-                name = proc.info.get('name', '')
+                name = info.get('name') or ''
                 if 'agy' in name or 'agy' in cmd_str or 'antigravity' in cmd_str:
+                    mem = info.get('memory_info')
+                    mem_rss = getattr(mem, 'rss', 0) if mem else 0
                     running_processes.append({
-                        "pid": proc.info['pid'],
+                        "pid": info['pid'],
                         "name": name,
                         "cmd": cmd_str[:120],
-                        "created_at": proc.info.get('create_time') or 0.0,
-                        "memory_mb": round((proc.info['memory_info'].rss or 0) / (1024 * 1024), 1) if proc.info.get('memory_info') else 0
+                        "created_at": info.get('create_time') or 0.0,
+                        "memory_mb": round((mem_rss or 0) / (1024 * 1024), 1)
                     })
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError, KeyError, TypeError):
                 continue
     except Exception as e:
         logger.warning(f"Error scanning psutil processes: {e}")
@@ -134,12 +139,18 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
         if req.task_id:
             try:
                 for p in psutil.process_iter(['pid', 'cmdline']):
-                    cmd_str = " ".join(p.info.get('cmdline') or [])
-                    if req.task_id in cmd_str:
-                        target_pid = p.info.get('pid')
-                        break
-            except Exception:
-                pass
+                    try:
+                        p_info = p.info
+                        if not p_info:
+                            continue
+                        cmd_str = " ".join(p_info.get('cmdline') or [])
+                        if req.task_id in cmd_str:
+                            target_pid = p_info.get('pid')
+                            break
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError, KeyError):
+                        continue
+            except Exception as e:
+                logger.warning(f"Error resolving task_id to pid: {e}")
         if not target_pid:
             return {"success": False, "message": "Aucun PID spécifié ou processus actif trouvé pour la tâche demandée"}
     current_pid = os.getpid()

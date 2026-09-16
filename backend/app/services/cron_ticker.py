@@ -281,7 +281,7 @@ async def _execute_job(job: dict[str, Any]) -> None:
                             due = due.replace(tzinfo=timezone.utc)
                         if due > datetime.now(timezone.utc):
                             is_future = True
-                    except ValueError:
+                    except (ValueError, TypeError):
                         pass
                 if not is_future:
                     computed_next = compute_next_run(j.get("schedule"))

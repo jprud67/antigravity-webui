@@ -53,6 +53,7 @@ import {
 } from 'lucide-react';
 import { DiffViewer } from './DiffViewer';
 import { PreContext, copyText, extractRawText } from '../utils/codeBlockUtils';
+import { triggerFileDownload } from '../services/api';
 
 const MermaidRenderer = React.lazy(() =>
   import('./MermaidRenderer').then((m) => ({ default: m.MermaidRenderer }))
@@ -401,14 +402,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
     const ext = EXTENSION_MAP[language] || 'txt';
     const name = filename || `snippet.${ext}`;
     const blob = new Blob([cleanedCode], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    triggerFileDownload(blob, name);
   };
 
   const LangIcon = langMeta.icon;

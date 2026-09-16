@@ -98,6 +98,12 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
         expr = schedule.strip()
     elif isinstance(schedule, dict):
         if schedule.get("kind") == "interval":
+            if "hours" in schedule and schedule["hours"] is not None:
+                try:
+                    hrs = max(1, int(schedule["hours"]))
+                    return (now + timedelta(hours=hrs)).isoformat()
+                except (ValueError, TypeError):
+                    pass
             if "minutes" in schedule and schedule["minutes"] is not None:
                 try:
                     mins = max(1, int(schedule["minutes"]))  # minimum 1 min pour éviter une boucle infinie

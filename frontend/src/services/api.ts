@@ -200,20 +200,28 @@ export async function bulkConversationAction(data: BulkActionPayload): Promise<a
   return res.json();
 }
 
+export function triggerFileDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 2000);
+}
+
 export async function bulkConversationExport(conversationIds: string[]): Promise<void> {
-  const res = await fetch(`${API_BASE}/conversations/bulk/export`, {
+  const res = await fetch(`${API_BASE}/conversations/bulk`, {
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ action: 'export', conversation_ids: conversationIds })
   });
   if (!res.ok) throw new Error("Échec de l'export groupé");
   const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `antigravity_bulk_export_${Date.now()}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  triggerFileDownload(blob, `antigravity_bulk_export_${Date.now()}.json`);
 }
 
 export function getExportHtmlUrl(conversationId: string): string {

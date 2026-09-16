@@ -54,6 +54,7 @@ import {
   exportConversationMarkdown,
   exportConversationJSON,
   importConversation,
+  triggerFileDownload,
   fetchSystemVersion,
   checkSystemUpdate,
   applySystemUpdate,
@@ -217,20 +218,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
       if (format === 'markdown') {
         const blob = await exportConversationMarkdown(activeConversation.conversation_id);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `session_${activeConversation.conversation_id.slice(0, 8)}.md`;
-        a.click();
-        URL.revokeObjectURL(url);
+        triggerFileDownload(blob, `session_${activeConversation.conversation_id.slice(0, 8)}.md`);
       } else {
         const blob = await exportConversationJSON(activeConversation.conversation_id);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `session_${activeConversation.conversation_id.slice(0, 8)}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+        triggerFileDownload(blob, `session_${activeConversation.conversation_id.slice(0, 8)}.json`);
       }
       showToast(`Export ${format.toUpperCase()} téléchargé`, 'success');
     } catch (e: any) {
