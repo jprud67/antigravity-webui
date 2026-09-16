@@ -221,9 +221,15 @@ class PersistentTerminalSession:
                 logger.debug(f"terminal write interrompu (PTY fermé ?) : {e}")
                 return
 
-    async def resize(self, rows: int, cols: int):
-        self.rows = max(4, min(int(rows or 24), 200))
-        self.cols = max(10, min(int(cols or 80), 300))
+    async def resize(self, rows: Any, cols: Any):
+        try:
+            self.rows = max(4, min(int(rows or 24), 200))
+        except (ValueError, TypeError):
+            self.rows = 24
+        try:
+            self.cols = max(10, min(int(cols or 80), 300))
+        except (ValueError, TypeError):
+            self.cols = 80
         if not self.is_alive():
             return
         if IS_WINDOWS:

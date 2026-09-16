@@ -137,12 +137,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleAddFiles = (files: File[]) => {
     if (!files || files.length === 0) return;
     for (const file of files) {
       const isImg = file.type.startsWith('image/');
       const reader = new FileReader();
       const id = `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      reader.onerror = () => {
+        showToast(`Impossible de lire le fichier "${file.name}"`, 'error');
+      };
       if (isImg) {
         reader.onload = (e) => {
           const content = e.target?.result as string;
@@ -191,9 +196,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const finalSpeechRef = useRef<string>('');
 
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'info') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), 3000);
   };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   const toggleListening = () => {
     if (isListening) {
