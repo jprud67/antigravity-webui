@@ -10,7 +10,11 @@ from app.platform_utils import (
     terminate_process_group_async,
     terminate_process_group_sync,
 )
-from app.services.agy_driver import get_model_families, stream_turn
+from app.services.agy_driver import (
+    get_model_families,
+    resolve_model_and_effort,
+    stream_turn,
+)
 from app.services.google_auth import (
     get_active_account,
     is_quota_error,
@@ -256,6 +260,7 @@ class ExecutionSession:
                 self.live_tool_calls = []
                 self.live_usage = None
                 self.pending_approval = None
+                self.active_proc = None
 
                 try:
                     active_cid = self.conversation_id or conv_id
@@ -341,28 +346,32 @@ class ExecutionSession:
                         for cand in candidate_models:
                             variants = cand.get("variants") or {}
                             cand_model = variants.get("default") or next(iter(variants.values()), None)
-                            if cand_model and cand_model != current_model:
-                                old_model = current_model
-                                current_model = cand_model
-                                current_effort = cand.get("default_effort")
-                                model_switched_on_current_account = True
-                                found_alternative = True
-                                logger.warning(
-                                    f"[Session {self.conversation_id}] Quota reached on {current_email} with {old_model} — switching to alternative model {current_model}..."
-                                )
-                                self.live_thought = ""
-                                self.live_content = ""
-                                self.live_tool_calls = []
-                                self.pending_approval = None
-                                await self.broadcast({
-                                    "event": "model_failover",
-                                    "conversation_id": self.conversation_id,
-                                    "previous_model": old_model,
-                                    "new_model": current_model,
-                                    "account": current_email,
-                                    "message": f"Quota atteint avec {old_model}. Basculement automatique sur {current_model} et relance de la tâche..."
-                                })
-                                break
+                            if cand_model:
+                                norm_cand_model, norm_effort = resolve_model_and_effort(cand_model, cand.get("default_effort"))
+                                target_candidate = norm_cand_model or cand_model
+                                if target_candidate and target_candidate != current_model:
+                                    old_model = current_model
+                                    current_model = target_candidate
+                                    current_effort = norm_effort
+                                    model_switched_on_current_account = True
+                                    found_alternative = True
+                                    logger.warning(
+                                        f"[Session {self.conversation_id}] Quota reached on {current_email} with {old_model} — switching to alternative model {current_model}..."
+                                    )
+                                    self.live_thought = ""
+                                    self.live_content = ""
+                                    self.live_tool_calls = []
+                                    self.pending_approval = None
+                                    self.active_proc = None
+                                    await self.broadcast({
+                                        "event": "model_failover",
+                                        "conversation_id": self.conversation_id,
+                                        "previous_model": old_model,
+                                        "new_model": current_model,
+                                        "account": current_email,
+                                        "message": f"Quota atteint avec {old_model}. Basculement automatique sur {current_model} et relance de la tâche..."
+                                    })
+                                    break
                         if found_alternative and attempt < max_failover_attempts:
                             await asyncio.sleep(1.0)
                             continue
@@ -379,6 +388,7 @@ class ExecutionSession:
                         self.live_content = ""
                         self.live_tool_calls = []
                         self.pending_approval = None
+                        self.active_proc = None
                         await self.broadcast({
                             "event": "account_failover",
                             "conversation_id": self.conversation_id,

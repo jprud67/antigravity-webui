@@ -239,7 +239,7 @@ def test_version_consistency():
     assert frontend_ver == backend_ver == updater_ver, (
         f"Version mismatch: frontend={frontend_ver}, backend={backend_ver}, updater={updater_ver}"
     )
-    assert frontend_ver == "0.1.57", f"Expected version 0.1.57, got {frontend_ver}"
+    assert frontend_ver == "0.1.58", f"Expected version 0.1.58, got {frontend_ver}"
     print(f"✓ test_version_consistency passed ({frontend_ver})")
 
 
@@ -250,6 +250,8 @@ def test_is_tool_output_content_and_clean_prompt():
     assert is_tool_output_content("Created At: 2026-09-16T12:00:00") is True
     assert is_tool_output_content("The command exited with code 0") is True
     assert is_tool_output_content('{"File":"/path/to/file.py"}') is True
+    assert is_tool_output_content('[{"File":"/path/to/file.py"}]') is True
+    assert is_tool_output_content('[{"status":"ok"}]') is True
     assert is_tool_output_content("Bonjour le monde") is False
 
     # Prompt cleaning
@@ -296,6 +298,29 @@ def test_skill_md_utf8_bom(tmp_path=None):
     print("✓ test_skill_md_utf8_bom passed")
 
 
+def test_scan_dir_symlink_cycle_guard():
+    import tempfile
+    from app.api.files import scan_dir
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        sub = root / "subdir"
+        sub.mkdir()
+        (sub / "file.txt").write_text("hello")
+        # Create a cyclic directory symlink pointing back to root
+        symlink = sub / "cyclic_symlink"
+        try:
+            symlink.symlink_to(root, target_is_directory=True)
+        except OSError:
+            # Skip if symlinks not supported on filesystem
+            return
+        
+        # Scanning must terminate cleanly without RecursionError or infinite loop
+        items = scan_dir(root, current_depth=0, max_depth=3)
+        assert len(items) > 0
+    print("✓ test_scan_dir_symlink_cycle_guard passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -311,5 +336,6 @@ if __name__ == "__main__":
     test_is_tool_output_content_and_clean_prompt()
     test_session_meta_legacy_defaults()
     test_skill_md_utf8_bom()
+    test_scan_dir_symlink_cycle_guard()
     print("\nAll unit tests passed successfully!")
 

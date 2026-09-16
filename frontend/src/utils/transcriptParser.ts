@@ -34,11 +34,18 @@ export function isToolOutputContent(content: any): boolean {
     c.startsWith('Completed At:') ||
     c.startsWith('File Path:') ||
     c.startsWith('The command exited with code') ||
+    c.startsWith('The command exited') ||
     c.startsWith('Tool is running as a background task') ||
     c.startsWith('Encountered error in tool execution:') ||
     c.startsWith('{"File":') ||
     c.startsWith('{"status":') ||
     c.startsWith('{"event":') ||
+    c.startsWith('{"step_index":') ||
+    c.startsWith('{"type":') ||
+    c.startsWith('[{"File":') ||
+    c.startsWith('[{"status":') ||
+    c.startsWith('[{"name":') ||
+    c.startsWith('[{"step_index":') ||
     c.startsWith('Task id "') ||
     c.startsWith('[Active skills:') ||
     c.startsWith('Starting background task')

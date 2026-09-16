@@ -20,9 +20,19 @@ IGNORED_DIRS = {
     "dist", ".cache", ".next", ".turbo", "vendor"
 }
 
-def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> list[dict[str, Any]]:
+def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2, visited: set[Path] | None = None) -> list[dict[str, Any]]:
     if current_depth > max_depth or not dir_path.is_dir():
         return []
+
+    if visited is None:
+        visited = set()
+    try:
+        resolved_dir = dir_path.resolve()
+    except (OSError, RuntimeError):
+        return []
+    if resolved_dir in visited:
+        return []
+    visited.add(resolved_dir)
 
     items = []
     try:
@@ -47,8 +57,8 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> list
                     "last_modified": stat.st_mtime,
                 }
 
-                if is_dir and current_depth < max_depth:
-                    item["children"] = scan_dir(entry, current_depth + 1, max_depth)
+                if is_dir and not entry.is_symlink() and current_depth < max_depth:
+                    item["children"] = scan_dir(entry, current_depth + 1, max_depth, visited)
 
                 items.append(item)
             except (PermissionError, OSError):

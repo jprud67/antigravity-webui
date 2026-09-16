@@ -11,6 +11,7 @@ export class ChatWebSocketClient {
   private _status: 'connected' | 'disconnected' | 'reconnecting' = 'disconnected';
   private currentConversationId: string | null = null;
   private pendingPayloads: any[] = [];
+  private reconnectAttempts: number = 0;
 
   // Heartbeat config
   private static readonly HEARTBEAT_INTERVAL = 5000; // 5s ping
@@ -39,6 +40,17 @@ export class ChatWebSocketClient {
     if (this._status === status) return;
     this._status = status;
     this.statusListeners.forEach((cb) => cb(status));
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.setStatus('reconnecting');
+    const delay = Math.min(15000, Math.round(2000 * Math.pow(1.5, Math.min(this.reconnectAttempts, 8))));
+    this.reconnectAttempts++;
+    this.reconnectTimer = setTimeout(() => this.connect(), delay);
   }
 
   public connect() {
@@ -70,6 +82,7 @@ export class ChatWebSocketClient {
 
       this.ws.onopen = () => {
         console.log('[WS] Connected to Antigravity WebUI chat socket');
+        this.reconnectAttempts = 0;
         this.setStatus('connected');
         this.startHeartbeat();
         if (this.currentConversationId) {
@@ -119,9 +132,7 @@ export class ChatWebSocketClient {
           this.pendingPayloads = [];
           return;
         }
-        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-        this.setStatus('reconnecting');
-        this.reconnectTimer = setTimeout(() => this.connect(), 2000);
+        this.scheduleReconnect();
       };
 
       this.ws.onerror = (err) => {
@@ -129,9 +140,7 @@ export class ChatWebSocketClient {
       };
     } catch (e) {
       console.error('[WS] Connection exception:', e);
-      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-      this.setStatus('reconnecting');
-      this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+      this.scheduleReconnect();
     }
 
   }
@@ -205,6 +214,7 @@ export class ChatWebSocketClient {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    this.reconnectAttempts = 0;
     this.stopHeartbeat();
     if (this.ws) {
       try {

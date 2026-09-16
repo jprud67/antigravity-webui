@@ -301,10 +301,17 @@ class PushRequest(BaseModel):
 def git_push(req: PushRequest, _ = Depends(require_auth)):
     import os as _os
     target = _validate_workspace(req.workspace)
-    branch = req.branch
+    remote = req.remote.strip() if req.remote else "origin"
+    if remote.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote):
+        raise HTTPException(status_code=400, detail="Nom de remote Git invalide.")
+
+    branch = req.branch.strip() if req.branch else None
     if not branch:
         res_br = run_git(["branch", "--show-current"], target)
         branch = res_br.stdout.strip() or "main"
+
+    if branch.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
+        raise HTTPException(status_code=400, detail="Nom de branche Git invalide.")
 
     # Préparer l'environnement avec désactivation du prompt interactif
     # Le token peut être injecté via GIT_TOKEN dans l'environnement du serveur,
@@ -312,11 +319,11 @@ def git_push(req: PushRequest, _ = Depends(require_auth)):
     git_env = _os.environ.copy()
     git_env["GIT_TERMINAL_PROMPT"] = "0"  # Désactive tout prompt interactif git
 
-    push_res = run_git(["push", req.remote, branch], target, timeout=35, env=git_env)
+    push_res = run_git(["push", remote, branch], target, timeout=35, env=git_env)
     if push_res.returncode != 0:
         err_out = push_res.stderr or push_res.stdout or ""
         if "has no upstream branch" in err_out or "--set-upstream" in err_out:
-            push_res = run_git(["push", "-u", req.remote, branch], target, timeout=35, env=git_env)
+            push_res = run_git(["push", "-u", remote, branch], target, timeout=35, env=git_env)
         if push_res.returncode != 0:
             raise HTTPException(status_code=500, detail=f"Échec du push : {push_res.stderr or push_res.stdout}")
 
@@ -351,6 +358,12 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
     tag_name = req.tag.strip()
     if not tag_name:
         raise HTTPException(status_code=400, detail="Le nom du tag ne peut être vide.")
+    if tag_name.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', tag_name):
+        raise HTTPException(status_code=400, detail="Nom de tag Git invalide.")
+
+    remote = req.remote.strip() if req.remote else "origin"
+    if remote.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote):
+        raise HTTPException(status_code=400, detail="Nom de remote Git invalide.")
 
     raw_tag_msg = req.message.strip() if req.message else tag_name
     clean_tag_msg = _sanitize_git_message(raw_tag_msg)
@@ -369,7 +382,7 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
     if req.push:
         git_env = _os.environ.copy()
         git_env["GIT_TERMINAL_PROMPT"] = "0"
-        push_res = run_git(["push", req.remote, tag_name], target, timeout=35, env=git_env)
+        push_res = run_git(["push", remote, tag_name], target, timeout=35, env=git_env)
         if push_res.returncode != 0:
             raise HTTPException(status_code=400, detail=f"Tag créé mais échec du push : {(push_res.stderr or push_res.stdout or '').strip()}")
         push_output = push_res.stdout.strip() or push_res.stderr.strip()

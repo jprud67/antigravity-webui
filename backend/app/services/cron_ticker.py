@@ -224,20 +224,22 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
                 for cand in candidate_models:
                     variants = cand.get("variants") or {}
                     cand_model = variants.get("default") or next(iter(variants.values()), None)
-                    if cand_model and cand_model != model:
-                        old_model = model
+                    if cand_model:
                         norm_cand_model, norm_effort = resolve_model_and_effort(cand_model, cand.get("default_effort"))
-                        model = norm_cand_model or cand_model
-                        effort = norm_effort
-                        model_switched_on_current_account = True
-                        found_alternative = True
+                        target_model = norm_cand_model or cand_model
+                        if target_model and target_model != model:
+                            old_model = model
+                            model = target_model
+                            effort = norm_effort
+                            model_switched_on_current_account = True
+                            found_alternative = True
 
-                        failovers.append({"from": old_model, "to": model, "attempt": attempts, "type": "model"})
-                        logger.warning(
-                            f"[Cron] Quota atteint sur {current_email} avec {old_model} — bascule sur le modèle alternatif {model}, "
-                            f"relance de la tâche (tentative {attempts + 1}/{MAX_TASK_FAILOVER})..."
-                        )
-                        break
+                            failovers.append({"from": old_model, "to": model, "attempt": attempts, "type": "model"})
+                            logger.warning(
+                                f"[Cron] Quota atteint sur {current_email} avec {old_model} — bascule sur le modèle alternatif {model}, "
+                                f"relance de la tâche (tentative {attempts + 1}/{MAX_TASK_FAILOVER})..."
+                            )
+                            break
 
                 if found_alternative and attempts < MAX_TASK_FAILOVER:
                     await asyncio.sleep(1.0)
