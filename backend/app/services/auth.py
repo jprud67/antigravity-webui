@@ -135,6 +135,8 @@ def verify_access_token(token: str | None) -> bool:
     return True
 
 def update_password(new_password: str):
+    if not new_password or len(new_password.strip()) < 4:
+        raise ValueError("Le nouveau mot de passe doit comporter au moins 4 caractères.")
     config = get_auth_config()
     config["password"] = hash_password(new_password.strip())
     config["secret_key"] = secrets.token_hex(32)  # Invalidate previous tokens

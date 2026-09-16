@@ -11,7 +11,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 try:
     import pty
@@ -405,15 +405,24 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
     stash_path = Path(session["stash_path"])
 
     code = raw_input.strip()
-    # If the user pasted the entire redirect URL e.g. https://antigravity.google/oauth-callback?code=...
+    # If the user pasted the entire redirect URL e.g. https://...?code=... or fragment or code=...
     if "code=" in code:
         try:
             parsed = urlparse(code)
-            params = parse_qs(parsed.query)
-            if params.get("code"):
-                code = params["code"][0]
+            query_str = parsed.query or parsed.fragment or ""
+            if query_str:
+                params = parse_qs(query_str)
+                if params.get("code"):
+                    code = params["code"][0]
+            if "code=" in code:
+                m = re.search(r'(?:[?&#]code=|^code=)([^&\s#]+)', code)
+                if m:
+                    code = m.group(1)
         except Exception:
             pass
+        code = code.removeprefix("code=")
+
+    code = unquote(code.strip())
 
     if not code:
         raise ValueError("Code d'autorisation vide.")

@@ -129,10 +129,19 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
 
 @router.post("/kill")
 def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
-    if not req.pid:
-        return {"success": False, "message": "Aucun PID spécifié"}
-
     target_pid = req.pid
+    if not target_pid:
+        if req.task_id:
+            try:
+                for p in psutil.process_iter(['pid', 'cmdline']):
+                    cmd_str = " ".join(p.info.get('cmdline') or [])
+                    if req.task_id in cmd_str:
+                        target_pid = p.info.get('pid')
+                        break
+            except Exception:
+                pass
+        if not target_pid:
+            return {"success": False, "message": "Aucun PID spécifié ou processus actif trouvé pour la tâche demandée"}
     current_pid = os.getpid()
     parent_pid = os.getppid()
 

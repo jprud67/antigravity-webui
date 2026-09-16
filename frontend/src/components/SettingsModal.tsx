@@ -146,12 +146,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [updateProgressMsg, setUpdateProgressMsg] = useState<string | null>(null);
 
   // Conversation state
-  const [convTitle, setConvTitle] = useState('');
-  const [convProject, setConvProject] = useState('');
-  const [convProjectColor, setConvProjectColor] = useState<string>(CONV_PALETTE[0]);
-  const [convTagsStr, setConvTagsStr] = useState('');
-  const [convPinned, setConvPinned] = useState(false);
-  const [convArchived, setConvArchived] = useState(false);
+  const [convTitle, setConvTitle] = useState(() => activeConversation ? (activeConversation.customTitle || activeConversation.title || '') : '');
+  const [convProject, setConvProject] = useState(() => activeConversation?.project || '');
+  const [convProjectColor, setConvProjectColor] = useState<string>(() => activeConversation?.projectColor || CONV_PALETTE[0]);
+  const [convTagsStr, setConvTagsStr] = useState(() => (activeConversation?.tags || []).join(', '));
+  const [convPinned, setConvPinned] = useState(() => !!activeConversation?.pinned);
+  const [convArchived, setConvArchived] = useState(() => !!activeConversation?.archived);
   const [convSaving, setConvSaving] = useState(false);
   const [convExporting, setConvExporting] = useState(false);
   const convFileInputRef = useRef<HTMLInputElement>(null);
@@ -169,26 +169,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     showToast(`Raccourci d'envoi réglé sur : ${mode === 'ctrlEnter' ? 'Ctrl/Cmd+Entrée' : 'Entrée'}`, 'info');
   };
 
-  const [prevConvId, setPrevConvId] = useState<string | null>(null);
-  const currentConvId = isOpen ? (activeConversation?.conversation_id || 'active') : null;
-  if (currentConvId !== prevConvId) {
-    setPrevConvId(currentConvId);
-    if (activeConversation) {
-      setConvTitle(activeConversation.customTitle || activeConversation.title || '');
-      setConvProject(activeConversation.project || '');
-      setConvProjectColor(activeConversation.projectColor || CONV_PALETTE[0]);
-      setConvTagsStr((activeConversation.tags || []).join(', '));
-      setConvPinned(!!activeConversation.pinned);
-      setConvArchived(!!activeConversation.archived);
-    } else {
-      setConvTitle('');
-      setConvProject('');
-      setConvProjectColor(CONV_PALETTE[0]);
-      setConvTagsStr('');
-      setConvPinned(false);
-      setConvArchived(false);
+  const prevConvIdRef = useRef(activeConversation?.conversation_id);
+  useEffect(() => {
+    if (activeConversation?.conversation_id !== prevConvIdRef.current) {
+      prevConvIdRef.current = activeConversation?.conversation_id;
+      // oxlint-disable-next-line react/set-state-in-effect
+      setConvTitle(activeConversation?.customTitle || activeConversation?.title || '');
+      setConvProject(activeConversation?.project || '');
+      setConvProjectColor(activeConversation?.projectColor || CONV_PALETTE[0]);
+      setConvTagsStr((activeConversation?.tags || []).join(', '));
+      setConvPinned(!!activeConversation?.pinned);
+      setConvArchived(!!activeConversation?.archived);
     }
-  }
+  }, [activeConversation]);
 
   const handleSaveConvMeta = async () => {
     if (!activeConversation) return;
@@ -506,19 +499,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const [prevOpenState, setPrevOpenState] = useState<{ open: boolean; tab?: SettingsTab }>({ open: false });
-  if (isOpen && (!prevOpenState.open || prevOpenState.tab !== initialTab)) {
-    setPrevOpenState({ open: true, tab: initialTab });
-    if (initialTab) setActiveTab(initialTab);
-    setSelectedModelId(currentModel);
-    setSkillsLoading(true);
-    setGoogleLoading(true);
-  } else if (!isOpen && prevOpenState.open) {
-    setPrevOpenState({ open: false });
-  }
-
   useEffect(() => {
     if (isOpen) {
+      // oxlint-disable-next-line react/set-state-in-effect
+      if (initialTab) setActiveTab(initialTab);
+      // oxlint-disable-next-line react/set-state-in-effect
+      setSelectedModelId(currentModel);
+      setSkillsLoading(true);
+      setGoogleLoading(true);
+
       fetchSettings().then((s) => {
         setSettings(s);
         if (s.model) {

@@ -345,6 +345,7 @@ class ExecutionSession:
         finally:
             self.active_proc = None
             self.is_running = False
+            self.pending_approval = None
             self.last_active_at = time.time()
 
     async def queue_worker(self):
@@ -354,22 +355,24 @@ class ExecutionSession:
             except asyncio.CancelledError:
                 break
             self.is_steering = False
-            self.active_task = asyncio.create_task(self.run_turn(item))
             try:
-                await self.active_task
-            except asyncio.CancelledError:
-                # Distinguer : le worker lui-même est annulé (pruning → sortir
-                # proprement) vs la tâche active annulée par steer/interrupt
-                # (l'erreur remonte de la tâche attendue → continuer la boucle).
-                current = asyncio.current_task()
-                # Task.cancelling() est disponible uniquement à partir de Python 3.11.
-                cancelling = getattr(current, "cancelling", None)
-                if current is not None and callable(cancelling) and cancelling() > 0:
-                    raise
-            except Exception as e:
-                logger.error(f"[Session {self.conversation_id}] Worker task error: {e}")
-            self.last_active_at = time.time()
-            self.message_queue.task_done()
+                self.active_task = asyncio.create_task(self.run_turn(item))
+                try:
+                    await self.active_task
+                except asyncio.CancelledError:
+                    # Distinguer : le worker lui-même est annulé (pruning → sortir
+                    # proprement) vs la tâche active annulée par steer/interrupt
+                    # (l'erreur remonte de la tâche attendue → continuer la boucle).
+                    current = asyncio.current_task()
+                    # Task.cancelling() est disponible uniquement à partir de Python 3.11.
+                    cancelling = getattr(current, "cancelling", None)
+                    if current is not None and callable(cancelling) and cancelling() > 0:
+                        raise
+                except Exception as e:
+                    logger.error(f"[Session {self.conversation_id}] Worker task error: {e}")
+            finally:
+                self.last_active_at = time.time()
+                self.message_queue.task_done()
 
 
 class ExecutionManager:
@@ -427,16 +430,26 @@ class ExecutionManager:
 
     def get_or_create_session(self, conversation_id: str | None, workspace_path: str | None = None) -> ExecutionSession:
         self.prune_inactive_sessions()
-        if conversation_id and conversation_id in self.sessions:
-            s = self.sessions[conversation_id]
-            if workspace_path:
-                s.workspace_path = workspace_path
-            # Ensure worker task is running
-            if not s.worker_task or s.worker_task.done():
-                s.worker_task = asyncio.create_task(s.queue_worker())
-            return s
+        if conversation_id:
+            if conversation_id in self.sessions:
+                s = self.sessions[conversation_id]
+                if workspace_path:
+                    s.workspace_path = workspace_path
+                # Ensure worker task is running
+                if not s.worker_task or s.worker_task.done():
+                    s.worker_task = asyncio.create_task(s.queue_worker())
+                return s
+            if self.active_session and self.active_session.conversation_id == conversation_id:
+                self.sessions[conversation_id] = self.active_session
+                if workspace_path:
+                    self.active_session.workspace_path = workspace_path
+                if not self.active_session.worker_task or self.active_session.worker_task.done():
+                    self.active_session.worker_task = asyncio.create_task(self.active_session.queue_worker())
+                return self.active_session
 
-        if not conversation_id and self.active_session and self.active_session.is_running and not self.active_session.conversation_id:
+        if not conversation_id and self.active_session and self.active_session.is_running:
+            if workspace_path and not self.active_session.workspace_path:
+                self.active_session.workspace_path = workspace_path
             return self.active_session
 
         if self.active_session and (not self.active_session.conversation_id or self.active_session.conversation_id not in self.sessions):

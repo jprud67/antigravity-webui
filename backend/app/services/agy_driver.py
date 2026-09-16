@@ -26,14 +26,25 @@ DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
         },
     },
     {
-        "id": "gemini-3.8-pro",
-        "name": "Gemini 3.8 Pro",
+        "id": "gemini-3.7-flash",
+        "name": "Gemini 3.7 Flash",
         "default_effort": "high",
         "supported_efforts": ["high", "medium", "low"],
         "variants": {
-            "high": "gemini-3.8-pro-high",
-            "medium": "gemini-3.8-pro-medium",
-            "low": "gemini-3.8-pro-low",
+            "high": "gemini-3.7-flash-high",
+            "medium": "gemini-3.7-flash-medium",
+            "low": "gemini-3.7-flash-low",
+        },
+    },
+    {
+        "id": "gemini-3.6-flash",
+        "name": "Gemini 3.6 Flash",
+        "default_effort": "high",
+        "supported_efforts": ["high", "medium", "low"],
+        "variants": {
+            "high": "gemini-3.6-flash-high",
+            "medium": "gemini-3.6-flash-medium",
+            "low": "gemini-3.6-flash-low",
         },
     },
     {
@@ -59,6 +70,13 @@ DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
         "default_effort": None,
         "supported_efforts": [],
         "variants": {"default": "claude-opus-4-6-thinking"},
+    },
+    {
+        "id": "gpt-oss-120b-medium",
+        "name": "GPT-OSS 120B",
+        "default_effort": "medium",
+        "supported_efforts": ["medium"],
+        "variants": {"medium": "gpt-oss-120b-medium"},
     },
 ]
 
@@ -196,7 +214,9 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
             norm = norm.removesuffix(sfx)
         if "opus" in norm:
             return "claude-opus-4-6-thinking", None
-        return "claude-sonnet-4-6", None
+        if "sonnet" in norm:
+            return "claude-sonnet-4-6", None
+        return raw, None
 
     # GPT-OSS only supports medium
     if "gpt-oss" in norm:

@@ -251,6 +251,7 @@ export function App() {
       }
       setIsAuthenticated(true);
       setIsAuthModalOpen(false);
+      chatSocket.connect();
 
       const [convs, mods, settings, googleRes] = await Promise.all([
         fetchConversations(50),

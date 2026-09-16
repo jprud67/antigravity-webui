@@ -71,7 +71,7 @@ def _is_blocked_sensitive_path(resolved: Path) -> bool:
     # Points de montage système root
     if len(parts) > 1 and parts[1] in ("proc", "sys"):
         return True
-    if len(parts) > 2 and parts[1] == "etc" and parts[2] in ("shadow", "sudoers", "master.passwd"):
+    if len(parts) > 2 and parts[1] == "etc" and parts[2] in ("passwd", "shadow", "sudoers", "master.passwd"):
         return True
 
     # Fichiers de secrets et identifiants

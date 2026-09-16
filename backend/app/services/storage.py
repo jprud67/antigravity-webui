@@ -779,6 +779,7 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
     conv_dir = BRAIN_DIR / conversation_id
     transcript_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
     transcript_full_file = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
+    legacy_file = conv_dir / "transcript.jsonl"
 
     steps = get_conversation_transcript(conversation_id)
     if not steps:
@@ -799,6 +800,11 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
 
     # Persist updated compact transcript file atomically
     if transcript_file.exists():
+        atomic_write_jsonl(transcript_file, remaining_steps)
+    elif not transcript_full_file.exists() and legacy_file.exists():
+        atomic_write_jsonl(legacy_file, remaining_steps)
+    else:
+        transcript_file.parent.mkdir(parents=True, exist_ok=True)
         atomic_write_jsonl(transcript_file, remaining_steps)
 
     # Persist updated full transcript file independently to avoid degrading unabridged history
@@ -1016,10 +1022,8 @@ def clean_user_prompt(raw: str) -> str:
     if m:
         text = m.group(1).strip()
     else:
-        text = re.sub(r'<ADDITIONAL_METADATA>[\s\S]*?</ADDITIONAL_METADATA>', '', raw, flags=re.IGNORECASE)
-        text = re.sub(r'<USER_SETTINGS_CHANGE>[\s\S]*?</USER_SETTINGS_CHANGE>', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'<CONTEXT_SUMMARY>[\s\S]*?</CONTEXT_SUMMARY>', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE)>', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>', '', raw, flags=re.IGNORECASE)
+        text = re.sub(r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>', '', text, flags=re.IGNORECASE)
         text = text.strip()
     # Strip steering/queued instruction prefixes so history stays pure and clean
     text = re.sub(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+', '', text)
