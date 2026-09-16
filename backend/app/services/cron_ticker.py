@@ -180,6 +180,8 @@ async def run_agy_task(
             if not t.done():
                 t.cancel()
         await asyncio.gather(*pumps, quota_task, return_exceptions=True)
+        if job_id and _running_job_procs.get(job_id) is proc:
+            _running_job_procs.pop(job_id, None)
 
     out = "".join(stdout_chunks)
     err = "".join(stderr_chunks)

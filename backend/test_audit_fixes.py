@@ -240,7 +240,7 @@ def test_version_consistency():
     assert frontend_ver == backend_ver == updater_ver, (
         f"Version mismatch: frontend={frontend_ver}, backend={backend_ver}, updater={updater_ver}"
     )
-    assert frontend_ver == "0.1.60", f"Expected version 0.1.60, got {frontend_ver}"
+    assert frontend_ver == "0.1.61", f"Expected version 0.1.61, got {frontend_ver}"
     print(f"✓ test_version_consistency passed ({frontend_ver})")
 
 
