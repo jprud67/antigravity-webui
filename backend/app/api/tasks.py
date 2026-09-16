@@ -31,7 +31,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                 all_dirs = [d for d in BRAIN_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")]
                 all_dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
                 conv_dirs = all_dirs[:30]
-            except Exception:
+            except Exception as e:
                 conv_dirs = []
         for cdir in conv_dirs:
             if not cdir.is_dir():
@@ -55,7 +55,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                             if stat_size > 65536 and len(lines) > 1:
                                 lines = lines[1:]
                             preview = "".join(lines[-10:]) if lines else ""
-                    except Exception:
+                    except Exception as e:
                         preview = ""
                         stat_size = 0
                         stat_mtime = 0.0
@@ -171,8 +171,8 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
     if hasattr(os, "getpgid"):
         try:
             current_pgid = os.getpgid(current_pid)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
 
     # Block killing system critical PIDs and backend server itself
     if (
@@ -209,7 +209,7 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
             try:
                 child.terminate()
             except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
+                logger.debug("Ignored error")
 
         proc.terminate()
         _, alive = psutil.wait_procs([proc] + children, timeout=1.5)
@@ -217,7 +217,7 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
             try:
                 p.kill()
             except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
+                logger.debug("Ignored error")
 
         logger.info(f"Terminated process PID {target_pid} ({proc_name})")
         return {"success": True, "message": f"Processus {target_pid} ({proc_name}) arrêté avec succès"}

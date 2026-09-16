@@ -82,12 +82,47 @@ def save_jobs(data: dict[str, Any]) -> None:
             restrict_file_permissions(temp_path)
             temp_path.replace(JOBS_FILE)
             restrict_file_permissions(JOBS_FILE)
-        except Exception:
+        except Exception as e:
             if temp_path.exists():
                 try:
                     temp_path.unlink()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
+            raise
+
+def update_jobs(modifier) -> None:
+    """Effectue une opération atomique de lecture, modification et écriture."""
+    with _jobs_lock:
+        ensure_dirs()
+        data = {"jobs": [], "updated_at": now_iso()}
+        if JOBS_FILE.exists():
+            try:
+                with open(JOBS_FILE, "r", encoding="utf-8") as f:
+                    file_data = json.load(f)
+                    if isinstance(file_data, dict):
+                        file_data.setdefault("jobs", [])
+                        data = file_data
+                    elif isinstance(file_data, list):
+                        data = {"jobs": file_data, "updated_at": now_iso()}
+            except Exception as e:
+                logger.error(f"Lecture de jobs.json impossible: {e}")
+
+        modifier(data)
+        
+        data["updated_at"] = now_iso()
+        temp_path = JOBS_FILE.parent / f"{JOBS_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
+        try:
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            restrict_file_permissions(temp_path)
+            temp_path.replace(JOBS_FILE)
+            restrict_file_permissions(JOBS_FILE)
+        except Exception as e:
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
             raise
 
 
@@ -106,13 +141,13 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
                     hrs = max(1, int(schedule["hours"]))
                     return (now + timedelta(hours=hrs)).isoformat()
                 except (ValueError, TypeError):
-                    pass
+                    logger.debug("Ignored error")
             if "minutes" in schedule and schedule["minutes"] is not None:
                 try:
                     mins = max(1, int(schedule["minutes"]))  # minimum 1 min pour éviter une boucle infinie
                     return (now + timedelta(minutes=mins)).isoformat()
                 except (ValueError, TypeError):
-                    pass
+                    logger.debug("Ignored error")
             expr = schedule.get("expr") or schedule.get("display") or schedule.get("schedule_display") or ""
 
         elif schedule.get("kind") == "cron":
@@ -143,8 +178,8 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
                 return (now + timedelta(days=val)).isoformat()
             else:
                 return (now + timedelta(minutes=val)).isoformat()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
 
     try:
         if croniter.is_valid(expr):

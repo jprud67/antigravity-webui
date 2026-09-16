@@ -41,7 +41,7 @@ async def _sse_generator(request: Request, q: asyncio.Queue):
                 yield 'data: {"type":"ping"}\n\n'
 
     except asyncio.CancelledError:
-        pass
+        logger.debug("Ignored error")
     finally:
         remove_subscriber(q)
         logger.debug("SSE client disconnected")

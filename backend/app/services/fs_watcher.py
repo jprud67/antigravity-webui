@@ -39,9 +39,9 @@ async def _broadcast(event: dict[str, Any]) -> None:
                 logger.debug(f"SSE queue drain failed: {e}")
             try:
                 q.put_nowait(event)
-            except Exception:
+            except Exception as e:
                 dead.add(q)
-        except Exception:
+        except Exception as e:
             dead.add(q)
     for q in dead:
         _subscribers.discard(q)
@@ -80,8 +80,8 @@ def extract_conv_id_from_artifact(artifact_path: Path, brain_dir: Path) -> str |
             cand = rel.parts[0]
             if _UUID_PATTERN.match(cand):
                 return cand
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Ignored error: {e}")
     return None
 
 

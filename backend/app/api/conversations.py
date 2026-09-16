@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
@@ -88,14 +90,14 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             try:
                 await execution_manager.interrupt(cid)
                 execution_manager.remove_session(cid)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Ignored error: {e}")
         try:
             bulk_delete_conversations(ids)
             for cid in ids:
                 results[cid] = True
             return {"success": True, "action": action, "count": len(ids), "results": results}
-        except Exception:
+        except Exception as e:
             for cid in ids:
                 results[cid] = False
             return {"success": False, "action": action, "count": len(ids), "results": results}
@@ -107,7 +109,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             bulk_update_session_meta(ids, {"pinned": pinned})
             for cid in ids:
                 results[cid] = True
-        except Exception:
+        except Exception as e:
             for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
@@ -118,7 +120,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             bulk_update_session_meta(ids, {"archived": archived})
             for cid in ids:
                 results[cid] = True
-        except Exception:
+        except Exception as e:
             for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
@@ -142,7 +144,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             bulk_update_session_meta_batch(updates_per_id)
             for cid in ids:
                 results[cid] = True
-        except Exception:
+        except Exception as e:
             for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
@@ -159,7 +161,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             bulk_update_session_meta(ids, updates)
             for cid in ids:
                 results[cid] = True
-        except Exception:
+        except Exception as e:
             for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
@@ -185,8 +187,8 @@ def bulk_export(req: BulkActionRequest, _ = Depends(require_auth)):
                 "metadata": meta,
                 "steps": steps
             })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
 
     return Response(
         content=json.dumps({"exported_at": time.time(), "count": len(exported), "conversations": exported}, indent=2, ensure_ascii=False),
@@ -270,8 +272,8 @@ async def remove_conversation(conversation_id: str, _ = Depends(require_auth)):
     try:
         await execution_manager.interrupt(conversation_id)
         execution_manager.remove_session(conversation_id)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Ignored error: {e}")
     success = delete_conversation(conversation_id)
     return {"success": success, "conversation_id": conversation_id}
 

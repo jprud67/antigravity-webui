@@ -136,7 +136,7 @@ class PersistentTerminalSession:
                 else:
                     self._handle_eof_or_exit()
             except (BlockingIOError, InterruptedError):
-                pass
+                logger.debug("Ignored error")
             except OSError:
                 self._handle_eof_or_exit()
 
@@ -151,12 +151,12 @@ class PersistentTerminalSession:
             if self.loop and not self.loop.is_closed():
                 try:
                     self.loop.remove_reader(fd)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
             try:
                 os.close(fd)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Ignored error: {e}")
         ws = self.active_websocket
         if ws and self.loop and not self.loop.is_closed():
             self.loop.create_task(_safe_send_bytes(ws, b"\r\n\x1b[33m\xe2\x9a\xa1 Session terminal ferm\xc3\xa9e.\x1b[0m\r\n"))
@@ -281,12 +281,12 @@ class PersistentTerminalSession:
             if self.loop:
                 try:
                     self.loop.remove_reader(fd)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
             try:
                 os.close(fd)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Ignored error: {e}")
 
         if self.proc:
             await terminate_process_group_async(self.proc, grace=0.1)
@@ -392,7 +392,7 @@ async def terminal_websocket(
                                 if cols > 0 and rows > 0:
                                     await session.resize(rows, cols)
                             except (TypeError, ValueError):
-                                pass
+                                logger.debug("Ignored error")
                             continue
                         elif action == "stdin":
                             data = msg_obj.get("data", "")
@@ -406,10 +406,10 @@ async def terminal_websocket(
                             await websocket.send_text(f"\r\n\x1b[32m{reset_label}\x1b[0m\r\n")
                             continue
                     except json.JSONDecodeError:
-                        pass
+                        logger.debug("Ignored error")
                 await session.write(text.encode("utf-8", errors="replace"))
     except (WebSocketDisconnect, ConnectionResetError):
-        pass
+        logger.debug("Ignored error")
     except Exception as e:
         logger.debug(f"Terminal client disconnected from session {sid}: {e}")
     finally:
@@ -430,8 +430,8 @@ async def prune_dead_sessions() -> None:
             if s:
                 try:
                     await s.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
 
 @router.get("/api/terminal/sessions")
 async def list_terminal_sessions(_ = Depends(require_auth)):

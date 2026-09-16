@@ -80,8 +80,8 @@ def _validate_path_access(file_path: Path) -> Path:
     for ws in workspaces:
         try:
             allowed_roots.append(Path(ws).resolve())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
 
     if not is_safe_path(resolved, allowed_roots):
         raise HTTPException(status_code=403, detail="Accès refusé : chemin en dehors des répertoires de travail autorisés.")

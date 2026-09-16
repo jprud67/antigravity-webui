@@ -415,13 +415,13 @@ async def stream_turn(
             try:
                 await stderr_task
             except (asyncio.CancelledError, Exception):
-                pass
+                logger.debug("Ignored error")
         if quota_task and not quota_task.done():
             quota_task.cancel()
             try:
                 await quota_task
             except (asyncio.CancelledError, Exception):
-                pass
+                logger.debug("Ignored error")
 
         # Terminaison robuste du groupe de processus si encore actif
         # (couvre GeneratorExit, break et erreurs) — multiplateforme.
@@ -443,8 +443,8 @@ def _extract_json_payload(raw: str) -> Any:
     trimmed = raw.strip()
     try:
         return json.loads(trimmed)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Ignored error: {e}")
 
     # Détection des blocs de code Markdown (```json ... ``` ou ``` ... ```)
     code_fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", trimmed, re.IGNORECASE)
@@ -452,8 +452,8 @@ def _extract_json_payload(raw: str) -> Any:
         fence_content = code_fence_match.group(1).strip()
         try:
             return json.loads(fence_content)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
 
     first_brace = trimmed.find('{')
     last_brace = trimmed.rfind('}')
@@ -469,8 +469,8 @@ def _extract_json_payload(raw: str) -> Any:
     for c in candidates:
         try:
             return json.loads(c)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
 
     # Search lines for JSON payloads, prioritizing lines with command-specific keys or traversing in reverse (most recent output first)
     preferred_keys = {"groups", "buckets", "remaining_credits", "changelog", "entries", "data", "models", "quota"}
@@ -483,8 +483,8 @@ def _extract_json_payload(raw: str) -> Any:
                 if isinstance(parsed, dict) and any(k in parsed for k in preferred_keys):
                     return parsed
                 parsed_lines.append(parsed)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Ignored error: {e}")
 
     if parsed_lines:
         return parsed_lines[0]
@@ -522,11 +522,11 @@ async def get_usage_quota() -> dict[str, Any]:
                         dict_payload = {"items": data}
                         _quota_cache = {"data": dict_payload, "timestamp": now}
                         return dict_payload
-            except Exception:
+            except Exception as e:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
                 raise
         except Exception as e:
             logger.warning(f"Error fetching usage quota: {e}")
@@ -564,11 +564,11 @@ async def get_credits() -> dict[str, Any]:
                         dict_payload = {"items": data}
                         _credits_cache = {"data": dict_payload, "timestamp": now}
                         return dict_payload
-            except Exception:
+            except Exception as e:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
                 raise
         except Exception as e:
             logger.warning(f"Error fetching credits: {e}")
@@ -606,11 +606,11 @@ async def get_changelog() -> dict[str, Any]:
                         dict_payload = {"items": data}
                         _changelog_cache = {"data": dict_payload, "timestamp": now}
                         return dict_payload
-            except Exception:
+            except Exception as e:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
                 raise
         except Exception as e:
             logger.warning(f"Error fetching changelog: {e}")

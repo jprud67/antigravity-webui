@@ -36,7 +36,7 @@ def is_safe_conversation_id(conversation_id: str) -> bool:
         resolved_brain = BRAIN_DIR.resolve()
         resolved_conv = (BRAIN_DIR / conversation_id).resolve()
         return resolved_conv.is_relative_to(resolved_brain) and resolved_conv != resolved_brain
-    except Exception:
+    except Exception as e:
         return False
 
 
@@ -44,7 +44,7 @@ def get_default_workspace_uri() -> str:
     """Safely return the default workspace as a file URI."""
     try:
         return Path(DEFAULT_WORKSPACE).resolve().as_uri()
-    except Exception:
+    except Exception as e:
         resolved = str(Path(DEFAULT_WORKSPACE).resolve()).replace("\\", "/")
         if not resolved.startswith("/"):
             resolved = "/" + resolved
@@ -281,8 +281,8 @@ def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
                     steps.append(json.loads(line_str))
                 except json.JSONDecodeError:
                     continue
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Ignored error: {e}")
     return steps
 
 def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]:
@@ -347,18 +347,18 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
         raw_c = s.get("content")
         try:
             content = raw_c if isinstance(raw_c, str) else (json.dumps(raw_c, ensure_ascii=False, default=str) if raw_c is not None else "")
-        except Exception:
+        except Exception as e:
             content = str(raw_c) if raw_c is not None else ""
 
         raw_t = s.get("thinking")
         try:
             thinking = raw_t if isinstance(raw_t, str) else (json.dumps(raw_t, ensure_ascii=False, default=str) if raw_t is not None else "")
-        except Exception:
+        except Exception as e:
             thinking = str(raw_t) if raw_t is not None else ""
 
         try:
             tool_calls = json.dumps(s.get("tool_calls") or [], default=str) if s.get("tool_calls") else ""
-        except Exception:
+        except Exception as e:
             tool_calls = str(s.get("tool_calls") or "")
         
         src = s.get("source") or ""
@@ -402,12 +402,12 @@ def atomic_write_jsonl(target_path: Path, items: list[dict[str, Any]]) -> None:
         with open(tmp_file, "w", encoding="utf-8") as f:
             f.writelines(json.dumps(item, ensure_ascii=False) + "\n" for item in items)
         tmp_file.replace(target_path)
-    except Exception:
+    except Exception as e:
         if tmp_file.exists():
             try:
                 tmp_file.unlink()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Ignored error: {e}")
         raise
 
 def fork_conversation(
@@ -445,7 +445,7 @@ def fork_conversation(
                     line = line.strip()
                     if line:
                         source_full_steps.append(json.loads(line))
-        except Exception:
+        except Exception as e:
             source_full_steps = []
 
     forked_full_steps = [s for s in source_full_steps if s.get("step_index", 0) <= up_to_step_index] if source_full_steps else forked_steps
@@ -781,8 +781,8 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
         from app.services.execution_manager import execution_manager
         for cid in safe_ids:
             execution_manager.remove_session(cid)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Ignored error: {e}")
 
     conn = get_db_connection()
     try:
@@ -805,8 +805,8 @@ def delete_conversation(conversation_id: str) -> bool:
     try:
         from app.services.execution_manager import execution_manager
         execution_manager.remove_session(conversation_id)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Ignored error: {e}")
 
     conn = get_db_connection()
     try:
@@ -842,7 +842,7 @@ def clean_user_prompt(raw: Any) -> str:
     if not isinstance(raw, str):
         try:
             raw = str(raw)
-        except Exception:
+        except Exception as e:
             return ""
     m = re.search(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', raw, flags=re.IGNORECASE)
     if m:
@@ -1120,7 +1120,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                         else:
                             try:
                                 raw_content = json.dumps(val_content, ensure_ascii=False)
-                            except Exception:
+                            except Exception as e:
                                 raw_content = str(val_content)
 
                         val_thinking = s.get("thinking")
@@ -1131,7 +1131,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                         else:
                             try:
                                 raw_thinking = json.dumps(val_thinking, ensure_ascii=False)
-                            except Exception:
+                            except Exception as e:
                                 raw_thinking = str(val_thinking)
 
                         content_lower = raw_content.lower()
@@ -1154,9 +1154,9 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                             matched.append(c_copy)
                             seen_ids.add(cid)
                             break
-                    except Exception:
+                    except Exception as e:
                         continue
-            except Exception:
+            except Exception as e:
                 continue
 
             if len(matched) >= limit:
@@ -1190,7 +1190,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
         else:
             try:
                 content = json.dumps(raw_c, ensure_ascii=False, indent=2)
-            except Exception:
+            except Exception as e:
                 content = str(raw_c)
 
         raw_t = s.get("thinking")
@@ -1201,7 +1201,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
         else:
             try:
                 thinking = json.dumps(raw_t, ensure_ascii=False, indent=2)
-            except Exception:
+            except Exception as e:
                 thinking = str(raw_t)
 
         step_index = s.get("step_index", idx)
@@ -1877,12 +1877,12 @@ def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
         try:
             tmp_file.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
             tmp_file.replace(SETTINGS_FILE)
-        except Exception:
+        except Exception as e:
             if tmp_file.exists():
                 try:
                     tmp_file.unlink()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
             raise
         return current
 

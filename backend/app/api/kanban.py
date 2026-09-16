@@ -101,8 +101,8 @@ def _ensure_schema(conn: sqlite3.Connection):
         if col not in existing_cols:
             try:
                 conn.execute(f"ALTER TABLE tasks ADD COLUMN {col} {col_type}")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Ignored error: {e}")
     conn.commit()
 
 class CreateTaskRequest(BaseModel):

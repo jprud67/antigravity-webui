@@ -39,8 +39,8 @@ def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
             if tmp_file and tmp_file.exists():
                 try:
                     tmp_file.unlink()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
 
 def get_session_meta(conversation_id: str) -> dict[str, Any]:
     all_meta = get_all_session_metadata()

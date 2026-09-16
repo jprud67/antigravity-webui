@@ -27,7 +27,7 @@ def _validate_workspace(workspace: str | None) -> Path:
     target = Path(workspace) if workspace else Path(DEFAULT_WORKSPACE)
     try:
         resolved = target.resolve()
-    except Exception:
+    except Exception as e:
         raise HTTPException(status_code=400, detail="Chemin de workspace invalide.")
     
     if not resolved.exists() or not resolved.is_dir():
@@ -39,8 +39,8 @@ def _validate_workspace(workspace: str | None) -> Path:
     for ws in workspaces:
         try:
             allowed_roots.append(Path(ws).resolve())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
 
     if not is_safe_path(resolved, allowed_roots):
         raise HTTPException(status_code=403, detail="Accès refusé : workspace non autorisé.")
@@ -122,13 +122,13 @@ def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth
                     if "ahead " in track_info:
                         try:
                             ahead = int(track_info.split("ahead ")[1].split("]")[0].split(",")[0])
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Ignored error: {e}")
                     if "behind " in track_info:
                         try:
                             behind = int(track_info.split("behind ")[1].split("]")[0].split(",")[0].strip())
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Ignored error: {e}")
                 else:
                     tracking = track_info
             continue

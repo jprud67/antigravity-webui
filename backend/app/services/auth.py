@@ -71,8 +71,8 @@ def save_auth_config(config: dict[str, Any]):
             if temp_file.exists():
                 try:
                     temp_file.unlink()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
 
 def verify_password(input_password: str) -> bool:
     config = get_auth_config()

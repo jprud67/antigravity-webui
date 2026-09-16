@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 import json
 import os
 import shutil
@@ -24,7 +26,7 @@ def _validate_workspace_path(workspace_path: str) -> Path:
     """Resolve a workspace path and confine it to the authorized working roots."""
     try:
         resolved = Path(workspace_path).resolve()
-    except Exception:
+    except Exception as e:
         raise HTTPException(status_code=400, detail="Chemin de workspace invalide.")
 
     allowed_roots = [Path(DEFAULT_WORKSPACE).resolve()]
@@ -32,10 +34,10 @@ def _validate_workspace_path(workspace_path: str) -> Path:
         for ws in get_settings().get("trustedWorkspaces", []) or []:
             try:
                 allowed_roots.append(Path(ws).resolve())
-            except Exception:
+            except Exception as e:
                 continue
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Ignored error: {e}")
 
     if not is_safe_path(resolved, allowed_roots):
         raise HTTPException(status_code=403, detail="Accès refusé : chemin en dehors des répertoires de travail autorisés.")
@@ -74,7 +76,7 @@ def _safe_stat(p: Path) -> tuple[bool, int, float]:
             st = p.stat()
             return True, st.st_size, st.st_mtime
     except OSError:
-        pass
+        logger.debug("Ignored error")
     return False, 0, 0.0
 
 @router.get("/files")
@@ -222,8 +224,8 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
         try:
             backup_path = target_path.with_suffix(target_path.suffix + ".bak")
             shutil.copy2(target_path, backup_path)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
 
     # Save content atomically with unique temp name to prevent concurrent write collisions
     tmp_path = target_path.parent / f".{target_path.name}.tmp.{uuid.uuid4().hex[:8]}"
@@ -241,8 +243,8 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
         events_dir = HERMES_HOME / "events"
         events_dir.mkdir(parents=True, exist_ok=True)
         (events_dir / "antigravity_update.trigger").touch()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Ignored error: {e}")
 
     return {
         "success": True,

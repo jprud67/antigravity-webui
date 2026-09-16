@@ -102,8 +102,8 @@ def sync_active_account_to_store():
                 if temp.exists():
                     try:
                         temp.unlink()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Ignored error: {e}")
     except Exception as e:
         logger.error(f"Error syncing active account: {e}")
 
@@ -197,8 +197,8 @@ def switch_google_account(target_email: str) -> dict[str, Any]:
         if temp_file.exists():
             try:
                 temp_file.unlink()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Ignored error: {e}")
 
     active_meta = get_active_account()
     logger.info(f"Switched Google account to {target_email}")
@@ -257,7 +257,7 @@ def _close_login_resources(master_fd, proc) -> None:
         try:
             os.close(master_fd)
         except OSError:
-            pass
+            logger.debug("Ignored error")
     _terminate_login_proc(proc)
 
 
@@ -405,7 +405,7 @@ def start_google_login_flow() -> dict[str, Any]:
             "instructions": "Ouvrez l'URL dans votre navigateur, connectez-vous avec votre compte Google, puis copiez-collez le code d'autorisation obtenu.",
             "timeout_seconds": 180
         }
-    except Exception:
+    except Exception as e:
         _close_login_resources(master_fd, proc)
         _restore_stash(stash_path)
         raise
@@ -435,8 +435,8 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
                 m = re.search(r'(?:[?&#]code=|^code=)([^&\s#]+)', code)
                 if m:
                     code = m.group(1)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
         code = code.removeprefix("code=")
 
     code = unquote(code.strip())
@@ -462,7 +462,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
                             token_ready = True
                             break
                 except (json.JSONDecodeError, OSError):
-                    pass
+                    logger.debug(f"Ignored error: {e}")
             if not _proc_running(proc):
                 time.sleep(0.2)
                 if TOKEN_FILE.exists() and TOKEN_FILE.stat().st_size > 0:
@@ -473,7 +473,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
                                 token_ready = True
                                 break
                     except (json.JSONDecodeError, OSError):
-                        pass
+                        logger.debug(f"Ignored error: {e}")
                 break
             time.sleep(0.3)
 
@@ -502,7 +502,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
             "active_account": active_meta,
             "message": f"Nouveau compte Google connecté avec succès : {active_email}"
         }
-    except Exception:
+    except Exception as e:
         _close_login_resources(master_fd, proc)
         _restore_stash(stash_path)
         with _login_lock:
@@ -579,8 +579,8 @@ def import_raw_token(token_data: dict[str, Any]) -> dict[str, Any]:
         if temp_acc.exists():
             try:
                 temp_acc.unlink()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Ignored error: {e}")
 
     temp_file = TOKEN_FILE.parent / f".{TOKEN_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
     try:
@@ -593,8 +593,8 @@ def import_raw_token(token_data: dict[str, Any]) -> dict[str, Any]:
         if temp_file.exists():
             try:
                 temp_file.unlink()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Ignored error: {e}")
 
     return {
         "success": True,

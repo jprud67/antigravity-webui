@@ -95,7 +95,7 @@ class ExecutionSession:
         for ws in list(self.subscribers):
             try:
                 await ws.send_json(event)
-            except Exception:
+            except Exception as e:
                 dead.add(ws)
         for ws in dead:
             self.subscribers.discard(ws)
@@ -235,8 +235,8 @@ class ExecutionSession:
                 model = settings.get("model")
             if not effort:
                 effort = settings.get("effort")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
 
         def on_proc_spawned(p: asyncio.subprocess.Process):
             self.active_proc = p
@@ -446,7 +446,7 @@ class ExecutionManager:
                         task.add_done_callback(self._background_tasks.discard)
                         terminated_async = True
                 except RuntimeError:
-                    pass
+                    logger.debug(f"Ignored error: {e}")
 
                 if not terminated_async:
                     try:
@@ -458,7 +458,7 @@ class ExecutionManager:
                             )
                         else:
                             terminate_process_group_sync(target_session.active_proc, force=True)
-                    except Exception:
+                    except Exception as e:
                         terminate_process_group_sync(target_session.active_proc, force=True)
             if target_session.worker_task and not target_session.worker_task.done():
                 target_session.worker_task.cancel()
@@ -513,8 +513,8 @@ class ExecutionManager:
                     except RuntimeError:
                         try:
                             target_session.active_proc.kill()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Ignored error: {e}")
                 if target_session.worker_task and not target_session.worker_task.done():
                     target_session.worker_task.cancel()
             logger.info(f"Pruned inactive execution session for conversation {cid} from memory.")
@@ -656,7 +656,7 @@ class ExecutionManager:
                     try:
                         await asyncio.wait_for(asyncio.shield(session.active_task), timeout=2.0)
                     except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
-                        pass
+                        logger.debug(f"Ignored error: {e}")
                 # Purge obsolete pending messages in the queue so the steering directive executes immediately
                 while not session.message_queue.empty():
                     try:
@@ -708,7 +708,7 @@ class ExecutionManager:
             try:
                 await asyncio.wait_for(asyncio.shield(session.active_task), timeout=2.0)
             except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
-                pass
+                logger.debug("Ignored error")
 
         session.is_running = False
         session.active_proc = None

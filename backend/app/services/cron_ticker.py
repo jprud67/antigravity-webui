@@ -138,7 +138,7 @@ async def run_agy_task(
         for t in pumps:
             try:
                 await asyncio.wait_for(t, timeout=3.0)
-            except Exception:
+            except Exception as e:
                 t.cancel()
 
         if quota_seen["line"] is None:
@@ -146,7 +146,7 @@ async def run_agy_task(
                 quota_line = await asyncio.wait_for(quota_task, timeout=2.0)
                 if quota_line:
                     quota_seen["line"] = quota_line
-            except Exception:
+            except Exception as e:
                 quota_task.cancel()
         elif not quota_task.done():
             quota_task.cancel()
@@ -191,8 +191,8 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
                 model = settings.get("model")
             if not effort or not str(effort).strip():
                 effort = settings.get("effort")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
     while attempts < MAX_TASK_FAILOVER:
         attempts += 1
         try:
@@ -209,7 +209,7 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
             current = get_active_account()
             current_email = (current or {}).get("email") or "inconnu"
             new_account = switch_to_next_healthy_account(exclude_email=current_email, model=model)
-            if new_account:
+            if new_account and attempts < MAX_TASK_FAILOVER:
                 failovers.append({"from": current_email, "to": new_account, "attempt": attempts})
                 logger.warning(
                     f"[Cron] Quota atteint sur {current_email} — bascule sur {new_account}, "
@@ -218,7 +218,7 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
                 await asyncio.sleep(1.0)
                 continue
             status = "quota_exhausted"
-            logger.error("[Cron] Quota atteint et aucun compte alternatif disponible.")
+            logger.error("[Cron] Quota atteint et limite de failover atteinte ou aucun compte sain disponible.")
             break
 
         # agy s'auto-limite à son print-timeout en sortant code 0 avec une sortie
@@ -293,7 +293,7 @@ async def _execute_job(job: dict[str, Any]) -> None:
                         if due > datetime.now(timezone.utc):
                             is_future = True
                     except (ValueError, TypeError):
-                        pass
+                        logger.debug("Ignored error")
                 if not is_future:
                     computed_next = compute_next_run(j.get("schedule"))
                     if not computed_next:
