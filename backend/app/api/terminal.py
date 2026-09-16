@@ -342,8 +342,20 @@ async def terminal_websocket(
         for sp in raw_subprotocols.split(","):
             sp_clean = sp.strip()
             if sp_clean.startswith("token."):
+                raw_token = sp_clean[6:]
                 if not token:
-                    token = sp_clean[6:]
+                    import base64
+                    try:
+                        rem = len(raw_token) % 4
+                        padded = raw_token + ("=" * ((4 - rem) % 4))
+                        decoded = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
+                        if verify_access_token(decoded):
+                            token = decoded
+                        elif verify_access_token(raw_token):
+                            token = raw_token
+                    except Exception:
+                        if verify_access_token(raw_token):
+                            token = raw_token
                 selected_subprotocol = sp_clean
                 break
             elif sp_clean == "terminal":
@@ -362,7 +374,7 @@ async def terminal_websocket(
     cwd = workspace if workspace and os.path.isdir(workspace) else default_home
     # Identify session (default to global persistent session for workspace)
     # hash() est non-déterministe entre redémarrages (PYTHONHASHSEED) → utiliser hashlib pour un ID stable
-    sid = session_id or f"ws_{hashlib.md5(cwd.encode()).hexdigest()[:8]}"
+    sid = session_id or f"ws_{hashlib.sha256(cwd.encode()).hexdigest()[:8]}"
 
     session: PersistentTerminalSession | None = None
     try:
@@ -451,6 +463,9 @@ async def prune_dead_sessions() -> None:
 async def list_terminal_sessions(_ = Depends(require_auth)):
     """List active persistent terminal sessions"""
     await prune_dead_sessions()
+    async with _sessions_lock:
+        sessions_copy = list(_sessions.items())
+    
     return [
         {
             "session_id": sid,
@@ -461,7 +476,7 @@ async def list_terminal_sessions(_ = Depends(require_auth)):
             "last_active": s.last_active,
             "has_client": s.active_websocket is not None
         }
-        for sid, s in _sessions.items()
+        for sid, s in sessions_copy
     ]
 
 @router.post("/api/terminal/sessions/{session_id}/restart")

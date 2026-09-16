@@ -12,6 +12,9 @@ from app.services.cron_ticker import run_job_with_failover
 logging.basicConfig(level=logging.WARNING)
 
 
+import pytest
+
+@pytest.mark.asyncio
 async def test():
     print("Testing Cron Failover Logic...")
     job = {

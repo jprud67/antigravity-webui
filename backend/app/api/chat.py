@@ -17,8 +17,20 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
         for sp in raw_subprotocols.split(","):
             sp_clean = sp.strip()
             if sp_clean.startswith("token."):
+                raw_token = sp_clean[6:]
                 if not token:
-                    token = sp_clean[6:]
+                    import base64
+                    try:
+                        rem = len(raw_token) % 4
+                        padded = raw_token + ("=" * ((4 - rem) % 4))
+                        decoded = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
+                        if verify_access_token(decoded):
+                            token = decoded
+                        elif verify_access_token(raw_token):
+                            token = raw_token
+                    except Exception:
+                        if verify_access_token(raw_token):
+                            token = raw_token
                 selected_subprotocol = sp_clean
                 break
             elif sp_clean == "antigravity":

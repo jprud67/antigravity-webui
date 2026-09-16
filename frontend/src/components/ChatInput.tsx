@@ -86,7 +86,7 @@ export interface AttachmentItem {
 
 const createAttachmentId = (): string => `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
-export const ChatInput: React.FC<ChatInputProps> = ({
+export const ChatInput = React.memo<ChatInputProps>(({
   onSendMessage,
   isStreaming,
   onStopStreaming,
@@ -1571,4 +1571,4 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     </div>
   </div>
 );
-};
+});

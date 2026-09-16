@@ -12,16 +12,26 @@ logger = logging.getLogger("antigravity-webui.session_metadata")
 _meta_lock = threading.RLock()
 
 
+_cached_meta: dict[str, dict[str, Any]] = {}
+_cached_mtime: float = 0.0
+
 def get_all_session_metadata() -> dict[str, dict[str, Any]]:
+    global _cached_meta, _cached_mtime
     with _meta_lock:
         if not SESSION_METADATA_FILE.exists():
             return {}
         try:
+            mtime = SESSION_METADATA_FILE.stat().st_mtime
+            if mtime <= _cached_mtime and _cached_meta:
+                return _cached_meta
+            
             content = SESSION_METADATA_FILE.read_text(encoding="utf-8")
             if not content.strip():
                 return {}
             data = json.loads(content)
-            return data if isinstance(data, dict) else {}
+            _cached_meta = data if isinstance(data, dict) else {}
+            _cached_mtime = mtime
+            return _cached_meta
         except Exception as e:
             logger.error(f"Failed to read session metadata: {e}")
             return {}

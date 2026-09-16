@@ -93,7 +93,8 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             except Exception as e:
                 logger.debug(f"Ignored error: {e}")
         try:
-            bulk_delete_conversations(ids)
+            import asyncio
+            await asyncio.to_thread(bulk_delete_conversations, ids)
             for cid in ids:
                 results[cid] = True
             return {"success": True, "action": action, "count": len(ids), "results": results}
@@ -170,7 +171,8 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
     elif action == "export":
-        return _do_bulk_export(req)
+        import asyncio
+        return await asyncio.to_thread(_do_bulk_export, req)
     else:
         raise HTTPException(status_code=400, detail=f"Action non supportée: {action}")
 

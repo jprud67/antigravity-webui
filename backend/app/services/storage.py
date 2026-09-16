@@ -1123,6 +1123,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
 
         # 2. Match customTitle, tags, project from session metadata for convs not yet matched
         if len(matched) < limit:
+            metadata_cids = []
             for cid, meta in all_meta.items():
                 if cid in seen_ids:
                     continue
@@ -1135,14 +1136,24 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                     or q_lower in project
                     or any(q_lower in t for t in tags)
                 ):
-                    c_item = get_conversation_by_id(cid, conn=conn)
-                    if c_item:
-                        c_item["match_type"] = "metadata"
-                        c_item["match_snippet"] = meta.get("customTitle") or meta.get("project") or c_item.get("preview")
-                        matched.append(c_item)
-                        seen_ids.add(cid)
-                        if len(matched) >= limit:
-                            break
+                    metadata_cids.append(cid)
+                    if len(matched) + len(metadata_cids) >= limit:
+                        break
+            
+            if metadata_cids:
+                placeholders = ",".join(["?"] * len(metadata_cids))
+                cursor.execute(
+                    f"SELECT * FROM conversation_summaries WHERE conversation_id IN ({placeholders})",
+                    tuple(metadata_cids)
+                )
+                for r in cursor.fetchall():
+                    cid = r["conversation_id"]
+                    meta = all_meta.get(cid, {})
+                    c_item = _build_conversation_dict(r, meta)
+                    c_item["match_type"] = "metadata"
+                    c_item["match_snippet"] = meta.get("customTitle") or meta.get("project") or c_item.get("preview")
+                    matched.append(c_item)
+                    seen_ids.add(cid)
     finally:
         conn.close()
 

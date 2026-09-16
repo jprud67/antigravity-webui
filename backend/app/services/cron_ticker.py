@@ -48,8 +48,28 @@ JOB_TIMEOUT_SECONDS = 20 * 60
 MAX_TASK_FAILOVER = 5
 
 _running_jobs: set[str] = set()
+_running_job_tasks: dict[str, asyncio.Task[None]] = {}
+_running_job_procs: dict[str, Any] = {}
 _background_tasks: set[asyncio.Task[None]] = set()
 _jobs_write_lock = asyncio.Lock()
+
+
+def cancel_running_job(job_id: str) -> bool:
+    """Annule immédiatement l'exécution d'un job cron en cours."""
+    canceled = False
+    task = _running_job_tasks.get(job_id)
+    if task and not task.done():
+        task.cancel()
+        canceled = True
+    proc = _running_job_procs.get(job_id)
+    if proc:
+        try:
+            if hasattr(proc, "terminate"):
+                proc.terminate()
+            canceled = True
+        except Exception:
+            pass
+    return canceled
 
 
 async def run_agy_task(
@@ -57,7 +77,8 @@ async def run_agy_task(
     skills: list[str] | None = None,
     model: str | None = None,
     effort: str | None = None,
-    timeout: int = JOB_TIMEOUT_SECONDS
+    timeout: int = JOB_TIMEOUT_SECONDS,
+    job_id: str | None = None
 ) -> tuple[str, str, int]:
     """
     Exécute un prompt via `agy` en mode headless. Retourne (stdout, stderr, code).

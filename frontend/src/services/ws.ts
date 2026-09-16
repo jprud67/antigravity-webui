@@ -70,15 +70,27 @@ export class ChatWebSocketClient {
     const token = localStorage.getItem('antigravity_token');
     // NOTE: token is passed as a WebSocket sub-protocol to avoid exposure in
     // server/proxy access logs (query-string tokens are frequently logged).
-    // The backend reads it from the Sec-WebSocket-Protocol header.
-    // Fallback: if the server doesn't accept the subprotocol, we retain a
-    // query-param as secondary support — remove it once the backend is updated
-    // to always read from the subprotocol.
+    // RFC 6455 / RFC 2616 strictly forbids separators (including colons ':') in subprotocol strings.
+    // We encode the token using standard URL-safe base64 without padding to guarantee token compliance.
+    let protocols: string[] | undefined;
+    if (token) {
+      try {
+        const safeToken = btoa(token).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        protocols = [`token.${safeToken}`];
+      } catch {
+        protocols = undefined;
+      }
+    }
     const url = `${protocol}//${host}/ws/chat${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-    const protocols = token ? [`token.${token}`] : undefined;
 
     try {
-      this.ws = protocols ? new WebSocket(url, protocols) : new WebSocket(url);
+      try {
+        this.ws = protocols ? new WebSocket(url, protocols) : new WebSocket(url);
+      } catch (subErr) {
+        // Fallback to plain connection without subprotocols if constructor rejects it
+        console.warn('[WS] Subprotocol connection failed, falling back to query param auth:', subErr);
+        this.ws = new WebSocket(url);
+      }
 
       this.ws.onopen = () => {
         console.log('[WS] Connected to Antigravity WebUI chat socket');

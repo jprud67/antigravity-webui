@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatCanvas } from './components/ChatCanvas';
 import { ChatInput } from './components/ChatInput';
@@ -212,6 +212,10 @@ export function App() {
     setQueueCount(0);
     try {
       const data = await fetchConversationTranscript(convId);
+      
+      // Prevent race conditions from rapid clicking
+      if (activeConversationIdRef.current !== convId) return;
+      
       const chatMsgs = parseStepsToMessages(data.steps || []);
       setMessages(chatMsgs);
 
@@ -1377,6 +1381,27 @@ export function App() {
   const displayModelName = currentModelObj ? currentModelObj.name : 'Gemini 3.8 Flash';
   const displayEffort = currentModelObj && currentModelObj.supported_efforts.length > 0 ? selectedEffort : undefined;
 
+  const stableOpenCrons = useCallback(() => setIsCronModalOpen(true), []);
+  const stableOpenRules = useCallback(() => setIsRulesModalOpen(true), []);
+  const stableOpenTasks = useCallback(() => setIsTaskDashboardOpen(true), []);
+  const stableApprovalResolved = useCallback(() => setPendingApproval(null), []);
+  
+  // selectedModel and selectedEffort are state vars, we can use refs to avoid dependency on them
+  // Or just put them in dependencies, but they change rarely so it's fine.
+  const stableAnswerQuestion = useCallback((ans: string) => {
+    if (isStreamingRef.current) {
+      chatSocket.sendInput(ans);
+    }
+    handleSendMessage(ans, {
+      model: selectedModel,
+      effort: selectedEffort,
+    });
+  }, [selectedModel, selectedEffort]);
+
+  const stableEditSessionMeta = useCallback(() => {
+    handleEditSessionMeta(activeConv);
+  }, [activeConv, handleEditSessionMeta]);
+
   return (
     <div
       className="flex h-[100dvh] w-screen font-sans overflow-hidden antialiased"
@@ -1461,33 +1486,25 @@ export function App() {
           projectColor={activeConv?.projectColor}
           tags={activeConv?.tags}
           parentConversationId={activeConv?.parent_conversation_id}
-          onQuickPrompt={(p) => setQuickPrompt(p)}
-          onAnswerQuestion={(ans) => {
-            if (isStreaming) {
-              chatSocket.sendInput(ans);
-            }
-            handleSendMessage(ans, {
-              model: selectedModel,
-              effort: selectedEffort,
-            });
-          }}
+          onQuickPrompt={setQuickPrompt}
+          onAnswerQuestion={stableAnswerQuestion}
           onOpenFiles={handleOpenFilesPanel}
           onOpenArtifacts={handleOpenArtifactsPanel}
           onOpenTerminal={handleOpenTerminalPanel}
           onOpenGit={handleOpenGitPanel}
           onOpenKanban={handleOpenKanbanPanel}
-          onOpenCrons={() => setIsCronModalOpen(true)}
-          onOpenRules={() => setIsRulesModalOpen(true)}
-          onOpenTasks={() => setIsTaskDashboardOpen(true)}
+          onOpenCrons={stableOpenCrons}
+          onOpenRules={stableOpenRules}
+          onOpenTasks={stableOpenTasks}
           isRightPanelOpen={isRightPanelOpen}
           activeRightPanelTab={rightPanelTab}
           onToggleRightPanel={handleToggleRightPanel}
           onToggleMobileSidebar={handleToggleMobileSidebar}
           onNewConversation={handleNewConversation}
           pendingApproval={pendingApproval}
-          onApprovalResolved={() => setPendingApproval(null)}
+          onApprovalResolved={stableApprovalResolved}
           onForkMessage={handleForkMessage}
-          onEditSessionMeta={() => handleEditSessionMeta(activeConv)}
+          onEditSessionMeta={stableEditSessionMeta}
           onRetry={handleRetry}
         />
 
