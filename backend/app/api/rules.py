@@ -47,7 +47,6 @@ def _get_current_journal_path() -> Path:
     now = datetime.now(timezone.utc)
     month_str = now.strftime("%Y_%m")
     log_dir = HERMES_HOME / "memories" / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir / f"server_actions_{month_str}.md"
 
 def _resolve_file_path(file_id: str, workspace_path: str | None = None) -> Path | None:
@@ -238,11 +237,11 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
         raise HTTPException(status_code=500, detail=f"Erreur d'écriture: {e}")
 
 
-    # Trigger Hermes IPC event
+    # Trigger Hermes IPC event if Hermes directory exists
     try:
         events_dir = HERMES_HOME / "events"
-        events_dir.mkdir(parents=True, exist_ok=True)
-        (events_dir / "antigravity_update.trigger").touch()
+        if events_dir.is_dir():
+            (events_dir / "antigravity_update.trigger").touch()
     except Exception as e:
         logger.debug(f"Ignored error: {e}")
 

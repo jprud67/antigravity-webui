@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import time
 from typing import Any
 
@@ -147,13 +148,23 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
     if not target_pid or target_pid <= 0:
         if req.task_id:
             try:
+                clean_tid = req.task_id.strip()
+                escaped_tid = re.escape(clean_tid)
+                tid_regex = re.compile(rf"(?:^|[\s\"'=/]){escaped_tid}(?:[\s\"'/]|$)")
                 for p in psutil.process_iter(['pid', 'cmdline']):
                     try:
                         p_info = p.info
                         if not p_info:
                             continue
-                        cmd_str = " ".join(p_info.get('cmdline') or [])
-                        if req.task_id in cmd_str:
+                        cmdline_list = p_info.get('cmdline') or []
+                        cmd_str = " ".join(cmdline_list)
+                        # Match exact token, key=value pair, or word-boundary delimited regex
+                        matches_task = (
+                            clean_tid in cmdline_list
+                            or any(clean_tid in arg.split("=") for arg in cmdline_list)
+                            or bool(tid_regex.search(cmd_str))
+                        )
+                        if matches_task:
                             candidate_pid = p_info.get('pid')
                             if candidate_pid and candidate_pid > 100:
                                 target_pid = candidate_pid

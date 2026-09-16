@@ -218,30 +218,30 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
                 is_gemini = "gemini" in str(model).lower()
                 candidate_models = [
                     f for f in families 
-                    if ("gemini" not in f["id"].lower() if is_gemini else "gemini" in f["id"].lower())
+                    if ("gemini" not in f.get("id", "").lower() if is_gemini else "gemini" in f.get("id", "").lower())
                 ]
-                if candidate_models and attempts < MAX_TASK_FAILOVER:
-                    new_model_family = candidate_models[0]
-                    # Récupérer la variante par défaut ou la première disponible
-                    # next(iter(...), None) évite StopIteration si variants est vide
-                    variants = new_model_family.get("variants") or {}
-                    new_model = variants.get("default") or next(iter(variants.values()), None)
-                    if not new_model:
-                        logger.warning("[Cron] Famille de modèle alternative sans variante disponible, skip.")
-                        model_switched_on_current_account = True
-                    else:
+                found_alternative = False
+                for cand in candidate_models:
+                    variants = cand.get("variants") or {}
+                    cand_model = variants.get("default") or next(iter(variants.values()), None)
+                    if cand_model and cand_model != model:
                         old_model = model
-                        model = new_model
-                        effort = new_model_family.get("default_effort")
+                        model = cand_model
+                        effort = cand.get("default_effort")
                         model_switched_on_current_account = True
+                        found_alternative = True
 
-                        failovers.append({"from": old_model, "to": new_model, "attempt": attempts, "type": "model"})
+                        failovers.append({"from": old_model, "to": model, "attempt": attempts, "type": "model"})
                         logger.warning(
-                            f"[Cron] Quota atteint sur {current_email} avec {old_model} — bascule sur le modèle alternatif {new_model}, "
+                            f"[Cron] Quota atteint sur {current_email} avec {old_model} — bascule sur le modèle alternatif {model}, "
                             f"relance de la tâche (tentative {attempts + 1}/{MAX_TASK_FAILOVER})..."
                         )
-                        await asyncio.sleep(1.0)
-                        continue
+                        break
+
+                if found_alternative and attempts < MAX_TASK_FAILOVER:
+                    await asyncio.sleep(1.0)
+                    continue
+                model_switched_on_current_account = True
 
             # 2. Si le modèle a déjà été basculé ou si c'est impossible, basculer le compte Google
             new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=model)

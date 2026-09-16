@@ -58,6 +58,7 @@ def get_db_connection() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     # Double-checked locking: cheap read without lock, then initialize if needed
     if not _schema_initialized:
         ensure_db_schema(conn)
@@ -81,6 +82,7 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None) -> None:
         if conn is None:
             CONVERSATION_DB.parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(str(CONVERSATION_DB), timeout=15.0)
+            conn.execute("PRAGMA busy_timeout=5000")
             close_after = True
         try:
             conn.execute(

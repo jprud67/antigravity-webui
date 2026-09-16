@@ -35,6 +35,8 @@ async def _broadcast(event: dict[str, Any]) -> None:
             try:
                 q.get_nowait()
                 q.task_done()
+            except (asyncio.QueueEmpty, ValueError):
+                pass
             except Exception as e:
                 logger.debug(f"SSE queue drain failed: {e}")
             try:
