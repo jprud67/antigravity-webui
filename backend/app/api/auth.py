@@ -85,8 +85,9 @@ async def login(req: LoginRequest):
 def change_pwd(req: PasswordChangeRequest, _ = Depends(require_auth)):
     if not verify_password(req.old_password):
         raise HTTPException(status_code=400, detail="L'ancien mot de passe est incorrect.")
-    if len(req.new_password.strip()) < 4:
-        raise HTTPException(status_code=400, detail="Le nouveau mot de passe doit comporter au moins 4 caractères.")
+    if len(req.new_password.strip()) < 8:
+        raise HTTPException(status_code=400, detail="Le nouveau mot de passe doit comporter au moins 8 caractères.")
+
     
     update_password(req.new_password.strip())
     new_token = create_access_token(expires_in_days=14)

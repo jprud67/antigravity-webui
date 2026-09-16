@@ -67,12 +67,14 @@ def save_auth_config(config: dict[str, Any]):
             restrict_file_permissions(AUTH_CONFIG_FILE)
             _auth_cache = config.copy()
             _auth_cache_mtime = AUTH_CONFIG_FILE.stat().st_mtime
-        finally:
+        except Exception:
             if temp_file.exists():
                 try:
                     temp_file.unlink()
                 except Exception as e:
                     logger.debug(f"Ignored error: {e}")
+            raise
+
 
 def verify_password(input_password: str) -> bool:
     config = get_auth_config()

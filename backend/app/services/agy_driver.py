@@ -438,9 +438,93 @@ _credits_lock = asyncio.Lock()
 _changelog_lock = asyncio.Lock()
 
 
+async def _cached_agy_command(
+    agy_args: list[str],
+    cache: dict[str, Any],
+    lock: asyncio.Lock,
+    ttl: float,
+    fallback: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Exécute une commande agy --output-format json avec cache mémoire et verrou anti-stampede.
+    Mutualisé pour quota, credits, changelog — élimine le code dupliqué.
+    """
+    now = time.time()
+    if cache["data"] is not None and (now - cache["timestamp"]) < ttl:
+        return cache["data"]
+
+    async with lock:
+        now = time.time()
+        if cache["data"] is not None and (now - cache["timestamp"]) < ttl:
+            return cache["data"]
+
+        cmd = [AGY_BIN, "--output-format", "json"] + agy_args
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                **spawn_group_kwargs(),
+            )
+            try:
+                stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+                if proc.returncode == 0 and stdout:
+                    data = _extract_json_payload(stdout.decode(errors="replace"))
+                    if isinstance(data, dict):
+                        cache["data"] = data
+                        cache["timestamp"] = now
+                        return data
+                    elif isinstance(data, list):
+                        dict_payload: dict[str, Any] = {"items": data}
+                        cache["data"] = dict_payload
+                        cache["timestamp"] = now
+                        return dict_payload
+            except Exception:
+                try:
+                    await terminate_process_group_async(proc, grace=0.5)
+                except Exception as e:
+                    logger.debug(f"Ignored error: {e}")
+                raise
+        except Exception as e:
+            logger.warning(f"Error running agy {' '.join(agy_args)}: {e}")
+
+        return cache["data"] or fallback
+
+
+async def get_usage_quota() -> dict[str, Any]:
+    return await _cached_agy_command(
+        agy_args=["-p", "/usage"],
+        cache=_quota_cache,
+        lock=_quota_lock,
+        ttl=10.0,
+        fallback={"status": "unavailable", "message": "Impossible de charger les quotas Antigravity."},
+    )
+
+
+async def get_credits() -> dict[str, Any]:
+    return await _cached_agy_command(
+        agy_args=["-p", "/credits"],
+        cache=_credits_cache,
+        lock=_credits_lock,
+        ttl=30.0,
+        fallback={"status": "unavailable"},
+    )
+
+
+async def get_changelog() -> dict[str, Any]:
+    return await _cached_agy_command(
+        agy_args=["-p", "/changelog"],
+        cache=_changelog_cache,
+        lock=_changelog_lock,
+        ttl=300.0,
+        fallback={"status": "unavailable"},
+    )
+
+
 def _extract_json_payload(raw: str) -> Any:
     """Extraie et décode un payload JSON même si des bannières ou des avertissements précèdent."""
     trimmed = raw.strip()
+
     try:
         return json.loads(trimmed)
     except Exception as e:
@@ -491,130 +575,5 @@ def _extract_json_payload(raw: str) -> Any:
 
     raise json.JSONDecodeError("No valid JSON found", raw, 0)
 
-
-async def get_usage_quota() -> dict[str, Any]:
-    global _quota_cache
-    now = time.time()
-    if _quota_cache["data"] is not None and (now - _quota_cache["timestamp"]) < 10:
-        return _quota_cache["data"]
-
-    async with _quota_lock:
-        now = time.time()
-        if _quota_cache["data"] is not None and (now - _quota_cache["timestamp"]) < 10:
-            return _quota_cache["data"]
-
-        cmd = [AGY_BIN, "--output-format", "json", "-p", "/usage"]
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                **spawn_group_kwargs(),
-            )
-            try:
-                stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
-                if proc.returncode == 0 and stdout:
-                    data = _extract_json_payload(stdout.decode(errors="replace"))
-                    if isinstance(data, dict):
-                        _quota_cache = {"data": data, "timestamp": now}
-                        return data
-                    elif isinstance(data, list):
-                        dict_payload = {"items": data}
-                        _quota_cache = {"data": dict_payload, "timestamp": now}
-                        return dict_payload
-            except Exception:
-                try:
-                    await terminate_process_group_async(proc, grace=0.5)
-                except Exception as e:
-                    logger.debug(f"Ignored error: {e}")
-                raise
-        except Exception as e:
-            logger.warning(f"Error fetching usage quota: {e}")
-
-        return _quota_cache["data"] or {"status": "unavailable", "message": "Impossible de charger les quotas Antigravity."}
-
-
-async def get_credits() -> dict[str, Any]:
-    global _credits_cache
-    now = time.time()
-    if _credits_cache["data"] is not None and (now - _credits_cache["timestamp"]) < 30:
-        return _credits_cache["data"]
-
-    async with _credits_lock:
-        now = time.time()
-        if _credits_cache["data"] is not None and (now - _credits_cache["timestamp"]) < 30:
-            return _credits_cache["data"]
-
-        cmd = [AGY_BIN, "--output-format", "json", "-p", "/credits"]
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                **spawn_group_kwargs(),
-            )
-            try:
-                stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
-                if proc.returncode == 0 and stdout:
-                    data = _extract_json_payload(stdout.decode(errors="replace"))
-                    if isinstance(data, dict):
-                        _credits_cache = {"data": data, "timestamp": now}
-                        return data
-                    elif isinstance(data, list):
-                        dict_payload = {"items": data}
-                        _credits_cache = {"data": dict_payload, "timestamp": now}
-                        return dict_payload
-            except Exception:
-                try:
-                    await terminate_process_group_async(proc, grace=0.5)
-                except Exception as e:
-                    logger.debug(f"Ignored error: {e}")
-                raise
-        except Exception as e:
-            logger.warning(f"Error fetching credits: {e}")
-
-        return _credits_cache["data"] or {"status": "unavailable"}
-
-
-async def get_changelog() -> dict[str, Any]:
-    global _changelog_cache
-    now = time.time()
-    if _changelog_cache["data"] is not None and (now - _changelog_cache["timestamp"]) < 300:
-        return _changelog_cache["data"]
-
-    async with _changelog_lock:
-        now = time.time()
-        if _changelog_cache["data"] is not None and (now - _changelog_cache["timestamp"]) < 300:
-            return _changelog_cache["data"]
-
-        cmd = [AGY_BIN, "--output-format", "json", "-p", "/changelog"]
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                **spawn_group_kwargs(),
-            )
-            try:
-                stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
-                if proc.returncode == 0 and stdout:
-                    data = _extract_json_payload(stdout.decode(errors="replace"))
-                    if isinstance(data, dict):
-                        _changelog_cache = {"data": data, "timestamp": now}
-                        return data
-                    elif isinstance(data, list):
-                        dict_payload = {"items": data}
-                        _changelog_cache = {"data": dict_payload, "timestamp": now}
-                        return dict_payload
-            except Exception:
-                try:
-                    await terminate_process_group_async(proc, grace=0.5)
-                except Exception as e:
-                    logger.debug(f"Ignored error: {e}")
-                raise
-        except Exception as e:
-            logger.warning(f"Error fetching changelog: {e}")
-
-        return _changelog_cache["data"] or {"status": "unavailable"}
 
 

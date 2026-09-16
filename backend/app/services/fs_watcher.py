@@ -230,5 +230,8 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
             artifact_mtimes = cur_artifacts
 
 
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.warning(f"Watcher error: {e}")
+

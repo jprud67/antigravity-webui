@@ -1,7 +1,5 @@
-import logging
-
-logger = logging.getLogger(__name__)
 import json
+import logging
 import os
 import shutil
 import uuid
@@ -16,6 +14,7 @@ from app.config import DEFAULT_WORKSPACE, HOME, SETTINGS_FILE
 from app.platform_utils import is_safe_path
 from app.services.storage import get_settings
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/rules", tags=["rules"])
 
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(HOME / ".hermes")))
