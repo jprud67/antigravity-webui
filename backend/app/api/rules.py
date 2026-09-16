@@ -209,6 +209,14 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
     if not target_path:
         raise HTTPException(status_code=400, detail="Identifiant de fichier inconnu")
 
+    # Guard against modifying external Hermes system memory without explicit authorization
+    if req.file_id in ("hermes_arch", "hermes_journal"):
+        if os.environ.get("ENABLE_HERMES_WRITE", "0").lower() not in ("1", "true"):
+            raise HTTPException(
+                status_code=403,
+                detail="La modification directe des mémoires Hermes est désactivée par mesure de sécurité."
+            )
+
     # If JSON, validate syntax before saving
     if target_path.suffix == ".json":
         try:

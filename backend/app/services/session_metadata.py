@@ -55,8 +55,9 @@ def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
             if tmp_file and tmp_file.exists():
                 try:
                     tmp_file.unlink()
-                except Exception as e:
-                    logger.debug(f"Ignored error: {e}")
+                except Exception as clean_err:
+                    logger.debug(f"Ignored cleanup error: {clean_err}")
+            raise
 
 def make_default_meta() -> dict[str, Any]:
     return {

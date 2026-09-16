@@ -162,7 +162,10 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
                 raw_cands = [clean_tid]
                 if pure_tid and pure_tid != clean_tid:
                     raw_cands.append(pure_tid)
-                candidate_tids = [c for c in raw_cands if len(c) >= 3]
+                candidate_tids = [
+                    c for c in raw_cands
+                    if len(c) >= 4 and c.lower() not in {"bash", "sh", "zsh", "node", "npm", "python", "python3", "uvicorn", "git", "cat", "grep", "root", "systemd"}
+                ]
 
                 if candidate_tids:
                     for p in psutil.process_iter(['pid', 'cmdline']):

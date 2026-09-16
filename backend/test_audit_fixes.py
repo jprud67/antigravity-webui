@@ -800,6 +800,128 @@ def test_cron_update_jobs_atomic():
     print("✓ test_cron_update_jobs_atomic passed")
 
 
+def test_session_metadata_save_failure_reraised():
+    from unittest.mock import patch
+    import pytest
+    from app.services.session_metadata import save_all_session_metadata
+
+    with patch("pathlib.Path.replace", side_effect=OSError("Disk full or permission denied")):
+        with pytest.raises(OSError):
+            save_all_session_metadata({"test": {"pinned": True}})
+    print("✓ test_session_metadata_save_failure_reraised passed")
+
+
+def test_is_safe_conversation_id_hardened():
+    from app.services.storage import is_safe_conversation_id
+
+    # Valid UUID
+    assert is_safe_conversation_id("3d0ba9f7-e491-4c58-b3e4-142fc763fc47") is True
+    assert is_safe_conversation_id("conv-123_abc") is True
+
+    # Invalid: hidden directory or dot
+    assert is_safe_conversation_id(".system_generated") is False
+    assert is_safe_conversation_id(".hidden") is False
+    assert is_safe_conversation_id(".") is False
+    assert is_safe_conversation_id("..") is False
+
+    # Invalid: directory traversal or special chars
+    assert is_safe_conversation_id("../etc/passwd") is False
+    assert is_safe_conversation_id("conv/sub") is False
+    assert is_safe_conversation_id("conv\\sub") is False
+    assert is_safe_conversation_id("conv;rm -rf /") is False
+    assert is_safe_conversation_id("conv`id`") is False
+    assert is_safe_conversation_id("null") is False
+    assert is_safe_conversation_id("") is False
+    print("✓ test_is_safe_conversation_id_hardened passed")
+
+
+def test_rules_hermes_write_restricted():
+    import os
+    from fastapi import HTTPException
+    import pytest
+    from app.api.rules import SaveRuleRequest, save_rule_content
+
+    # Ensure ENABLE_HERMES_WRITE is not set
+    assert os.environ.get("ENABLE_HERMES_WRITE", "0") != "1"
+
+    req_arch = SaveRuleRequest(file_id="hermes_arch", content="# New Arch")
+    with pytest.raises(HTTPException) as exc_info:
+        save_rule_content(req_arch, _=None)
+    assert exc_info.value.status_code == 403
+
+    req_journal = SaveRuleRequest(file_id="hermes_journal", content="# New Journal")
+    with pytest.raises(HTTPException) as exc_info2:
+        save_rule_content(req_journal, _=None)
+    assert exc_info2.value.status_code == 403
+    print("✓ test_rules_hermes_write_restricted passed")
+
+
+def test_kill_task_rejects_system_words():
+    from app.api.tasks import KillTaskRequest, kill_task
+
+    # System binary words should not resolve to a kill candidate
+    for word in ("bash", "python", "node", "git", "systemd"):
+        res = kill_task(KillTaskRequest(task_id=word), _=None)
+        assert res["success"] is False
+    print("✓ test_kill_task_rejects_system_words passed")
+
+
+def test_undo_conversation_turn_nullifies_last_user_time():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    import sqlite3
+    from app.services import storage
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_brain = Path(tmp_dir) / "brain"
+        tmp_brain.mkdir(parents=True, exist_ok=True)
+        conv_id = "test-undo-conv-uuid"
+        conv_dir = tmp_brain / conv_id
+        logs_dir = conv_dir / ".system_generated" / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create single turn transcript
+        transcript_file = logs_dir / "transcript.jsonl"
+        storage.atomic_write_jsonl(transcript_file, [
+            {"step_index": 0, "source": "USER_EXPLICIT", "type": "USER_INPUT", "content": "Hello", "created_at": "2026-09-16T10:00:00Z"},
+            {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Hi there!"}
+        ])
+
+        # Create test database
+        db_file = tmp_brain / "conversations.db"
+        conn = sqlite3.connect(str(db_file))
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE conversation_summaries (
+                conversation_id TEXT PRIMARY KEY,
+                step_count INTEGER,
+                preview TEXT,
+                last_modified_time TEXT,
+                last_user_input_step_index INTEGER,
+                last_user_input_time TEXT
+            )
+        """)
+        cursor.execute("""
+            INSERT INTO conversation_summaries VALUES (?, ?, ?, ?, ?, ?)
+        """, (conv_id, 2, "Hello", "2026-09-16 10:01:00", 0, "2026-09-16T10:00:00Z"))
+        conn.commit()
+        conn.close()
+
+        with patch("app.services.storage.BRAIN_DIR", tmp_brain), \
+             patch("app.services.storage.get_db_connection", side_effect=lambda: sqlite3.connect(str(db_file))):
+            res = storage.undo_conversation_turn(conv_id)
+            assert res["step_count"] == 0
+
+            # Verify that in DB, last_user_input_time was updated to NULL
+            conn_verify = sqlite3.connect(str(db_file))
+            row = conn_verify.cursor().execute("SELECT last_user_input_time, last_user_input_step_index FROM conversation_summaries WHERE conversation_id = ?", (conv_id,)).fetchone()
+            conn_verify.close()
+            assert row[0] is None
+            assert row[1] == -1
+    print("✓ test_undo_conversation_turn_nullifies_last_user_time passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -834,5 +956,10 @@ if __name__ == "__main__":
     test_cancel_running_job_process_group()
     test_compute_next_run_monthly_and_weekly()
     test_cron_update_jobs_atomic()
+    test_session_metadata_save_failure_reraised()
+    test_is_safe_conversation_id_hardened()
+    test_rules_hermes_write_restricted()
+    test_kill_task_rejects_system_words()
+    test_undo_conversation_turn_nullifies_last_user_time()
     print("\nAll unit tests passed successfully!")
 

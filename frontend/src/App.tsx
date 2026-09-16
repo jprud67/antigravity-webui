@@ -960,36 +960,29 @@ export function App() {
       timestamp: new Date().toISOString()
     };
 
+    const liveMsgId = mode !== 'queue' ? `live-assistant-${Date.now()}` : null;
+    const liveAssistantMsg: ChatMessage | null = liveMsgId ? {
+      id: liveMsgId,
+      role: 'assistant',
+      content: '',
+      thought: '',
+      toolCalls: [],
+      isLive: true,
+      timestamp: new Date().toISOString()
+    } : null;
+
     if (mode === 'queue') {
       setMessages((prev) => [...prev, userMsg]);
       setQueueCount((prev) => prev + 1);
     } else if (mode === 'steer') {
       // Steer mode: cleanly close the previous turn and open a steered assistant bubble
-      const liveAssistantMsg: ChatMessage = {
-        id: `live-assistant-${Date.now()}`,
-        role: 'assistant',
-        content: '',
-        thought: '',
-        toolCalls: [],
-        isLive: true,
-        timestamp: new Date().toISOString()
-      };
       setMessages((prev) => {
         const finalized = prev.map((m) => (m.isLive ? { ...m, isLive: false } : m));
-        return [...finalized, userMsg, liveAssistantMsg];
+        return liveAssistantMsg ? [...finalized, userMsg, liveAssistantMsg] : [...finalized, userMsg];
       });
       setIsStreaming(true);
     } else {
-      const liveAssistantMsg: ChatMessage = {
-        id: `live-assistant-${Date.now()}`,
-        role: 'assistant',
-        content: '',
-        thought: '',
-        toolCalls: [],
-        isLive: true,
-        timestamp: new Date().toISOString()
-      };
-      setMessages((prev) => [...prev, userMsg, liveAssistantMsg]);
+      setMessages((prev) => (liveAssistantMsg ? [...prev, userMsg, liveAssistantMsg] : [...prev, userMsg]));
       setIsStreaming(true);
     }
 
@@ -1007,6 +1000,9 @@ export function App() {
       // WebSocket not ready (reconnecting) — inform the user instead of silently losing the prompt
       showToast(e?.message || 'Connexion WebSocket indisponible : message non envoyé.', 'error');
       setIsStreaming(false);
+      if (liveMsgId) {
+        setMessages((prev) => prev.filter((m) => m.id !== liveMsgId));
+      }
       if (mode === 'queue') {
         setQueueCount((prev) => Math.max(0, prev - 1));
       }

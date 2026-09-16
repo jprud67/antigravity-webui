@@ -28,13 +28,16 @@ def is_safe_conversation_id(conversation_id: str) -> bool:
     """Verifies conversation_id is safe, contains no directory traversal elements, and stays inside BRAIN_DIR."""
     if not conversation_id or not isinstance(conversation_id, str):
         return False
-    if conversation_id.strip().lower() in {"null", "undefined", "none", ""}:
+    clean = conversation_id.strip()
+    if clean.lower() in {"null", "undefined", "none", ""}:
         return False
-    if ".." in conversation_id or "/" in conversation_id or "\\" in conversation_id:
+    if clean.startswith(".") or ".." in clean or "/" in clean or "\\" in clean or "\x00" in clean:
+        return False
+    if not re.fullmatch(r"^[a-zA-Z0-9_\-]{1,128}$", clean):
         return False
     try:
         resolved_brain = BRAIN_DIR.resolve()
-        resolved_conv = (BRAIN_DIR / conversation_id).resolve()
+        resolved_conv = (BRAIN_DIR / clean).resolve()
         return resolved_conv.is_relative_to(resolved_brain) and resolved_conv != resolved_brain
     except Exception:
         return False
@@ -1061,7 +1064,7 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
             cursor.execute(
                 """
                 UPDATE conversation_summaries
-                SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?
+                SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = NULL
                 WHERE conversation_id = ?
                 """,
                 (len(remaining_steps), new_preview, now_str, new_last_user_idx, conversation_id)
