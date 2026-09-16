@@ -76,15 +76,15 @@ def _is_blocked_sensitive_path(resolved: Path) -> bool:
 
     # Fichiers de secrets et identifiants
     name = resolved.name.lower()
+    if any(p == ".git" for p in parts):
+        return True
     if name in ("antigravity-oauth-token", "webui_auth.json", "webui_password.txt", "google_accounts.json"):
         return True
     if name in ("id_rsa", "id_ed25519", "id_dsa", "id_ecdsa") or name.startswith(("id_rsa.", "id_ed25519.")):
         return True
     if name == ".env" or name.startswith(".env."):
         return True
-    if ".stash_" in name:
-        return True
-    return False
+    return ".stash_" in name
 
 
 def _validate_path_access(file_path: Path) -> Path:
