@@ -21,7 +21,7 @@ from typing import Any
 
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
 from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
-from app.services.agy_driver import resolve_model_and_effort
+from app.services.agy_driver import resolve_model_and_effort, get_model_families
 from app.services.cron_store import (
     CRON_DIR,
     OUTPUT_DIR,
@@ -193,6 +193,8 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
                 effort = settings.get("effort")
         except Exception as e:
             logger.debug(f"Ignored error: {e}")
+    model_switched_on_current_account = False
+    
     while attempts < MAX_TASK_FAILOVER:
         attempts += 1
         try:
@@ -208,15 +210,47 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
         if is_quota_error(combined):
             current = get_active_account()
             current_email = (current or {}).get("email") or "inconnu"
+            
+            # 1. Essayer de basculer sur un autre type de modèle (Gemini <-> Externe) avant de changer de compte
+            if not model_switched_on_current_account:
+                families = await get_model_families()
+                is_gemini = "gemini" in str(model).lower()
+                candidate_models = [
+                    f for f in families 
+                    if ("gemini" not in f["id"].lower() if is_gemini else "gemini" in f["id"].lower())
+                ]
+                if candidate_models and attempts < MAX_TASK_FAILOVER:
+                    new_model_family = candidate_models[0]
+                    # Récupérer la variante par défaut ou la première disponible
+                    new_model = new_model_family["variants"].get("default") or list(new_model_family["variants"].values())[0]
+                    
+                    old_model = model
+                    model = new_model
+                    effort = new_model_family.get("default_effort")
+                    model_switched_on_current_account = True
+                    
+                    failovers.append({"from": old_model, "to": new_model, "attempt": attempts, "type": "model"})
+                    logger.warning(
+                        f"[Cron] Quota atteint sur {current_email} avec {old_model} — bascule sur le modèle alternatif {new_model}, "
+                        f"relance de la tâche (tentative {attempts + 1}/{MAX_TASK_FAILOVER})..."
+                    )
+                    await asyncio.sleep(1.0)
+                    continue
+
+            # 2. Si le modèle a déjà été basculé ou si c'est impossible, basculer le compte Google
             new_account = switch_to_next_healthy_account(exclude_email=current_email, model=model)
             if new_account and attempts < MAX_TASK_FAILOVER:
-                failovers.append({"from": current_email, "to": new_account, "attempt": attempts})
+                # On réinitialise la bascule de modèle pour ce nouveau compte
+                model_switched_on_current_account = False
+                
+                failovers.append({"from": current_email, "to": new_account, "attempt": attempts, "type": "account"})
                 logger.warning(
-                    f"[Cron] Quota atteint sur {current_email} — bascule sur {new_account}, "
+                    f"[Cron] Quota atteint sur {current_email} — bascule sur le compte {new_account}, "
                     f"relance de la tâche (tentative {attempts + 1}/{MAX_TASK_FAILOVER})..."
                 )
                 await asyncio.sleep(1.0)
                 continue
+                
             status = "quota_exhausted"
             logger.error("[Cron] Quota atteint et limite de failover atteinte ou aucun compte sain disponible.")
             break
