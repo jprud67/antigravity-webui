@@ -381,10 +381,11 @@ def fork_conversation(
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM conversation_summaries WHERE conversation_id = ?", (source_conversation_id,))
         source_row = cursor.fetchone()
-        source_title = source_row["title"] if source_row and source_row["title"] else "Session"
+        row_dict = dict(source_row) if source_row else {}
+        source_title = row_dict.get("title") or "Session"
         default_workspace_uri = json.dumps([get_default_workspace_uri()])
-        source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else default_workspace_uri
-        agent_name = source_row["agent_name"] if source_row and source_row["agent_name"] else ""
+        source_workspace = row_dict.get("workspace_uris") or default_workspace_uri
+        agent_name = row_dict.get("agent_name") or ""
 
         title = new_title or f"{source_title} (Branche #{up_to_step_index})"
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
@@ -458,10 +459,11 @@ def create_conversation_handoff(
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM conversation_summaries WHERE conversation_id = ?", (source_conversation_id,))
         source_row = cursor.fetchone()
-        source_title = source_row["title"] if source_row and source_row["title"] else "Session"
+        row_dict = dict(source_row) if source_row else {}
+        source_title = row_dict.get("title") or "Session"
         default_workspace_uri = json.dumps([get_default_workspace_uri()])
-        source_workspace = source_row["workspace_uris"] if source_row and source_row["workspace_uris"] else default_workspace_uri
-        agent_name = source_row["agent_name"] if source_row and source_row["agent_name"] else ""
+        source_workspace = row_dict.get("workspace_uris") or default_workspace_uri
+        agent_name = row_dict.get("agent_name") or ""
     finally:
         conn.close()
 

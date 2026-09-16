@@ -34,6 +34,8 @@ def _read_log_chunk(path: Path, off: int) -> tuple[str, int]:
 
 def _newest_log_after(since_ts: float) -> Path | None:
     """Retourne le journal cli-*.log créé/modifié depuis `since_ts` (le plus récent)."""
+    if not LOG_DIR.exists():
+        return None
     candidates = []
     try:
         for f in LOG_DIR.glob("cli-*.log"):
@@ -60,6 +62,8 @@ def _expected_log_candidates(since_ts: float, window: float = 5.0) -> list[Path]
     (± quelques secondes) — ce qui lève l'ambiguïté entre runs concurrents.
     On vérifie à la fois l'heure locale et UTC pour supporter toute configuration.
     """
+    if not LOG_DIR.exists():
+        return []
     out: list[Path] = []
     seen: set[Path] = set()
     base = int(since_ts) - 1
@@ -83,8 +87,15 @@ def _expected_log_candidates(since_ts: float, window: float = 5.0) -> list[Path]
                     out.append(p)
             except OSError:
                 continue
+
+    def _safe_mtime(item: Path) -> float:
+        try:
+            return item.stat().st_mtime
+        except OSError:
+            return 0.0
+
     # Sort candidates by mtime descending so candidates[0] is the most recently created/written log
-    out.sort(key=lambda item: item.stat().st_mtime if item.exists() else 0.0, reverse=True)
+    out.sort(key=_safe_mtime, reverse=True)
     return out
 
 

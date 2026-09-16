@@ -43,30 +43,38 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
             if tasks_dir.exists() and tasks_dir.is_dir():
                 for tfile in tasks_dir.glob("*.log"):
                     tid = tfile.stem
-                    stat = tfile.stat()
                     try:
+                        stat = tfile.stat()
+                        stat_size = stat.st_size
+                        stat_mtime = stat.st_mtime
                         with open(tfile, "r", encoding="utf-8", errors="replace") as f:
-                            if stat.st_size > 65536:
-                                f.seek(stat.st_size - 65536)
-                            lines = f.readlines()
+                            if stat_size > 65536:
+                                f.seek(stat_size - 65536)
+                                lines = f.readlines()
+                                if len(lines) > 1:
+                                    lines = lines[1:]
+                            else:
+                                lines = f.readlines()
                             preview = "".join(lines[-10:]) if lines else ""
                     except Exception:
                         preview = ""
+                        stat_size = 0
+                        stat_mtime = 0.0
 
                     now_ts = time.time()
                     is_finished = (
                         "finished with result" in preview
                         or "exited with code" in preview
                         or "Completed At:" in preview
-                        or (now_ts - stat.st_mtime) > 1800
+                        or (now_ts - stat_mtime) > 1800
                     )
                     tasks.append({
                         "id": f"{cid}/{tid}",
                         "task_id": tid,
                         "conversation_id": cid,
                         "log_path": str(tfile),
-                        "size": stat.st_size,
-                        "last_modified": stat.st_mtime,
+                        "size": stat_size,
+                        "last_modified": stat_mtime,
                         "preview": preview,
                         "status": "completed" if is_finished else "running"
                     })
@@ -76,12 +84,15 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
             if subagent_dir.exists() and subagent_dir.is_dir():
                 for sdir in subagent_dir.iterdir():
                     if sdir.is_dir():
-                        stat = sdir.stat()
+                        try:
+                            s_mtime = sdir.stat().st_mtime
+                        except OSError:
+                            s_mtime = 0.0
                         subagents.append({
                             "id": sdir.name,
                             "conversation_id": cid,
                             "path": str(sdir),
-                            "last_modified": stat.st_mtime,
+                            "last_modified": s_mtime,
                             "status": "idle"
                         })
 

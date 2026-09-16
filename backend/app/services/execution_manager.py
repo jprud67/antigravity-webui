@@ -47,6 +47,7 @@ class ExecutionSession:
 
     def add_subscriber(self, ws: WebSocket):
         self.subscribers.add(ws)
+        self.last_active_at = time.time()
 
     def remove_subscriber(self, ws: WebSocket):
         self.subscribers.discard(ws)
@@ -343,6 +344,7 @@ class ExecutionSession:
         finally:
             self.active_proc = None
             self.is_running = False
+            self.last_active_at = time.time()
 
     async def queue_worker(self):
         while True:
@@ -365,6 +367,7 @@ class ExecutionSession:
                     raise
             except Exception as e:
                 logger.error(f"[Session {self.conversation_id}] Worker task error: {e}")
+            self.last_active_at = time.time()
             self.message_queue.task_done()
 
 
@@ -511,6 +514,7 @@ class ExecutionManager:
 
         session = self.get_or_create_session(conv_id, ws_path)
         session.add_subscriber(ws)
+        session.last_active_at = time.time()
         self.active_session = session
 
         if session.is_running:
