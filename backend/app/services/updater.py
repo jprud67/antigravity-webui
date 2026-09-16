@@ -211,15 +211,16 @@ def check_for_updates(force: bool = False) -> dict[str, Any]:
     now = time.time()
 
     if not force:
+        local_sha = _git_cmd(["rev-parse", "--short=8", "HEAD"], timeout=5)
+
         if _update_result_cache is not None:
             age = now - _update_result_cache.get("checked_at", 0)
-            if age < CACHE_DURATION_SECONDS:
+            if age < CACHE_DURATION_SECONDS and _update_result_cache.get("current_commit") == local_sha:
                 return _update_result_cache
 
         cached = _read_disk_cache()
         if cached and (now - cached.get("ts", 0)) < CACHE_DURATION_SECONDS:
             cached_payload = cached.get("payload") or {}
-            local_sha = _git_cmd(["rev-parse", "--short=8", "HEAD"], timeout=5)
             if cached_payload and cached.get("commit") == local_sha:
                 _update_result_cache = cached_payload
                 return cached_payload

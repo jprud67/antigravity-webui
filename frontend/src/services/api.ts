@@ -918,7 +918,7 @@ export interface UpdateCheckResult {
 }
 
 export async function fetchSystemVersion(): Promise<SystemVersionInfo> {
-  const res = await fetch(`${API_BASE}/system/version`, {
+  const res = await fetch(`${API_BASE}/system/version?t=${Date.now()}`, {
     headers: getHeaders()
   });
   if (!res.ok) throw new Error("Impossible de récupérer les informations de version");

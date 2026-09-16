@@ -492,12 +492,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      const tabToUse = initialTab || activeTab;
       // oxlint-disable-next-line react/set-state-in-effect
       if (initialTab) setActiveTab(initialTab);
       // oxlint-disable-next-line react/set-state-in-effect
       setSelectedModelId(currentModel);
       setSkillsLoading(true);
       setGoogleLoading(true);
+
+      if (tabToUse === 'updates') {
+        loadUpdateInfo(false);
+      }
 
       fetchSettings().then((s) => {
         setSettings(s);
@@ -538,6 +543,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         .catch((err) => console.error('Failed to load Google accounts:', err))
         .finally(() => setGoogleLoading(false));
     }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, currentModel, models, initialTab, onGoogleAccountChanged]);
 
   const activeModelObj = models.find((m) => m.id === selectedModelId);
