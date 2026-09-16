@@ -409,6 +409,19 @@ class ExecutionManager:
         self.sessions: dict[str, ExecutionSession] = {}
         self.active_session: ExecutionSession | None = None
         self.connected_sockets: set[WebSocket] = set()
+        self._lock: asyncio.Lock = asyncio.Lock()
+
+    def remove_session(self, conversation_id: str | None) -> None:
+        """Immediately removes a session from memory and cancels its worker task."""
+        if not conversation_id:
+            return
+        target_session = self.sessions.pop(conversation_id, None)
+        if target_session:
+            if target_session is self.active_session:
+                self.active_session = None
+            if target_session.worker_task and not target_session.worker_task.done():
+                target_session.worker_task.cancel()
+            logger.info(f"Removed execution session for conversation {conversation_id} from memory.")
 
     def register_socket(self, ws: WebSocket):
         self.connected_sockets.add(ws)
@@ -706,6 +719,7 @@ class ExecutionManager:
         async with self._lock:
             sessions = list(self.sessions.values())
             self.sessions.clear()
+            self.active_session = None
 
         for session in sessions:
             # 1. Drain queue

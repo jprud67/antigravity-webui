@@ -83,6 +83,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
         for cid in ids:
             try:
                 await execution_manager.interrupt(cid)
+                execution_manager.remove_session(cid)
             except Exception:
                 pass
         try:
@@ -259,6 +260,7 @@ async def remove_conversation(conversation_id: str, _ = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     try:
         await execution_manager.interrupt(conversation_id)
+        execution_manager.remove_session(conversation_id)
     except Exception:
         pass
     success = delete_conversation(conversation_id)

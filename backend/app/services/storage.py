@@ -283,8 +283,14 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
 
     # Check if any recent step has exact usage metadata from agy
     for s in reversed(steps):
-        if "usage" in s and isinstance(s["usage"], dict) and s["usage"].get("total_tokens", 0) > 0:
-            u = s["usage"]
+        if not isinstance(s, dict):
+            continue
+        u = s.get("usage")
+        if not u and isinstance(s.get("result"), dict):
+            u = s["result"].get("usage")
+        if not u and isinstance(s.get("step_update"), dict):
+            u = s["step_update"].get("usage")
+        if isinstance(u, dict) and u.get("total_tokens", 0) > 0:
             return {
                 "input_tokens": u.get("input_tokens", 0),
                 "output_tokens": u.get("output_tokens", 0),

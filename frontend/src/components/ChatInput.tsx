@@ -957,7 +957,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         if (att.isImage) {
           finalText += `\n\n[Image attachée : ${att.name}]\n${att.content}`;
         } else {
-          finalText += `\n\n[Fichier attaché : ${att.name} (${Math.round(att.size / 1024)} ko)]\n\`\`\`\n${att.content.slice(0, 50000)}\n\`\`\``;
+          const content = att.content.length > 50000
+            ? `${att.content.slice(0, 50000)}\n[...Tronqué à 50 000 caractères...]`
+            : att.content;
+          finalText += `\n\n[Fichier attaché : ${att.name} (${Math.round(att.size / 1024)} ko)]\n\`\`\`\n${content}\n\`\`\``;
         }
       }
       setAttachments([]);
