@@ -95,7 +95,7 @@ class ExecutionSession:
         for ws in list(self.subscribers):
             try:
                 await ws.send_json(event)
-            except Exception as e:
+            except Exception:
                 dead.add(ws)
         for ws in dead:
             self.subscribers.discard(ws)
@@ -320,11 +320,12 @@ class ExecutionSession:
                 if quota_error_detected:
                     current_meta = get_active_account()
                     current_email = current_meta.get("email") if current_meta else "inconnu"
+                    exclude_email = current_email if (current_email and "@" in current_email) else None
                     logger.warning(
                         f"[Session {self.conversation_id}] Google Account {current_email} reached quota limits. Triggering auto-failover..."
                     )
 
-                    new_account = switch_to_next_healthy_account(exclude_email=current_email, model=model)
+                    new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=model)
                     if new_account:
                         logger.info(
                             f"[Session {self.conversation_id}] Auto-failover: Switched from {current_email} to {new_account}. Relaunching task immediately..."
@@ -445,7 +446,7 @@ class ExecutionManager:
                         self._background_tasks.add(task)
                         task.add_done_callback(self._background_tasks.discard)
                         terminated_async = True
-                except RuntimeError:
+                except RuntimeError as e:
                     logger.debug(f"Ignored error: {e}")
 
                 if not terminated_async:
@@ -458,7 +459,7 @@ class ExecutionManager:
                             )
                         else:
                             terminate_process_group_sync(target_session.active_proc, force=True)
-                    except Exception as e:
+                    except Exception:
                         terminate_process_group_sync(target_session.active_proc, force=True)
             if target_session.worker_task and not target_session.worker_task.done():
                 target_session.worker_task.cancel()
@@ -655,7 +656,7 @@ class ExecutionManager:
                     session.active_task.cancel()
                     try:
                         await asyncio.wait_for(asyncio.shield(session.active_task), timeout=2.0)
-                    except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                    except (asyncio.CancelledError, asyncio.TimeoutError, Exception) as e:
                         logger.debug(f"Ignored error: {e}")
                 # Purge obsolete pending messages in the queue so the steering directive executes immediately
                 while not session.message_queue.empty():

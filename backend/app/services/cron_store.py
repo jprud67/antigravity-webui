@@ -82,7 +82,7 @@ def save_jobs(data: dict[str, Any]) -> None:
             restrict_file_permissions(temp_path)
             temp_path.replace(JOBS_FILE)
             restrict_file_permissions(JOBS_FILE)
-        except Exception as e:
+        except Exception:
             if temp_path.exists():
                 try:
                     temp_path.unlink()
@@ -117,7 +117,7 @@ def update_jobs(modifier) -> None:
             restrict_file_permissions(temp_path)
             temp_path.replace(JOBS_FILE)
             restrict_file_permissions(JOBS_FILE)
-        except Exception as e:
+        except Exception:
             if temp_path.exists():
                 try:
                     temp_path.unlink()

@@ -21,7 +21,7 @@ from typing import Any
 
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
 from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
-from app.services.agy_driver import resolve_model_and_effort, get_model_families
+from app.services.agy_driver import get_model_families, resolve_model_and_effort
 from app.services.cron_store import (
     CRON_DIR,
     OUTPUT_DIR,
@@ -138,7 +138,7 @@ async def run_agy_task(
         for t in pumps:
             try:
                 await asyncio.wait_for(t, timeout=3.0)
-            except Exception as e:
+            except Exception:
                 t.cancel()
 
         if quota_seen["line"] is None:
@@ -146,7 +146,7 @@ async def run_agy_task(
                 quota_line = await asyncio.wait_for(quota_task, timeout=2.0)
                 if quota_line:
                     quota_seen["line"] = quota_line
-            except Exception as e:
+            except Exception:
                 quota_task.cancel()
         elif not quota_task.done():
             quota_task.cancel()
@@ -210,6 +210,7 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
         if is_quota_error(combined):
             current = get_active_account()
             current_email = (current or {}).get("email") or "inconnu"
+            exclude_email = current_email if (current_email and "@" in current_email) else None
             
             # 1. Essayer de basculer sur un autre type de modèle (Gemini <-> Externe) avant de changer de compte
             if not model_switched_on_current_account:
@@ -222,7 +223,7 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
                 if candidate_models and attempts < MAX_TASK_FAILOVER:
                     new_model_family = candidate_models[0]
                     # Récupérer la variante par défaut ou la première disponible
-                    new_model = new_model_family["variants"].get("default") or list(new_model_family["variants"].values())[0]
+                    new_model = new_model_family["variants"].get("default") or next(iter(new_model_family["variants"].values()))
                     
                     old_model = model
                     model = new_model
@@ -238,7 +239,7 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
                     continue
 
             # 2. Si le modèle a déjà été basculé ou si c'est impossible, basculer le compte Google
-            new_account = switch_to_next_healthy_account(exclude_email=current_email, model=model)
+            new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=model)
             if new_account and attempts < MAX_TASK_FAILOVER:
                 # On réinitialise la bascule de modèle pour ce nouveau compte
                 model_switched_on_current_account = False

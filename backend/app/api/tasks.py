@@ -31,7 +31,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                 all_dirs = [d for d in BRAIN_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")]
                 all_dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
                 conv_dirs = all_dirs[:30]
-            except Exception as e:
+            except Exception:
                 conv_dirs = []
         for cdir in conv_dirs:
             if not cdir.is_dir():
@@ -55,7 +55,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                             if stat_size > 65536 and len(lines) > 1:
                                 lines = lines[1:]
                             preview = "".join(lines[-10:]) if lines else ""
-                    except Exception as e:
+                    except Exception:
                         preview = ""
                         stat_size = 0
                         stat_mtime = 0.0

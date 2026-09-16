@@ -27,7 +27,7 @@ def _validate_workspace(workspace: str | None) -> Path:
     target = Path(workspace) if workspace else Path(DEFAULT_WORKSPACE)
     try:
         resolved = target.resolve()
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Chemin de workspace invalide.")
     
     if not resolved.exists() or not resolved.is_dir():

@@ -1,4 +1,5 @@
 import logging
+
 logger = logging.getLogger(__name__)
 from typing import Any
 
@@ -97,7 +98,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             for cid in ids:
                 results[cid] = True
             return {"success": True, "action": action, "count": len(ids), "results": results}
-        except Exception as e:
+        except Exception:
             for cid in ids:
                 results[cid] = False
             return {"success": False, "action": action, "count": len(ids), "results": results}
@@ -109,7 +110,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             bulk_update_session_meta(ids, {"pinned": pinned})
             for cid in ids:
                 results[cid] = True
-        except Exception as e:
+        except Exception:
             for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
@@ -120,7 +121,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             bulk_update_session_meta(ids, {"archived": archived})
             for cid in ids:
                 results[cid] = True
-        except Exception as e:
+        except Exception:
             for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
@@ -144,7 +145,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             bulk_update_session_meta_batch(updates_per_id)
             for cid in ids:
                 results[cid] = True
-        except Exception as e:
+        except Exception:
             for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
@@ -161,7 +162,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             bulk_update_session_meta(ids, updates)
             for cid in ids:
                 results[cid] = True
-        except Exception as e:
+        except Exception:
             for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}

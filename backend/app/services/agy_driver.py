@@ -522,7 +522,7 @@ async def get_usage_quota() -> dict[str, Any]:
                         dict_payload = {"items": data}
                         _quota_cache = {"data": dict_payload, "timestamp": now}
                         return dict_payload
-            except Exception as e:
+            except Exception:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)
                 except Exception as e:
@@ -564,7 +564,7 @@ async def get_credits() -> dict[str, Any]:
                         dict_payload = {"items": data}
                         _credits_cache = {"data": dict_payload, "timestamp": now}
                         return dict_payload
-            except Exception as e:
+            except Exception:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)
                 except Exception as e:
@@ -606,7 +606,7 @@ async def get_changelog() -> dict[str, Any]:
                         dict_payload = {"items": data}
                         _changelog_cache = {"data": dict_payload, "timestamp": now}
                         return dict_payload
-            except Exception as e:
+            except Exception:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)
                 except Exception as e:

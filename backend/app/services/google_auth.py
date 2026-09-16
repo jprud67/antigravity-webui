@@ -405,7 +405,7 @@ def start_google_login_flow() -> dict[str, Any]:
             "instructions": "Ouvrez l'URL dans votre navigateur, connectez-vous avec votre compte Google, puis copiez-collez le code d'autorisation obtenu.",
             "timeout_seconds": 180
         }
-    except Exception as e:
+    except Exception:
         _close_login_resources(master_fd, proc)
         _restore_stash(stash_path)
         raise
@@ -461,7 +461,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
                         if isinstance(data, dict) and data:
                             token_ready = True
                             break
-                except (json.JSONDecodeError, OSError):
+                except (json.JSONDecodeError, OSError) as e:
                     logger.debug(f"Ignored error: {e}")
             if not _proc_running(proc):
                 time.sleep(0.2)
@@ -472,7 +472,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
                             if isinstance(data, dict) and data:
                                 token_ready = True
                                 break
-                    except (json.JSONDecodeError, OSError):
+                    except (json.JSONDecodeError, OSError) as e:
                         logger.debug(f"Ignored error: {e}")
                 break
             time.sleep(0.3)
@@ -502,7 +502,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
             "active_account": active_meta,
             "message": f"Nouveau compte Google connecté avec succès : {active_email}"
         }
-    except Exception as e:
+    except Exception:
         _close_login_resources(master_fd, proc)
         _restore_stash(stash_path)
         with _login_lock:

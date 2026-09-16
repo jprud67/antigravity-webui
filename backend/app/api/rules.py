@@ -1,4 +1,5 @@
 import logging
+
 logger = logging.getLogger(__name__)
 import json
 import os
@@ -26,7 +27,7 @@ def _validate_workspace_path(workspace_path: str) -> Path:
     """Resolve a workspace path and confine it to the authorized working roots."""
     try:
         resolved = Path(workspace_path).resolve()
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Chemin de workspace invalide.")
 
     allowed_roots = [Path(DEFAULT_WORKSPACE).resolve()]
@@ -34,7 +35,7 @@ def _validate_workspace_path(workspace_path: str) -> Path:
         for ws in get_settings().get("trustedWorkspaces", []) or []:
             try:
                 allowed_roots.append(Path(ws).resolve())
-            except Exception as e:
+            except Exception:
                 continue
     except Exception as e:
         logger.debug(f"Ignored error: {e}")
