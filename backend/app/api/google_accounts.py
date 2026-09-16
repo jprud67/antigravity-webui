@@ -81,9 +81,10 @@ def delete_account(email: str = Query(..., min_length=1, description="Google acc
 
 
 @router.post("/accounts/login/start")
-def start_login(_ = Depends(require_auth)):
+async def start_login(_ = Depends(require_auth)):
     try:
-        res = start_google_login_flow()
+        import asyncio
+        res = await asyncio.to_thread(start_google_login_flow)
         return res
     except Exception as e:
         logger.error(f"Error starting Google OAuth flow: {e}")
@@ -91,9 +92,10 @@ def start_login(_ = Depends(require_auth)):
 
 
 @router.post("/accounts/login/submit")
-def submit_code(req: SubmitCodeRequest, _ = Depends(require_auth)):
+async def submit_code(req: SubmitCodeRequest, _ = Depends(require_auth)):
     try:
-        res = submit_google_auth_code(req.session_id, req.code)
+        import asyncio
+        res = await asyncio.to_thread(submit_google_auth_code, req.session_id, req.code)
         return res
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

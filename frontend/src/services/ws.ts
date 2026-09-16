@@ -56,10 +56,17 @@ export class ChatWebSocketClient {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const token = localStorage.getItem('antigravity_token');
+    // NOTE: token is passed as a WebSocket sub-protocol to avoid exposure in
+    // server/proxy access logs (query-string tokens are frequently logged).
+    // The backend reads it from the Sec-WebSocket-Protocol header.
+    // Fallback: if the server doesn't accept the subprotocol, we retain a
+    // query-param as secondary support — remove it once the backend is updated
+    // to always read from the subprotocol.
     const url = `${protocol}//${host}/ws/chat${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    const protocols = token ? [`token.${token}`] : undefined;
 
     try {
-      this.ws = new WebSocket(url);
+      this.ws = protocols ? new WebSocket(url, protocols) : new WebSocket(url);
 
       this.ws.onopen = () => {
         console.log('[WS] Connected to Antigravity WebUI chat socket');
@@ -133,6 +140,11 @@ export class ChatWebSocketClient {
   private startHeartbeat() {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
+      // Skip heartbeat when page is hidden — avoids spurious timeout reconnects
+      // when the OS suspends timers (e.g. laptop sleep, background tab throttling).
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         try {
           this.ws.send(JSON.stringify({ 
@@ -150,7 +162,24 @@ export class ChatWebSocketClient {
         }
       }
     }, ChatWebSocketClient.HEARTBEAT_INTERVAL);
+
+    // Resume heartbeat and check connection when tab becomes visible
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this._onVisibilityChange);
+      document.addEventListener('visibilitychange', this._onVisibilityChange);
+    }
   }
+
+  private _onVisibilityChange = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      // Tab is visible again — reset the heartbeat timeout that may have fired while hidden
+      this.resetHeartbeatTimeout();
+      // Reconnect if disconnected while tab was hidden
+      if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+        this.connect();
+      }
+    }
+  };
 
   private resetHeartbeatTimeout() {
     if (this.heartbeatTimeout) {
@@ -163,6 +192,9 @@ export class ChatWebSocketClient {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this._onVisibilityChange);
     }
     this.resetHeartbeatTimeout();
   }

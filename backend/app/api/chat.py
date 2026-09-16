@@ -23,9 +23,10 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
     # Send connection handshake with server status
     try:
         active_cids = execution_manager.get_running_conversations()
+        _active_session = execution_manager.active_session
         active_turn = (
-            execution_manager.active_session.get_live_state()
-            if execution_manager.active_session and execution_manager.active_session.is_running
+            _active_session.get_live_state()
+            if _active_session is not None and _active_session.is_running
             else None
         )
         await websocket.send_json({

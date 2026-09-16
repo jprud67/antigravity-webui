@@ -357,7 +357,6 @@ class ExecutionSession:
                         return
                 else:
                     logger.info(f"[Session {self.conversation_id}] Turn finished naturally.")
-                    self.is_running = False
                     for tc in self.live_tool_calls:
                         if isinstance(tc, dict) and tc.get("status") == "running":
                             tc["status"] = "done"
@@ -366,6 +365,7 @@ class ExecutionSession:
                         "conversation_id": self.conversation_id,
                         "queue_size": self.message_queue.qsize()
                     })
+                    self.is_running = False
                     return
 
             # All failover attempts were exhausted without a conclusive outcome

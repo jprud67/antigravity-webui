@@ -1,6 +1,4 @@
 import logging
-
-logger = logging.getLogger(__name__)
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
@@ -34,6 +32,7 @@ from app.services.storage import (
 )
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
+logger = logging.getLogger(__name__)
 
 class ForkRequest(BaseModel):
     up_to_step_index: int
@@ -106,25 +105,29 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
 
     elif action in ("pin", "unpin"):
         pinned = (action == "pin")
+        ok = True
         try:
             bulk_update_session_meta(ids, {"pinned": pinned})
             for cid in ids:
                 results[cid] = True
         except Exception:
+            ok = False
             for cid in ids:
                 results[cid] = False
-        return {"success": True, "action": action, "count": len(ids), "results": results}
+        return {"success": ok, "action": action, "count": len(ids), "results": results}
 
     elif action in ("archive", "unarchive"):
         archived = (action == "archive")
+        ok = True
         try:
             bulk_update_session_meta(ids, {"archived": archived})
             for cid in ids:
                 results[cid] = True
         except Exception:
+            ok = False
             for cid in ids:
                 results[cid] = False
-        return {"success": True, "action": action, "count": len(ids), "results": results}
+        return {"success": ok, "action": action, "count": len(ids), "results": results}
 
     elif action == "tag":
         raw_tags = req.payload.get("tags", []) if req.payload else []
@@ -167,12 +170,12 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
     elif action == "export":
-        return bulk_export(req)
+        return _do_bulk_export(req)
     else:
         raise HTTPException(status_code=400, detail=f"Action non supportée: {action}")
 
-@router.post("/bulk/export")
-def bulk_export(req: BulkActionRequest, _ = Depends(require_auth)):
+def _do_bulk_export(req: "BulkActionRequest") -> Response:
+    """Internal bulk export logic (auth already verified by caller)."""
     import json
     import time
     ids = [cid for cid in req.conversation_ids if is_safe_conversation_id(cid)]
@@ -198,6 +201,10 @@ def bulk_export(req: BulkActionRequest, _ = Depends(require_auth)):
             "Content-Disposition": 'attachment; filename="antigravity_bulk_export.json"'
         }
     )
+
+@router.post("/bulk/export")
+def bulk_export(req: BulkActionRequest, _ = Depends(require_auth)):
+    return _do_bulk_export(req)
 
 @router.get("/metadata")
 def get_all_metadata(_ = Depends(require_auth)):
