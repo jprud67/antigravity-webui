@@ -90,11 +90,11 @@ class ExecutionSession:
         # Update live state from event
         self._update_live_state(event)
 
-        # Broadcast to all connected subscribers
+        # Broadcast to all connected subscribers with bounded timeout
         dead = set()
         for ws in list(self.subscribers):
             try:
-                await ws.send_json(event)
+                await asyncio.wait_for(ws.send_json(event), timeout=2.0)
             except Exception:
                 dead.add(ws)
         for ws in dead:

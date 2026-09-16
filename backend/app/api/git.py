@@ -194,33 +194,38 @@ def get_git_diff(
     args = ["diff"]
     if staged:
         args.append("--cached")
+    norm_path = None
     if path:
-        file_candidate = (target / path).resolve()
+        clean_rel = path.strip().replace("\\", "/").lstrip("/")
+        if not clean_rel or ".." in Path(clean_rel).parts:
+            raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+        file_candidate = (target / clean_rel).resolve()
         if not is_safe_path(file_candidate, [target]):
             raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
-        args.extend(["--", path])
+        norm_path = clean_rel
+        args.extend(["--", norm_path])
 
     res = run_git(args, target)
     diff_text = res.stdout
 
     # Fallback pour fichiers indexes ou non suivis si aucun diff standard n'est trouve
-    if not diff_text and path:
+    if not diff_text and norm_path:
         if not staged:
             # Verifier si un diff indexe (staged) existe pour ce fichier
-            cached_res = run_git(["diff", "--cached", "--", path], target)
+            cached_res = run_git(["diff", "--cached", "--", norm_path], target)
             if cached_res.stdout:
                 diff_text = cached_res.stdout
         # Si toujours vide, verifier si c'est un fichier non suivi (untracked) present sur le disque
         if not diff_text:
-            file_on_disk = (target / path).resolve()
+            file_on_disk = (target / norm_path).resolve()
             if is_safe_path(file_on_disk, [target]) and file_on_disk.is_file():
-                untracked_res = run_git(["diff", "--no-index", "--", os.devnull, path], target)
+                untracked_res = run_git(["diff", "--no-index", "--", os.devnull, norm_path], target)
                 if untracked_res.stdout:
                     diff_text = untracked_res.stdout
 
     return {
         "workspace": str(target),
-        "path": path,
+        "path": norm_path or path,
         "diff": diff_text
     }
 

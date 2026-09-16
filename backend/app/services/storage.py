@@ -1869,6 +1869,9 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
 
 _settings_lock = threading.RLock()
 
+MAX_ARTIFACT_READ_BYTES = 5 * 1024 * 1024  # 5 Mo max
+
+
 def read_artifact_content(conversation_id: str, filename: str) -> str:
     if not is_safe_conversation_id(conversation_id):
         raise ValueError("Identifiant de conversation non valide")
@@ -1881,11 +1884,21 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
         raise PermissionError("Accès refusé : les fichiers système internes ou temporaires ne sont pas accessibles via les artefacts.")
     if not target_path.exists() or not target_path.is_file():
         raise FileNotFoundError(f"Artifact introuvable : {filename}")
+
+    file_size = target_path.stat().st_size
+    if file_size > MAX_ARTIFACT_READ_BYTES:
+        try:
+            with open(target_path, "r", encoding="utf-8", errors="replace") as f:
+                content_chunk = f.read(MAX_ARTIFACT_READ_BYTES)
+            return f"[Fichier volumineux ({file_size} octets) : affichage limité aux 5 premiers Mo]\n{content_chunk}"
+        except Exception:
+            return f"[Fichier binaire ou non lisible : {file_size} octets]"
+
     try:
         return target_path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        raw = target_path.read_bytes()
-        return f"[Fichier binaire : {len(raw)} octets]"
+        return f"[Fichier binaire : {file_size} octets]"
+
 
 def get_settings() -> dict[str, Any]:
     defaults: dict[str, Any] = {
@@ -1972,47 +1985,48 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
         }]
 
     new_conv_dir = BRAIN_DIR / new_id
-    new_logs_dir = new_conv_dir / ".system_generated" / "logs"
-    new_logs_dir.mkdir(parents=True, exist_ok=True)
-
-    transcript_path = new_logs_dir / "transcript.jsonl"
-    transcript_full_path = new_logs_dir / "transcript_full.jsonl"
-
-    cloned_steps = []
-    for s in steps:
-        cloned = dict(s)
-        cloned["conversation_id"] = new_id
-        cloned_steps.append(cloned)
-
-    atomic_write_jsonl(transcript_path, cloned_steps)
-    atomic_write_jsonl(transcript_full_path, cloned_steps)
-
-    meta_raw = payload.get("metadata")
-    meta_payload: dict[str, Any] = meta_raw if isinstance(meta_raw, dict) else {}
-    update_session_meta(new_id, {
-        "customTitle": title,
-        "title": title,
-        "pinned": bool(meta_payload.get("pinned", False)),
-        "archived": bool(meta_payload.get("archived", False)),
-        "tags": payload.get("tags") or meta_payload.get("tags") or ["importé"],
-        "project": payload.get("project") or meta_payload.get("project") or ""
-    })
-
-    # Persist summary in SQLite database so the imported session appears in session lists
-    preview = ""
-    for s in steps:
-        c = s.get("content") or s.get("thinking") or ""
-        if c:
-            preview = str(c)[:150]
-            break
-
-    parent_conv_id = payload.get("parent_conversation_id") or meta_payload.get("parent_conversation_id") or ""
-
     should_close = False
     if conn is None:
         conn = get_db_connection()
         should_close = True
+
     try:
+        new_logs_dir = new_conv_dir / ".system_generated" / "logs"
+        new_logs_dir.mkdir(parents=True, exist_ok=True)
+
+        transcript_path = new_logs_dir / "transcript.jsonl"
+        transcript_full_path = new_logs_dir / "transcript_full.jsonl"
+
+        cloned_steps = []
+        for s in steps:
+            cloned = dict(s)
+            cloned["conversation_id"] = new_id
+            cloned_steps.append(cloned)
+
+        atomic_write_jsonl(transcript_path, cloned_steps)
+        atomic_write_jsonl(transcript_full_path, cloned_steps)
+
+        meta_raw = payload.get("metadata")
+        meta_payload: dict[str, Any] = meta_raw if isinstance(meta_raw, dict) else {}
+        update_session_meta(new_id, {
+            "customTitle": title,
+            "title": title,
+            "pinned": bool(meta_payload.get("pinned", False)),
+            "archived": bool(meta_payload.get("archived", False)),
+            "tags": payload.get("tags") or meta_payload.get("tags") or ["importé"],
+            "project": payload.get("project") or meta_payload.get("project") or ""
+        })
+
+        # Persist summary in SQLite database so the imported session appears in session lists
+        preview = ""
+        for s in steps:
+            c = s.get("content") or s.get("thinking") or ""
+            if c:
+                preview = str(c)[:150]
+                break
+
+        parent_conv_id = payload.get("parent_conversation_id") or meta_payload.get("parent_conversation_id") or ""
+
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -2046,6 +2060,16 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
         )
         if should_close:
             conn.commit()
+    except Exception:
+        if should_close and conn is not None:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            delete_session_meta(new_id)
+            if new_conv_dir.exists():
+                shutil.rmtree(new_conv_dir, ignore_errors=True)
+        raise
     finally:
         if should_close and conn is not None:
             conn.close()
@@ -2080,14 +2104,23 @@ def import_conversation(payload: dict[str, Any] | list[Any]) -> dict[str, Any]:
 
     if items_to_import is not None:
         imported = []
+        created_dirs: list[Path] = []
+        created_ids: list[str] = []
         conn = get_db_connection()
         try:
             for item in items_to_import:
                 res = _import_single_conversation(item, now_iso, now_db, conn=conn)
                 imported.append(res)
+                created_ids.append(res["conversation_id"])
+                created_dirs.append(BRAIN_DIR / res["conversation_id"])
             conn.commit()
         except Exception:
             conn.rollback()
+            for cid in created_ids:
+                delete_session_meta(cid)
+            for d in created_dirs:
+                if d.exists():
+                    shutil.rmtree(d, ignore_errors=True)
             raise
         finally:
             conn.close()

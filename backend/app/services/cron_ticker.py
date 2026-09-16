@@ -226,8 +226,9 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
                     cand_model = variants.get("default") or next(iter(variants.values()), None)
                     if cand_model and cand_model != model:
                         old_model = model
-                        model = cand_model
-                        effort = cand.get("default_effort")
+                        norm_cand_model, norm_effort = resolve_model_and_effort(cand_model, cand.get("default_effort"))
+                        model = norm_cand_model or cand_model
+                        effort = norm_effort
                         model_switched_on_current_account = True
                         found_alternative = True
 

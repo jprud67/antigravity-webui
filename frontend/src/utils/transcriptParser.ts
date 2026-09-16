@@ -143,7 +143,9 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
           timestamp: createdAt
         };
       } else {
-        currentAssistantMsg.error = errText;
+        currentAssistantMsg.error = currentAssistantMsg.error
+          ? `${currentAssistantMsg.error}\n${errText}`
+          : errText;
       }
       continue;
     }

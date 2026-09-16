@@ -7,6 +7,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 import json
 
+from app.config import BRAIN_DIR
 from app.main import app
 from app.services.auth import update_password
 from app.services.session_metadata import (
@@ -18,6 +19,7 @@ from app.services.storage import (
     aggregate_steps_into_turns,
     calculate_conversation_tokens,
     import_conversation,
+    read_artifact_content,
 )
 from app.services.updater import CURRENT_VERSION
 
@@ -167,6 +169,63 @@ def test_bulk_import_transaction():
     print("✓ test_bulk_import_transaction passed")
 
 
+def test_artifact_read_cap():
+    test_cid = "test-artifact-session-cid"
+    cid_dir = BRAIN_DIR / test_cid
+    cid_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        # Binary test
+        bin_path = cid_dir / "test.bin"
+        bin_path.write_bytes(b"\x00\xff\xfe\x42")
+        res_bin = read_artifact_content(test_cid, "test.bin")
+        assert "[Fichier binaire : 4 octets]" in res_bin, f"Expected binary info, got: {res_bin}"
+
+        # Large file test (> 5 MB)
+        large_path = cid_dir / "large.txt"
+        with open(large_path, "w", encoding="utf-8") as f:
+            f.write("A" * (5 * 1024 * 1024 + 500))
+        res_large = read_artifact_content(test_cid, "large.txt")
+        assert "[Fichier volumineux" in res_large, f"Expected size warning, got: {res_large[:100]}"
+        print("✓ test_artifact_read_cap passed")
+    finally:
+        import shutil
+        if cid_dir.exists():
+            shutil.rmtree(cid_dir, ignore_errors=True)
+
+
+def test_bulk_import_cleanup_on_error():
+    bad_payload = [
+        {
+            "title": "Batch Session Valid",
+            "steps": [{"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Valid"}]
+        },
+        "not-a-dict-causing-exception"
+    ]
+    try:
+        import_conversation(bad_payload)
+        assert False, "Should have failed due to invalid payload item"
+    except Exception:
+        pass
+    print("✓ test_bulk_import_cleanup_on_error passed")
+
+
+def test_git_diff_sanitization():
+    from fastapi import HTTPException
+    from app.api.git import get_git_diff
+
+    # Path with leading slash should normalize without crashing or escaping target
+    res = get_git_diff(workspace=str(BACKEND_DIR.parent), path="/backend/app/main.py", _=None)
+    assert res["path"] == "backend/app/main.py"
+
+    # Traversal attempt should be rejected with 400
+    try:
+        get_git_diff(workspace=str(BACKEND_DIR.parent), path="../../etc/passwd", _=None)
+        assert False, "Should have raised HTTPException 400 for path traversal"
+    except HTTPException as exc:
+        assert exc.status_code == 400
+    print("✓ test_git_diff_sanitization passed")
+
+
 def test_version_consistency():
     pkg_path = BACKEND_DIR.parent / "frontend" / "package.json"
     with open(pkg_path, "r", encoding="utf-8") as f:
@@ -179,7 +238,7 @@ def test_version_consistency():
     assert frontend_ver == backend_ver == updater_ver, (
         f"Version mismatch: frontend={frontend_ver}, backend={backend_ver}, updater={updater_ver}"
     )
-    assert frontend_ver == "0.1.55", f"Expected version 0.1.55, got {frontend_ver}"
+    assert frontend_ver == "0.1.56", f"Expected version 0.1.56, got {frontend_ver}"
     print(f"✓ test_version_consistency passed ({frontend_ver})")
 
 
@@ -191,5 +250,9 @@ if __name__ == "__main__":
     test_build_conversation_dict_normalization()
     test_aggregate_steps_tool_outputs()
     test_bulk_import_transaction()
+    test_artifact_read_cap()
+    test_bulk_import_cleanup_on_error()
+    test_git_diff_sanitization()
     test_version_consistency()
     print("\nAll unit tests passed successfully!")
+
