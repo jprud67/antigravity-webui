@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import BRAIN_DIR, CONVERSATION_DB, DEFAULT_WORKSPACE, SETTINGS_FILE
+from app.platform_utils import is_safe_path
 from app.services.session_metadata import (
     bulk_delete_session_meta,
     delete_session_meta,
@@ -964,7 +965,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                     lines = raw_data.splitlines()[1:]  # skip potential partial line
                 else:
                     with open(t_file, "r", encoding="utf-8", errors="ignore") as f:
-                        lines = f.readlines()
+                        lines = f.readlines()[-500:]
 
                 for line in lines:
                     if q_lower not in line.lower():
@@ -1550,7 +1551,12 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
             continue
         c_id = cdir.name
         cdir_str = str(cdir)
+        cdir_depth = cdir_str.rstrip(os.sep).count(os.sep)
         for root, dirs, files in os.walk(cdir_str):
+            # Limit scan depth to 5 levels to avoid runaway recursive scans in massive subtrees
+            if root.count(os.sep) - cdir_depth > 5:
+                dirs.clear()
+                continue
             # Prune internal and hidden directories in-place so os.walk avoids scanning them
             dirs[:] = [d for d in dirs if d not in (".system_generated", "scratch") and not d.startswith(".")]
             for fname in files:
@@ -1579,7 +1585,7 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
         raise ValueError("Identifiant de conversation non valide")
     base_dir = (BRAIN_DIR / conversation_id).resolve()
     target_path = (base_dir / filename).resolve()
-    if not target_path.is_relative_to(base_dir):
+    if not is_safe_path(target_path, [base_dir]):
         raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
     rel_parts = target_path.relative_to(base_dir).parts
     if ".system_generated" in rel_parts or "scratch" in rel_parts:

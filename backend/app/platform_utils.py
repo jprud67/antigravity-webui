@@ -129,3 +129,28 @@ def npm_argv(*args: str) -> list[str]:
     if IS_WINDOWS:
         return ["cmd", "/c", npm, *args]
     return [npm, *args]
+
+
+def is_safe_path(target: os.PathLike | str, allowed_roots: list[os.PathLike | str]) -> bool:
+    """
+    Vérifie de manière robuste qu'un chemin cible est confiné sous l'un des répertoires autorisés.
+    Prend en charge la résolution de liens symboliques et la compatibilité cross-platform.
+    """
+    try:
+        from pathlib import Path
+        t = Path(target).resolve()
+        for root in allowed_roots:
+            try:
+                r = Path(root).resolve()
+                try:
+                    if t.is_relative_to(r):
+                        return True
+                except AttributeError:
+                    if t == r or r in t.parents:
+                        return True
+            except Exception:
+                continue
+    except Exception:
+        return False
+    return False
+

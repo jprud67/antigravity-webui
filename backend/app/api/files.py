@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
+from app.platform_utils import is_safe_path
 from app.services.storage import get_settings
 
 logger = logging.getLogger("antigravity.files")
@@ -82,13 +83,7 @@ def _validate_path_access(file_path: Path) -> Path:
         except Exception:
             pass
 
-    def _is_within(p: Path, r: Path) -> bool:
-        try:
-            return p.is_relative_to(r)
-        except AttributeError:
-            return p == r or r in p.parents
-
-    if not any(_is_within(resolved, root) for root in allowed_roots):
+    if not is_safe_path(resolved, allowed_roots):
         raise HTTPException(status_code=403, detail="Accès refusé : chemin en dehors des répertoires de travail autorisés.")
 
     return resolved

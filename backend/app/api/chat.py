@@ -62,6 +62,10 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
                 rule = data.get("rule")
                 await execution_manager.handle_approval(conv_id, decision, rule)
 
+            elif action in ["input", "answer", "stdin"]:
+                input_text = data.get("text", "") or data.get("input", "") or data.get("answer", "")
+                await execution_manager.handle_stdin_input(conv_id, str(input_text))
+
             elif action == "ping":
                 session = execution_manager.get_session(conv_id)
                 await websocket.send_json({

@@ -247,6 +247,13 @@ export class ChatWebSocketClient {
       this.ws.send(JSON.stringify({ action: 'approval', decision, rule, conversation_id: cid }));
     }
   }
+
+  public sendInput(text: string, conversationId?: string) {
+    const cid = conversationId || this.currentConversationId;
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ action: 'input', text, conversation_id: cid }));
+    }
+  }
 }
 
 export const chatSocket = new ChatWebSocketClient();

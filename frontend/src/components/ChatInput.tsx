@@ -989,6 +989,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setShowSlashMenu(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
+      textareaRef.current.rows = 1;
     }
   };
 

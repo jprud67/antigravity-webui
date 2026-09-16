@@ -649,5 +649,19 @@ class ExecutionManager:
             "decision": decision
         })
 
+    async def handle_stdin_input(self, conversation_id: str | None, text: str):
+        session = self.get_session(conversation_id)
+        if not session:
+            return
+
+        if session.active_proc and session.active_proc.stdin and session.active_proc.returncode is None:
+            try:
+                payload = text if text.endswith("\n") else f"{text}\n"
+                session.active_proc.stdin.write(payload.encode("utf-8"))
+                await session.active_proc.stdin.drain()
+                logger.info(f"Stdin input routed to active proc in session {session.conversation_id}")
+            except Exception as e:
+                logger.warning(f"Error writing stdin input to proc stdin: {e}")
+
 
 execution_manager = ExecutionManager()

@@ -95,7 +95,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
     ws.onopen = () => {
       setConnected(true);
       // Send initial terminal dimensions
-      if (ws.readyState === WebSocket.OPEN && xtermRef.current) {
+      if (ws.readyState === WebSocket.OPEN && xtermRef.current && xtermRef.current.cols > 0 && xtermRef.current.rows > 0) {
         ws.send(JSON.stringify({ action: 'resize', cols: xtermRef.current.cols, rows: xtermRef.current.rows }));
       }
     };
@@ -140,13 +140,15 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
       if (fitAddonRef.current && xtermRef.current && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         try {
           fitAddonRef.current.fit();
-          wsRef.current.send(
-            JSON.stringify({
-              action: 'resize',
-              cols: xtermRef.current.cols,
-              rows: xtermRef.current.rows,
-            })
-          );
+          if (xtermRef.current.cols > 0 && xtermRef.current.rows > 0) {
+            wsRef.current.send(
+              JSON.stringify({
+                action: 'resize',
+                cols: xtermRef.current.cols,
+                rows: xtermRef.current.rows,
+              })
+            );
+          }
         } catch {}
       }
     };

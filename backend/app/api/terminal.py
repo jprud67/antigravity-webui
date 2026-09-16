@@ -364,9 +364,13 @@ async def terminal_websocket(
                         msg_obj = json.loads(text)
                         action = msg_obj.get("action")
                         if action == "resize":
-                            cols = msg_obj.get("cols", 80)
-                            rows = msg_obj.get("rows", 24)
-                            await session.resize(rows, cols)
+                            try:
+                                cols = int(msg_obj.get("cols") or 80)
+                                rows = int(msg_obj.get("rows") or 24)
+                                if cols > 0 and rows > 0:
+                                    await session.resize(rows, cols)
+                            except (TypeError, ValueError):
+                                pass
                             continue
                         elif action == "stdin":
                             data = msg_obj.get("data", "")

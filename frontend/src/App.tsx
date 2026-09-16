@@ -1435,12 +1435,15 @@ export function App() {
           tags={activeConv?.tags}
           parentConversationId={activeConv?.parent_conversation_id}
           onQuickPrompt={(p) => setQuickPrompt(p)}
-          onAnswerQuestion={(ans) =>
+          onAnswerQuestion={(ans) => {
+            if (isStreaming) {
+              chatSocket.sendInput(ans);
+            }
             handleSendMessage(ans, {
               model: selectedModel,
               effort: selectedEffort,
-            })
-          }
+            });
+          }}
           onOpenFiles={handleOpenFilesPanel}
           onOpenArtifacts={handleOpenArtifactsPanel}
           onOpenTerminal={handleOpenTerminalPanel}

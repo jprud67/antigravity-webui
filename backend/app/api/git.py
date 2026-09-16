@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
+from app.platform_utils import is_safe_path
 from app.services.storage import get_settings
 
 logger = logging.getLogger("antigravity.git")
@@ -40,7 +41,7 @@ def _validate_workspace(workspace: str | None) -> Path:
         except Exception:
             pass
 
-    if not any(resolved == root or root in resolved.parents for root in allowed_roots):
+    if not is_safe_path(resolved, allowed_roots):
         raise HTTPException(status_code=403, detail="Accès refusé : workspace non autorisé.")
 
     return resolved
