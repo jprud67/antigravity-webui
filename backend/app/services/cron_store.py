@@ -126,7 +126,7 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
     match = re.match(r"^(?:every|toutes les|chaque)\s+(\d+)\s*(m|min|minutes?|h|hours?|heures?|d|days?|jours?)?$", lower)
     if match:
         try:
-            val = int(match.group(1))
+            val = max(1, int(match.group(1)))  # minimum 1 pour éviter une boucle d'exécution infinie
             unit = match.group(2) or "m"
             if unit.startswith("h"):
                 return (now + timedelta(hours=val)).isoformat()

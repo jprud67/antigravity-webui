@@ -84,7 +84,7 @@ def sync_active_account_to_store():
     if not TOKEN_FILE.exists():
         return
     try:
-        with open(TOKEN_FILE, "r") as f:
+        with open(TOKEN_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         meta = get_account_meta_from_token_data(data)
         email = meta.get("email")
@@ -113,7 +113,7 @@ def get_active_account() -> dict[str, Any] | None:
     if not TOKEN_FILE.exists():
         return None
     try:
-        with open(TOKEN_FILE, "r") as f:
+        with open(TOKEN_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         meta = get_account_meta_from_token_data(data)
         meta["is_active"] = True
@@ -134,7 +134,7 @@ def list_google_accounts() -> dict[str, Any]:
     accounts = []
     for p in ACCOUNTS_DIR.glob("*.json"):
         try:
-            with open(p, "r") as f:
+            with open(p, "r", encoding="utf-8") as f:
                 data = json.load(f)
             meta = get_account_meta_from_token_data(data)
             email_val = (meta.get("email") or "").strip().lower()

@@ -1285,7 +1285,10 @@ export function App() {
   const handleRetry = () => {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUserMsg && lastUserMsg.content) {
-      handleSendMessage(lastUserMsg.content, {
+      let content = lastUserMsg.content;
+      content = content.replace(/<\/?USER_REQUEST>/g, '');
+      content = content.replace(/^(?:⚡ \[Guidage\] |📥 \[En attente\] )+/, '');
+      handleSendMessage(content.trim(), {
         model: selectedModel,
         effort: selectedEffort,
         autoApprove: true,

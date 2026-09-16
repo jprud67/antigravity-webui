@@ -79,8 +79,18 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
     """
     logger.info(f"Starting filesystem watcher — brain: {brain_dir}, db: {conv_db}, interval: {poll_interval}s")
 
-    # Track last-seen mtime for all watched paths
-    prev_db_mtime: float = conv_db.stat().st_mtime if conv_db.exists() else 0.0
+    def _get_db_mtime() -> float:
+        try:
+            m = conv_db.stat().st_mtime if conv_db.exists() else 0.0
+            wal = conv_db.with_name(conv_db.name + "-wal")
+            if wal.exists():
+                m = max(m, wal.stat().st_mtime)
+            return m
+        except OSError:
+            return 0.0
+
+    # Track last-seen mtime for all watched paths (including SQLite WAL file)
+    prev_db_mtime: float = _get_db_mtime()
     # transcript path → last mtime
     transcript_mtimes: dict[str, float] = {}
     # artifact path → last mtime
@@ -131,16 +141,15 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
         await asyncio.sleep(poll_interval)
 
         try:
-            # --- 1. Check conversation DB (new/updated conversations) ---
-            if conv_db.exists():
-                cur_db_mtime = conv_db.stat().st_mtime
-                if cur_db_mtime != prev_db_mtime:
-                    prev_db_mtime = cur_db_mtime
-                    logger.debug("conversation_summaries.db changed → broadcasting conversations_updated")
-                    await _broadcast({
-                        "type": "conversations_updated",
-                        "ts": time.time()
-                    })
+            # --- 1. Check conversation DB & WAL (new/updated conversations) ---
+            cur_db_mtime = _get_db_mtime()
+            if cur_db_mtime > 0.0 and cur_db_mtime != prev_db_mtime:
+                prev_db_mtime = cur_db_mtime
+                logger.debug("conversation_summaries.db changed → broadcasting conversations_updated")
+                await _broadcast({
+                    "type": "conversations_updated",
+                    "ts": time.time()
+                })
 
             # --- 2. Check transcript and artifact files (single traversal) ---
             cur_transcripts, cur_artifacts = await asyncio.to_thread(_scan_brain)

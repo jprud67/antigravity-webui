@@ -30,6 +30,7 @@ from app.config import BRAIN_DIR, CONVERSATION_DB
 from app.services.cron_ticker import cron_ticker_loop
 from app.services.fs_watcher import watch_filesystem
 from app.services.google_auth import restore_stashed_token_if_needed
+from app.services.storage import ensure_db_schema
 from app.services.updater import prefetch_update_check
 
 logger = logging.getLogger("antigravity.main")
@@ -51,6 +52,7 @@ def _warn_if_default_password() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Démarre les services d'arrière-plan : watcher FS, ticker des tâches planifiées, prefetch MAJ."""
+    ensure_db_schema()
     restore_stashed_token_if_needed()
     prefetch_update_check()
     _warn_if_default_password()
@@ -83,7 +85,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Antigravity WebUI",
     description="Web Interface to orchestrate Antigravity CLI without touching the terminal",
-    version="0.1.17",
+    version="0.1.18",
     lifespan=lifespan
 )
 

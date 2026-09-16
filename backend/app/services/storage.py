@@ -54,7 +54,63 @@ def get_db_connection() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+    if not _schema_initialized:
+        ensure_db_schema(conn)
     return conn
+
+
+_schema_initialized = False
+_schema_lock = threading.Lock()
+
+
+def ensure_db_schema(conn: sqlite3.Connection | None = None) -> None:
+    """Garantit l'existence de la table conversation_summaries dans la base SQLite."""
+    global _schema_initialized
+    if _schema_initialized:
+        return
+    with _schema_lock:
+        if _schema_initialized:
+            return
+        close_after = False
+        if conn is None:
+            CONVERSATION_DB.parent.mkdir(parents=True, exist_ok=True)
+            conn = sqlite3.connect(str(CONVERSATION_DB), timeout=15.0)
+            close_after = True
+        try:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversation_summaries (
+                    conversation_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL DEFAULT '',
+                    preview TEXT NOT NULL DEFAULT '',
+                    step_count INTEGER NOT NULL DEFAULT 0,
+                    last_modified_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    workspace_uris TEXT NOT NULL DEFAULT '[]',
+                    status TEXT NOT NULL DEFAULT '',
+                    source TEXT NOT NULL DEFAULT '',
+                    project_id TEXT NOT NULL DEFAULT '',
+                    agent_name TEXT NOT NULL DEFAULT '',
+                    parent_conversation_id TEXT NOT NULL DEFAULT '',
+                    nesting_depth INTEGER NOT NULL DEFAULT 0,
+                    battle_id TEXT NOT NULL DEFAULT '',
+                    winning_conversation_id TEXT NOT NULL DEFAULT '',
+                    not_fully_idle NUMERIC NOT NULL DEFAULT 0,
+                    killed NUMERIC NOT NULL DEFAULT 0,
+                    last_user_input_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    last_user_input_step_index INTEGER NOT NULL DEFAULT -1,
+                    app_data_dir TEXT NOT NULL DEFAULT '',
+                    raw_summary BLOB,
+                    group_id TEXT NOT NULL DEFAULT ''
+                );
+                """
+            )
+            conn.commit()
+            _schema_initialized = True
+        except Exception as e:
+            logger.warning(f"ensure_db_schema warning: {e}")
+        finally:
+            if close_after:
+                conn.close()
 
 def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     """Construit le dict conversation à partir d'une ligne SQLite et des métadonnées session."""
@@ -693,6 +749,8 @@ def delete_conversation(conversation_id: str) -> bool:
     return True
 
 def update_conversation_title(conversation_id: str, new_title: str) -> bool:
+    if not is_safe_conversation_id(conversation_id):
+        return False
     update_session_meta(conversation_id, {"customTitle": new_title})
     conn = get_db_connection()
     try:

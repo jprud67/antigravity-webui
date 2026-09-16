@@ -291,7 +291,7 @@ async def _execute_job(job: dict[str, Any]) -> None:
                     j["next_run_at"] = computed_next
                 break
         save_jobs(data)
-    logger.info(f"[Cron] Job « {name} » terminé: {result['status']} ({duration}s).")
+    logger.info(f"[Cron] Job « {name} » terminé: {result.get('status', 'unknown')} ({duration}s).")
 
 
 async def _guarded_execute(job: dict[str, Any]) -> None:
