@@ -541,6 +541,103 @@ def test_rules_no_touch_hermes_by_default():
     print("✓ test_rules_no_touch_hermes_by_default passed")
 
 
+def test_get_all_session_metadata_deep_copy():
+    from app.services.session_metadata import get_all_session_metadata
+
+    all_meta_1 = get_all_session_metadata()
+    # Mutate returned dictionary
+    all_meta_1["__test_fake_mutation__"] = {"tags": ["polluted"]}
+    if all_meta_1:
+        first_key = next(iter(all_meta_1.keys()))
+        if isinstance(all_meta_1[first_key], dict):
+            all_meta_1[first_key]["__polluted_attr__"] = True
+
+    all_meta_2 = get_all_session_metadata()
+    assert "__test_fake_mutation__" not in all_meta_2, "Cache was contaminated by caller mutation!"
+    if all_meta_2:
+        first_key = next(iter(all_meta_2.keys()))
+        if isinstance(all_meta_2[first_key], dict):
+            assert "__polluted_attr__" not in all_meta_2[first_key], "Cache inner dict was contaminated by caller mutation!"
+    print("✓ test_get_all_session_metadata_deep_copy passed")
+
+
+def test_aggregate_steps_non_serializable_objects():
+    from datetime import datetime, timezone
+    from app.services.storage import aggregate_steps_into_turns
+
+    class NonSerializableObj:
+        def __str__(self):
+            return "<CustomObjVal>"
+
+    steps = [
+        {
+            "step_index": 0,
+            "source": "USER_EXPLICIT",
+            "type": "USER_INPUT",
+            "content": "Test non-serializable input",
+            "created_at": "2026-09-16T12:00:00Z"
+        },
+        {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "thinking": {"timestamp": datetime.now(timezone.utc), "custom": NonSerializableObj()},
+            "content": {"result_date": datetime.now(timezone.utc), "custom": NonSerializableObj()},
+            "created_at": "2026-09-16T12:00:01Z"
+        }
+    ]
+
+    # Should not raise TypeError: Object of type ... is not JSON serializable
+    turns = aggregate_steps_into_turns(steps)
+    assert len(turns) == 2
+    asst_turn = turns[1]
+    assert "<CustomObjVal>" in asst_turn["content"] or "result_date" in asst_turn["content"]
+    assert "<CustomObjVal>" in asst_turn["thinking"] or "timestamp" in asst_turn["thinking"]
+    print("✓ test_aggregate_steps_non_serializable_objects passed")
+
+
+def test_kill_task_safety():
+    import os
+    from fastapi import HTTPException
+    from app.api.tasks import KillTaskRequest, kill_task
+
+    # PID <= 100 must be rejected with 403
+    try:
+        kill_task(KillTaskRequest(pid=1), _=None)
+        assert False, "Should have rejected PID 1 with 403"
+    except HTTPException as e:
+        assert e.status_code == 403
+
+    # Current process PID must be rejected with 403
+    try:
+        kill_task(KillTaskRequest(pid=os.getpid()), _=None)
+        assert False, "Should have rejected current PID with 403"
+    except HTTPException as e:
+        assert e.status_code == 403
+
+    # Short task_id (< 3 chars) should return success=False safely without matching arbitrary processes
+    res = kill_task(KillTaskRequest(task_id="a"), _=None)
+    assert res["success"] is False
+    print("✓ test_kill_task_safety passed")
+
+
+def test_git_commit_sanitize_fallback():
+    from app.api.git import _sanitize_git_message
+
+    # Multi-line message containing co-authored-by
+    msg = "feat: implement features\nCo-Authored-By: Claude <claude@anthropic.com>\nSome notes"
+    sanitized = _sanitize_git_message(msg)
+    assert "Co-Authored-By" not in sanitized
+    assert "feat: implement features" in sanitized
+    assert "Some notes" in sanitized
+
+    # Only co-author line should fallback cleanly
+    msg_only_coauthor = "Co-Authored-By: Claude"
+    fallback = _sanitize_git_message(msg_only_coauthor)
+    assert fallback == "chore: update repository"
+    print("✓ test_git_commit_sanitize_fallback passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -566,5 +663,9 @@ if __name__ == "__main__":
     test_aggregate_empty_string_tool_result()
     test_skill_detail_safe_path()
     test_rules_no_touch_hermes_by_default()
+    test_get_all_session_metadata_deep_copy()
+    test_aggregate_steps_non_serializable_objects()
+    test_kill_task_safety()
+    test_git_commit_sanitize_fallback()
     print("\nAll unit tests passed successfully!")
 

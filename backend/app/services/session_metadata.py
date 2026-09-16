@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import threading
@@ -23,15 +24,17 @@ def get_all_session_metadata() -> dict[str, dict[str, Any]]:
         try:
             mtime = SESSION_METADATA_FILE.stat().st_mtime
             if mtime <= _cached_mtime and _cached_meta:
-                return _cached_meta
+                return copy.deepcopy(_cached_meta)
             
             content = SESSION_METADATA_FILE.read_text(encoding="utf-8")
             if not content.strip():
+                _cached_meta = {}
+                _cached_mtime = mtime
                 return {}
             data = json.loads(content)
             _cached_meta = data if isinstance(data, dict) else {}
             _cached_mtime = mtime
-            return _cached_meta
+            return copy.deepcopy(_cached_meta)
         except Exception as e:
             logger.error(f"Failed to read session metadata: {e}")
             return {}

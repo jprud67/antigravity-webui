@@ -145,55 +145,66 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
             detail=f"Arrêt non autorisé pour le PID système critique {target_pid}"
         )
 
-    if not target_pid or target_pid <= 0:
-        if req.task_id:
-            try:
-                clean_tid = req.task_id.strip()
-                pure_tid = clean_tid.split("/")[-1].strip() if "/" in clean_tid else clean_tid
-                candidate_tids = [clean_tid]
-                if pure_tid and pure_tid != clean_tid:
-                    candidate_tids.append(pure_tid)
-
-                for p in psutil.process_iter(['pid', 'cmdline']):
-                    try:
-                        p_info = p.info
-                        if not p_info:
-                            continue
-                        cmdline_list = p_info.get('cmdline') or []
-                        cmd_str = " ".join(cmdline_list)
-
-                        matches_task = False
-                        for tid_cand in candidate_tids:
-                            escaped_tid = re.escape(tid_cand)
-                            tid_regex = re.compile(rf"(?:^|[\s\"'=/]){escaped_tid}(?:[\s\"'/]|$)")
-                            if (
-                                tid_cand in cmdline_list
-                                or any(tid_cand in arg.split("=") for arg in cmdline_list)
-                                or bool(tid_regex.search(cmd_str))
-                            ):
-                                matches_task = True
-                                break
-
-                        if matches_task:
-                            candidate_pid = p_info.get('pid')
-                            if candidate_pid and candidate_pid > 100:
-                                target_pid = candidate_pid
-                                break
-                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError, KeyError):
-                        continue
-            except Exception as e:
-                logger.warning(f"Error resolving task_id to pid: {e}")
-        if not target_pid:
-            return {"success": False, "message": "Aucun PID spécifié ou processus actif trouvé pour la tâche demandée"}
     current_pid = os.getpid()
     parent_pid = os.getppid()
-
     current_pgid = None
     if hasattr(os, "getpgid"):
         try:
             current_pgid = os.getpgid(current_pid)
         except Exception as e:
             logger.debug(f"Ignored error: {e}")
+
+    if not target_pid or target_pid <= 0:
+        if req.task_id:
+            try:
+                clean_tid = req.task_id.strip()
+                pure_tid = clean_tid.split("/")[-1].strip() if "/" in clean_tid else clean_tid
+                raw_cands = [clean_tid]
+                if pure_tid and pure_tid != clean_tid:
+                    raw_cands.append(pure_tid)
+                candidate_tids = [c for c in raw_cands if len(c) >= 3]
+
+                if candidate_tids:
+                    for p in psutil.process_iter(['pid', 'cmdline']):
+                        try:
+                            p_info = p.info
+                            if not p_info:
+                                continue
+                            candidate_pid = p_info.get('pid')
+                            if not candidate_pid or candidate_pid <= 100:
+                                continue
+                            if candidate_pid in (current_pid, parent_pid) or (current_pgid and candidate_pid == current_pgid):
+                                continue
+
+                            cmdline_list = p_info.get('cmdline') or []
+                            cmd_str = " ".join(cmdline_list)
+                            cmd_lower = cmd_str.lower()
+
+                            # Disallow matching server or uvicorn
+                            if ("uvicorn" in cmd_lower and "backend" in cmd_lower) or ("antigravity-webui" in cmd_lower and "run.py" in cmd_lower):
+                                continue
+
+                            matches_task = False
+                            for tid_cand in candidate_tids:
+                                escaped_tid = re.escape(tid_cand)
+                                tid_regex = re.compile(rf"(?:^|[\s\"'=/]){escaped_tid}(?:[\s\"'/]|$)")
+                                if (
+                                    tid_cand in cmdline_list
+                                    or any(tid_cand in arg.split("=") for arg in cmdline_list)
+                                    or bool(tid_regex.search(cmd_str))
+                                ):
+                                    matches_task = True
+                                    break
+
+                            if matches_task:
+                                target_pid = candidate_pid
+                                break
+                        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError, KeyError):
+                            continue
+            except Exception as e:
+                logger.warning(f"Error resolving task_id to pid: {e}")
+        if not target_pid:
+            return {"success": False, "message": "Aucun PID spécifié ou processus actif trouvé pour la tâche demandée"}
 
     # Block killing system critical PIDs and backend server itself
     if (

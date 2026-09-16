@@ -408,6 +408,11 @@ async def stream_turn(
     except asyncio.CancelledError:
         pid_str = proc.pid if proc else "none"
         logger.info(f"stream_turn cancelled: terminating process group {pid_str}")
+        if proc and proc.returncode is None:
+            try:
+                await terminate_process_group_async(proc, grace=1.0)
+            except Exception as e:
+                logger.debug(f"Ignored error during cancellation process cleanup: {e}")
         raise
     finally:
         if stderr_task and not stderr_task.done():

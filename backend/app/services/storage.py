@@ -412,7 +412,7 @@ def atomic_write_jsonl(target_path: Path, items: list[dict[str, Any]]) -> None:
     tmp_file = target_path.parent / f".{target_path.name}.tmp.{uuid.uuid4().hex[:8]}"
     try:
         with open(tmp_file, "w", encoding="utf-8") as f:
-            f.writelines(json.dumps(item, ensure_ascii=False) + "\n" for item in items)
+            f.writelines(json.dumps(item, ensure_ascii=False, default=str) + "\n" for item in items)
         tmp_file.replace(target_path)
     except Exception:
         if tmp_file.exists():
@@ -1198,7 +1198,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                             raw_content = ""
                         else:
                             try:
-                                raw_content = json.dumps(val_content, ensure_ascii=False)
+                                raw_content = json.dumps(val_content, ensure_ascii=False, default=str)
                             except Exception:
                                 raw_content = str(val_content)
 
@@ -1209,7 +1209,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                             raw_thinking = ""
                         else:
                             try:
-                                raw_thinking = json.dumps(val_thinking, ensure_ascii=False)
+                                raw_thinking = json.dumps(val_thinking, ensure_ascii=False, default=str)
                             except Exception:
                                 raw_thinking = str(val_thinking)
 
@@ -1271,7 +1271,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
             content = ""
         else:
             try:
-                content = json.dumps(raw_c, ensure_ascii=False, indent=2)
+                content = json.dumps(raw_c, ensure_ascii=False, indent=2, default=str)
             except Exception:
                 content = str(raw_c)
 
@@ -1282,7 +1282,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
             thinking = ""
         else:
             try:
-                thinking = json.dumps(raw_t, ensure_ascii=False, indent=2)
+                thinking = json.dumps(raw_t, ensure_ascii=False, indent=2, default=str)
             except Exception:
                 thinking = str(raw_t)
 
