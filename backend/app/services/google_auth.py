@@ -307,12 +307,20 @@ def _spawn_login_process(env):
     return proc, master_fd, None
 
 
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+_AUTH_URL_PATTERN = re.compile(r"https://accounts\.google\.com/o/oauth2/(?:v2/)?auth[^\s\r\n]+")
+
+
+def _clean_auth_url(raw_url: str) -> str:
+    cleaned = _ANSI_ESCAPE_RE.sub("", raw_url)
+    return cleaned.rstrip("'\"`>)];.,")
+
+
 def _read_auth_url(proc, master_fd, win_pty, timeout: float = 12.0):
     """Lit la sortie du CLI jusqu'à capturer l'URL OAuth Google."""
     import queue
     import threading
 
-    pattern = re.compile(r"https://accounts\.google\.com/o/oauth2/auth[^\s\r\n]+")
     output = ""
 
     if IS_WINDOWS:
@@ -343,9 +351,9 @@ def _read_auth_url(proc, master_fd, win_pty, timeout: float = 12.0):
             if chunk is None:
                 break
             output += chunk
-            match = pattern.search(output)
+            match = _AUTH_URL_PATTERN.search(output)
             if match:
-                return match.group(0), output
+                return _clean_auth_url(match.group(0)), output
         return None, output
 
     # POSIX : lecture non bloquante via select
@@ -360,9 +368,9 @@ def _read_auth_url(proc, master_fd, win_pty, timeout: float = 12.0):
             if not chunk:
                 break
             output += chunk
-            match = pattern.search(output)
+            match = _AUTH_URL_PATTERN.search(output)
             if match:
-                return match.group(0), output
+                return _clean_auth_url(match.group(0)), output
     return None, output
 
 

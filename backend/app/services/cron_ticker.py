@@ -208,6 +208,13 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
         output = combined
 
         if is_quota_error(combined):
+            if attempts >= MAX_TASK_FAILOVER:
+                status = "quota_exhausted"
+                logger.error(
+                    f"[Cron] Quota atteint et limite maximale de tentatives ({MAX_TASK_FAILOVER}) atteinte."
+                )
+                break
+
             current = get_active_account()
             current_email = (current or {}).get("email") or "inconnu"
             exclude_email = current_email if (current_email and "@" in current_email) else None

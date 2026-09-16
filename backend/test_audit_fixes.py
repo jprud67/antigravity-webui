@@ -6,6 +6,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 import json
+from datetime import datetime, timezone
 
 from app.config import BRAIN_DIR
 from app.main import app
@@ -239,7 +240,7 @@ def test_version_consistency():
     assert frontend_ver == backend_ver == updater_ver, (
         f"Version mismatch: frontend={frontend_ver}, backend={backend_ver}, updater={updater_ver}"
     )
-    assert frontend_ver == "0.1.58", f"Expected version 0.1.58, got {frontend_ver}"
+    assert frontend_ver == "0.1.59", f"Expected version 0.1.59, got {frontend_ver}"
     print(f"✓ test_version_consistency passed ({frontend_ver})")
 
 
@@ -300,6 +301,7 @@ def test_skill_md_utf8_bom(tmp_path=None):
 
 def test_scan_dir_symlink_cycle_guard():
     import tempfile
+
     from app.api.files import scan_dir
 
     with tempfile.TemporaryDirectory() as td:
@@ -321,6 +323,127 @@ def test_scan_dir_symlink_cycle_guard():
     print("✓ test_scan_dir_symlink_cycle_guard passed")
 
 
+def test_aggregate_all_tool_step_types():
+    from app.services.storage import aggregate_steps_into_turns
+
+    steps = [
+        {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Update the config", "step_index": 0},
+        {
+            "type": "WRITE_TO_FILE",
+            "source": "MODEL",
+            "content": "Wrote 120 bytes to config.json",
+            "step_index": 1,
+        },
+        {
+            "type": "SEARCH_WEB",
+            "source": "MODEL",
+            "content": "Result 1: Python documentation",
+            "step_index": 2,
+        },
+        {
+            "type": "PLANNER_RESPONSE",
+            "source": "MODEL",
+            "content": "File created and search finished.",
+            "step_index": 3,
+        },
+    ]
+    turns = aggregate_steps_into_turns(steps)
+    assert len(turns) == 2, f"Expected 2 turns, got {len(turns)}"
+    asst = turns[1]
+    assert asst["role"] == "assistant"
+    assert "Wrote 120 bytes" not in asst["content"], "Tool output leaked into assistant dialogue"
+    assert "Result 1: Python documentation" not in asst["content"], "Tool output leaked into assistant dialogue"
+    assert len(asst["tool_activities"]) == 2
+    assert asst["tool_activities"][0]["name"] == "write_to_file"
+    assert asst["tool_activities"][1]["name"] == "search_web"
+    print("✓ test_aggregate_all_tool_step_types passed")
+
+
+def test_compute_next_run_days_and_seconds():
+    from app.services.cron_store import compute_next_run
+
+    # Interval with days
+    next_days = compute_next_run({"kind": "interval", "days": 3})
+    assert next_days is not None
+    dt_days = datetime.fromisoformat(next_days)
+    now = datetime.now(timezone.utc)
+    diff_days = (dt_days - now).total_seconds() / 86400
+    assert 2.9 <= diff_days <= 3.1
+
+    # Interval with seconds
+    next_secs = compute_next_run({"kind": "interval", "seconds": 45})
+    assert next_secs is not None
+    dt_secs = datetime.fromisoformat(next_secs)
+    diff_secs = (dt_secs - now).total_seconds()
+    assert 40 <= diff_secs <= 50
+
+    # Interval regex string
+    next_str = compute_next_run("every 20s")
+    assert next_str is not None
+    dt_str = datetime.fromisoformat(next_str)
+    diff_str = (dt_str - now).total_seconds()
+    assert 15 <= diff_str <= 25
+    print("✓ test_compute_next_run_days_and_seconds passed")
+
+
+def test_google_auth_url_cleaning():
+    from app.services.google_auth import _AUTH_URL_PATTERN, _clean_auth_url
+
+    raw_v1 = "Please open: https://accounts.google.com/o/oauth2/auth?client_id=123&scope=openid"
+    match_v1 = _AUTH_URL_PATTERN.search(raw_v1)
+    assert match_v1 is not None
+    assert _clean_auth_url(match_v1.group(0)) == "https://accounts.google.com/o/oauth2/auth?client_id=123&scope=openid"
+
+    raw_v2_ansi = "URL: \x1b[4mhttps://accounts.google.com/o/oauth2/v2/auth?client_id=456&scope=email\x1b[0m."
+    match_v2 = _AUTH_URL_PATTERN.search(raw_v2_ansi)
+    assert match_v2 is not None
+    assert _clean_auth_url(match_v2.group(0)) == "https://accounts.google.com/o/oauth2/v2/auth?client_id=456&scope=email"
+    print("✓ test_google_auth_url_cleaning passed")
+
+
+def test_git_diff_absolute_workspace_path():
+    from app.api.git import get_git_diff
+
+    # Absolute path within workspace
+    abs_path = str((BACKEND_DIR.parent / "backend" / "app" / "main.py").resolve())
+    res = get_git_diff(workspace=str(BACKEND_DIR.parent), path=abs_path, _=None)
+    assert res["path"] == "backend/app/main.py"
+    print("✓ test_git_diff_absolute_workspace_path passed")
+
+
+def test_kanban_status_normalization_and_timestamps():
+    from app.api.kanban import (
+        CreateTaskRequest,
+        UpdateTaskRequest,
+        _normalize_status,
+        create_task,
+        update_task,
+    )
+
+    assert _normalize_status("In-Progress") == "in_progress"
+    assert _normalize_status("TODO ") == "todo"
+
+    # Create directly as in-progress
+    req_running = CreateTaskRequest(title="Running Task", status="in-progress")
+    res = create_task(req_running, _=None)
+    assert res["success"] is True
+    task = res["task"]
+    assert task["status"] == "in_progress"
+    assert task["started_at"] is not None
+    assert task["completed_at"] is None
+
+    # Update to completed
+    task_id = task["id"]
+    req_done = UpdateTaskRequest(status="completed")
+    res_done = update_task(task_id, req_done, _=None)
+    assert res_done["success"] is True
+    updated = res_done["task"]
+    assert updated["status"] == "completed"
+    assert updated["completed_at"] is not None
+    assert updated["started_at"] is not None
+    print("✓ test_kanban_status_normalization_and_timestamps passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -337,5 +460,10 @@ if __name__ == "__main__":
     test_session_meta_legacy_defaults()
     test_skill_md_utf8_bom()
     test_scan_dir_symlink_cycle_guard()
+    test_aggregate_all_tool_step_types()
+    test_compute_next_run_days_and_seconds()
+    test_google_auth_url_cleaning()
+    test_git_diff_absolute_workspace_path()
+    test_kanban_status_normalization_and_timestamps()
     print("\nAll unit tests passed successfully!")
 

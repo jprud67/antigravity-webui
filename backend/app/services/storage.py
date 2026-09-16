@@ -422,6 +422,49 @@ def atomic_write_jsonl(target_path: Path, items: list[dict[str, Any]]) -> None:
                 logger.debug(f"Ignored error: {e}")
         raise
 
+_USER_REQUEST_RE = re.compile(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', re.IGNORECASE)
+_XML_BLOCKS_RE = re.compile(
+    r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>',
+    re.IGNORECASE,
+)
+_XML_TAGS_RE = re.compile(
+    r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>',
+    re.IGNORECASE,
+)
+_STEERING_PREFIX_RE = re.compile(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+')
+_USER_METADATA_CHECK_RE = re.compile(
+    r'<(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>',
+    re.IGNORECASE,
+)
+_TASK_NOTIFY_RE = re.compile(r'Task id "([^"]+)" finished with result:\s*([\s\S]*)', re.IGNORECASE)
+_SYSTEM_MESSAGE_TAG_RE = re.compile(r'<SYSTEM_MESSAGE>([\s\S]*?)</SYSTEM_MESSAGE>', re.IGNORECASE)
+
+TOOL_STEP_TYPES: set[str] = {
+    "GENERIC",
+    "SYSTEM",
+    "TOOL_RESULT",
+    "TOOL_OUTPUT",
+    "VIEW_FILE",
+    "RUN_COMMAND",
+    "CODE_ACTION",
+    "GREP_SEARCH",
+    "LIST_DIRECTORY",
+    "LIST_DIR",
+    "WRITE_TO_FILE",
+    "REPLACE_FILE_CONTENT",
+    "SEARCH_WEB",
+    "READ_URL_CONTENT",
+    "FIND_BY_NAME",
+    "MANAGE_TASK",
+    "SCHEDULE",
+    "ASK_QUESTION",
+    "INVOKE_SUBAGENT",
+    "MANAGE_SUBAGENTS",
+    "DEFINE_SUBAGENT",
+    "GENERATE_IMAGE",
+}
+
+
 def clean_user_prompt(raw: Any) -> str:
     if not raw:
         return ""
@@ -430,25 +473,15 @@ def clean_user_prompt(raw: Any) -> str:
             raw = str(raw)
         except Exception:
             return ""
-    m = re.search(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', raw, flags=re.IGNORECASE)
+    m = _USER_REQUEST_RE.search(raw)
     if m:
         text = m.group(1).strip()
     else:
         text = raw
-    text = re.sub(
-        r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>',
-        '',
-        text,
-        flags=re.IGNORECASE
-    )
-    text = re.sub(
-        r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>',
-        '',
-        text,
-        flags=re.IGNORECASE
-    )
+    text = _XML_BLOCKS_RE.sub('', text)
+    text = _XML_TAGS_RE.sub('', text)
     # Strip steering/queued instruction prefixes so history stays pure and clean
-    text = re.sub(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+', '', text)
+    text = _STEERING_PREFIX_RE.sub('', text)
     return text.strip()
 
 
@@ -464,6 +497,10 @@ def is_tool_output_content(content: Any) -> bool:
         "The command exited",
         "Tool is running as a background task",
         "Encountered error in tool execution:",
+        "Exit code:",
+        "process terminated",
+        "Process terminated",
+        "Command exited with code",
         '{"File":',
         '{"status":',
         '{"event":',
@@ -1055,6 +1092,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        escaped_query = q_clean.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         cursor.execute(
             """
             SELECT 
@@ -1068,37 +1106,18 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 agent_name,
                 parent_conversation_id
             FROM conversation_summaries
-            WHERE title LIKE ? OR preview LIKE ?
+            WHERE title LIKE ? ESCAPE '\\' OR preview LIKE ? ESCAPE '\\'
             ORDER BY last_modified_time DESC
             LIMIT ?
             """,
-            (f"%{q_clean}%", f"%{q_clean}%", limit)
+            (f"%{escaped_query}%", f"%{escaped_query}%", limit)
         )
         for r in cursor.fetchall():
             cid = r["conversation_id"]
             meta = all_meta.get(cid, {})
-            custom_title = meta.get("customTitle", "").strip()
-            display_title = custom_title or r["title"] or "Nouvelle session"
-            c = {
-                "conversation_id": cid,
-                "title": display_title,
-                "raw_title": r["title"] or "Nouvelle session",
-                "preview": r["preview"],
-                "step_count": r["step_count"],
-                "last_modified_time": r["last_modified_time"],
-                "workspace_uris": r["workspace_uris"],
-                "status": r["status"],
-                "agent_name": r["agent_name"],
-                "parent_conversation_id": dict(r).get("parent_conversation_id"),
-                "pinned": meta.get("pinned", False),
-                "archived": meta.get("archived", False),
-                "tags": meta.get("tags", []),
-                "project": meta.get("project", ""),
-                "projectColor": meta.get("projectColor", ""),
-                "customTitle": custom_title,
-                "match_type": "metadata",
-                "match_snippet": r["preview"] or display_title
-            }
+            c = _build_conversation_dict(r, meta)
+            c["match_type"] = "metadata"
+            c["match_snippet"] = r["preview"] or c["title"]
             matched.append(c)
             seen_ids.add(cid)
 
@@ -1272,7 +1291,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
             flush_asst()
             clean_c = clean_user_prompt(content)
             display_c = clean_c or (
-                "" if re.search(r'<(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>', content, flags=re.IGNORECASE)
+                "" if _USER_METADATA_CHECK_RE.search(content)
                 else content.strip()
             )
             if display_c:
@@ -1288,7 +1307,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
         if stype == "SYSTEM_MESSAGE":
             flush_asst()
             if "finished with result:" in content:
-                match_task = re.search(r'Task id "([^"]+)" finished with result:\s*([\s\S]*)', content, flags=re.IGNORECASE)
+                match_task = _TASK_NOTIFY_RE.search(content)
                 task_id = match_task.group(1) if match_task else "Tâche"
                 task_res = match_task.group(2).strip() if match_task else content
                 turns.append({
@@ -1300,7 +1319,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                     "content": task_res,
                 })
             else:
-                m_sys = re.search(r'<SYSTEM_MESSAGE>([\s\S]*?)</SYSTEM_MESSAGE>', content, flags=re.IGNORECASE)
+                m_sys = _SYSTEM_MESSAGE_TAG_RE.search(content)
                 sys_text = m_sys.group(1).strip() if m_sys else content.strip()
                 if sys_text:
                     turns.append({
@@ -1312,21 +1331,11 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                     })
             continue
 
-        # 4. Tool outputs (GENERIC / SYSTEM steps following a tool call)
+        # 4. Tool outputs (GENERIC / SYSTEM / Tool-specific steps following a tool call)
         tool_calls = s.get("tool_calls") or []
         is_tool_output = (
             (
-                stype.upper() in [
-                    "GENERIC",
-                    "SYSTEM",
-                    "TOOL_RESULT",
-                    "TOOL_OUTPUT",
-                    "VIEW_FILE",
-                    "RUN_COMMAND",
-                    "CODE_ACTION",
-                    "GREP_SEARCH",
-                    "LIST_DIRECTORY",
-                ]
+                stype.upper() in TOOL_STEP_TYPES
                 or is_tool_output_content(content)
             )
             and not tool_calls

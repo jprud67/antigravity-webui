@@ -200,9 +200,28 @@ def get_git_diff(
         args.append("--cached")
     norm_path = None
     if path:
-        clean_rel = path.strip().replace("\\", "/").lstrip("/")
-        if not clean_rel or ".." in Path(clean_rel).parts:
-            raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+        p = Path(path.strip())
+        if p.is_absolute():
+            try:
+                resolved_p = p.resolve()
+                resolved_target = target.resolve()
+                clean_rel = str(resolved_p.relative_to(resolved_target)).replace("\\", "/")
+            except ValueError:
+                # Check if it was passed as a slash-prefixed workspace-relative path (e.g. "/backend/app/main.py")
+                clean_str = path.strip().replace("\\", "/").lstrip("/")
+                if not clean_str or ".." in Path(clean_str).parts:
+                    raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+                candidate = (target / clean_str).resolve()
+                if is_safe_path(candidate, [target]) and candidate.exists():
+                    clean_rel = clean_str
+                else:
+                    raise HTTPException(status_code=400, detail="Chemin de fichier en dehors de l'espace de travail.")
+        else:
+            clean_str = path.strip().replace("\\", "/")
+            if ".." in Path(clean_str).parts:
+                raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+            clean_rel = clean_str.lstrip("/")
+
         file_candidate = (target / clean_rel).resolve()
         if not is_safe_path(file_candidate, [target]):
             raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
@@ -285,7 +304,10 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
 
     commit_res = run_git(["commit", "-m", clean_msg], target)
     if commit_res.returncode != 0:
-        raise HTTPException(status_code=500, detail=f"Échec du commit : {commit_res.stderr or commit_res.stdout}")
+        err_msg = commit_res.stderr or commit_res.stdout or ""
+        if "nothing to commit" in err_msg.lower() or "working tree clean" in err_msg.lower():
+            raise HTTPException(status_code=400, detail="Rien à commiter, l'arbre de travail est propre.")
+        raise HTTPException(status_code=500, detail=f"Échec du commit : {err_msg}")
 
     return {
         "success": True,

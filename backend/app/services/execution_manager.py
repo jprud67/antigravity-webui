@@ -329,6 +329,21 @@ class ExecutionSession:
                 if quota_error_detected:
                     current_meta = get_active_account()
                     current_email = current_meta.get("email") if current_meta else "inconnu"
+                    if attempt >= max_failover_attempts:
+                        logger.error(
+                            f"[Session {self.conversation_id}] Quota error detected and max failover attempts ({max_failover_attempts}) reached."
+                        )
+                        for tc in self.live_tool_calls:
+                            if isinstance(tc, dict) and tc.get("status") == "running":
+                                tc["status"] = "error"
+                        self.is_running = False
+                        await self.broadcast({
+                            "event": "error",
+                            "conversation_id": self.conversation_id,
+                            "message": f"Quota atteint sur le compte Google ({current_email}). Limite maximale de tentatives ({max_failover_attempts}) atteinte."
+                        })
+                        return
+
                     exclude_email = current_email if (current_email and "@" in current_email) else None
                     logger.warning(
                         f"[Session {self.conversation_id}] Google Account {current_email} reached quota limits. Triggering auto-failover..."

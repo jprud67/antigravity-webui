@@ -125,6 +125,10 @@ class UpdateTaskRequest(BaseModel):
     project_id: str | None = None
     result: str | None = None
 
+def _normalize_status(st: str) -> str:
+    return st.lower().strip().replace("-", "_")
+
+
 @router.get("/tasks")
 def list_tasks(
     status: str | None = Query(None),
@@ -136,8 +140,8 @@ def list_tasks(
             query = "SELECT * FROM tasks WHERE 1=1"
             params: list = []
             if status:
-                query += " AND LOWER(status) = ?"
-                params.append(status.lower().strip())
+                query += " AND LOWER(REPLACE(status, '-', '_')) = ?"
+                params.append(_normalize_status(status))
             if project_id:
                 query += " AND project_id = ?"
                 params.append(project_id.strip())
@@ -156,7 +160,7 @@ def list_tasks(
             "done": []
         }
         for t in tasks:
-            st = (t.get("status") or "todo").lower()
+            st = _normalize_status(t.get("status") or "todo")
             if st in ["todo", "ready", "triage", "scheduled"]:
                 columns["todo"].append(t)
             elif st in ["running", "review", "in_progress"]:
@@ -185,7 +189,11 @@ def create_task(req: CreateTaskRequest, _ = Depends(require_auth)):
     
     task_id = f"task-{uuid.uuid4().hex[:8]}"
     now = int(time.time())
-    st = req.status.lower() if req.status else "todo"
+    st = _normalize_status(req.status or "todo")
+    started_at = now if st in ["running", "in_progress"] else None
+    completed_at = now if st in ["done", "completed"] else None
+    if completed_at and not started_at:
+        started_at = now
     
     try:
         with get_db() as conn:
@@ -193,8 +201,9 @@ def create_task(req: CreateTaskRequest, _ = Depends(require_auth)):
             cur.execute("""
             INSERT INTO tasks (
                 id, title, body, assignee, status, priority, created_by,
-                created_at, workspace_kind, workspace_path, project_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                created_at, workspace_kind, workspace_path, project_id,
+                started_at, completed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 task_id,
                 req.title.strip(),
@@ -206,7 +215,9 @@ def create_task(req: CreateTaskRequest, _ = Depends(require_auth)):
                 now,
                 "scratch",
                 req.workspace_path or DEFAULT_WORKSPACE,
-                req.project_id or "default"
+                req.project_id or "default",
+                started_at,
+                completed_at
             ))
             conn.commit()
 
@@ -254,7 +265,7 @@ def update_task(task_id: str, req: UpdateTaskRequest, _ = Depends(require_auth))
                 params.append(req.result)
 
             if req.status is not None:
-                new_st = req.status.lower()
+                new_st = _normalize_status(req.status)
                 updates.append("status = ?")
                 params.append(new_st)
                 now = int(time.time())
@@ -264,6 +275,9 @@ def update_task(task_id: str, req: UpdateTaskRequest, _ = Depends(require_auth))
                 elif new_st in ["done", "completed"]:
                     if not current.get("completed_at"):
                         updates.append("completed_at = ?")
+                        params.append(now)
+                    if not current.get("started_at"):
+                        updates.append("started_at = ?")
                         params.append(now)
                 else:
                     # If moved away from done (e.g. reopened to todo or blocked), reset completed_at

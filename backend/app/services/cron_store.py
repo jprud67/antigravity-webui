@@ -126,6 +126,11 @@ def update_jobs(modifier) -> None:
             raise
 
 
+_SCHEDULE_INTERVAL_RE = re.compile(
+    r"^(?:every|toutes les|chaque)\s+(\d+)\s*(s|sec|seconds?|secondes?|m|min|minutes?|h|hours?|heures?|d|days?|jours?)?$"
+)
+
+
 def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
     """Calcule la prochaine date d'exécution depuis une expression cron ou un intervalle."""
     if not schedule:
@@ -136,6 +141,12 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
         expr = schedule.strip()
     elif isinstance(schedule, dict):
         if schedule.get("kind") == "interval":
+            if "days" in schedule and schedule["days"] is not None:
+                try:
+                    dys = max(1, int(schedule["days"]))
+                    return (now + timedelta(days=dys)).isoformat()
+                except (ValueError, TypeError):
+                    logger.debug("Ignored error")
             if "hours" in schedule and schedule["hours"] is not None:
                 try:
                     hrs = max(1, int(schedule["hours"]))
@@ -146,6 +157,12 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
                 try:
                     mins = max(1, int(schedule["minutes"]))  # minimum 1 min pour éviter une boucle infinie
                     return (now + timedelta(minutes=mins)).isoformat()
+                except (ValueError, TypeError):
+                    logger.debug("Ignored error")
+            if "seconds" in schedule and schedule["seconds"] is not None:
+                try:
+                    secs = max(10, int(schedule["seconds"]))  # minimum 10s pour éviter surcharge
+                    return (now + timedelta(seconds=secs)).isoformat()
                 except (ValueError, TypeError):
                     logger.debug("Ignored error")
             expr = schedule.get("expr") or schedule.get("display") or schedule.get("schedule_display") or ""
@@ -167,7 +184,7 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
     if lower in ("every week", "weekly", "chaque semaine", "toutes les semaines"):
         return (now + timedelta(weeks=1)).isoformat()
 
-    match = re.match(r"^(?:every|toutes les|chaque)\s+(\d+)\s*(m|min|minutes?|h|hours?|heures?|d|days?|jours?)?$", lower)
+    match = _SCHEDULE_INTERVAL_RE.match(lower)
     if match:
         try:
             val = max(1, int(match.group(1)))  # minimum 1 pour éviter une boucle d'exécution infinie
@@ -176,6 +193,8 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
                 return (now + timedelta(hours=val)).isoformat()
             elif unit.startswith(("d", "j")):
                 return (now + timedelta(days=val)).isoformat()
+            elif unit.startswith("s"):
+                return (now + timedelta(seconds=max(10, val))).isoformat()
             else:
                 return (now + timedelta(minutes=val)).isoformat()
         except Exception as e:

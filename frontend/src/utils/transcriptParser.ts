@@ -1,5 +1,38 @@
 import type { ChatMessage } from '../types';
 
+const REQUEST_REGEX = /<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i;
+const XML_BLOCKS_REGEX = /<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?<\/(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>/gi;
+const XML_TAGS_REGEX = /<\/?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>/gi;
+const STEERING_PREFIX_REGEX = /^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+/g;
+const TASK_NOTIFY_REGEX = /Task id "([^"]+)" finished with result:\s*([\s\S]*)/i;
+const SYSTEM_MESSAGE_TAG_REGEX = /<SYSTEM_MESSAGE>([\s\S]*?)<\/SYSTEM_MESSAGE>/i;
+const USER_METADATA_CHECK_REGEX = /<(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>/i;
+
+const TOOL_STEP_TYPES = new Set([
+  'GENERIC',
+  'SYSTEM',
+  'TOOL_RESULT',
+  'TOOL_OUTPUT',
+  'VIEW_FILE',
+  'RUN_COMMAND',
+  'CODE_ACTION',
+  'GREP_SEARCH',
+  'LIST_DIRECTORY',
+  'LIST_DIR',
+  'WRITE_TO_FILE',
+  'REPLACE_FILE_CONTENT',
+  'SEARCH_WEB',
+  'READ_URL_CONTENT',
+  'FIND_BY_NAME',
+  'MANAGE_TASK',
+  'SCHEDULE',
+  'ASK_QUESTION',
+  'INVOKE_SUBAGENT',
+  'MANAGE_SUBAGENTS',
+  'DEFINE_SUBAGENT',
+  'GENERATE_IMAGE',
+]);
+
 /**
  * Nettoie le texte utilisateur pour extraire la requête réelle en retirant
  * les balises XML internes injectées par agy (<USER_REQUEST>, <ADDITIONAL_METADATA>, etc.)
@@ -9,15 +42,15 @@ export function cleanUserPrompt(raw: any): string {
   const str = typeof raw === 'string' ? raw : (typeof raw === 'object' ? JSON.stringify(raw) : String(raw));
 
   // 1. Extraire le contenu spécifique de <USER_REQUEST> s'il est présent
-  const requestMatch = /<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i.exec(str);
+  const requestMatch = REQUEST_REGEX.exec(str);
   let cleaned = requestMatch ? requestMatch[1] : str;
 
   // 2. Retirer les blocs de métadonnées, contexte et paramètres système
-  cleaned = cleaned.replace(/<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?<\/(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>/gi, '');
-  cleaned = cleaned.replace(/<\/?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>/gi, '');
+  cleaned = cleaned.replace(XML_BLOCKS_REGEX, '');
+  cleaned = cleaned.replace(XML_TAGS_REGEX, '');
 
   // 3. Retirer les préfixes de guidage/file d'attente
-  cleaned = cleaned.replace(/^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+/g, '');
+  cleaned = cleaned.replace(STEERING_PREFIX_REGEX, '');
 
   return cleaned.trim();
 }
@@ -37,6 +70,10 @@ export function isToolOutputContent(content: any): boolean {
     c.startsWith('The command exited') ||
     c.startsWith('Tool is running as a background task') ||
     c.startsWith('Encountered error in tool execution:') ||
+    c.startsWith('Exit code:') ||
+    c.startsWith('process terminated') ||
+    c.startsWith('Process terminated') ||
+    c.startsWith('Command exited with code') ||
     c.startsWith('{"File":') ||
     c.startsWith('{"status":') ||
     c.startsWith('{"event":') ||
@@ -122,7 +159,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
     if (src === 'USER_EXPLICIT' || stype === 'USER_INPUT') {
       flushAssistant();
       const cleanContent = cleanUserPrompt(content);
-      const displayContent = cleanContent || (/<(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>/i.test(content) ? '' : content.trim());
+      const displayContent = cleanContent || (USER_METADATA_CHECK_REGEX.test(content) ? '' : content.trim());
       if (displayContent) {
         messages.push({
           id: `step-user-${idx}`,
@@ -160,7 +197,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
     // 4. Notifications système / Fin de tâche en arrière-plan
     if (stype === 'SYSTEM_MESSAGE') {
       if (content.includes('finished with result:')) {
-        const matchTask = /Task id "([^"]+)" finished with result:\s*([\s\S]*)/i.exec(content);
+        const matchTask = TASK_NOTIFY_REGEX.exec(content);
         const taskId = matchTask ? matchTask[1] : 'Tâche';
         const taskResult = matchTask ? matchTask[2].trim() : content;
         flushAssistant();
@@ -177,7 +214,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
       } else {
         // Extraire le message système réel en retirant le préambule d'antigravity
         let sysText = content;
-        const msgMatch = /<SYSTEM_MESSAGE>([\s\S]*?)<\/SYSTEM_MESSAGE>/i.exec(content);
+        const msgMatch = SYSTEM_MESSAGE_TAG_REGEX.exec(content);
         if (msgMatch) {
           sysText = msgMatch[1].trim();
         }
@@ -243,7 +280,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
     );
 
     const isToolOutput = !isModelResponse && (
-      ['GENERIC', 'TOOL_OUTPUT', 'TOOL_RESULT', 'VIEW_FILE', 'RUN_COMMAND', 'CODE_ACTION', 'GREP_SEARCH', 'LIST_DIRECTORY'].includes(stype.toUpperCase()) ||
+      TOOL_STEP_TYPES.has(stype.toUpperCase()) ||
       (!toolCallsRaw.length && !thinking && isToolOutputContent(content))
     );
 
@@ -260,7 +297,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
         // Sortie d'action implicite sans appel préalable (ex: amorce subagent)
         currentAssistantMsg.toolCalls = currentAssistantMsg.toolCalls || [];
         currentAssistantMsg.toolCalls.push({
-          name: stype !== 'GENERIC' && stype !== 'TOOL_OUTPUT' && stype !== 'TOOL_RESULT' ? stype.toLowerCase() : 'action',
+          name: !['GENERIC', 'TOOL_OUTPUT', 'TOOL_RESULT', 'SYSTEM'].includes(stype.toUpperCase()) ? stype.toLowerCase() : 'action',
           args: {},
           result: outputText,
           status: isErr ? 'error' : 'done'
