@@ -1436,7 +1436,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
             // 3. Assistant Message
             const isThoughtOpen = expandedThoughts[msg.id];
             const isToolsExpanded = expandedTools[msg.id] ?? (msg.isLive || false);
-            const isSpeaking = speakingMsgId === msg.id;
+            const isSpeaking = activeSpeakingMsgId === msg.id;
 
             return (
               <div

@@ -296,6 +296,20 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
             u = s["result"].get("usage")
         if not u and isinstance(s.get("step_update"), dict):
             u = s["step_update"].get("usage")
+        if not u and isinstance(s.get("metadata"), dict):
+            u = s["metadata"].get("usage")
+        if not u and s.get("token_count"):
+            tc = s.get("token_count")
+            if isinstance(tc, dict):
+                u = tc
+            elif isinstance(tc, (int, float)) and tc > 0:
+                return {
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "thinking_tokens": 0,
+                    "total_tokens": int(tc),
+                    "is_estimated": False,
+                }
         if isinstance(u, dict):
             tot = u.get("total_tokens")
             if tot is None or tot == 0:
@@ -811,6 +825,35 @@ def update_conversation_title(conversation_id: str, new_title: str) -> bool:
         conn.close()
     return True
 
+def clean_user_prompt(raw: Any) -> str:
+    if not raw:
+        return ""
+    if not isinstance(raw, str):
+        try:
+            raw = str(raw)
+        except Exception:
+            return ""
+    m = re.search(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', raw, flags=re.IGNORECASE)
+    if m:
+        text = m.group(1).strip()
+    else:
+        text = raw
+    text = re.sub(
+        r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>',
+        '',
+        text,
+        flags=re.IGNORECASE
+    )
+    text = re.sub(
+        r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>',
+        '',
+        text,
+        flags=re.IGNORECASE
+    )
+    # Strip steering/queued instruction prefixes so history stays pure and clean
+    text = re.sub(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+', '', text)
+    return text.strip()
+
 def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
     if not is_safe_conversation_id(conversation_id):
         raise ValueError("Invalid conversation_id")
@@ -1109,35 +1152,6 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 break
 
     return matched[:limit]
-
-def clean_user_prompt(raw: Any) -> str:
-    if not raw:
-        return ""
-    if not isinstance(raw, str):
-        try:
-            raw = str(raw)
-        except Exception:
-            return ""
-    m = re.search(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', raw, flags=re.IGNORECASE)
-    if m:
-        text = m.group(1).strip()
-    else:
-        text = raw
-    text = re.sub(
-        r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>',
-        '',
-        text,
-        flags=re.IGNORECASE
-    )
-    text = re.sub(
-        r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>',
-        '',
-        text,
-        flags=re.IGNORECASE
-    )
-    # Strip steering/queued instruction prefixes so history stays pure and clean
-    text = re.sub(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+', '', text)
-    return text.strip()
 
 def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not steps:

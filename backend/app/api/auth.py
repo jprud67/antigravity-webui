@@ -36,7 +36,10 @@ def get_current_token(
             return auth_stripped[7:].strip()
         return auth_stripped
     if token:
-        return token.strip()
+        tok_stripped = token.strip()
+        if tok_stripped.lower().startswith("bearer "):
+            return tok_stripped[7:].strip()
+        return tok_stripped
     return None
 
 def require_auth(token: str | None = Depends(get_current_token)):

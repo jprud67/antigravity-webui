@@ -51,6 +51,7 @@ import {
   cancelGoogleLogin,
   updateConversationMetadata,
   deleteConversation,
+  exportConversationHtml,
   exportConversationMarkdown,
   exportConversationJSON,
   importConversation,
@@ -212,13 +213,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleExportConv = async (format: 'markdown' | 'json') => {
+  const handleExportConv = async (format: 'markdown' | 'json' | 'html') => {
     if (!activeConversation) return;
     setConvExporting(true);
     try {
       if (format === 'markdown') {
         const blob = await exportConversationMarkdown(activeConversation.conversation_id);
         triggerFileDownload(blob, `session_${activeConversation.conversation_id.slice(0, 8)}.md`);
+      } else if (format === 'html') {
+        const blob = await exportConversationHtml(activeConversation.conversation_id);
+        triggerFileDownload(blob, `session_${activeConversation.conversation_id.slice(0, 8)}.html`);
       } else {
         const blob = await exportConversationJSON(activeConversation.conversation_id);
         triggerFileDownload(blob, `session_${activeConversation.conversation_id.slice(0, 8)}.json`);
@@ -1133,7 +1137,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className="hidden"
                     />
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                       <button
                         type="button"
                         onClick={() => handleExportConv('markdown')}
@@ -1151,6 +1155,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </span>
                           <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
                             Transcript lisible & formaté
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleExportConv('html')}
+                        disabled={convExporting}
+                        className="p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2.5 shadow-xs hover:border-amber-500/50"
+                        style={{
+                          backgroundColor: 'var(--surface-subtle)',
+                          borderColor: 'var(--border)',
+                        }}
+                      >
+                        <Globe className="w-4 h-4 text-amber-500 shrink-0" />
+                        <div>
+                          <span className="font-bold text-xs block" style={{ color: 'var(--strong)' }}>
+                            Export Web (.html)
+                          </span>
+                          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                            Rendu visuel autonome
                           </span>
                         </div>
                       </button>

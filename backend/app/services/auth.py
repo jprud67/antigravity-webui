@@ -108,6 +108,11 @@ def create_access_token(expires_in_days: int = 7) -> str:
 def verify_access_token(token: str | None) -> bool:
     if not token:
         return False
+    token = token.strip()
+    if token.lower().startswith("bearer "):
+        token = token[7:].strip()
+    if not token:
+        return False
     config = get_auth_config()
     if not config.get("enabled", True):
         return True
