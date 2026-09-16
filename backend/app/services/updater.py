@@ -369,7 +369,7 @@ async def apply_update() -> dict[str, Any]:
                 stderr=asyncio.subprocess.PIPE,
                 env=os.environ
             )
-            _b_out, b_err = await asyncio.wait_for(build_proc.communicate(), timeout=120.0)
+            _b_out, b_err = await asyncio.wait_for(build_proc.communicate(), timeout=300.0)
             if build_proc.returncode != 0:
                 build_ok = False
                 build_output = b_err.decode(errors="replace").strip()
@@ -442,7 +442,7 @@ async def apply_update() -> dict[str, Any]:
                 logger.info("Executing graceful systemctl restart antigravity-webui...")
                 try:
                     await asyncio.to_thread(
-                        subprocess.run, ["systemctl", "restart", "antigravity-webui"], check=False
+                        subprocess.run, ["systemctl", "--no-block", "restart", "antigravity-webui"], check=False
                     )
                 except Exception as e:
                     logger.error(f"Service restart trigger error: {e}")

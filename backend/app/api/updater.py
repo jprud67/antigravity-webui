@@ -35,7 +35,7 @@ async def api_apply_update(_ = Depends(require_auth)) -> dict[str, Any]:
     try:
         res = await apply_update()
         if not res.get("ok"):
-            raise HTTPException(status_code=500, detail=res.get("message", "Échec de la mise à jour"))
+            raise HTTPException(status_code=400, detail=res.get("message", "Échec de la mise à jour"))
         return res
     except HTTPException:
         raise
