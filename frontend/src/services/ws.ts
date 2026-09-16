@@ -30,7 +30,7 @@ export class ChatWebSocketClient {
 
   public setCurrentConversation(convId: string | null) {
     this.currentConversationId = convId;
-    if (this.ws && this.ws.readyState === WebSocket.OPEN && convId) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.sendAttach(convId);
     }
   }
@@ -197,10 +197,10 @@ export class ChatWebSocketClient {
     };
   }
 
-  public sendAttach(conversationId?: string) {
-    const cid = conversationId || this.currentConversationId;
+  public sendAttach(conversationId?: string | null) {
+    const cid = conversationId !== undefined ? conversationId : this.currentConversationId;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ action: 'attach', conversation_id: cid }));
+      this.ws.send(JSON.stringify({ action: 'attach', conversation_id: cid ?? null }));
     }
   }
 

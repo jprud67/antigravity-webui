@@ -864,7 +864,10 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         for i in range(len(remaining_steps) - 1, -1, -1):
             s = remaining_steps[i]
             if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
-                new_last_user_idx = int(s.get("step_index", i))
+                try:
+                    new_last_user_idx = int(s.get("step_index", i))
+                except (ValueError, TypeError):
+                    new_last_user_idx = i
                 break
 
         cursor.execute(

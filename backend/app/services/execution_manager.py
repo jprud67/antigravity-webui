@@ -412,15 +412,26 @@ class ExecutionManager:
         self._lock: asyncio.Lock = asyncio.Lock()
 
     def remove_session(self, conversation_id: str | None) -> None:
-        """Immediately removes a session from memory and cancels its worker task."""
+        """Immediately removes a session from memory, terminates any active child processes, and cancels tasks."""
         if not conversation_id:
             return
         target_session = self.sessions.pop(conversation_id, None)
         if target_session:
             if target_session is self.active_session:
                 self.active_session = None
+            if target_session.active_task and not target_session.active_task.done():
+                target_session.active_task.cancel()
+            if target_session.active_proc and target_session.active_proc.returncode is None:
+                try:
+                    asyncio.create_task(terminate_process_group_async(target_session.active_proc, grace=0.5))
+                except RuntimeError:
+                    try:
+                        target_session.active_proc.kill()
+                    except Exception:
+                        pass
             if target_session.worker_task and not target_session.worker_task.done():
                 target_session.worker_task.cancel()
+            target_session.is_running = False
             logger.info(f"Removed execution session for conversation {conversation_id} from memory.")
 
     def register_socket(self, ws: WebSocket):
@@ -462,6 +473,16 @@ class ExecutionManager:
             if target_session:
                 if target_session is self.active_session:
                     self.active_session = None
+                if target_session.active_task and not target_session.active_task.done():
+                    target_session.active_task.cancel()
+                if target_session.active_proc and target_session.active_proc.returncode is None:
+                    try:
+                        asyncio.create_task(terminate_process_group_async(target_session.active_proc, grace=0.5))
+                    except RuntimeError:
+                        try:
+                            target_session.active_proc.kill()
+                        except Exception:
+                            pass
                 if target_session.worker_task and not target_session.worker_task.done():
                     target_session.worker_task.cancel()
             logger.info(f"Pruned inactive execution session for conversation {cid} from memory.")
@@ -531,6 +552,21 @@ class ExecutionManager:
         return list(cids)
 
     async def attach(self, conversation_id: str | None, ws: WebSocket) -> dict[str, Any]:
+        # If conversation_id is None or empty, user is not viewing any conversation.
+        # Detach WebSocket from all sessions so that live events don't leak into new chat / home.
+        if not conversation_id:
+            for s in list(self.sessions.values()):
+                s.remove_subscriber(ws)
+            if self.active_session:
+                self.active_session.remove_subscriber(ws)
+            return {
+                "conversation_id": None,
+                "is_running": False,
+                "queue_size": 0,
+                "live_state": None,
+                "recent_events": []
+            }
+
         session = self.get_session(conversation_id)
 
         # Detach WebSocket from all other sessions to prevent event cross-talk across conversations

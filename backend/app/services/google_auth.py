@@ -216,6 +216,8 @@ def delete_google_account(email: str) -> dict[str, Any]:
         raise ValueError("Impossible de supprimer le compte Google actuellement actif. Veuillez d'abord basculer sur un autre compte.")
 
     target_file.unlink(missing_ok=True)
+    with _exhaustion_lock:
+        _account_exhaustion_tracker.pop(email.strip().lower(), None)
     logger.info(f"Deleted saved Google account {email}")
     return {"success": True, "message": f"Compte {email} supprimé"}
 

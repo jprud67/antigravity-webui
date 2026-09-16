@@ -84,6 +84,25 @@ def _ensure_schema(conn: sqlite3.Connection):
         block_recurrences    INTEGER NOT NULL DEFAULT 0
     )
     """)
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(tasks)")
+    existing_cols = {row[1] for row in cur.fetchall()}
+    expected_cols = {
+        "workspace_path": "TEXT",
+        "branch_name": "TEXT",
+        "project_id": "TEXT",
+        "result": "TEXT",
+        "started_at": "INTEGER",
+        "completed_at": "INTEGER",
+        "skills": "TEXT",
+        "model_override": "TEXT",
+    }
+    for col, col_type in expected_cols.items():
+        if col not in existing_cols:
+            try:
+                conn.execute(f"ALTER TABLE tasks ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass
     conn.commit()
 
 class CreateTaskRequest(BaseModel):

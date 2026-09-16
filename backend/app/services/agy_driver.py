@@ -386,8 +386,9 @@ async def stream_turn(
         if quota_line is None and quota_task:
             try:
                 quota_line = await asyncio.wait_for(quota_task, timeout=2.0)
-            except asyncio.TimeoutError:
-                quota_task.cancel()
+            except (asyncio.TimeoutError, Exception):
+                if not quota_task.done():
+                    quota_task.cancel()
                 quota_line = None
 
         if returncode != 0:

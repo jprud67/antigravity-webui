@@ -67,10 +67,25 @@ class SaveRuleRequest(BaseModel):
     content: str
     workspace_path: str | None = None
 
+def _safe_stat(p: Path) -> tuple[bool, int, float]:
+    try:
+        if p.exists():
+            st = p.stat()
+            return True, st.st_size, st.st_mtime
+    except OSError:
+        pass
+    return False, 0, 0.0
+
 @router.get("/files")
 def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(require_auth)):
     journal_path = _get_current_journal_path()
     journal_month = datetime.now(timezone.utc).strftime('%Y_%m')
+
+    ag_exists, ag_size, ag_mtime = _safe_stat(GLOBAL_AGENTS_FILE)
+    sc_exists, sc_size, sc_mtime = _safe_stat(SETTINGS_FILE)
+    ha_exists, ha_size, ha_mtime = _safe_stat(ARCH_STATE_FILE)
+    hj_exists, hj_size, hj_mtime = _safe_stat(journal_path)
+
     files = [
         {
             "id": "agents_global",
@@ -78,9 +93,9 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
             "description": "Règles directrices globales pour Antigravity et Hermes",
             "path": str(GLOBAL_AGENTS_FILE),
             "syntax": "markdown",
-            "exists": GLOBAL_AGENTS_FILE.exists(),
-            "size": GLOBAL_AGENTS_FILE.stat().st_size if GLOBAL_AGENTS_FILE.exists() else 0,
-            "last_modified": GLOBAL_AGENTS_FILE.stat().st_mtime if GLOBAL_AGENTS_FILE.exists() else 0,
+            "exists": ag_exists,
+            "size": ag_size,
+            "last_modified": ag_mtime,
         },
         {
             "id": "settings_cli",
@@ -88,9 +103,9 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
             "description": "Permissions système, modèles et répertoires de confiance",
             "path": str(SETTINGS_FILE),
             "syntax": "json",
-            "exists": SETTINGS_FILE.exists(),
-            "size": SETTINGS_FILE.stat().st_size if SETTINGS_FILE.exists() else 0,
-            "last_modified": SETTINGS_FILE.stat().st_mtime if SETTINGS_FILE.exists() else 0,
+            "exists": sc_exists,
+            "size": sc_size,
+            "last_modified": sc_mtime,
         },
         {
             "id": "hermes_arch",
@@ -98,9 +113,9 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
             "description": "Synthèse architecturale et état consolidé du serveur",
             "path": str(ARCH_STATE_FILE),
             "syntax": "markdown",
-            "exists": ARCH_STATE_FILE.exists(),
-            "size": ARCH_STATE_FILE.stat().st_size if ARCH_STATE_FILE.exists() else 0,
-            "last_modified": ARCH_STATE_FILE.stat().st_mtime if ARCH_STATE_FILE.exists() else 0,
+            "exists": ha_exists,
+            "size": ha_size,
+            "last_modified": ha_mtime,
         },
         {
             "id": "hermes_journal",
@@ -108,9 +123,9 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
             "description": "Journal mensuel horodaté des actions et interventions serveur",
             "path": str(journal_path),
             "syntax": "markdown",
-            "exists": journal_path.exists(),
-            "size": journal_path.stat().st_size if journal_path.exists() else 0,
-            "last_modified": journal_path.stat().st_mtime if journal_path.exists() else 0,
+            "exists": hj_exists,
+            "size": hj_size,
+            "last_modified": hj_mtime,
         }
     ]
 
@@ -125,15 +140,18 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
             ws_agents = ws_p / "AGENTS.md"
             ws_gemini = ws_p / "GEMINI.md"
 
+            wa_exists, wa_size, wa_mtime = _safe_stat(ws_agents)
+            wg_exists, wg_size, wg_mtime = _safe_stat(ws_gemini)
+
             files.append({
                 "id": "workspace_agents",
                 "name": f"AGENTS.md ({ws_p.name})",
                 "description": f"Règles locales du workspace {workspace_path}",
                 "path": str(ws_agents),
                 "syntax": "markdown",
-                "exists": ws_agents.exists(),
-                "size": ws_agents.stat().st_size if ws_agents.exists() else 0,
-                "last_modified": ws_agents.stat().st_mtime if ws_agents.exists() else 0,
+                "exists": wa_exists,
+                "size": wa_size,
+                "last_modified": wa_mtime,
             })
 
             files.append({
@@ -142,9 +160,9 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
                 "description": f"Instructions contextuelles du workspace {workspace_path}",
                 "path": str(ws_gemini),
                 "syntax": "markdown",
-                "exists": ws_gemini.exists(),
-                "size": ws_gemini.stat().st_size if ws_gemini.exists() else 0,
-                "last_modified": ws_gemini.stat().st_mtime if ws_gemini.exists() else 0,
+                "exists": wg_exists,
+                "size": wg_size,
+                "last_modified": wg_mtime,
             })
 
     return {"files": files}
