@@ -212,11 +212,16 @@ export function triggerFileDownload(blob: Blob, filename: string): void {
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 2000);
+  try {
+    a.click();
+  } finally {
+    if (a.parentNode) {
+      a.parentNode.removeChild(a);
+    }
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 2000);
+  }
 }
 
 export async function bulkConversationExport(conversationIds: string[]): Promise<void> {

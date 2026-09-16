@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import BRAIN_DIR, CONVERSATION_DB, DEFAULT_WORKSPACE, SETTINGS_FILE
-from app.platform_utils import is_safe_path
+from app.platform_utils import is_safe_path, restrict_file_permissions
 from app.services.session_metadata import (
     bulk_delete_session_meta,
     delete_session_meta,
@@ -2006,7 +2006,9 @@ def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
         tmp_file = SETTINGS_FILE.parent / f".settings.json.tmp.{uuid.uuid4().hex[:8]}"
         try:
             tmp_file.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
+            restrict_file_permissions(tmp_file)
             tmp_file.replace(SETTINGS_FILE)
+            restrict_file_permissions(SETTINGS_FILE)
         except Exception:
             if tmp_file.exists():
                 try:

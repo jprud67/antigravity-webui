@@ -1393,6 +1393,14 @@ export function App() {
   const stableAnswerQuestion = useCallback((ans: string) => {
     if (isStreamingRef.current) {
       chatSocket.sendInput(ans);
+      const userMsg: ChatMessage = {
+        id: `usr-${Date.now()}`,
+        role: 'user',
+        content: ans,
+        timestamp: new Date().toISOString()
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      return;
     }
     handleSendMessage(ans, {
       model: selectedModel,

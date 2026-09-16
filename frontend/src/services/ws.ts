@@ -81,15 +81,16 @@ export class ChatWebSocketClient {
         protocols = undefined;
       }
     }
-    const url = `${protocol}//${host}/ws/chat${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    const baseUrl = `${protocol}//${host}/ws/chat`;
+    const fallbackUrl = `${baseUrl}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 
     try {
       try {
-        this.ws = protocols ? new WebSocket(url, protocols) : new WebSocket(url);
+        this.ws = protocols ? new WebSocket(baseUrl, protocols) : new WebSocket(fallbackUrl);
       } catch (subErr) {
-        // Fallback to plain connection without subprotocols if constructor rejects it
+        // Fallback to query param auth if subprotocol constructor rejects it
         console.warn('[WS] Subprotocol connection failed, falling back to query param auth:', subErr);
-        this.ws = new WebSocket(url);
+        this.ws = new WebSocket(fallbackUrl);
       }
 
       this.ws.onopen = () => {

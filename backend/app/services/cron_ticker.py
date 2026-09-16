@@ -31,9 +31,7 @@ from app.services.cron_store import (
     OUTPUT_DIR,
     compute_next_run,
     ensure_dirs,
-    load_jobs,
     now_iso,
-    save_jobs,
     update_jobs,
     write_heartbeat,
 )
@@ -445,10 +443,9 @@ async def tick_once() -> int:
     ensure_dirs()
     to_launch: list[dict[str, Any]] = []
 
-    async with _jobs_write_lock:
-        data = load_jobs()
+    def _collect_due(data: dict[str, Any]) -> list[dict[str, Any]]:
         now = datetime.now(timezone.utc)
-        changed = False
+        due_jobs: list[dict[str, Any]] = []
 
         for job in data.get("jobs", []):
             job_id = job.get("id")
@@ -478,7 +475,6 @@ async def tick_once() -> int:
                     logger.info(f"[Cron] Job {job_id} sans planification récurrente valide marqué 'completed'.")
                 else:
                     job["next_run_at"] = computed_next
-                changed = True
                 continue
             if due <= now:
                 job["last_status"] = "running"
@@ -489,12 +485,15 @@ async def tick_once() -> int:
                     job["state"] = "completed"
                 else:
                     job["next_run_at"] = computed_next
-                changed = True
-                _running_jobs.add(job_id)
-                to_launch.append(dict(job))
+                due_jobs.append(dict(job))
+        return due_jobs
 
-        if changed:
-            save_jobs(data)
+    async with _jobs_write_lock:
+        to_launch = update_jobs(_collect_due)
+        for job in to_launch:
+            job_id = job.get("id")
+            if job_id:
+                _running_jobs.add(job_id)
 
     for job in to_launch:
         task = asyncio.create_task(_guarded_execute(job))

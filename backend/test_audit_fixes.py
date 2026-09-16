@@ -515,8 +515,9 @@ def test_aggregate_empty_string_tool_result():
 
 
 def test_skill_detail_safe_path():
-    from app.api.skills import get_skill_detail
     from fastapi import HTTPException
+
+    from app.api.skills import get_skill_detail
 
     # Path traversal should raise 400
     try:
@@ -529,6 +530,7 @@ def test_skill_detail_safe_path():
 
 def test_rules_no_touch_hermes_by_default():
     import os
+
     from app.api.rules import SaveRuleRequest, save_rule_content
 
     # Ensure ENABLE_HERMES_IPC is not enabled
@@ -563,6 +565,7 @@ def test_get_all_session_metadata_deep_copy():
 
 def test_aggregate_steps_non_serializable_objects():
     from datetime import datetime, timezone
+
     from app.services.storage import aggregate_steps_into_turns
 
     class NonSerializableObj:
@@ -598,7 +601,9 @@ def test_aggregate_steps_non_serializable_objects():
 
 def test_kill_task_safety():
     import os
+
     from fastapi import HTTPException
+
     from app.api.tasks import KillTaskRequest, kill_task
 
     # PID <= 100 must be rejected with 403
@@ -640,7 +645,11 @@ def test_git_commit_sanitize_fallback():
 
 def test_export_conversation_markdown_and_html_non_string():
     from unittest.mock import patch
-    from app.services.storage import export_conversation_html, export_conversation_markdown
+
+    from app.services.storage import (
+        export_conversation_html,
+        export_conversation_markdown,
+    )
 
     mock_steps = [
         {
@@ -703,7 +712,11 @@ def test_save_all_session_metadata_deepcopy_isolation():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
-    from app.services.session_metadata import get_all_session_metadata, save_all_session_metadata
+
+    from app.services.session_metadata import (
+        get_all_session_metadata,
+        save_all_session_metadata,
+    )
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_meta_file = Path(tmp_dir) / "session_metadata.json"
@@ -725,6 +738,7 @@ def test_save_all_session_metadata_deepcopy_isolation():
 
 def test_cancel_running_job_process_group():
     from unittest.mock import MagicMock, patch
+
     from app.services.cron_ticker import _running_job_procs, cancel_running_job
 
     mock_proc = MagicMock()
@@ -743,6 +757,7 @@ def test_cancel_running_job_process_group():
 
 def test_compute_next_run_monthly_and_weekly():
     from datetime import datetime, timezone
+
     from app.services.cron_store import compute_next_run
 
     # Natural language French & English
@@ -774,6 +789,7 @@ def test_cron_update_jobs_atomic():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
+
     from app.services.cron_store import update_jobs
 
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -802,12 +818,16 @@ def test_cron_update_jobs_atomic():
 
 def test_session_metadata_save_failure_reraised():
     from unittest.mock import patch
+
     import pytest
+
     from app.services.session_metadata import save_all_session_metadata
 
-    with patch("pathlib.Path.replace", side_effect=OSError("Disk full or permission denied")):
-        with pytest.raises(OSError):
-            save_all_session_metadata({"test": {"pinned": True}})
+    with (
+        patch("pathlib.Path.replace", side_effect=OSError("Disk full or permission denied")),
+        pytest.raises(OSError),
+    ):
+        save_all_session_metadata({"test": {"pinned": True}})
     print("✓ test_session_metadata_save_failure_reraised passed")
 
 
@@ -837,8 +857,10 @@ def test_is_safe_conversation_id_hardened():
 
 def test_rules_hermes_write_restricted():
     import os
-    from fastapi import HTTPException
+
     import pytest
+    from fastapi import HTTPException
+
     from app.api.rules import SaveRuleRequest, save_rule_content
 
     # Ensure ENABLE_HERMES_WRITE is not set
@@ -867,10 +889,11 @@ def test_kill_task_rejects_system_words():
 
 
 def test_undo_conversation_turn_nullifies_last_user_time():
+    import sqlite3
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
-    import sqlite3
+
     from app.services import storage
 
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -920,6 +943,73 @@ def test_undo_conversation_turn_nullifies_last_user_time():
             assert row[0] is None
             assert row[1] == -1
     print("✓ test_undo_conversation_turn_nullifies_last_user_time passed")
+
+
+def test_cron_update_jobs_noop_when_unchanged():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.services.cron_store import update_jobs
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_jobs_file = Path(tmp_dir) / "jobs.json"
+        with patch("app.services.cron_store.JOBS_FILE", tmp_jobs_file):
+            # Seed initial job
+            update_jobs(lambda d: d.setdefault("jobs", []).append({"id": "j1"}))
+            mtime_before = tmp_jobs_file.stat().st_mtime
+
+            # Modifier does not change data
+            res = update_jobs(lambda d: len(d.get("jobs", [])))
+            assert res == 1
+            # File should not have been re-written
+            mtime_after = tmp_jobs_file.stat().st_mtime
+            assert mtime_before == mtime_after
+    print("✓ test_cron_update_jobs_noop_when_unchanged passed")
+
+
+def test_auth_corrupt_config_backup():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.services import auth
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_auth = Path(tmp_dir) / "webui_auth.json"
+        tmp_auth.write_text("NOT_VALID_JSON{{{", encoding="utf-8")
+        corrupt_bak = Path(tmp_dir) / "webui_auth.json.corrupt.bak"
+
+        with patch("app.services.auth.AUTH_CONFIG_FILE", tmp_auth):
+            # Force cache reset
+            auth._auth_cache = None
+            auth._auth_cache_mtime = 0.0
+
+            cfg = auth.get_auth_config()
+            assert cfg.get("enabled") is True
+            assert corrupt_bak.exists()
+            assert corrupt_bak.read_text(encoding="utf-8") == "NOT_VALID_JSON{{{"
+    print("✓ test_auth_corrupt_config_backup passed")
+
+
+def test_kanban_schema_double_checked_lock():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.api import kanban
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_db = Path(tmp_dir) / "kanban.db"
+        with patch("app.api.kanban.KANBAN_DB_PATH", tmp_db):
+            kanban._schema_initialized = False
+            conn = kanban.get_db_connection()
+            assert kanban._schema_initialized is True
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'")
+            assert cur.fetchone() is not None
+            conn.close()
+    print("✓ test_kanban_schema_double_checked_lock passed")
 
 
 if __name__ == "__main__":

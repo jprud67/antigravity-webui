@@ -6,6 +6,7 @@ import uuid
 from typing import Any
 
 from app.config import SESSION_METADATA_FILE
+from app.platform_utils import restrict_file_permissions
 
 logger = logging.getLogger("antigravity-webui.session_metadata")
 
@@ -47,7 +48,9 @@ def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
             SESSION_METADATA_FILE.parent.mkdir(parents=True, exist_ok=True)
             tmp_file = SESSION_METADATA_FILE.parent / f"{SESSION_METADATA_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
             tmp_file.write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
+            restrict_file_permissions(tmp_file)
             tmp_file.replace(SESSION_METADATA_FILE)
+            restrict_file_permissions(SESSION_METADATA_FILE)
             _cached_meta = copy.deepcopy(metadata)
             _cached_mtime = SESSION_METADATA_FILE.stat().st_mtime
         except Exception as e:

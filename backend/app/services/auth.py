@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import secrets
+import shutil
 import threading
 import time
 import uuid
@@ -44,6 +45,14 @@ def get_auth_config() -> dict[str, Any]:
                     return data.copy()
         except Exception as e:
             logger.warning(f"Configuration d'authentification illisible — régénération : {e}")
+            if AUTH_CONFIG_FILE.exists():
+                try:
+                    corrupt_bak = AUTH_CONFIG_FILE.parent / f"{AUTH_CONFIG_FILE.name}.corrupt.bak"
+                    shutil.copy2(AUTH_CONFIG_FILE, corrupt_bak)
+                    restrict_file_permissions(corrupt_bak)
+                    logger.warning(f"Sauvegarde du fichier corrompu créée: {corrupt_bak}")
+                except Exception as bak_err:
+                    logger.debug(f"Impossible de sauvegarder le fichier auth corrompu: {bak_err}")
 
         # Default config
         config = {

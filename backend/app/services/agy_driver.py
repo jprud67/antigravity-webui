@@ -307,7 +307,19 @@ async def stream_turn(
     # Prompt parameter
     cmd.extend(["-p", prompt])
 
-    logger.info(f"Spawning agy: {' '.join(cmd)} (cwd={cwd})")
+    safe_cmd = []
+    skip_next = False
+    for arg in cmd:
+        if skip_next:
+            preview = arg[:60].replace("\n", " ") + ("..." if len(arg) > 60 else "")
+            safe_cmd.append(f'"{preview}"')
+            skip_next = False
+        elif arg in ("-p", "--prompt"):
+            safe_cmd.append(arg)
+            skip_next = True
+        else:
+            safe_cmd.append(arg)
+    logger.info(f"Spawning agy: {' '.join(safe_cmd)} (cwd={cwd})")
 
     spawned_at = time.time()
     proc: asyncio.subprocess.Process | None = None

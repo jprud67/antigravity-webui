@@ -40,8 +40,6 @@ async def _sse_generator(request: Request, q: asyncio.Queue):
                 # Send keepalive ping every 20s to prevent proxy/browser timeout
                 yield 'data: {"type":"ping"}\n\n'
 
-    except asyncio.CancelledError:
-        logger.debug("Ignored error")
     finally:
         remove_subscriber(q)
         logger.debug("SSE client disconnected")

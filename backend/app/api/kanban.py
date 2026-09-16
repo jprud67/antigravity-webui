@@ -1,6 +1,7 @@
 import logging
 import os
 import sqlite3
+import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -12,11 +13,13 @@ from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE, GEMINI_DIR
+from app.platform_utils import restrict_file_permissions
 
 logger = logging.getLogger("antigravity.kanban")
 router = APIRouter(prefix="/api/kanban", tags=["kanban"])
 
 KANBAN_DB_PATH = Path(os.environ.get("ANTIGRAVITY_KANBAN_DB", str(GEMINI_DIR / "webui_kanban.db")))
+_schema_lock = threading.Lock()
 _schema_initialized = False
 
 
@@ -29,8 +32,11 @@ def get_db_connection() -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=5000")
     if not _schema_initialized:
-        _ensure_schema(conn)
-        _schema_initialized = True
+        with _schema_lock:
+            if not _schema_initialized:
+                _ensure_schema(conn)
+                restrict_file_permissions(KANBAN_DB_PATH)
+                _schema_initialized = True
     return conn
 
 

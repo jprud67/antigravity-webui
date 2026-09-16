@@ -14,6 +14,7 @@ logging.basicConfig(level=logging.WARNING)
 
 import pytest
 
+
 @pytest.mark.asyncio
 async def test():
     print("Testing Cron Failover Logic...")

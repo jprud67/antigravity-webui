@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE, HOME, SETTINGS_FILE
-from app.platform_utils import is_safe_path
+from app.platform_utils import is_safe_path, restrict_file_permissions
 from app.services.storage import get_settings
 
 logger = logging.getLogger(__name__)
@@ -231,6 +231,7 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
         try:
             backup_path = target_path.with_suffix(target_path.suffix + ".bak")
             shutil.copy2(target_path, backup_path)
+            restrict_file_permissions(backup_path)
         except Exception as e:
             logger.debug(f"Ignored error: {e}")
 
@@ -239,7 +240,9 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(req.content)
+        restrict_file_permissions(tmp_path)
         tmp_path.replace(target_path)
+        restrict_file_permissions(target_path)
     except Exception as e:
         tmp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Erreur d'écriture: {e}")

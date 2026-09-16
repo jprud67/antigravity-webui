@@ -9,6 +9,7 @@ Fichiers gérés :
 - ticker_heartbeat   : battement du ticker interne (lu par l'UI pour le statut)
 - output/            : journaux d'exécution de chaque run
 """
+import copy
 import json
 import logging
 import os
@@ -16,11 +17,14 @@ import re
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from croniter import croniter
+
+T = TypeVar("T")
 
 from app.config import GEMINI_DIR
 from app.platform_utils import restrict_file_permissions
@@ -90,11 +94,11 @@ def save_jobs(data: dict[str, Any]) -> None:
                     logger.debug(f"Ignored error: {e}")
             raise
 
-def update_jobs(modifier) -> None:
+def update_jobs(modifier: Callable[[dict[str, Any]], T]) -> T:
     """Effectue une opération atomique de lecture, modification et écriture."""
     with _jobs_lock:
         ensure_dirs()
-        data = {"jobs": [], "updated_at": now_iso()}
+        data: dict[str, Any] = {"jobs": [], "updated_at": now_iso()}
         if JOBS_FILE.exists():
             try:
                 with open(JOBS_FILE, "r", encoding="utf-8") as f:
@@ -107,7 +111,12 @@ def update_jobs(modifier) -> None:
             except Exception as e:
                 logger.error(f"Lecture de jobs.json impossible: {e}")
 
+        snapshot = copy.deepcopy(data)
         result = modifier(data)
+
+        # Si les données n'ont subi aucune modification, éviter une réécriture inutile du disque
+        if data == snapshot:
+            return result
         
         data["updated_at"] = now_iso()
         temp_path = JOBS_FILE.parent / f"{JOBS_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
