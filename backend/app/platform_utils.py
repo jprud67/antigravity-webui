@@ -104,6 +104,32 @@ async def terminate_process_group_async(proc, grace: float = 0.8) -> None:
         logger.warning(f"Le processus {proc.pid} ne répond toujours pas après terminaison forcée.")
 
 
+def terminate_process_group_sync(proc, force: bool = True) -> None:
+    """
+    Termine immédiatement et de manière synchrone un sous-processus et l'ensemble
+    de son groupe de processus (POSIX killpg / Windows taskkill /T).
+    Utile lors des suppressions de sessions depuis des threads synchrones ou lors du déchargement.
+    """
+    if proc is None:
+        return
+    returncode = getattr(proc, "returncode", None)
+    if returncode is not None:
+        return
+    pid = getattr(proc, "pid", None)
+    if not pid:
+        return
+
+    if IS_WINDOWS:
+        _taskkill(pid, force=force)
+    else:
+        _killpg(pid, signal.SIGKILL if force else signal.SIGTERM)
+
+    try:
+        proc.kill()
+    except Exception:
+        pass
+
+
 def restrict_file_permissions(path) -> None:
     """Restreint un fichier à son propriétaire (POSIX). No-op explicite sous Windows."""
     if IS_WINDOWS:

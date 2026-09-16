@@ -148,7 +148,7 @@ def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth
         if x == "?" and y == "?":
             untracked.append(path)
         else:
-            if x in ["M", "A", "R", "C"]:
+            if x in ["M", "A", "R", "C", "D"]:
                 staged.append(path)
             if y == "M":
                 modified.append(path)

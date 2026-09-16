@@ -6,7 +6,10 @@ from typing import Any
 
 from fastapi import WebSocket
 
-from app.platform_utils import terminate_process_group_async
+from app.platform_utils import (
+    terminate_process_group_async,
+    terminate_process_group_sync,
+)
 from app.services.agy_driver import stream_turn
 from app.services.google_auth import (
     get_active_account,
@@ -434,15 +437,29 @@ class ExecutionManager:
             if target_session.active_task and not target_session.active_task.done():
                 target_session.active_task.cancel()
             if target_session.active_proc and target_session.active_proc.returncode is None:
+                terminated_async = False
                 try:
-                    task = asyncio.create_task(terminate_process_group_async(target_session.active_proc, grace=0.5))
-                    self._background_tasks.add(task)
-                    task.add_done_callback(self._background_tasks.discard)
+                    loop = asyncio.get_running_loop()
+                    if loop.is_running():
+                        task = loop.create_task(terminate_process_group_async(target_session.active_proc, grace=0.5))
+                        self._background_tasks.add(task)
+                        task.add_done_callback(self._background_tasks.discard)
+                        terminated_async = True
                 except RuntimeError:
+                    pass
+
+                if not terminated_async:
                     try:
-                        target_session.active_proc.kill()
+                        session_loop = getattr(target_session, "loop", None)
+                        if session_loop and session_loop.is_running():
+                            asyncio.run_coroutine_threadsafe(
+                                terminate_process_group_async(target_session.active_proc, grace=0.5),
+                                session_loop
+                            )
+                        else:
+                            terminate_process_group_sync(target_session.active_proc, force=True)
                     except Exception:
-                        pass
+                        terminate_process_group_sync(target_session.active_proc, force=True)
             if target_session.worker_task and not target_session.worker_task.done():
                 target_session.worker_task.cancel()
             target_session.is_running = False

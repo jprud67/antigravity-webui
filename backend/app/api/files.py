@@ -29,9 +29,11 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> list
         entries = sorted(dir_path.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
         for entry in entries:
             name = entry.name
-            if name.startswith(".") and name not in [".env", ".gitignore"]:
+            if name.startswith(".") and name != ".gitignore":
                 continue
             if entry.is_dir() and name in IGNORED_DIRS:
+                continue
+            if is_blocked_sensitive_path(entry):
                 continue
 
             try:

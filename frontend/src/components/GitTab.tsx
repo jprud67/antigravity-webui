@@ -149,6 +149,29 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     }
   };
 
+  const allChangedFiles = React.useMemo(() => {
+    if (!status) return [];
+    const map = new Map<string, { path: string; type: string }>();
+    (status.staged || []).forEach((f) => map.set(f, { path: f, type: 'S' }));
+    (status.modified || []).forEach((f) => {
+      const existing = map.get(f);
+      if (existing) {
+        existing.type = 'S+M';
+      } else {
+        map.set(f, { path: f, type: 'M' });
+      }
+    });
+    (status.deleted || []).forEach((f) => {
+      map.set(f, { path: f, type: 'D' });
+    });
+    (status.untracked || []).forEach((f) => {
+      if (!map.has(f)) {
+        map.set(f, { path: f, type: '?' });
+      }
+    });
+    return Array.from(map.values());
+  }, [status]);
+
   if (loading && !status) {
     return (
       <div className="flex items-center justify-center h-64 text-slate-400 text-xs">
@@ -169,13 +192,6 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
       </div>
     );
   }
-
-  const allChangedFiles = [
-    ...(status?.modified.map((f) => ({ path: f, type: 'M' })) || []),
-    ...(status?.staged.map((f) => ({ path: f, type: 'S' })) || []),
-    ...(status?.untracked.map((f) => ({ path: f, type: '?' })) || []),
-    ...(status?.deleted.map((f) => ({ path: f, type: 'D' })) || []),
-  ];
 
   return (
     <div
@@ -278,11 +294,11 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
             </div>
           ) : (
             <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-              {allChangedFiles.map((file, idx) => {
+              {allChangedFiles.map((file) => {
                 const isSelected = selectedFile === file.path;
                 return (
                   <button
-                    key={idx}
+                    key={file.path}
                     onClick={() => handleSelectFile(file.path)}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
                       isSelected
@@ -297,7 +313,11 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                     </div>
                     <span
                       className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        file.type === 'M'
+                        file.type === 'S+M'
+                          ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400'
+                          : file.type === 'S'
+                          ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                          : file.type === 'M'
                           ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
                           : file.type === 'D'
                           ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
