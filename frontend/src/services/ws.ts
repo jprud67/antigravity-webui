@@ -73,13 +73,15 @@ export class ChatWebSocketClient {
             break;
           }
           const item = this.pendingPayloads.shift();
+          if (!item) continue;
+          if (!item.conversation_id && this.currentConversationId) {
+            item.conversation_id = this.currentConversationId;
+          }
           try {
             this.ws.send(JSON.stringify(item));
           } catch (e) {
             console.error('[WS] Failed to flush queued payload:', e);
-            if (item) {
-              this.pendingPayloads.unshift(item);
-            }
+            this.pendingPayloads.unshift(item);
             break;
           }
         }
@@ -269,6 +271,10 @@ export class ChatWebSocketClient {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ action: 'input', text, conversation_id: cid }));
     }
+  }
+
+  public clearPendingPayloads() {
+    this.pendingPayloads = [];
   }
 }
 

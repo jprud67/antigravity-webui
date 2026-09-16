@@ -255,7 +255,11 @@ class PersistentTerminalSession:
                 except Exception as e:
                     logger.debug(f"terminal resize failed: {e}")
             return
-        set_winsize(self.master_fd, self.rows, self.cols)
+
+        try:
+            set_winsize(self.master_fd, self.rows, self.cols)
+        except Exception as e:
+            logger.debug(f"terminal set_winsize failed: {e}")
 
     async def close(self):
         self._closing = True

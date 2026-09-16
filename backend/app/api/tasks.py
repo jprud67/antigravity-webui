@@ -134,7 +134,13 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
 @router.post("/kill")
 def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
     target_pid = req.pid
-    if not target_pid:
+    if target_pid is not None and target_pid <= 100:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Arrêt non autorisé pour le PID système critique {target_pid}"
+        )
+
+    if not target_pid or target_pid <= 0:
         if req.task_id:
             try:
                 for p in psutil.process_iter(['pid', 'cmdline']):
@@ -144,8 +150,10 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
                             continue
                         cmd_str = " ".join(p_info.get('cmdline') or [])
                         if req.task_id in cmd_str:
-                            target_pid = p_info.get('pid')
-                            break
+                            candidate_pid = p_info.get('pid')
+                            if candidate_pid and candidate_pid > 100:
+                                target_pid = candidate_pid
+                                break
                     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError, KeyError):
                         continue
             except Exception as e:
@@ -209,8 +217,8 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
 
         logger.info(f"Terminated process PID {target_pid} ({proc_name})")
         return {"success": True, "message": f"Processus {target_pid} ({proc_name}) arrêté avec succès"}
-    except psutil.NoSuchProcess:
-        raise HTTPException(status_code=404, detail="Processus introuvable")
+    except (psutil.NoSuchProcess, psutil.ZombieProcess):
+        raise HTTPException(status_code=404, detail="Processus introuvable ou déjà terminé")
     except psutil.AccessDenied:
         raise HTTPException(status_code=403, detail="Permission refusée pour arrêter ce processus")
     except HTTPException:

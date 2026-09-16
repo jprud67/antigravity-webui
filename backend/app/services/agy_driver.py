@@ -254,13 +254,17 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
             ver = m_ver.group(1)
             return f"gemini-{ver}-{tier}-{eff}", None
         else:
-            base = norm.removesuffix(f"-{eff}")
+            base = norm.rstrip("-")
             return f"{base}-{eff}", None
 
-    # For other models, preserve suffix or raw
-    if model_suffix:
-        return f"{norm}-{model_suffix}", None
-    return raw, effort
+    # For other models, use explicit effort if provided, otherwise preserve original suffix if it existed
+    target_eff = effort or model_suffix
+    if target_eff:
+        eff_clean = target_eff.lower().strip()
+        if model_suffix:
+            return f"{norm}-{eff_clean}", None
+        return raw, eff_clean
+    return raw, None
 
 async def stream_turn(
     prompt: str,
@@ -434,6 +438,41 @@ _credits_lock = asyncio.Lock()
 _changelog_lock = asyncio.Lock()
 
 
+def _extract_json_payload(raw: str) -> Any:
+    """Extraie et décode un payload JSON même si des bannières ou des avertissements précèdent."""
+    trimmed = raw.strip()
+    try:
+        return json.loads(trimmed)
+    except Exception:
+        pass
+
+    first_brace = trimmed.find('{')
+    last_brace = trimmed.rfind('}')
+    first_bracket = trimmed.find('[')
+    last_bracket = trimmed.rfind(']')
+
+    candidates: list[str] = []
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        candidates.append(trimmed[first_brace : last_brace + 1])
+    if first_bracket != -1 and last_bracket != -1 and last_bracket > first_bracket:
+        candidates.append(trimmed[first_bracket : last_bracket + 1])
+
+    for c in candidates:
+        try:
+            return json.loads(c)
+        except Exception:
+            pass
+
+    for line in trimmed.splitlines():
+        line = line.strip()
+        if (line.startswith('{') and line.endswith('}')) or (line.startswith('[') and line.endswith(']')):
+            try:
+                return json.loads(line)
+            except Exception:
+                pass
+    raise json.JSONDecodeError("No valid JSON found", raw, 0)
+
+
 async def get_usage_quota() -> dict[str, Any]:
     global _quota_cache
     now = time.time()
@@ -456,9 +495,10 @@ async def get_usage_quota() -> dict[str, Any]:
             try:
                 stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
                 if proc.returncode == 0 and stdout:
-                    data = json.loads(stdout.decode(errors="replace"))
-                    _quota_cache = {"data": data, "timestamp": now}
-                    return data
+                    data = _extract_json_payload(stdout.decode(errors="replace"))
+                    if isinstance(data, dict):
+                        _quota_cache = {"data": data, "timestamp": now}
+                        return data
             except Exception:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)
@@ -493,9 +533,10 @@ async def get_credits() -> dict[str, Any]:
             try:
                 stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
                 if proc.returncode == 0 and stdout:
-                    data = json.loads(stdout.decode(errors="replace"))
-                    _credits_cache = {"data": data, "timestamp": now}
-                    return data
+                    data = _extract_json_payload(stdout.decode(errors="replace"))
+                    if isinstance(data, dict):
+                        _credits_cache = {"data": data, "timestamp": now}
+                        return data
             except Exception:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)
@@ -530,9 +571,10 @@ async def get_changelog() -> dict[str, Any]:
             try:
                 stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=8.0)
                 if proc.returncode == 0 and stdout:
-                    data = json.loads(stdout.decode(errors="replace"))
-                    _changelog_cache = {"data": data, "timestamp": now}
-                    return data
+                    data = _extract_json_payload(stdout.decode(errors="replace"))
+                    if isinstance(data, dict):
+                        _changelog_cache = {"data": data, "timestamp": now}
+                        return data
             except Exception:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)

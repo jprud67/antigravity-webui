@@ -175,25 +175,29 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
         fetched_ids = {r["conversation_id"] for r in rows}
         missing_pinned = [cid for cid in pinned_ids if cid not in fetched_ids]
         if missing_pinned:
-            placeholders = ",".join("?" * len(missing_pinned))
-            cursor.execute(
-                f"""
-                SELECT 
-                    conversation_id,
-                    title,
-                    preview,
-                    step_count,
-                    last_modified_time,
-                    workspace_uris,
-                    status,
-                    agent_name,
-                    parent_conversation_id
-                FROM conversation_summaries
-                WHERE conversation_id IN ({placeholders})
-                """,
-                tuple(missing_pinned)
-            )
-            rows.extend(cursor.fetchall())
+            # Chunk missing_pinned in batches of 500 to avoid SQLite variable limits
+            chunk_size = 500
+            for i in range(0, len(missing_pinned), chunk_size):
+                chunk = missing_pinned[i : i + chunk_size]
+                placeholders = ",".join("?" * len(chunk))
+                cursor.execute(
+                    f"""
+                    SELECT 
+                        conversation_id,
+                        title,
+                        preview,
+                        step_count,
+                        last_modified_time,
+                        workspace_uris,
+                        status,
+                        agent_name,
+                        parent_conversation_id
+                    FROM conversation_summaries
+                    WHERE conversation_id IN ({placeholders})
+                    """,
+                    tuple(chunk)
+                )
+                rows.extend(cursor.fetchall())
 
         result = []
         for r in rows:
@@ -886,7 +890,11 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         cursor = conn.cursor()
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
         last_step = remaining_steps[-1] if remaining_steps else {}
-        new_preview = str(last_step.get("content") or last_step.get("thinking") or "")[:150]
+        raw_prev = last_step.get("content") or last_step.get("thinking") or ""
+        if last_step.get("source") == "USER_EXPLICIT" or last_step.get("type") == "USER_INPUT":
+            new_preview = clean_user_prompt(raw_prev)[:150]
+        else:
+            new_preview = str(raw_prev)[:150]
 
         new_last_user_idx = -1
         new_last_user_time = None
@@ -1044,6 +1052,8 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                         lines = f.readlines()[-500:]
 
                 for line in lines:
+                    if not line.strip():
+                        continue
                     if q_lower not in line.lower():
                         continue
                     try:
@@ -1114,13 +1124,13 @@ def clean_user_prompt(raw: Any) -> str:
     else:
         text = raw
     text = re.sub(
-        r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT)(?:\s+[^>]*)?>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT)>',
+        r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>',
         '',
         text,
         flags=re.IGNORECASE
     )
     text = re.sub(
-        r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT)(?:\s+[^>]*)?>',
+        r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>',
         '',
         text,
         flags=re.IGNORECASE
@@ -1200,7 +1210,35 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                 })
             continue
 
-        # 3. Tool outputs (GENERIC / SYSTEM steps following a tool call)
+        # 3. System notifications and background task completions
+        if stype == "SYSTEM_MESSAGE":
+            flush_asst()
+            if "finished with result:" in content:
+                match_task = re.search(r'Task id "([^"]+)" finished with result:\s*([\s\S]*)', content, flags=re.IGNORECASE)
+                task_id = match_task.group(1) if match_task else "Tâche"
+                task_res = match_task.group(2).strip() if match_task else content
+                turns.append({
+                    "role": "system",
+                    "subtype": "task",
+                    "task_id": task_id,
+                    "step_index": step_index,
+                    "timestamp": ts,
+                    "content": task_res,
+                })
+            else:
+                m_sys = re.search(r'<SYSTEM_MESSAGE>([\s\S]*?)</SYSTEM_MESSAGE>', content, flags=re.IGNORECASE)
+                sys_text = m_sys.group(1).strip() if m_sys else content.strip()
+                if sys_text:
+                    turns.append({
+                        "role": "system",
+                        "subtype": "system",
+                        "step_index": step_index,
+                        "timestamp": ts,
+                        "content": sys_text,
+                    })
+            continue
+
+        # 4. Tool outputs (GENERIC / SYSTEM steps following a tool call)
         tool_calls = s.get("tool_calls") or []
         is_tool_output = (
             stype in ["GENERIC", "SYSTEM", "TOOL_RESULT"]
@@ -1298,6 +1336,19 @@ def export_conversation_markdown(conversation_id: str) -> str:
             md_lines.append("")
             continue
 
+        if role == "system":
+            subtype = turn.get("subtype", "system")
+            if subtype == "task":
+                task_id = turn.get("task_id", "Tâche")
+                md_lines.append(f"> ⚙️ **Notification de tâche [{task_id}] (Étape #{idx})**")
+            else:
+                md_lines.append(f"> ℹ️ **Notification Système (Étape #{idx})**")
+            if turn.get("content"):
+                for s_line in str(turn["content"]).strip().splitlines():
+                    md_lines.append(f"> {s_line}")
+            md_lines.append("\n---\n")
+            continue
+
         # Assistant turn
         md_lines.append(f"## ⚡ Assistant Antigravity (Étape #{idx})")
         md_lines.append("")
@@ -1350,6 +1401,18 @@ def export_conversation_html(conversation_id: str) -> str:
             messages_html.append(f"""
             <div class="checkpoint-divider">
                 <span>📌 Point de restauration — Étape #{idx}</span>
+            </div>
+            """)
+            continue
+
+        if role == "system":
+            subtype = turn.get("subtype", "system")
+            label = f"⚙️ Tâche [{turn.get('task_id', 'Tâche')}]" if subtype == "task" else "ℹ️ Notification Système"
+            escaped_sys = html.escape(str(turn.get("content", "")), quote=True)
+            messages_html.append(f"""
+            <div class="system-divider">
+                <span>{label} — Étape #{idx}</span>
+                <pre class="system-content">{escaped_sys}</pre>
             </div>
             """)
             continue
@@ -1511,6 +1574,28 @@ def export_conversation_html(conversation_id: str) -> str:
             color: #64748b;
             border-radius: 9999px;
             border: 1px solid #1e293b;
+        }}
+        .system-divider {{
+            margin: 20px 0;
+            padding: 12px 16px;
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+        }}
+        .system-divider span {{
+            display: inline-block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #38bdf8;
+            margin-bottom: 6px;
+        }}
+        .system-content {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #94a3b8;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
         }}
         .message-row {{
             display: flex;

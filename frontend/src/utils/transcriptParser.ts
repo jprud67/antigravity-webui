@@ -39,7 +39,9 @@ export function isToolOutputContent(content: any): boolean {
     c.startsWith('{"File":') ||
     c.startsWith('{"status":') ||
     c.startsWith('{"event":') ||
-    c.startsWith('Task id "')
+    c.startsWith('Task id "') ||
+    c.startsWith('[Active skills:') ||
+    c.startsWith('Starting background task')
   );
 }
 

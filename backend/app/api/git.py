@@ -16,7 +16,7 @@ logger = logging.getLogger("antigravity.git")
 router = APIRouter(prefix="/api/git", tags=["git"])
 
 GIT_TIMEOUT = 12
-_COAUTHOR_RE = re.compile(r"co[-_ ]?authored[-_ ]?by", re.IGNORECASE)
+_COAUTHOR_RE = re.compile(r"(?:co[-_ ]?authored[-_ ]?by|co[-_ ]?author:?|claude)", re.IGNORECASE)
 
 def _sanitize_git_message(msg: str) -> str:
     lines = [line for line in msg.strip().split("\n") if not _COAUTHOR_RE.search(line)]

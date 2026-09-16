@@ -845,6 +845,14 @@ export async function importConversation(payload: any): Promise<{
   return res.json();
 }
 
+export async function exportConversationHtml(conversationId: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}/export/html`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error("Échec du téléchargement de l'export HTML");
+  return res.blob();
+}
+
 export async function exportConversationMarkdown(conversationId: string): Promise<Blob> {
   const res = await fetch(`${API_BASE}/conversations/${conversationId}/export/markdown`, {
     headers: getHeaders()

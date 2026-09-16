@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
@@ -67,7 +67,7 @@ def switch_account(req: SwitchAccountRequest, _ = Depends(require_auth)):
 
 
 @router.delete("/accounts")
-def delete_account(email: str, _ = Depends(require_auth)):
+def delete_account(email: str = Query(..., min_length=1, description="Google account email to delete"), _ = Depends(require_auth)):
     try:
         res = delete_google_account(email)
         return res
