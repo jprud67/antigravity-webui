@@ -178,6 +178,11 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
             target["state"] = "paused"
             target["paused_at"] = now_iso()
             target["next_run_at"] = None
+            try:
+                from app.services.cron_ticker import cancel_running_job
+                cancel_running_job(job_id)
+            except Exception as e:
+                logger.debug(f"Error cancelling running job {job_id}: {e}")
         else:
             target["enabled"] = True
             target["state"] = "scheduled"

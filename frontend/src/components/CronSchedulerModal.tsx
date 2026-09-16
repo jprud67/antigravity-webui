@@ -139,12 +139,27 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
   };
 
   const handleToggleState = async (job: CronJobItem) => {
-    const nextState = job.state === 'scheduled' ? 'paused' : 'scheduled';
+    const isCurrentlyActive = job.state === 'scheduled' && (job.enabled !== false);
+    const nextState = isCurrentlyActive ? 'paused' : 'scheduled';
+
+    // Optimistic UI update
+    setCronData(prev => prev ? ({
+      ...prev,
+      jobs: prev.jobs.map(j => j.id === job.id ? {
+        ...j,
+        state: nextState,
+        enabled: nextState === 'scheduled',
+        next_run_at: nextState === 'paused' ? null : j.next_run_at
+      } : j)
+    }) : null);
+
     try {
       await updateCronJob(job.id, { state: nextState });
+      showToast(nextState === 'paused' ? 'Tâche mise en pause' : 'Tâche réactivée', 'info');
       await loadCrons();
     } catch (e: any) {
       showToast(e.message || 'Erreur modification statut', 'error');
+      await loadCrons();
     }
   };
 
@@ -501,7 +516,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
             ) : (
               <div className="space-y-3">
                 {cronData?.jobs.map(job => {
-                  const isScheduled = job.state === 'scheduled' && job.enabled;
+                  const isScheduled = job.state === 'scheduled' && (job.enabled !== false);
                   return (
                     <div
                       key={job.id}
@@ -627,7 +642,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                           color: 'var(--muted)'
                         }}
                       >
-                        <span>Prochaine exécution : <strong style={{ color: 'var(--strong)' }}>{formatDateTime(job.next_run_at)}</strong></span>
+                        <span>Prochaine exécution : <strong style={{ color: 'var(--strong)' }}>{!isScheduled ? 'En pause' : formatDateTime(job.next_run_at)}</strong></span>
                         {job.last_run_at && (
                           <span>Dernier passage : <strong style={{ color: 'var(--strong)' }}>{formatDateTime(job.last_run_at)}</strong></span>
                         )}

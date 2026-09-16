@@ -402,9 +402,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setTimeout(checkTabsScroll, 250);
   };
 
-  const handleTabClick = (tab: typeof activeTab, e: React.MouseEvent<HTMLButtonElement>) => {
+  const prevIsOpenRef = useRef(false);
+
+  const handleTabClick = (tab: SettingsTab, e: React.MouseEvent<HTMLButtonElement>) => {
     setActiveTab(tab);
-    e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    const container = tabsContainerRef.current;
+    if (container) {
+      const button = e.currentTarget;
+      const targetScroll = button.offsetLeft - (container.clientWidth / 2) + (button.clientWidth / 2);
+      container.scrollTo({ left: targetScroll, behavior: 'smooth' });
+    }
   };
 
   const loadGoogleAccounts = useCallback(async () => {
@@ -495,11 +502,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen) {
-      const tabToUse = initialTab || activeTab;
-      // oxlint-disable-next-line react/set-state-in-effect
-      if (initialTab) setActiveTab(initialTab);
-      // oxlint-disable-next-line react/set-state-in-effect
+    if (isOpen && !prevIsOpenRef.current) {
+      const tabToUse = initialTab || 'models';
+      setActiveTab(tabToUse);
       setSelectedModelId(currentModel);
       setSkillsLoading(true);
       setGoogleLoading(true);
@@ -547,8 +552,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         .catch((err) => console.error('Failed to load Google accounts:', err))
         .finally(() => setGoogleLoading(false));
     }
+    prevIsOpenRef.current = isOpen;
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, currentModel, models, initialTab, onGoogleAccountChanged]);
+  }, [isOpen, initialTab, currentModel, models, onGoogleAccountChanged]);
 
   const activeModelObj = models.find((m) => m.id === selectedModelId);
   const supportedEfforts = activeModelObj ? activeModelObj.supported_efforts : [];
@@ -728,7 +734,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div
             ref={tabsContainerRef}
             onScroll={checkTabsScroll}
-            className="flex px-3 sm:px-6 gap-2 shrink-0 overflow-x-auto tabs-horizontal-scroll scroll-smooth w-full py-0.5"
+            className="flex px-3 sm:px-6 pr-10 gap-2 shrink-0 overflow-x-auto tabs-horizontal-scroll scroll-smooth w-full py-0.5"
           >
             <button
               onClick={(e) => handleTabClick('conversation', e)}
@@ -2536,9 +2542,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </div>
                           <div className="text-[10px] mt-1 opacity-50 flex items-center gap-2">
                             <span>Auteur : {c.author}</span>
-                            {c.timestamp > 0 && (
-                              <span>• {new Date(c.timestamp * 1000).toLocaleString()}</span>
-                            )}
+                            {(() => {
+                              if (!c.timestamp) return null;
+                              const tsNum = Number(c.timestamp);
+                              const dateObj = !isNaN(tsNum) && tsNum > 0
+                                ? new Date(tsNum > 1e11 ? tsNum : tsNum * 1000)
+                                : new Date(String(c.timestamp));
+                              return !isNaN(dateObj.getTime()) ? (
+                                <span>• {dateObj.toLocaleString()}</span>
+                              ) : null;
+                            })()}
                           </div>
                         </div>
                       </div>

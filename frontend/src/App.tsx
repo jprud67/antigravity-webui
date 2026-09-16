@@ -180,6 +180,10 @@ export function App() {
   const [activeGoogleAccount, setActiveGoogleAccount] = useState<GoogleAccountInfo | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
 
+  const handleGoogleAccountChanged = useCallback((acc: GoogleAccountInfo | null) => {
+    setActiveGoogleAccount(acc);
+  }, []);
+
   const handleOpenSkills = () => {
     setSettingsTab('skills');
     setIsSettingsOpen(true);
@@ -1606,7 +1610,7 @@ export function App() {
         currentModel={selectedModel}
         onModelSaved={handleModelSavedFromSettings}
         initialTab={settingsTab}
-        onGoogleAccountChanged={(acc) => setActiveGoogleAccount(acc)}
+        onGoogleAccountChanged={handleGoogleAccountChanged}
         activeConversation={activeConv}
         onClearHistory={() => setMessages([])}
         onDeleteConversation={(deletedId) => {

@@ -107,6 +107,8 @@ async def run_agy_task(
         stderr=asyncio.subprocess.PIPE,
         **spawn_group_kwargs()
     )
+    if job_id:
+        _running_job_procs[job_id] = proc
 
     stdout_chunks: list = []
     stderr_chunks: list = []
@@ -219,7 +221,7 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
     while attempts < MAX_TASK_FAILOVER:
         attempts += 1
         try:
-            out, err, code = await run_agy_task(prompt, skills=skills, model=model, effort=effort)
+            out, err, code = await run_agy_task(prompt, skills=skills, model=model, effort=effort, job_id=job.get("id"))
         except Exception as exc:
             logger.error(f"[Cron] Exception levée pendant run_agy_task: {exc}", exc_info=True)
             output = f"Exception: {exc}"
@@ -353,26 +355,30 @@ async def _execute_job(job: dict[str, Any]) -> None:
                 failovers = result.get("failovers")
                 if failovers:
                     j["last_failover"] = failovers[-1]
-                # Ne recalculer next_run_at que s'il n'est pas déjà planifié dans le futur (évite la dérive de timing)
-                current_next = j.get("next_run_at")
-                is_future = False
-                if current_next:
-                    try:
-                        due = datetime.fromisoformat(str(current_next).replace("Z", "+00:00"))
-                        if due.tzinfo is None:
-                            due = due.replace(tzinfo=timezone.utc)
-                        if due > datetime.now(timezone.utc):
-                            is_future = True
-                    except (ValueError, TypeError):
-                        logger.debug("Ignored error")
-                if not is_future:
-                    computed_next = compute_next_run(j.get("schedule"))
-                    if not computed_next:
-                        logger.info(f"[Cron] Job {j.get('id')} sans planification récurrente marqué comme 'completed'.")
-                        j["next_run_at"] = None
-                        j["state"] = "completed"
-                    else:
-                        j["next_run_at"] = computed_next
+                # Ne recalculer next_run_at QUE si le job est actif (non pausé / non désactivé)
+                if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
+                    j["next_run_at"] = None
+                else:
+                    # Ne recalculer next_run_at que s'il n'est pas déjà planifié dans le futur (évite la dérive de timing)
+                    current_next = j.get("next_run_at")
+                    is_future = False
+                    if current_next:
+                        try:
+                            due = datetime.fromisoformat(str(current_next).replace("Z", "+00:00"))
+                            if due.tzinfo is None:
+                                due = due.replace(tzinfo=timezone.utc)
+                            if due > datetime.now(timezone.utc):
+                                is_future = True
+                        except (ValueError, TypeError):
+                            logger.debug("Ignored error")
+                    if not is_future:
+                        computed_next = compute_next_run(j.get("schedule"))
+                        if not computed_next:
+                            logger.info(f"[Cron] Job {j.get('id')} sans planification récurrente marqué comme 'completed'.")
+                            j["next_run_at"] = None
+                            j["state"] = "completed"
+                        else:
+                            j["next_run_at"] = computed_next
                 break
         save_jobs(data)
     logger.info(f"[Cron] Job « {name} » terminé: {result.get('status', 'unknown')} ({duration}s).")
@@ -380,6 +386,11 @@ async def _execute_job(job: dict[str, Any]) -> None:
 
 async def _guarded_execute(job: dict[str, Any]) -> None:
     job_id = job.get("id")
+    if job_id:
+        _running_jobs.add(job_id)
+        current_task = asyncio.current_task()
+        if current_task is not None:
+            _running_job_tasks[job_id] = current_task
     try:
         await _execute_job(job)
     except asyncio.CancelledError:
@@ -388,9 +399,11 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
             async with _jobs_write_lock:
                 data = load_jobs()
                 for j in data.get("jobs", []):
-                    if j.get("id") == job_id and j.get("last_status") == "running":
+                    if j.get("id") == job_id:
                         j["last_status"] = "interrupted"
                         j["last_run_at"] = now_iso()
+                        if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
+                            j["next_run_at"] = None
                         break
                 save_jobs(data)
         except Exception as save_err:
@@ -402,15 +415,20 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
             async with _jobs_write_lock:
                 data = load_jobs()
                 for j in data.get("jobs", []):
-                    if j.get("id") == job_id and j.get("last_status") == "running":
+                    if j.get("id") == job_id:
                         j["last_status"] = "failed"
                         j["last_run_at"] = now_iso()
+                        if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
+                            j["next_run_at"] = None
                         break
                 save_jobs(data)
         except Exception as save_err:
             logger.error(f"[Cron] Impossible de mettre à jour le statut d'échec pour {job_id}: {save_err}")
     finally:
-        _running_jobs.discard(job_id)
+        if job_id:
+            _running_jobs.discard(job_id)
+            _running_job_tasks.pop(job_id, None)
+            _running_job_procs.pop(job_id, None)
 
 
 async def tick_once() -> int:
