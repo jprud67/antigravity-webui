@@ -148,9 +148,6 @@ async def run_agy_task(
                 quota_task.cancel()
         elif not quota_task.done():
             quota_task.cancel()
-
-        # Reaping all background tasks to avoid unhandled CancelledError or dangling coroutines
-        await asyncio.gather(*pumps, quota_task, return_exceptions=True)
     finally:
         if proc.returncode is None:
             await terminate_process_group_async(proc, grace=1.0)
@@ -262,8 +259,11 @@ async def _execute_job(job: dict[str, Any]) -> None:
         f"Basculements: {result.get('failovers') or 'aucun'}\n"
         f"{'-' * 60}\n"
     )
-    log_file.write_text(header + str(result.get("output") or ""), encoding="utf-8")
-    logger.info(f"[Cron] Journal écrit: {log_file}")
+    try:
+        log_file.write_text(header + str(result.get("output") or ""), encoding="utf-8")
+        logger.info(f"[Cron] Journal écrit: {log_file}")
+    except Exception as log_err:
+        logger.warning(f"[Cron] Impossible d'écrire le journal {log_file}: {log_err}")
 
     # Mise à jour du job (verrou pour éviter les écritures concurrentes)
     async with _jobs_write_lock:

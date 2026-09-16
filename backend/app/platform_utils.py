@@ -139,9 +139,13 @@ def is_safe_path(target: os.PathLike[Any] | str, allowed_roots: Sequence[os.Path
     Vérifie de manière robuste qu'un chemin cible est confiné sous l'un des répertoires autorisés.
     Prend en charge la résolution de liens symboliques et la compatibilité cross-platform.
     """
+    if not target or not allowed_roots:
+        return False
     try:
         t = Path(target).resolve()
         for root in allowed_roots:
+            if not root or not str(root).strip():
+                continue
             try:
                 r = Path(root).resolve()
                 try:

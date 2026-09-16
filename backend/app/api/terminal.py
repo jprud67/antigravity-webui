@@ -121,6 +121,8 @@ class PersistentTerminalSession:
 
         def on_master_read():
             try:
+                if self.master_fd <= 0:
+                    return
                 data = os.read(self.master_fd, 4096)
                 if data:
                     self.last_active = time.time()
@@ -132,23 +134,32 @@ class PersistentTerminalSession:
                     if ws and self.loop:
                         self.loop.create_task(_safe_send_bytes(ws, data))
                 else:
-                    if self.loop and self.master_fd > 0:
-                        try:
-                            self.loop.remove_reader(self.master_fd)
-                        except Exception:
-                            pass
+                    self._handle_eof_or_exit()
             except (BlockingIOError, InterruptedError):
                 pass
             except OSError:
-                if self.loop and self.master_fd > 0:
-                    try:
-                        self.loop.remove_reader(self.master_fd)
-                    except Exception:
-                        pass
+                self._handle_eof_or_exit()
 
         if self.loop:
             self.loop.add_reader(self.master_fd, on_master_read)
         logger.info(f"Persistent PTY session started: {self.session_id} (pid={proc.pid}, cwd={self.cwd})")
+
+    def _handle_eof_or_exit(self):
+        fd = self.master_fd
+        if fd > 0:
+            self.master_fd = -1
+            if self.loop:
+                try:
+                    self.loop.remove_reader(fd)
+                except Exception:
+                    pass
+            try:
+                os.close(fd)
+            except Exception:
+                pass
+        ws = self.active_websocket
+        if ws and self.loop:
+            self.loop.create_task(_safe_send_bytes(ws, b"\r\n\x1b[33m\xe2\x9a\xa1 Session terminal ferm\xc3\xa9e.\x1b[0m\r\n"))
 
     async def _start_windows(self):
         if not HAS_WINPTY:
@@ -255,16 +266,18 @@ class PersistentTerminalSession:
             logger.info(f"Persistent winpty session terminated: {self.session_id}")
             return
 
-        if self.loop and self.master_fd > 0:
-            try:
-                self.loop.remove_reader(self.master_fd)
-            except Exception:
-                pass
-            try:
-                os.close(self.master_fd)
-            except Exception:
-                pass
+        if self.master_fd > 0:
+            fd = self.master_fd
             self.master_fd = -1
+            if self.loop:
+                try:
+                    self.loop.remove_reader(fd)
+                except Exception:
+                    pass
+            try:
+                os.close(fd)
+            except Exception:
+                pass
 
         if self.proc:
             await terminate_process_group_async(self.proc, grace=0.1)

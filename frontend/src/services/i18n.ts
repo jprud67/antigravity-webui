@@ -916,6 +916,12 @@ export function t(key: string, defaultValOrArg?: string | number, ...args: (stri
 
   // 3. Fallback: if caller provided a fallback text string (e.g. t('some_key', 'Fallback text'))
   if (typeof defaultValOrArg === 'string' && defaultValOrArg.trim().length > 0) {
+    if (args.length > 0 && /\{\d+\}/.test(defaultValOrArg)) {
+      return defaultValOrArg.replace(/\{(\d+)\}/g, (match, idx) => {
+        const i = parseInt(idx, 10);
+        return i < args.length ? String(args[i]) : match;
+      });
+    }
     return defaultValOrArg;
   }
 
