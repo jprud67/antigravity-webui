@@ -1,6 +1,7 @@
 import html
 import json
 import logging
+import os
 import re
 import shutil
 import sqlite3
@@ -243,8 +244,13 @@ def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
     conv_dir = BRAIN_DIR / conversation_id
     transcript_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
     transcript_full_file = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
+    legacy_file = conv_dir / "transcript.jsonl"
 
-    target_file = transcript_full_file if transcript_full_file.exists() else (transcript_file if transcript_file.exists() else None)
+    target_file = (
+        transcript_full_file
+        if transcript_full_file.exists()
+        else (transcript_file if transcript_file.exists() else (legacy_file if legacy_file.exists() else None))
+    )
 
     if not target_file:
         return []
@@ -1529,26 +1535,26 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
         if not cdir.is_dir():
             continue
         c_id = cdir.name
-        for p in cdir.rglob("*"):
-            try:
-                if not p.is_file():
+        cdir_str = str(cdir)
+        for root, dirs, files in os.walk(cdir_str):
+            # Prune internal and hidden directories in-place so os.walk avoids scanning them
+            dirs[:] = [d for d in dirs if d not in (".system_generated", "scratch") and not d.startswith(".")]
+            for fname in files:
+                if fname.startswith((".", ".tmp", ".lock")):
                     continue
-                if p.name.startswith((".", ".tmp", ".lock")):
+                p = Path(root) / fname
+                try:
+                    stat = p.stat()
+                    artifacts.append({
+                        "conversation_id": c_id,
+                        "filename": p.name,
+                        "relative_path": str(p.relative_to(cdir)),
+                        "full_path": str(p),
+                        "size": stat.st_size,
+                        "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+                    })
+                except OSError:
                     continue
-                rel_parts = p.relative_to(cdir).parts
-                if ".system_generated" in rel_parts or "scratch" in rel_parts:
-                    continue
-                stat = p.stat()
-                artifacts.append({
-                    "conversation_id": c_id,
-                    "filename": p.name,
-                    "relative_path": str(p.relative_to(cdir)),
-                    "full_path": str(p),
-                    "size": stat.st_size,
-                    "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
-                })
-            except OSError:
-                continue
     artifacts.sort(key=lambda x: str(x["last_modified"]), reverse=True)
     return artifacts
 

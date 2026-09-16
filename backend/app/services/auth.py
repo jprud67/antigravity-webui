@@ -24,14 +24,24 @@ def hash_password(password: str, salt: str | None = None) -> str:
     key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000)
     return f"pbkdf2_sha256${salt}${key.hex()}"
 
+_auth_cache: dict[str, Any] | None = None
+_auth_cache_mtime: float = 0.0
+
 def get_auth_config() -> dict[str, Any]:
-    if AUTH_CONFIG_FILE.exists():
-        try:
+    global _auth_cache, _auth_cache_mtime
+    try:
+        if AUTH_CONFIG_FILE.exists():
+            stat = AUTH_CONFIG_FILE.stat()
+            if _auth_cache is not None and stat.st_mtime == _auth_cache_mtime:
+                return _auth_cache.copy()
             with open(AUTH_CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            logger.warning(f"Configuration d'authentification illisible — régénération : {e}")
-    
+                data = json.load(f)
+                _auth_cache = data
+                _auth_cache_mtime = stat.st_mtime
+                return data.copy()
+    except Exception as e:
+        logger.warning(f"Configuration d'authentification illisible — régénération : {e}")
+
     # Default config
     config = {
         "enabled": True,
@@ -39,9 +49,10 @@ def get_auth_config() -> dict[str, Any]:
         "secret_key": secrets.token_hex(32)
     }
     save_auth_config(config)
-    return config
+    return config.copy()
 
 def save_auth_config(config: dict[str, Any]):
+    global _auth_cache, _auth_cache_mtime
     AUTH_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     temp_file = AUTH_CONFIG_FILE.parent / f".{AUTH_CONFIG_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
     try:
@@ -50,6 +61,8 @@ def save_auth_config(config: dict[str, Any]):
         restrict_file_permissions(temp_file)
         temp_file.replace(AUTH_CONFIG_FILE)
         restrict_file_permissions(AUTH_CONFIG_FILE)
+        _auth_cache = config.copy()
+        _auth_cache_mtime = AUTH_CONFIG_FILE.stat().st_mtime
     finally:
         if temp_file.exists():
             try:

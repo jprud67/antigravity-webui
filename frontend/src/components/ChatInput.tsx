@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { 
   Send, 
   Square, 
@@ -74,6 +74,18 @@ interface ChatInputProps {
   onShowUpdateCard?: () => void;
 }
 
+export interface AttachmentItem {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  content: string;
+  isImage: boolean;
+  previewUrl?: string;
+}
+
+const createAttachmentId = (): string => `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
 export const ChatInput: React.FC<ChatInputProps> = ({
   onSendMessage,
   isStreaming,
@@ -124,27 +136,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Attachment states
-  interface AttachmentItem {
-    id: string;
-    name: string;
-    size: number;
-    type: string;
-    content: string;
-    isImage: boolean;
-    previewUrl?: string;
-  }
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleAddFiles = (files: File[]) => {
+  const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'info') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMessage({ text, type });
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), 3000);
+  }, []);
+
+  const handleAddFiles = useCallback((files: File[]) => {
     if (!files || files.length === 0) return;
     for (const file of files) {
       const isImg = file.type.startsWith('image/');
       const reader = new FileReader();
-      const id = `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const id = createAttachmentId();
       reader.onerror = () => {
         showToast(`Impossible de lire le fichier "${file.name}"`, 'error');
       };
@@ -183,23 +192,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         reader.readAsText(file);
       }
     }
-  };
+  }, [showToast]);
 
-  const handleRemoveAttachment = (id: string) => {
+  const handleRemoveAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
-  };
+  }, []);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const basePromptRef = useRef<string>('');
   const finalSpeechRef = useRef<string>('');
-
-  const showToast = (text: string, type: 'success' | 'info' | 'error' = 'info') => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastMessage({ text, type });
-    toastTimerRef.current = setTimeout(() => setToastMessage(null), 3000);
-  };
 
   useEffect(() => {
     return () => {

@@ -637,8 +637,10 @@ def get_candidate_accounts(exclude_email: str | None = None) -> list[str]:
     candidates = []
     norm_exclude = exclude_email.strip().lower() if exclude_email else None
     for p in ACCOUNTS_DIR.glob("*.json"):
-        email = p.stem
-        if norm_exclude and email.strip().lower() == norm_exclude:
+        email = p.stem.strip()
+        if "@" not in email:
+            continue
+        if norm_exclude and email.lower() == norm_exclude:
             continue
         candidates.append(email)
 
