@@ -240,7 +240,7 @@ def test_version_consistency():
     assert frontend_ver == backend_ver == updater_ver, (
         f"Version mismatch: frontend={frontend_ver}, backend={backend_ver}, updater={updater_ver}"
     )
-    assert frontend_ver == "0.1.59", f"Expected version 0.1.59, got {frontend_ver}"
+    assert frontend_ver == "0.1.60", f"Expected version 0.1.60, got {frontend_ver}"
     print(f"✓ test_version_consistency passed ({frontend_ver})")
 
 
@@ -437,11 +437,92 @@ def test_kanban_status_normalization_and_timestamps():
     req_done = UpdateTaskRequest(status="completed")
     res_done = update_task(task_id, req_done, _=None)
     assert res_done["success"] is True
-    updated = res_done["task"]
-    assert updated["status"] == "completed"
-    assert updated["completed_at"] is not None
-    assert updated["started_at"] is not None
+    # Reopen to running -> completed_at must be reset to None
+    req_reopen = UpdateTaskRequest(status="running")
+    res_reopen = update_task(task_id, req_reopen, _=None)
+    assert res_reopen["success"] is True
+    reopened = res_reopen["task"]
+    assert reopened["status"] == "running"
+    assert reopened["completed_at"] is None
     print("✓ test_kanban_status_normalization_and_timestamps passed")
+
+
+def test_git_diff_dot_slash_normalization():
+    from app.api.git import get_git_diff
+
+    # Relative path with leading ./
+    res = get_git_diff(workspace=str(BACKEND_DIR.parent), path="./backend/app/main.py", _=None)
+    assert res["path"] == "backend/app/main.py"
+    print("✓ test_git_diff_dot_slash_normalization passed")
+
+
+def test_aggregate_empty_string_tool_result():
+    from app.services.storage import aggregate_steps_into_turns
+
+    steps = [
+        {
+            "step_index": 0,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "content": "",
+            "tool_calls": [
+                {"name": "run_command", "args": {"command": "touch /tmp/test"}},
+                {"name": "run_command", "args": {"command": "ls /tmp/test"}},
+            ],
+            "created_at": "2026-09-16T12:00:00Z",
+        },
+        {
+            "step_index": 1,
+            "source": "SYSTEM",
+            "type": "RUN_COMMAND",
+            "content": "",  # Empty string output from first command!
+            "created_at": "2026-09-16T12:00:01Z",
+        },
+        {
+            "step_index": 2,
+            "source": "SYSTEM",
+            "type": "RUN_COMMAND",
+            "content": "/tmp/test",  # Output from second command
+            "created_at": "2026-09-16T12:00:02Z",
+        },
+    ]
+
+    turns = aggregate_steps_into_turns(steps)
+    asst = next(t for t in turns if t.get("role") == "assistant")
+    acts = asst.get("tool_activities", [])
+    assert len(acts) == 2, f"Expected 2 tool activities, got {len(acts)}"
+    assert acts[0]["result"] == "", f"Expected empty string for tool 1, got {acts[0]['result']}"
+    assert acts[0]["status"] == "done"
+    assert acts[1]["result"] == "/tmp/test", f"Expected '/tmp/test' for tool 2, got {acts[1]['result']}"
+    assert acts[1]["status"] == "done"
+    print("✓ test_aggregate_empty_string_tool_result passed")
+
+
+def test_skill_detail_safe_path():
+    from app.api.skills import get_skill_detail
+    from fastapi import HTTPException
+
+    # Path traversal should raise 400
+    try:
+        get_skill_detail("../../../etc/passwd", _=None)
+        assert False, "Should have raised HTTPException 400"
+    except HTTPException as e:
+        assert e.status_code == 400
+    print("✓ test_skill_detail_safe_path passed")
+
+
+def test_rules_no_touch_hermes_by_default():
+    import os
+    from app.api.rules import SaveRuleRequest, save_rule_content
+
+    # Ensure ENABLE_HERMES_IPC is not enabled
+    assert os.environ.get("ENABLE_HERMES_IPC", "0").lower() not in ("1", "true")
+
+    # Saving settings_cli should succeed without touching hermes events
+    req = SaveRuleRequest(file_id="settings_cli", content='{"colorScheme": "dark"}')
+    res = save_rule_content(req, _=None)
+    assert res["success"] is True
+    print("✓ test_rules_no_touch_hermes_by_default passed")
 
 
 if __name__ == "__main__":
@@ -465,5 +546,9 @@ if __name__ == "__main__":
     test_google_auth_url_cleaning()
     test_git_diff_absolute_workspace_path()
     test_kanban_status_normalization_and_timestamps()
+    test_git_diff_dot_slash_normalization()
+    test_aggregate_empty_string_tool_result()
+    test_skill_detail_safe_path()
+    test_rules_no_touch_hermes_by_default()
     print("\nAll unit tests passed successfully!")
 

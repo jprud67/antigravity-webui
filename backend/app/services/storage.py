@@ -1242,6 +1242,9 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
     def flush_asst():
         nonlocal current_asst
         if current_asst:
+            for act in current_asst.get("tool_activities", []):
+                if act.get("result") is None:
+                    act["result"] = ""
             turns.append(current_asst)
             current_asst = None
 
@@ -1355,7 +1358,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
             activities = current_asst.setdefault("tool_activities", [])
             pending = None
             for act in activities:
-                if not act.get("result"):
+                if act.get("result") is None:
                     pending = act
                     break
             is_err = s.get("status") == "ERROR" or bool(s.get("error"))
@@ -1391,7 +1394,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                 mapped_tools.append({
                     "name": name,
                     "args": raw_args if isinstance(raw_args, dict) else {},
-                    "result": "",
+                    "result": None,
                     "status": "done" if s.get("status") == "DONE" else "running"
                 })
 

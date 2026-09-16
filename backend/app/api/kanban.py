@@ -269,9 +269,13 @@ def update_task(task_id: str, req: UpdateTaskRequest, _ = Depends(require_auth))
                 updates.append("status = ?")
                 params.append(new_st)
                 now = int(time.time())
-                if new_st in ["running", "in_progress"] and not current.get("started_at"):
-                    updates.append("started_at = ?")
-                    params.append(now)
+                if new_st in ["running", "in_progress"]:
+                    if not current.get("started_at"):
+                        updates.append("started_at = ?")
+                        params.append(now)
+                    if current.get("completed_at"):
+                        updates.append("completed_at = ?")
+                        params.append(None)
                 elif new_st in ["done", "completed"]:
                     if not current.get("completed_at"):
                         updates.append("completed_at = ?")

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.auth import require_auth
 from app.config import GEMINI_DIR, HOME
+from app.platform_utils import is_safe_path
 
 logger = logging.getLogger("antigravity.skills")
 router = APIRouter(prefix="/api/skills", tags=["skills"])
@@ -136,9 +137,9 @@ def get_skill_detail(skill_id: str, _ = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Identifiant de skill non valide")
 
     for s_info in get_skill_dirs():
-        base_dir = Path(s_info["dir"])
-        target = base_dir / safe_id / "SKILL.md"
-        if target.exists():
+        base_dir = Path(s_info["dir"]).resolve()
+        target = (base_dir / safe_id / "SKILL.md").resolve()
+        if target.exists() and is_safe_path(target, [base_dir]):
             meta = parse_skill_md(target)
             return {
                 "id": safe_id,

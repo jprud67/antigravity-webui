@@ -237,13 +237,14 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
         raise HTTPException(status_code=500, detail=f"Erreur d'écriture: {e}")
 
 
-    # Trigger Hermes IPC event if Hermes directory exists
-    try:
-        events_dir = HERMES_HOME / "events"
-        if events_dir.is_dir():
-            (events_dir / "antigravity_update.trigger").touch()
-    except Exception as e:
-        logger.debug(f"Ignored error: {e}")
+    # Trigger Hermes IPC event only if explicitly enabled via environment variable
+    if os.environ.get("ENABLE_HERMES_IPC", "0").lower() in ("1", "true"):
+        try:
+            events_dir = HERMES_HOME / "events"
+            if events_dir.is_dir():
+                (events_dir / "antigravity_update.trigger").touch()
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
 
     return {
         "success": True,
