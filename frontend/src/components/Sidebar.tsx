@@ -26,7 +26,8 @@ import {
   Download, 
   Check, 
   Loader2,
-  Upload
+  Upload,
+  Archive
 } from 'lucide-react';
 import type { Conversation } from '../types';
 import { getStoredTheme, applyAppearance, type ThemeMode } from '../services/theme';
@@ -240,6 +241,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     return filtered.every((c) => selectedConvIds.has(c.conversation_id));
   }, [filtered, selectedConvIds]);
 
+  const isAllSelectedArchived = useMemo(() => {
+    if (selectedConvIds.size === 0) return false;
+    return Array.from(selectedConvIds).every((id) => conversations.find((c) => c.conversation_id === id)?.archived);
+  }, [selectedConvIds, conversations]);
+
   const handleToggleSelectAll = () => {
     if (isAllSelected) {
       setSelectedConvIds(new Set());
@@ -307,6 +313,29 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       showToast(pinState ? `${count} session(s) épinglée(s)` : `${count} session(s) désépinglée(s)`, 'success');
     } catch (err: any) {
       showToast(err.message || "Erreur lors de l'épinglage groupé", 'error');
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
+
+  const handleBulkArchive = async (archiveState: boolean) => {
+    if (selectedConvIds.size === 0) return;
+    const count = selectedConvIds.size;
+    setIsBulkLoading(true);
+    try {
+      const ids = Array.from(selectedConvIds);
+      await bulkConversationAction({
+        action: archiveState ? 'archive' : 'unarchive',
+        conversation_ids: ids,
+      });
+      if (onRefreshConversations) {
+        await onRefreshConversations();
+      }
+      setSelectedConvIds(new Set());
+      setIsBulkMode(false);
+      showToast(archiveState ? `${count} session(s) archivée(s)` : `${count} session(s) désarchivée(s)`, 'success');
+    } catch (err: any) {
+      showToast(err.message || "Erreur lors de l'archivage groupé", 'error');
     } finally {
       setIsBulkLoading(false);
     }
@@ -706,7 +735,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
           </div>
 
           {/* Action buttons row */}
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {/* Pin */}
             <button
               type="button"
@@ -780,6 +809,23 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             >
               <Folder className="w-3 h-3 text-indigo-500" />
               <span className="hidden sm:inline">Projet</span>
+            </button>
+
+            {/* Archive / Unarchive */}
+            <button
+              type="button"
+              disabled={selectedConvIds.size === 0 || isBulkLoading}
+              onClick={() => handleBulkArchive(!isAllSelectedArchived)}
+              className="py-1.5 px-2 rounded-lg border text-[11px] font-medium flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+              style={{
+                borderColor: 'var(--border)',
+                backgroundColor: 'var(--surface)',
+                color: 'var(--text)',
+              }}
+              title={isAllSelectedArchived ? "Désarchiver la sélection" : "Archiver la sélection"}
+            >
+              <Archive className="w-3 h-3 text-purple-500" />
+              <span className="hidden sm:inline">{isAllSelectedArchived ? 'Désarchiver' : 'Archiver'}</span>
             </button>
 
             {/* Export */}

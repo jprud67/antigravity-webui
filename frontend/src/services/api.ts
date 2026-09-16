@@ -179,7 +179,7 @@ export async function undoConversationTurn(conversationId: string): Promise<any>
 }
 
 export interface BulkActionPayload {
-  action: 'delete' | 'pin' | 'unpin' | 'tag' | 'project';
+  action: 'delete' | 'pin' | 'unpin' | 'archive' | 'unarchive' | 'tag' | 'project' | 'export';
   conversation_ids: string[];
   payload?: {
     tags?: string[];

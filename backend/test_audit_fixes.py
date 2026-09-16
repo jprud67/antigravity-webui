@@ -1012,6 +1012,20 @@ def test_kanban_schema_double_checked_lock():
     print("✓ test_kanban_schema_double_checked_lock passed")
 
 
+def test_cron_delete_cancels_running_job():
+    from unittest.mock import MagicMock, patch
+    from app.api.crons import delete_cron_job
+
+    mock_cancel = MagicMock()
+    with patch("app.api.crons.update_jobs", return_value=True), \
+         patch("app.services.cron_ticker.cancel_running_job", mock_cancel):
+        res = delete_cron_job("job-123", _=None)
+        assert res["success"] is True
+        assert res["job_id"] == "job-123"
+        mock_cancel.assert_called_once_with("job-123")
+    print("✓ test_cron_delete_cancels_running_job passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -1051,5 +1065,6 @@ if __name__ == "__main__":
     test_rules_hermes_write_restricted()
     test_kill_task_rejects_system_words()
     test_undo_conversation_turn_nullifies_last_user_time()
+    test_cron_delete_cancels_running_job()
     print("\nAll unit tests passed successfully!")
 

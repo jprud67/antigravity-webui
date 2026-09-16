@@ -208,6 +208,12 @@ def delete_cron_job(job_id: str, _ = Depends(require_auth)):
     if not found:
         raise HTTPException(status_code=404, detail="Job cron introuvable")
 
+    try:
+        from app.services.cron_ticker import cancel_running_job
+        cancel_running_job(job_id)
+    except Exception as e:
+        logger.debug(f"Error cancelling running job {job_id} on deletion: {e}")
+
     return {"success": True, "job_id": job_id}
 
 
