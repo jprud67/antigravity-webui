@@ -281,6 +281,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       }
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
+      showToast(`${count} session(s) supprimée(s)`, 'success');
     } catch (err: any) {
       showToast(err.message || 'Erreur lors de la suppression groupée', 'error');
     } finally {
@@ -290,6 +291,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
 
   const handleBulkPin = async (pinState: boolean) => {
     if (selectedConvIds.size === 0) return;
+    const count = selectedConvIds.size;
     setIsBulkLoading(true);
     try {
       const ids = Array.from(selectedConvIds);
@@ -300,6 +302,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       if (onRefreshConversations) {
         await onRefreshConversations();
       }
+      setSelectedConvIds(new Set());
+      setIsBulkMode(false);
+      showToast(pinState ? `${count} session(s) épinglée(s)` : `${count} session(s) désépinglée(s)`, 'success');
     } catch (err: any) {
       showToast(err.message || "Erreur lors de l'épinglage groupé", 'error');
     } finally {
@@ -309,6 +314,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
 
   const handleApplyBulkTags = async () => {
     if (selectedConvIds.size === 0) return;
+    const count = selectedConvIds.size;
     const tags = bulkTagInput
       .split(',')
       .map((t) => t.trim().replace(/^#/, ''))
@@ -326,6 +332,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       }
       setShowBulkTagModal(false);
       setBulkTagInput('');
+      setSelectedConvIds(new Set());
+      setIsBulkMode(false);
+      showToast(`Tags appliqués à ${count} session(s)`, 'success');
     } catch (err: any) {
       showToast(err.message || "Erreur lors de l'application des tags", 'error');
     } finally {
@@ -335,6 +344,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
 
   const handleApplyBulkProject = async (clear = false) => {
     if (selectedConvIds.size === 0) return;
+    const count = selectedConvIds.size;
     setIsBulkLoading(true);
     try {
       await bulkConversationAction({
@@ -350,6 +360,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       }
       setShowBulkProjectModal(false);
       setBulkProjectInput('');
+      setSelectedConvIds(new Set());
+      setIsBulkMode(false);
+      showToast(clear ? `Projet retiré de ${count} session(s)` : `Projet assigné à ${count} session(s)`, 'success');
     } catch (err: any) {
       showToast(err.message || "Erreur lors de l'assignation du projet", 'error');
     } finally {
@@ -359,9 +372,13 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
 
   const handleBulkExport = async () => {
     if (selectedConvIds.size === 0) return;
+    const count = selectedConvIds.size;
     setIsBulkLoading(true);
     try {
       await bulkConversationExport(Array.from(selectedConvIds));
+      setSelectedConvIds(new Set());
+      setIsBulkMode(false);
+      showToast(`${count} session(s) exportée(s)`, 'success');
     } catch (err: any) {
       showToast(err.message || "Erreur lors de l'export groupé", 'error');
     } finally {
@@ -721,6 +738,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               title="Désépingler la sélection"
             >
               <PinOff className="w-3 h-3 text-slate-400" />
+              <span className="hidden sm:inline">Désépingler</span>
             </button>
 
             {/* Tags */}
@@ -778,6 +796,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               title="Exporter la sélection en JSON"
             >
               <Download className="w-3 h-3 text-sky-500" />
+              <span className="hidden sm:inline">Export</span>
             </button>
 
             {/* Delete */}
@@ -785,14 +804,15 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               type="button"
               disabled={selectedConvIds.size === 0 || isBulkLoading}
               onClick={handleBulkDelete}
-              className="py-1.5 px-2 rounded-lg border text-[11px] font-medium flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer hover:bg-red-500/10 text-red-500"
+              className="py-1.5 px-2 rounded-lg border text-[11px] font-medium flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer hover:bg-red-500/10 text-red-500 font-semibold"
               style={{
                 borderColor: 'rgba(239, 68, 68, 0.3)',
                 backgroundColor: 'rgba(239, 68, 68, 0.05)',
               }}
-              title="Supprimer la sélection"
+              title="Supprimer définitivement la sélection"
             >
               {isBulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3 text-red-500" />}
+              <span className="hidden sm:inline">Supprimer</span>
             </button>
           </div>
 
@@ -827,10 +847,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 const isBulkSelected = selectedConvIds.has(conv.conversation_id);
 
                 return (
-                  <a
+                  <div
                     key={conv.conversation_id}
-                    href={`/c/${conv.conversation_id}`}
-                    className="group relative w-full text-left p-2.5 rounded-xl text-xs transition-all flex flex-col gap-1.5 border cursor-pointer no-underline block"
+                    role="button"
+                    tabIndex={0}
+                    className="group relative w-full text-left p-2.5 rounded-xl text-xs transition-all flex flex-col gap-1.5 border cursor-pointer select-none block"
                     style={{
                       backgroundColor: isBulkMode
                         ? isBulkSelected
@@ -848,6 +869,17 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                         : 'transparent',
                       color: (isBulkMode ? isBulkSelected : isSelected) ? 'var(--strong)' : 'var(--text)',
                       boxShadow: (isSelected && !isBulkMode) || (isBulkMode && isBulkSelected) ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (isBulkMode) {
+                          handleToggleCardSelection(conv.conversation_id);
+                        } else {
+                          onSelectConversation(conv.conversation_id);
+                          onCloseMobile?.();
+                        }
+                      }
                     }}
                     onClick={(e) => {
                       if (isBulkMode) {
@@ -1011,7 +1043,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                         <span>{conv.step_count}st</span>
                       </div>
                     </div>
-                  </a>
+                  </div>
                 );
               })}
             </div>

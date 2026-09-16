@@ -100,6 +100,11 @@ export function App() {
   const [currentWorkspace, setCurrentWorkspace] = useState('/root');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  const activeConv = useMemo(
+    () => conversations.find((c) => c.conversation_id === activeConversationId),
+    [conversations, activeConversationId]
+  );
+
   // Stable refs — used in effects with empty deps to avoid stale closures
   const activeConversationIdRef = React.useRef<string | null>(null);
   const isStreamingRef = React.useRef<boolean>(false);
@@ -262,7 +267,7 @@ export function App() {
       chatSocket.connect();
 
       const [convs, mods, settings, googleRes] = await Promise.all([
-        fetchConversations(50),
+        fetchConversations(100),
         fetchModels(),
         fetchSettings(),
         fetchGoogleAccounts().catch(() => ({ active_account: null, accounts: [] }))
@@ -361,7 +366,7 @@ export function App() {
     const unsubscribe = syncClient.subscribe((event) => {
       if (event.type === 'conversations_updated') {
         // Refresh sidebar without disrupting active chat
-        fetchConversations(50).then((c) => setConversations(c)).catch(() => {});
+        fetchConversations(100).then((c) => setConversations(c)).catch(() => {});
       } else if (event.type === 'artifacts_updated') {
         // Dispatch custom event for WorkspacePanel & artifact viewers
         window.dispatchEvent(new CustomEvent('antigravity:artifacts_updated', { detail: event }));
@@ -738,7 +743,7 @@ export function App() {
           }
         });
         // Refresh conversations in sidebar
-        fetchConversations(50).then((c) => setConversations(c));
+        fetchConversations(100).then((c) => setConversations(c));
       } else if (event.event === 'command_result') {
         const cmd = event.command || {};
         const cName = cmd.name;
@@ -935,7 +940,7 @@ export function App() {
   }, []);  // ← empty deps: subscribe once, use refs for mutable state
 
   // Send message
-  const handleSendMessage = (
+  const handleSendMessage = useCallback((
     prompt: string,
     options: {
       model?: string;
@@ -1006,7 +1011,7 @@ export function App() {
         setQueueCount((prev) => Math.max(0, prev - 1));
       }
     }
-  };
+  }, [activeConversationId, currentWorkspace]);
 
   const handleStopStreaming = () => {
     chatSocket.sendInterrupt(activeConversationId || undefined);
@@ -1076,10 +1081,10 @@ export function App() {
     }
   };
 
-  const handleEditSessionMeta = (conv?: Conversation | null) => {
+  const handleEditSessionMeta = useCallback((conv?: Conversation | null) => {
     setMetaTargetConversation(conv || activeConv || null);
     setIsSessionMetaOpen(true);
-  };
+  }, [activeConv]);
 
   const handleForkMessage = async (stepIndex: number) => {
     if (!activeConversationId) return;
@@ -1363,7 +1368,7 @@ export function App() {
       } else {
         setTokenUsage(estimateUsageFromMessages(chatMsgs));
       }
-      fetchConversations(50).then((c) => setConversations(c)).catch(() => {});
+      fetchConversations(100).then((c) => setConversations(c)).catch(() => {});
     } catch (e) {
       console.error('Failed to undo turn on backend:', e);
       setMessages((prev) => {
@@ -1380,7 +1385,6 @@ export function App() {
     }
   };
 
-  const activeConv = conversations.find((c) => c.conversation_id === activeConversationId);
   const currentModelObj = models.find((m) => m.id === selectedModel);
   const displayModelName = currentModelObj ? currentModelObj.name : 'Gemini 3.8 Flash';
   const displayEffort = currentModelObj && currentModelObj.supported_efforts.length > 0 ? selectedEffort : undefined;
@@ -1390,8 +1394,6 @@ export function App() {
   const stableOpenTasks = useCallback(() => setIsTaskDashboardOpen(true), []);
   const stableApprovalResolved = useCallback(() => setPendingApproval(null), []);
   
-  // selectedModel and selectedEffort are state vars, we can use refs to avoid dependency on them
-  // Or just put them in dependencies, but they change rarely so it's fine.
   const stableAnswerQuestion = useCallback((ans: string) => {
     if (isStreamingRef.current) {
       chatSocket.sendInput(ans);
@@ -1400,7 +1402,7 @@ export function App() {
       model: selectedModel,
       effort: selectedEffort,
     });
-  }, [selectedModel, selectedEffort]);
+  }, [selectedModel, selectedEffort, handleSendMessage]);
 
   const stableEditSessionMeta = useCallback(() => {
     handleEditSessionMeta(activeConv);

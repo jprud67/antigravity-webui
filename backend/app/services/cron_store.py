@@ -127,7 +127,8 @@ def update_jobs(modifier) -> None:
 
 
 _SCHEDULE_INTERVAL_RE = re.compile(
-    r"^(?:every|toutes les|chaque)\s+(\d+)\s*(s|sec|seconds?|secondes?|m|min|minutes?|h|hours?|heures?|d|days?|jours?)?$"
+    r"^(?:every|toutes les|chaque)\s+(\d+)\s*(s|sec|seconds?|secondes?|m|min|mins|minutes?|h|hr|hrs|hours?|heures?|d|day|days?|jours?)?$",
+    re.IGNORECASE
 )
 
 
@@ -177,6 +178,8 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
 
     # Syntaxes rapides : "every 10m", "hourly", "daily", "toutes les 30 min", "chaque 2 h"...
     lower = expr.lower().strip()
+    if lower in ("every minute", "chaque minute", "toutes les minutes"):
+        return (now + timedelta(minutes=1)).isoformat()
     if lower in ("every hour", "hourly", "chaque heure", "toutes les heures"):
         return (now + timedelta(hours=1)).isoformat()
     if lower in ("every day", "daily", "chaque jour", "tous les jours"):

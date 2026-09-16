@@ -67,9 +67,10 @@ export async function updatePassword(oldPassword: string, newPassword: string): 
 // Conversations
 export async function fetchConversations(limit = 100, q?: string): Promise<Conversation[]> {
   const url = q && q.trim() 
-    ? `${API_BASE}/conversations?limit=${limit}&q=${encodeURIComponent(q.trim())}`
-    : `${API_BASE}/conversations?limit=${limit}`;
+    ? `${API_BASE}/conversations?limit=${limit}&q=${encodeURIComponent(q.trim())}&_t=${Date.now()}`
+    : `${API_BASE}/conversations?limit=${limit}&_t=${Date.now()}`;
   const res = await fetch(url, {
+    cache: 'no-store',
     headers: getHeaders()
   });
   if (!res.ok) throw new Error(`Failed to load conversations: ${res.statusText}`);
@@ -77,7 +78,8 @@ export async function fetchConversations(limit = 100, q?: string): Promise<Conve
 }
 
 export async function searchConversations(query: string, limit = 50): Promise<Conversation[]> {
-  const res = await fetch(`${API_BASE}/conversations/search?q=${encodeURIComponent(query)}&limit=${limit}`, {
+  const res = await fetch(`${API_BASE}/conversations/search?q=${encodeURIComponent(query)}&limit=${limit}&_t=${Date.now()}`, {
+    cache: 'no-store',
     headers: getHeaders()
   });
   if (!res.ok) throw new Error(`Failed to search conversations: ${res.statusText}`);
@@ -197,7 +199,11 @@ export async function bulkConversationAction(data: BulkActionPayload): Promise<a
     const err = await res.json().catch(() => ({ detail: "Échec de l'action groupée" }));
     throw new Error(err.detail || "Impossible d'exécuter l'action groupée");
   }
-  return res.json();
+  const result = await res.json();
+  if (result && result.success === false) {
+    throw new Error(result.detail || result.error || "Échec de l'action groupée");
+  }
+  return result;
 }
 
 export function triggerFileDownload(blob: Blob, filename: string): void {

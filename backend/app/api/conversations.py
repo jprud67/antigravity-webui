@@ -98,37 +98,31 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             for cid in ids:
                 results[cid] = True
             return {"success": True, "action": action, "count": len(ids), "results": results}
-        except Exception:
-            for cid in ids:
-                results[cid] = False
-            return {"success": False, "action": action, "count": len(ids), "results": results}
-
+        except Exception as e:
+            logger.error(f"Erreur lors de la suppression groupée: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Échec de la suppression groupée: {e}")
 
     elif action in ("pin", "unpin"):
         pinned = (action == "pin")
-        ok = True
         try:
             bulk_update_session_meta(ids, {"pinned": pinned})
             for cid in ids:
                 results[cid] = True
-        except Exception:
-            ok = False
-            for cid in ids:
-                results[cid] = False
-        return {"success": ok, "action": action, "count": len(ids), "results": results}
+            return {"success": True, "action": action, "count": len(ids), "results": results}
+        except Exception as e:
+            logger.error(f"Erreur lors de l'épinglage groupé: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Échec de l'épinglage groupé: {e}")
 
     elif action in ("archive", "unarchive"):
         archived = (action == "archive")
-        ok = True
         try:
             bulk_update_session_meta(ids, {"archived": archived})
             for cid in ids:
                 results[cid] = True
-        except Exception:
-            ok = False
-            for cid in ids:
-                results[cid] = False
-        return {"success": ok, "action": action, "count": len(ids), "results": results}
+            return {"success": True, "action": action, "count": len(ids), "results": results}
+        except Exception as e:
+            logger.error(f"Erreur lors de l'archivage groupé: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Échec de l'archivage groupé: {e}")
 
     elif action == "tag":
         raw_tags = req.payload.get("tags", []) if req.payload else []
@@ -149,10 +143,10 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             bulk_update_session_meta_batch(updates_per_id)
             for cid in ids:
                 results[cid] = True
-        except Exception:
-            for cid in ids:
-                results[cid] = False
-        return {"success": True, "action": action, "count": len(ids), "results": results}
+            return {"success": True, "action": action, "count": len(ids), "results": results}
+        except Exception as e:
+            logger.error(f"Erreur lors de l'application groupée des tags: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Échec lors de l'application groupée des tags: {e}")
 
     elif action == "project":
         payload = req.payload or {}
@@ -166,10 +160,10 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             bulk_update_session_meta(ids, updates)
             for cid in ids:
                 results[cid] = True
-        except Exception:
-            for cid in ids:
-                results[cid] = False
-        return {"success": True, "action": action, "count": len(ids), "results": results}
+            return {"success": True, "action": action, "count": len(ids), "results": results}
+        except Exception as e:
+            logger.error(f"Erreur lors de l'assignation groupée de projet: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Échec lors de l'assignation groupée de projet: {e}")
     elif action == "export":
         import asyncio
         return await asyncio.to_thread(_do_bulk_export, req)

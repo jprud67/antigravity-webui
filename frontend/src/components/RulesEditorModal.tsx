@@ -10,7 +10,9 @@ import {
   FileText, 
   Database,
   History,
-  FileCheck2
+  FileCheck2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import type { RuleFileItem } from '../services/api';
 import { 
@@ -44,6 +46,13 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
   const [jsonError, setJsonError] = useState<string | null>(null);
   const gutterRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const tabsContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollTabs = (direction: 'left' | 'right') => {
+    if (tabsContainerRef.current) {
+      tabsContainerRef.current.scrollBy({ left: direction === 'left' ? -200 : 200, behavior: 'smooth' });
+    }
+  };
 
   // Load files list
   const loadFiles = useCallback(async () => {
@@ -222,42 +231,75 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
           </button>
         </div>
 
-        {/* File Selector Tabs */}
+        {/* File Selector Tabs Container with Horizontal Scroll */}
         <div
-          className="px-3 sm:px-4 py-2 border-b flex items-center gap-2 overflow-x-auto no-scrollbar touch-scroll shrink-0"
+          className="px-2 sm:px-3 py-2 border-b flex items-center gap-1.5 shrink-0 select-none relative"
           style={{
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)'
           }}
         >
-          {fileList.map(f => {
-            const IconComp = getIconForFile(f.id);
-            const isSelected = f.id === selectedFileId;
-            return (
-              <button
-                key={f.id}
-                onClick={async () => {
-                  if (hasUnsavedChanges) {
-                    if (!(await showConfirm('Vous avez des modifications non enregistrées. Changer de fichier ?'))) return;
-                  }
-                  setSelectedFileId(f.id);
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer border"
-                style={{
-                  backgroundColor: isSelected ? 'var(--accent-bg)' : 'var(--surface)',
-                  borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
-                  color: isSelected ? 'var(--accent-text)' : 'var(--text)'
-                }}
-                title={f.description}
-              >
-                <IconComp className="w-3.5 h-3.5" style={{ color: isSelected ? 'var(--accent)' : 'var(--muted)' }} />
-                <span>{f.name}</span>
-                {f.id === selectedFileId && hasUnsavedChanges && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                )}
-              </button>
-            );
-          })}
+          <button
+            type="button"
+            onClick={() => scrollTabs('left')}
+            className="p-1.5 rounded-lg border text-slate-400 hover:text-slate-200 hover:bg-black/10 transition-colors shrink-0 cursor-pointer shadow-xs"
+            style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}
+            title="Défiler vers la gauche"
+            aria-label="Défiler vers la gauche"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+
+          <div
+            ref={tabsContainerRef}
+            onWheel={(e) => {
+              if (e.deltaY !== 0) {
+                e.preventDefault();
+                e.currentTarget.scrollLeft += e.deltaY;
+              }
+            }}
+            className="flex-1 flex items-center gap-2 overflow-x-auto touch-scroll py-0.5 scrollbar-thin"
+          >
+            {fileList.map(f => {
+              const IconComp = getIconForFile(f.id);
+              const isSelected = f.id === selectedFileId;
+              return (
+                <button
+                  key={f.id}
+                  onClick={async () => {
+                    if (hasUnsavedChanges) {
+                      if (!(await showConfirm('Vous avez des modifications non enregistrées. Changer de fichier ?'))) return;
+                    }
+                    setSelectedFileId(f.id);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer border shrink-0"
+                  style={{
+                    backgroundColor: isSelected ? 'var(--accent-bg)' : 'var(--surface)',
+                    borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                    color: isSelected ? 'var(--accent-text)' : 'var(--text)'
+                  }}
+                  title={f.description}
+                >
+                  <IconComp className="w-3.5 h-3.5" style={{ color: isSelected ? 'var(--accent)' : 'var(--muted)' }} />
+                  <span>{f.name}</span>
+                  {f.id === selectedFileId && hasUnsavedChanges && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => scrollTabs('right')}
+            className="p-1.5 rounded-lg border text-slate-400 hover:text-slate-200 hover:bg-black/10 transition-colors shrink-0 cursor-pointer shadow-xs"
+            style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}
+            title="Défiler vers la droite"
+            aria-label="Défiler vers la droite"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* Editor Main Section */}

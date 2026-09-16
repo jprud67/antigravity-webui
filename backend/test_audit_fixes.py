@@ -383,6 +383,22 @@ def test_compute_next_run_days_and_seconds():
     dt_str = datetime.fromisoformat(next_str)
     diff_str = (dt_str - now).total_seconds()
     assert 15 <= diff_str <= 25
+
+    # Enhanced unit variations (mins, hrs, every minute)
+    next_mins = compute_next_run("every 15 mins")
+    assert next_mins is not None
+    dt_mins = datetime.fromisoformat(next_mins)
+    assert 14 * 60 <= (dt_mins - now).total_seconds() <= 16 * 60
+
+    next_hrs = compute_next_run("every 2 hrs")
+    assert next_hrs is not None
+    dt_hrs = datetime.fromisoformat(next_hrs)
+    assert 1.9 * 3600 <= (dt_hrs - now).total_seconds() <= 2.1 * 3600
+
+    next_one_min = compute_next_run("every minute")
+    assert next_one_min is not None
+    dt_one = datetime.fromisoformat(next_one_min)
+    assert 55 <= (dt_one - now).total_seconds() <= 65
     print("✓ test_compute_next_run_days_and_seconds passed")
 
 
