@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -14,6 +15,11 @@ logger = logging.getLogger("antigravity.git")
 router = APIRouter(prefix="/api/git", tags=["git"])
 
 GIT_TIMEOUT = 12
+_COAUTHOR_RE = re.compile(r"co[-_ ]?authored[-_ ]?by", re.IGNORECASE)
+
+def _sanitize_git_message(msg: str) -> str:
+    lines = [line for line in msg.strip().split("\n") if not _COAUTHOR_RE.search(line)]
+    return "\n".join(lines).strip()
 
 def _validate_workspace(workspace: str | None) -> Path:
     target = Path(workspace) if workspace else Path(DEFAULT_WORKSPACE)
@@ -52,13 +58,14 @@ def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | 
     merged_env = {
         **os.environ,
         "GIT_TERMINAL_PROMPT": "0",
-        "GIT_AUTHOR_NAME": "jprud67",
-        "GIT_AUTHOR_EMAIL": "jprud67@gmail.com",
-        "GIT_COMMITTER_NAME": "jprud67",
-        "GIT_COMMITTER_EMAIL": "jprud67@gmail.com",
     }
     if env:
         merged_env.update(env)
+    # Ensure identity cannot be overridden
+    merged_env["GIT_AUTHOR_NAME"] = "jprud67"
+    merged_env["GIT_AUTHOR_EMAIL"] = "jprud67@gmail.com"
+    merged_env["GIT_COMMITTER_NAME"] = "jprud67"
+    merged_env["GIT_COMMITTER_EMAIL"] = "jprud67@gmail.com"
     try:
         return subprocess.run(
             base_args,
@@ -236,7 +243,7 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Le message de commit ne peut être vide.")
 
     # Never allow Co-Authored-By
-    clean_msg = "\n".join([line for line in req.message.strip().split("\n") if "co-authored-by" not in line.lower()]).strip()
+    clean_msg = _sanitize_git_message(req.message)
     if not clean_msg:
         raise HTTPException(status_code=400, detail="Le message de commit ne peut être vide après nettoyage.")
 
@@ -311,7 +318,7 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Le nom du tag ne peut être vide.")
 
     raw_tag_msg = req.message.strip() if req.message else tag_name
-    clean_tag_msg = "\n".join([line for line in raw_tag_msg.split("\n") if "co-authored-by" not in line.lower()]).strip()
+    clean_tag_msg = _sanitize_git_message(raw_tag_msg)
     if not clean_tag_msg:
         clean_tag_msg = tag_name
 

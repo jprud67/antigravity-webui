@@ -109,7 +109,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                         "pid": proc.info['pid'],
                         "name": name,
                         "cmd": cmd_str[:120],
-                        "created_at": proc.info['create_time'],
+                        "created_at": proc.info.get('create_time') or 0.0,
                         "memory_mb": round((proc.info['memory_info'].rss or 0) / (1024 * 1024), 1) if proc.info.get('memory_info') else 0
                     })
             except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -119,6 +119,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
 
     # Sort recent first
     tasks.sort(key=lambda x: float(x.get("last_modified") or 0.0), reverse=True)
+    running_processes.sort(key=lambda p: float(p.get("created_at") or 0.0), reverse=True)
 
     return {
         "tasks": tasks[:20],

@@ -63,7 +63,7 @@ async def get_available_models() -> list[dict[str, Any]]:
         logger.error(f"Error fetching models: {stderr.decode()}")
         raise RuntimeError(f"agy models failed: {stderr.decode()}")
 
-    lines = stdout.decode().splitlines()
+    lines = stdout.decode().replace("\r\n", "\n").replace("\r", "\n").splitlines()
     models = []
     for line in lines:
         cleaned = line.strip()

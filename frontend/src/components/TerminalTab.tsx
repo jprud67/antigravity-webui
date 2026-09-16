@@ -105,8 +105,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
       if (typeof e.data === 'string') {
         xtermRef.current.write(e.data);
       } else if (e.data instanceof ArrayBuffer) {
-        const text = new TextDecoder().decode(e.data);
-        xtermRef.current.write(text);
+        xtermRef.current.write(new Uint8Array(e.data));
       }
     };
 

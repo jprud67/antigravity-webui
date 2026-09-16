@@ -326,6 +326,7 @@ class ExecutionSession:
                         return
                 else:
                     logger.info(f"[Session {self.conversation_id}] Turn finished naturally.")
+                    self.is_running = False
                     await self.broadcast({
                         "event": "done",
                         "conversation_id": self.conversation_id,

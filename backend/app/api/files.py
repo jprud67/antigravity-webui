@@ -82,7 +82,13 @@ def _validate_path_access(file_path: Path) -> Path:
         except Exception:
             pass
 
-    if not any(resolved == root or root in resolved.parents for root in allowed_roots):
+    def _is_within(p: Path, r: Path) -> bool:
+        try:
+            return p.is_relative_to(r)
+        except AttributeError:
+            return p == r or r in p.parents
+
+    if not any(_is_within(resolved, root) for root in allowed_roots):
         raise HTTPException(status_code=403, detail="Accès refusé : chemin en dehors des répertoires de travail autorisés.")
 
     return resolved

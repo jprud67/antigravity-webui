@@ -127,7 +127,9 @@ def list_google_accounts() -> dict[str, Any]:
     ensure_dirs()
     sync_active_account_to_store()
     active_meta = get_active_account()
-    active_email = active_meta.get("email") if active_meta else None
+    active_email = (active_meta.get("email") or "").strip().lower() if active_meta else None
+    if active_meta:
+        active_meta["is_exhausted"] = is_account_marked_exhausted(active_meta.get("email", ""))
 
     accounts = []
     for p in ACCOUNTS_DIR.glob("*.json"):
@@ -135,7 +137,9 @@ def list_google_accounts() -> dict[str, Any]:
             with open(p, "r") as f:
                 data = json.load(f)
             meta = get_account_meta_from_token_data(data)
-            meta["is_active"] = (meta.get("email") == active_email)
+            email_val = (meta.get("email") or "").strip().lower()
+            meta["is_active"] = bool(active_email and email_val == active_email)
+            meta["is_exhausted"] = is_account_marked_exhausted(email_val)
             meta["file_name"] = p.name
             meta["last_modified"] = p.stat().st_mtime
             accounts.append(meta)

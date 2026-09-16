@@ -10,6 +10,7 @@ export class ChatWebSocketClient {
   private heartbeatTimeout: any = null;
   private _status: 'connected' | 'disconnected' | 'reconnecting' = 'disconnected';
   private currentConversationId: string | null = null;
+  private pendingPayloads: any[] = [];
 
   // Heartbeat config
   private static readonly HEARTBEAT_INTERVAL = 5000; // 5s ping
@@ -62,6 +63,16 @@ export class ChatWebSocketClient {
         if (this.currentConversationId) {
           this.sendAttach(this.currentConversationId);
         }
+        while (this.pendingPayloads.length > 0) {
+          const item = this.pendingPayloads.shift();
+          try {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+              this.ws.send(JSON.stringify(item));
+            }
+          } catch (e) {
+            console.error('[WS] Failed to flush queued payload:', e);
+          }
+        }
       };
 
       this.ws.onmessage = (e) => {
@@ -86,6 +97,7 @@ export class ChatWebSocketClient {
         this.setStatus('disconnected');
         if (event.code === 1008) {
           // Unauthorized - do not reconnect automatically
+          this.pendingPayloads = [];
           return;
         }
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -185,11 +197,6 @@ export class ChatWebSocketClient {
     autoApprove?: boolean;
     mode?: 'normal' | 'queue' | 'steer';
   }) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.connect();
-      throw new Error('Connexion WebSocket en cours de rétablissement. Réessayez dans un instant.');
-    }
-
     const cid = params.conversationId || this.currentConversationId;
     if (cid) {
       this.currentConversationId = cid;
@@ -205,6 +212,17 @@ export class ChatWebSocketClient {
       auto_approve: params.autoApprove ?? true,
       mode: params.mode || 'normal',
     };
+
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.pendingPayloads.push(payload);
+      if (this.pendingPayloads.length > 20) {
+        this.pendingPayloads.shift();
+      }
+      if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+        this.connect();
+      }
+      return;
+    }
 
     this.ws.send(JSON.stringify(payload));
   }

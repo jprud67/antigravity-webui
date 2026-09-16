@@ -218,8 +218,18 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
     }
 
     // Appairage de la sortie d'exécution d'un outil
-    const isToolOutput = (
-      ['GENERIC', 'TOOL_OUTPUT', 'VIEW_FILE', 'RUN_COMMAND', 'CODE_ACTION', 'GREP_SEARCH', 'LIST_DIRECTORY'].includes(stype) ||
+    const isModelResponse = (
+      stype === 'PLANNER_RESPONSE' ||
+      stype === 'MODEL' ||
+      stype === 'AGENT_RESPONSE' ||
+      stype === 'MESSAGE' ||
+      stype === 'TEXT' ||
+      src === 'MODEL' ||
+      src === 'ASSISTANT'
+    );
+
+    const isToolOutput = !isModelResponse && (
+      ['GENERIC', 'TOOL_OUTPUT', 'TOOL_RESULT', 'VIEW_FILE', 'RUN_COMMAND', 'CODE_ACTION', 'GREP_SEARCH', 'LIST_DIRECTORY'].includes(stype) ||
       (!toolCallsRaw.length && !thinking && isToolOutputContent(content))
     );
 
@@ -234,23 +244,15 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
         // Sortie d'action implicite sans appel préalable (ex: amorce subagent)
         currentAssistantMsg.toolCalls = currentAssistantMsg.toolCalls || [];
         currentAssistantMsg.toolCalls.push({
-          name: stype !== 'GENERIC' && stype !== 'TOOL_OUTPUT' ? stype.toLowerCase() : 'action',
+          name: stype !== 'GENERIC' && stype !== 'TOOL_OUTPUT' && stype !== 'TOOL_RESULT' ? stype.toLowerCase() : 'action',
           args: {},
           result: content,
           status: 'done'
         });
       }
-    } else if (
-      stype === 'PLANNER_RESPONSE' ||
-      stype === 'MODEL' ||
-      stype === 'AGENT_RESPONSE' ||
-      stype === 'MESSAGE' ||
-      stype === 'TEXT' ||
-      src === 'MODEL' ||
-      src === 'ASSISTANT'
-    ) {
-      // N'accumuler que du vrai contenu de dialogue
-      if (content && !isToolOutputContent(content)) {
+    } else if (isModelResponse) {
+      // Accumuler le contenu de dialogue de l'assistant
+      if (content) {
         currentAssistantMsg.content = currentAssistantMsg.content
           ? `${currentAssistantMsg.content}\n\n${content}`.trim()
           : content.trim();

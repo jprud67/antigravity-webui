@@ -222,18 +222,18 @@ class PersistentTerminalSession:
                 return
 
     async def resize(self, rows: int, cols: int):
-        self.rows = rows
-        self.cols = cols
+        self.rows = max(4, min(int(rows or 24), 200))
+        self.cols = max(10, min(int(cols or 80), 300))
         if not self.is_alive():
             return
         if IS_WINDOWS:
             if self.win_pty is not None:
                 try:
-                    await asyncio.to_thread(self.win_pty.setwinsize, rows, cols)
+                    await asyncio.to_thread(self.win_pty.setwinsize, self.rows, self.cols)
                 except Exception as e:
                     logger.debug(f"terminal resize failed: {e}")
             return
-        set_winsize(self.master_fd, rows, cols)
+        set_winsize(self.master_fd, self.rows, self.cols)
 
     async def close(self):
         self._closing = True

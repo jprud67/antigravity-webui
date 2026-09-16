@@ -187,11 +187,10 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
     } catch {
       // Keep original if URI decoding fails
     }
-    if (/^\/[a-zA-Z]:/.test(cleanPath)) {
-      cleanPath = cleanPath.slice(1);
-    }
+    cleanPath = cleanPath.replace(/^\/+([a-zA-Z]:)/, '$1');
     const filename = cleanPath.split(/[/\\]/).pop() || cleanPath;
-    const isArtifact = cleanPath.includes('/brain/') && cleanPath.endsWith('.md');
+    const normalizedSlashPath = cleanPath.replace(/\\/g, '/');
+    const isArtifact = normalizedSlashPath.includes('/brain/') && cleanPath.endsWith('.md');
 
     if (isArtifact) {
       return (

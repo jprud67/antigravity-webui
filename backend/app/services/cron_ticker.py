@@ -333,7 +333,15 @@ async def tick_once() -> int:
                 due = datetime.fromisoformat(str(nxt))
                 if due.tzinfo is None:
                     due = due.replace(tzinfo=timezone.utc)
-            except ValueError:
+            except (ValueError, TypeError) as parse_err:
+                logger.warning(
+                    f"[Cron] Date next_run_at invalide pour le job {job.get('id')} ('{nxt}': {parse_err}). Recalcul automatique."
+                )
+                computed_next = compute_next_run(job.get("schedule"))
+                if not computed_next:
+                    computed_next = (now + timedelta(hours=1)).isoformat()
+                job["next_run_at"] = computed_next
+                changed = True
                 continue
             if due <= now:
                 job["last_status"] = "running"

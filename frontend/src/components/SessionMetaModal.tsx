@@ -32,6 +32,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
   onDeleted
 }) => {
   const [prevConvId, setPrevConvId] = useState<string | null>(null);
+  const [prevIsOpen, setPrevIsOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [project, setProject] = useState('');
   const [projectColor, setProjectColor] = useState(PALETTE[0]);
@@ -42,15 +43,20 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (conversation && conversation.conversation_id !== prevConvId) {
-    setPrevConvId(conversation.conversation_id);
-    setTitle(conversation.customTitle || conversation.title || '');
-    setProject(conversation.project || '');
-    setProjectColor(conversation.projectColor || PALETTE[0]);
-    setTagsStr((conversation.tags || []).join(', '));
-    setPinned(!!conversation.pinned);
-    setArchived(!!conversation.archived);
-    setError(null);
+  if (isOpen && (!prevIsOpen || (conversation && conversation.conversation_id !== prevConvId))) {
+    setPrevIsOpen(true);
+    setPrevConvId(conversation ? conversation.conversation_id : null);
+    if (conversation) {
+      setTitle(conversation.customTitle || conversation.title || '');
+      setProject(conversation.project || '');
+      setProjectColor(conversation.projectColor || PALETTE[0]);
+      setTagsStr((conversation.tags || []).join(', '));
+      setPinned(!!conversation.pinned);
+      setArchived(!!conversation.archived);
+      setError(null);
+    }
+  } else if (!isOpen && prevIsOpen) {
+    setPrevIsOpen(false);
   }
 
   if (!isOpen || !conversation) return null;

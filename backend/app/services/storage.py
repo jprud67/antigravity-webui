@@ -195,7 +195,7 @@ def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
 
     steps = []
     try:
-        with open(target_file, "r", encoding="utf-8") as f:
+        with open(target_file, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 line_str = line.strip()
                 if not line_str:
@@ -641,6 +641,19 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
     }
 
 
+def _safe_rmtree(dir_path: Path, root_boundary: Path) -> None:
+    try:
+        resolved = dir_path.resolve()
+        root_resolved = root_boundary.resolve()
+        if resolved.exists() and resolved.is_relative_to(root_resolved) and resolved != root_resolved:
+            try:
+                shutil.rmtree(resolved, ignore_errors=False)
+            except Exception as e:
+                logger.debug(f"Direct rmtree failed for {resolved} ({e}), retrying with ignore_errors")
+                shutil.rmtree(resolved, ignore_errors=True)
+    except Exception as err:
+        logger.warning(f"Error removing directory {dir_path}: {err}")
+
 def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
     if not conversation_ids:
         return True
@@ -655,11 +668,8 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
     finally:
         conn.close()
 
-    brain_resolved = BRAIN_DIR.resolve()
     for cid in safe_ids:
-        conv_dir = (BRAIN_DIR / cid).resolve()
-        if conv_dir.exists() and conv_dir.is_relative_to(brain_resolved) and conv_dir != brain_resolved:
-            shutil.rmtree(conv_dir, ignore_errors=True)
+        _safe_rmtree(BRAIN_DIR / cid, BRAIN_DIR)
 
     bulk_delete_session_meta(safe_ids)
     return True
@@ -676,10 +686,7 @@ def delete_conversation(conversation_id: str) -> bool:
         conn.close()
 
     # Remove brain directory safely
-    brain_resolved = BRAIN_DIR.resolve()
-    conv_dir = (BRAIN_DIR / conversation_id).resolve()
-    if conv_dir.exists() and conv_dir.is_relative_to(brain_resolved) and conv_dir != brain_resolved:
-        shutil.rmtree(conv_dir, ignore_errors=True)
+    _safe_rmtree(BRAIN_DIR / conversation_id, BRAIN_DIR)
 
     # Delete metadata
     delete_session_meta(conversation_id)
@@ -1165,7 +1172,7 @@ def export_conversation_html(conversation_id: str) -> str:
             tools_rendered = []
             for act in tool_activities:
                 tname = html.escape(act.get("name", "tool"))
-                targs = html.escape(json.dumps(act.get("args", {}), indent=2, ensure_ascii=False))
+                targs = html.escape(json.dumps(act.get("args", {}), indent=2, ensure_ascii=False, default=str))
                 res = act.get("result", "")
                 res_html = ""
                 if res:
@@ -1458,20 +1465,25 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
             continue
         c_id = cdir.name
         for p in cdir.rglob("*"):
-            if not p.is_file():
+            try:
+                if not p.is_file():
+                    continue
+                if p.name.startswith((".", ".tmp", ".lock")):
+                    continue
+                rel_parts = p.relative_to(cdir).parts
+                if ".system_generated" in rel_parts or "scratch" in rel_parts:
+                    continue
+                stat = p.stat()
+                artifacts.append({
+                    "conversation_id": c_id,
+                    "filename": p.name,
+                    "relative_path": str(p.relative_to(cdir)),
+                    "full_path": str(p),
+                    "size": stat.st_size,
+                    "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+                })
+            except OSError:
                 continue
-            rel_parts = p.relative_to(cdir).parts
-            if ".system_generated" in rel_parts or "scratch" in rel_parts:
-                continue
-            stat = p.stat()
-            artifacts.append({
-                "conversation_id": c_id,
-                "filename": p.name,
-                "relative_path": str(p.relative_to(cdir)),
-                "full_path": str(p),
-                "size": stat.st_size,
-                "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
-            })
     artifacts.sort(key=lambda x: str(x["last_modified"]), reverse=True)
     return artifacts
 
