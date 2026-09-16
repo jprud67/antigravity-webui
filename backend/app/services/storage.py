@@ -1507,9 +1507,14 @@ def export_conversation_markdown(conversation_id: str) -> str:
                 res = act.get("result", "")
                 md_lines.append(f"### Outil : `{tname}`")
                 md_lines.append(f"```json\n{targs}\n```")
-                if res:
-                    md_lines.append("**Résultat :**")
-                    md_lines.append(f"```\n{res[:2000]}{'...' if len(res) > 2000 else ''}\n```")
+                if res is not None and (res or res == 0):
+                    if isinstance(res, (dict, list)):
+                        res_str = json.dumps(res, indent=2, ensure_ascii=False, default=str)
+                    else:
+                        res_str = str(res)
+                    if res_str:
+                        md_lines.append("**Résultat :**")
+                        md_lines.append(f"```\n{res_str[:2000]}{'...' if len(res_str) > 2000 else ''}\n```")
                 md_lines.append("")
             md_lines.append("</details>\n")
 
@@ -1591,10 +1596,14 @@ def export_conversation_html(conversation_id: str) -> str:
                 targs = html.escape(targs_str, quote=True)
                 res = act.get("result", "")
                 res_html = ""
-                if res is not None and str(res):
-                    res_str = str(res)
-                    escaped_res = html.escape(res_str[:2000] + ("..." if len(res_str) > 2000 else ""), quote=True)
-                    res_html = f'<div class="tool-result-header">Résultat :</div><pre class="tool-result">{escaped_res}</pre>'
+                if res is not None and (res or res == 0):
+                    if isinstance(res, (dict, list)):
+                        res_str = json.dumps(res, indent=2, ensure_ascii=False, default=str)
+                    else:
+                        res_str = str(res)
+                    if res_str:
+                        escaped_res = html.escape(res_str[:2000] + ("..." if len(res_str) > 2000 else ""), quote=True)
+                        res_html = f'<div class="tool-result-header">Résultat :</div><pre class="tool-result">{escaped_res}</pre>'
 
                 tools_rendered.append(f"""
                 <div class="tool-card">

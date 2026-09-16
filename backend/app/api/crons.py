@@ -26,6 +26,7 @@ from app.services.cron_store import (
     load_jobs,
     now_iso,
     save_jobs,
+    update_jobs,
 )
 
 logger = logging.getLogger("antigravity.crons")
@@ -88,9 +89,6 @@ def create_cron_job(req: CreateCronJobRequest, _ = Depends(require_auth)):
     if not req.schedule.strip():
         raise HTTPException(status_code=400, detail="L'expression cron / planification est requise")
 
-    data = load_jobs()
-    job_id = uuid.uuid4().hex[:8]
-
     sched_raw = req.schedule.strip()
     next_run = compute_next_run(sched_raw)
     if next_run is None:
@@ -100,6 +98,7 @@ def create_cron_job(req: CreateCronJobRequest, _ = Depends(require_auth)):
         )
 
     from croniter import croniter
+    job_id = uuid.uuid4().hex[:8]
     schedule_dict = {
         "kind": "cron" if croniter.is_valid(sched_raw) else "interval",
         "expr": sched_raw,
@@ -124,36 +123,17 @@ def create_cron_job(req: CreateCronJobRequest, _ = Depends(require_auth)):
         "deliver": req.deliver or "local"
     }
 
-    data.setdefault("jobs", []).append(new_job)
-    save_jobs(data)
+    def _add(data):
+        data.setdefault("jobs", []).append(new_job)
+        return new_job
 
-    return {"success": True, "job": new_job}
+    created = update_jobs(_add)
+    return {"success": True, "job": created}
 
 
 @router.patch("/{job_id}")
 def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_auth)):
-    data = load_jobs()
-    jobs = data.get("jobs", [])
-    target = None
-    for j in jobs:
-        if j.get("id") == job_id:
-            target = j
-            break
-
-    if not target:
-        raise HTTPException(status_code=404, detail="Job cron introuvable")
-
-    if req.name is not None:
-        target["name"] = req.name.strip()
-    if req.prompt is not None:
-        target["prompt"] = req.prompt.strip()
-    if req.skills is not None:
-        target["skills"] = req.skills
-    if req.model is not None:
-        target["model"] = req.model.strip() if req.model else None
-    if req.effort is not None:
-        target["effort"] = req.effort.strip() if req.effort else None
-
+    next_run = None
     if req.schedule is not None:
         sched_raw = req.schedule.strip()
         next_run = compute_next_run(sched_raw)
@@ -162,73 +142,94 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
                 status_code=400,
                 detail=f"Expression de planification invalide : '{sched_raw}'."
             )
-        from croniter import croniter
-        target["schedule"] = {
-            "kind": "cron" if croniter.is_valid(sched_raw) else "interval",
-            "expr": sched_raw,
-            "display": sched_raw
-        }
-        target["schedule_display"] = sched_raw
-        target["next_run_at"] = next_run
 
-    if req.state is not None:
-        new_state = req.state.lower()
-        if new_state in ["paused", "disabled"]:
-            target["enabled"] = False
-            target["state"] = "paused"
-            target["paused_at"] = now_iso()
-            target["next_run_at"] = None
-            try:
-                from app.services.cron_ticker import cancel_running_job
-                cancel_running_job(job_id)
-            except Exception as e:
-                logger.debug(f"Error cancelling running job {job_id}: {e}")
-        else:
-            target["enabled"] = True
-            target["state"] = "scheduled"
-            target["paused_at"] = None
-            target["next_run_at"] = compute_next_run(target.get("schedule") or target.get("schedule_display")) or now_iso()
+    from croniter import croniter
 
-    save_jobs(data)
+    def _modify(data):
+        jobs = data.get("jobs", [])
+        for j in jobs:
+            if j.get("id") == job_id:
+                if req.name is not None:
+                    j["name"] = req.name.strip()
+                if req.prompt is not None:
+                    j["prompt"] = req.prompt.strip()
+                if req.skills is not None:
+                    j["skills"] = req.skills
+                if req.model is not None:
+                    j["model"] = req.model.strip() if req.model else None
+                if req.effort is not None:
+                    j["effort"] = req.effort.strip() if req.effort else None
+                if req.schedule is not None:
+                    sched_raw = req.schedule.strip()
+                    j["schedule"] = {
+                        "kind": "cron" if croniter.is_valid(sched_raw) else "interval",
+                        "expr": sched_raw,
+                        "display": sched_raw
+                    }
+                    j["schedule_display"] = sched_raw
+                    j["next_run_at"] = next_run
+                if req.state is not None:
+                    new_state = req.state.lower()
+                    if new_state in ["paused", "disabled"]:
+                        j["enabled"] = False
+                        j["state"] = "paused"
+                        j["paused_at"] = now_iso()
+                        j["next_run_at"] = None
+                    else:
+                        j["enabled"] = True
+                        j["state"] = "scheduled"
+                        j["paused_at"] = None
+                        j["next_run_at"] = compute_next_run(j.get("schedule") or j.get("schedule_display")) or now_iso()
+                return dict(j)
+        return None
+
+    target = update_jobs(_modify)
+    if not target:
+        raise HTTPException(status_code=404, detail="Job cron introuvable")
+
+    if req.state is not None and req.state.lower() in ["paused", "disabled"]:
+        try:
+            from app.services.cron_ticker import cancel_running_job
+            cancel_running_job(job_id)
+        except Exception as e:
+            logger.debug(f"Error cancelling running job {job_id}: {e}")
+
     return {"success": True, "job": target}
 
 
 @router.delete("/{job_id}")
 def delete_cron_job(job_id: str, _ = Depends(require_auth)):
-    data = load_jobs()
-    jobs = data.get("jobs", [])
-    before_count = len(jobs)
-    jobs = [j for j in jobs if j.get("id") != job_id]
-    if len(jobs) == before_count:
+    def _delete(data):
+        jobs = data.get("jobs", [])
+        before_count = len(jobs)
+        data["jobs"] = [j for j in jobs if j.get("id") != job_id]
+        return len(data["jobs"]) < before_count
+
+    found = update_jobs(_delete)
+    if not found:
         raise HTTPException(status_code=404, detail="Job cron introuvable")
 
-    data["jobs"] = jobs
-    save_jobs(data)
     return {"success": True, "job_id": job_id}
 
 
 @router.post("/{job_id}/run")
 def trigger_cron_job_now(job_id: str, _ = Depends(require_auth)):
-    data = load_jobs()
-    jobs = data.get("jobs", [])
-    target = None
-    for j in jobs:
-        if j.get("id") == job_id:
-            target = j
-            break
+    def _trigger(data):
+        jobs = data.get("jobs", [])
+        for j in jobs:
+            if j.get("id") == job_id:
+                j["enabled"] = True
+                j["state"] = "scheduled"
+                j["paused_at"] = None
+                j["next_run_at"] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+                j["last_run_at"] = now_iso()
+                j["last_status"] = "triggered"
+                return dict(j)
+        return None
 
+    target = update_jobs(_trigger)
     if not target:
         raise HTTPException(status_code=404, detail="Job cron introuvable")
-
-    # Le ticker interne exécute le job dès le prochain tick (<= 20 s)
-    # Si le job était en pause ou désactivé, on le réactive pour qu'il soit pris en compte par tick_once
-    target["enabled"] = True
-    target["state"] = "scheduled"
-    target["paused_at"] = None
-    target["next_run_at"] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
-    target["last_run_at"] = now_iso()
-    target["last_status"] = "triggered"
-    save_jobs(data)
 
     return {
         "success": True,

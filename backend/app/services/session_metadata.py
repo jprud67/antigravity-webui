@@ -48,7 +48,7 @@ def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
             tmp_file = SESSION_METADATA_FILE.parent / f"{SESSION_METADATA_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
             tmp_file.write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
             tmp_file.replace(SESSION_METADATA_FILE)
-            _cached_meta = dict(metadata)
+            _cached_meta = copy.deepcopy(metadata)
             _cached_mtime = SESSION_METADATA_FILE.stat().st_mtime
         except Exception as e:
             logger.error(f"Failed to write session metadata: {e}")

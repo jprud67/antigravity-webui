@@ -20,7 +20,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
-from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
+from app.platform_utils import (
+    spawn_group_kwargs,
+    terminate_process_group_async,
+    terminate_process_group_sync,
+)
 from app.services.agy_driver import get_model_families, resolve_model_and_effort
 from app.services.cron_store import (
     CRON_DIR,
@@ -30,6 +34,7 @@ from app.services.cron_store import (
     load_jobs,
     now_iso,
     save_jobs,
+    update_jobs,
     write_heartbeat,
 )
 from app.services.google_auth import (
@@ -55,7 +60,7 @@ _jobs_write_lock = asyncio.Lock()
 
 
 def cancel_running_job(job_id: str) -> bool:
-    """Annule immédiatement l'exécution d'un job cron en cours."""
+    """Annule immédiatement l'exécution d'un job cron en cours et de son groupe de processus."""
     canceled = False
     task = _running_job_tasks.get(job_id)
     if task and not task.done():
@@ -64,8 +69,7 @@ def cancel_running_job(job_id: str) -> bool:
     proc = _running_job_procs.get(job_id)
     if proc:
         try:
-            if hasattr(proc, "terminate"):
-                proc.terminate()
+            terminate_process_group_sync(proc, force=True)
             canceled = True
         except Exception:
             pass
@@ -347,42 +351,42 @@ async def _execute_job(job: dict[str, Any]) -> None:
 
     # Mise à jour du job (verrou pour éviter les écritures concurrentes)
     async with _jobs_write_lock:
-        data = load_jobs()
-        for j in data.get("jobs", []):
-            if j.get("id") == job_id:
-                j["last_run_at"] = now_iso()
-                j["last_status"] = result.get("status", "failed")
-                j["last_duration_seconds"] = duration
-                j["last_log"] = str(log_file)
-                failovers = result.get("failovers")
-                if failovers:
-                    j["last_failover"] = failovers[-1]
-                # Ne recalculer next_run_at QUE si le job est actif (non pausé / non désactivé)
-                if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
-                    j["next_run_at"] = None
-                else:
-                    # Ne recalculer next_run_at que s'il n'est pas déjà planifié dans le futur (évite la dérive de timing)
-                    current_next = j.get("next_run_at")
-                    is_future = False
-                    if current_next:
-                        try:
-                            due = datetime.fromisoformat(str(current_next).replace("Z", "+00:00"))
-                            if due.tzinfo is None:
-                                due = due.replace(tzinfo=timezone.utc)
-                            if due > datetime.now(timezone.utc):
-                                is_future = True
-                        except (ValueError, TypeError):
-                            logger.debug("Ignored error")
-                    if not is_future:
-                        computed_next = compute_next_run(j.get("schedule"))
-                        if not computed_next:
-                            logger.info(f"[Cron] Job {j.get('id')} sans planification récurrente marqué comme 'completed'.")
-                            j["next_run_at"] = None
-                            j["state"] = "completed"
-                        else:
-                            j["next_run_at"] = computed_next
-                break
-        save_jobs(data)
+        def _update_result(data: dict[str, Any]) -> None:
+            for j in data.get("jobs", []):
+                if j.get("id") == job_id:
+                    j["last_run_at"] = now_iso()
+                    j["last_status"] = result.get("status", "failed")
+                    j["last_duration_seconds"] = duration
+                    j["last_log"] = str(log_file)
+                    failovers = result.get("failovers")
+                    if failovers:
+                        j["last_failover"] = failovers[-1]
+                    # Ne recalculer next_run_at QUE si le job est actif (non pausé / non désactivé)
+                    if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
+                        j["next_run_at"] = None
+                    else:
+                        # Ne recalculer next_run_at que s'il n'est pas déjà planifié dans le futur (évite la dérive de timing)
+                        current_next = j.get("next_run_at")
+                        is_future = False
+                        if current_next:
+                            try:
+                                due = datetime.fromisoformat(str(current_next).replace("Z", "+00:00"))
+                                if due.tzinfo is None:
+                                    due = due.replace(tzinfo=timezone.utc)
+                                if due > datetime.now(timezone.utc):
+                                    is_future = True
+                            except (ValueError, TypeError):
+                                logger.debug("Ignored error")
+                        if not is_future:
+                            computed_next = compute_next_run(j.get("schedule"))
+                            if not computed_next:
+                                logger.info(f"[Cron] Job {j.get('id')} sans planification récurrente marqué comme 'completed'.")
+                                j["next_run_at"] = None
+                                j["state"] = "completed"
+                            else:
+                                j["next_run_at"] = computed_next
+                    break
+        update_jobs(_update_result)
     logger.info(f"[Cron] Job « {name} » terminé: {result.get('status', 'unknown')} ({duration}s).")
 
 
@@ -399,15 +403,15 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
         logger.warning(f"[Cron] Job {job_id} annulé.")
         try:
             async with _jobs_write_lock:
-                data = load_jobs()
-                for j in data.get("jobs", []):
-                    if j.get("id") == job_id:
-                        j["last_status"] = "interrupted"
-                        j["last_run_at"] = now_iso()
-                        if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
-                            j["next_run_at"] = None
-                        break
-                save_jobs(data)
+                def _mark_interrupted(data: dict[str, Any]) -> None:
+                    for j in data.get("jobs", []):
+                        if j.get("id") == job_id:
+                            j["last_status"] = "interrupted"
+                            j["last_run_at"] = now_iso()
+                            if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
+                                j["next_run_at"] = None
+                            break
+                update_jobs(_mark_interrupted)
         except Exception as save_err:
             logger.error(f"[Cron] Impossible de marquer le job {job_id} comme interrompu: {save_err}")
         raise
@@ -415,15 +419,15 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
         logger.error(f"[Cron] Erreur pendant l'exécution du job {job_id}: {e}", exc_info=True)
         try:
             async with _jobs_write_lock:
-                data = load_jobs()
-                for j in data.get("jobs", []):
-                    if j.get("id") == job_id:
-                        j["last_status"] = "failed"
-                        j["last_run_at"] = now_iso()
-                        if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
-                            j["next_run_at"] = None
-                        break
-                save_jobs(data)
+                def _mark_failed(data: dict[str, Any]) -> None:
+                    for j in data.get("jobs", []):
+                        if j.get("id") == job_id:
+                            j["last_status"] = "failed"
+                            j["last_run_at"] = now_iso()
+                            if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
+                                j["next_run_at"] = None
+                            break
+                update_jobs(_mark_failed)
         except Exception as save_err:
             logger.error(f"[Cron] Impossible de mettre à jour le statut d'échec pour {job_id}: {save_err}")
     finally:
@@ -506,14 +510,14 @@ async def cron_ticker_loop() -> None:
     # Nettoyage préventif des tâches restées en 'running' lors d'un crash ou redémarrage antérieur
     try:
         async with _jobs_write_lock:
-            init_data = load_jobs()
-            cleaned = False
-            for j in init_data.get("jobs", []):
-                if j.get("last_status") == "running":
-                    j["last_status"] = "interrupted"
-                    cleaned = True
-            if cleaned:
-                save_jobs(init_data)
+            def _clean_orphans(init_data: dict[str, Any]) -> bool:
+                cleaned = False
+                for j in init_data.get("jobs", []):
+                    if j.get("last_status") == "running":
+                        j["last_status"] = "interrupted"
+                        cleaned = True
+                return cleaned
+            if update_jobs(_clean_orphans):
                 logger.info("[Cron] Nettoyage des jobs orphelins restés en 'running' effectué.")
     except Exception as e:
         logger.warning(f"[Cron] Erreur lors du nettoyage initial des jobs: {e}")

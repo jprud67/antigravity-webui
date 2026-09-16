@@ -638,6 +638,168 @@ def test_git_commit_sanitize_fallback():
     print("✓ test_git_commit_sanitize_fallback passed")
 
 
+def test_export_conversation_markdown_and_html_non_string():
+    from unittest.mock import patch
+    from app.services.storage import export_conversation_html, export_conversation_markdown
+
+    mock_steps = [
+        {
+            "step_index": 0,
+            "source": "USER_EXPLICIT",
+            "type": "USER_INPUT",
+            "content": "Perform tool tasks",
+            "created_at": "2026-09-16T12:00:00Z"
+        },
+        {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "thinking": "Executing tools",
+            "content": "Here are tool outputs",
+            "tool_calls": [
+                {"name": "complex_dict_tool", "args": {"foo": "bar"}},
+                {"name": "list_tool", "args": [1, 2, 3]},
+                {"name": "int_tool", "args": "cmd"}
+            ],
+            "created_at": "2026-09-16T12:00:01Z"
+        },
+        {
+            "step_index": 2,
+            "source": "SYSTEM",
+            "type": "RUN_COMMAND",
+            "content": {"status": "ok", "items": [1, 2, 3]},
+            "created_at": "2026-09-16T12:00:02Z"
+        },
+        {
+            "step_index": 3,
+            "source": "SYSTEM",
+            "type": "RUN_COMMAND",
+            "content": ["itemA", "itemB"],
+            "created_at": "2026-09-16T12:00:03Z"
+        },
+        {
+            "step_index": 4,
+            "source": "SYSTEM",
+            "type": "RUN_COMMAND",
+            "content": 404,
+            "created_at": "2026-09-16T12:00:04Z"
+        }
+    ]
+
+    with patch("app.services.storage.get_conversation_transcript", return_value=mock_steps), \
+         patch("app.services.storage.get_conversation_by_id", return_value={"title": "Test Non String Export"}):
+        md = export_conversation_markdown("fake-conv-id")
+        assert "Outil :" in md
+        assert "complex_dict_tool" in md
+        assert "status" in md
+
+        html_out = export_conversation_html("fake-conv-id")
+        assert "Test Non String Export" in html_out
+        assert "complex_dict_tool" in html_out
+    print("✓ test_export_conversation_markdown_and_html_non_string passed")
+
+
+def test_save_all_session_metadata_deepcopy_isolation():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services.session_metadata import get_all_session_metadata, save_all_session_metadata
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_meta_file = Path(tmp_dir) / "session_metadata.json"
+        with patch("app.services.session_metadata.SESSION_METADATA_FILE", tmp_meta_file):
+            initial_data = {
+                "cid_1": {"tags": ["tag1"], "pinned": False}
+            }
+            save_all_session_metadata(initial_data)
+
+            # Mutate initial_data externally
+            initial_data["cid_1"]["tags"].append("polluted_tag")
+            initial_data["cid_1"]["pinned"] = True
+
+            cached = get_all_session_metadata()
+            assert cached["cid_1"]["tags"] == ["tag1"], "Cache was contaminated by caller mutating initial_data!"
+            assert cached["cid_1"]["pinned"] is False, "Cache was contaminated by caller mutating initial_data!"
+    print("✓ test_save_all_session_metadata_deepcopy_isolation passed")
+
+
+def test_cancel_running_job_process_group():
+    from unittest.mock import MagicMock, patch
+    from app.services.cron_ticker import _running_job_procs, cancel_running_job
+
+    mock_proc = MagicMock()
+    mock_proc.returncode = None
+    mock_proc.pid = 12345
+
+    _running_job_procs["test_job_cancel"] = mock_proc
+
+    with patch("app.services.cron_ticker.terminate_process_group_sync") as mock_terminate:
+        res = cancel_running_job("test_job_cancel")
+        assert res is True
+        mock_terminate.assert_called_once_with(mock_proc, force=True)
+    _running_job_procs.pop("test_job_cancel", None)
+    print("✓ test_cancel_running_job_process_group passed")
+
+
+def test_compute_next_run_monthly_and_weekly():
+    from datetime import datetime, timezone
+    from app.services.cron_store import compute_next_run
+
+    # Natural language French & English
+    for expr in ["every month", "monthly", "chaque mois", "tous les mois"]:
+        next_dt = compute_next_run(expr)
+        assert next_dt is not None, f"Failed to parse monthly expression: {expr}"
+        parsed = datetime.fromisoformat(next_dt)
+        now = datetime.now(timezone.utc)
+        diff_days = (parsed - now).total_seconds() / 86400
+        assert 28 <= diff_days <= 31, f"Expected ~30 days for {expr}, got {diff_days}"
+
+    for expr in ["every week", "weekly", "chaque semaine", "toutes les semaines"]:
+        next_dt = compute_next_run(expr)
+        assert next_dt is not None, f"Failed to parse weekly expression: {expr}"
+        parsed = datetime.fromisoformat(next_dt)
+        now = datetime.now(timezone.utc)
+        diff_days = (parsed - now).total_seconds() / 86400
+        assert 6.5 <= diff_days <= 7.5, f"Expected ~7 days for {expr}, got {diff_days}"
+
+    # Interval dicts with months & weeks
+    res_months = compute_next_run({"kind": "interval", "months": 2})
+    assert res_months is not None
+    res_weeks = compute_next_run({"kind": "interval", "weeks": 3})
+    assert res_weeks is not None
+    print("✓ test_compute_next_run_monthly_and_weekly passed")
+
+
+def test_cron_update_jobs_atomic():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services.cron_store import update_jobs
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_jobs_file = Path(tmp_dir) / "jobs.json"
+        with patch("app.services.cron_store.JOBS_FILE", tmp_jobs_file):
+            # Create a job atomically
+            def _add(data):
+                data.setdefault("jobs", []).append({"id": "atom_1", "name": "Atomic Job"})
+                return "created_atom_1"
+
+            res = update_jobs(_add)
+            assert res == "created_atom_1"
+
+            # Modify job atomically
+            def _modify(data):
+                for j in data.get("jobs", []):
+                    if j.get("id") == "atom_1":
+                        j["name"] = "Updated Name"
+                        return True
+                return False
+
+            modified = update_jobs(_modify)
+            assert modified is True
+    print("✓ test_cron_update_jobs_atomic passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -667,5 +829,10 @@ if __name__ == "__main__":
     test_aggregate_steps_non_serializable_objects()
     test_kill_task_safety()
     test_git_commit_sanitize_fallback()
+    test_export_conversation_markdown_and_html_non_string()
+    test_save_all_session_metadata_deepcopy_isolation()
+    test_cancel_running_job_process_group()
+    test_compute_next_run_monthly_and_weekly()
+    test_cron_update_jobs_atomic()
     print("\nAll unit tests passed successfully!")
 

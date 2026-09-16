@@ -107,7 +107,7 @@ def update_jobs(modifier) -> None:
             except Exception as e:
                 logger.error(f"Lecture de jobs.json impossible: {e}")
 
-        modifier(data)
+        result = modifier(data)
         
         data["updated_at"] = now_iso()
         temp_path = JOBS_FILE.parent / f"{JOBS_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
@@ -124,10 +124,11 @@ def update_jobs(modifier) -> None:
                 except Exception as e:
                     logger.debug(f"Ignored error: {e}")
             raise
+        return result
 
 
 _SCHEDULE_INTERVAL_RE = re.compile(
-    r"^(?:every|toutes les|chaque)\s+(\d+)\s*(s|sec|seconds?|secondes?|m|min|mins|minutes?|h|hr|hrs|hours?|heures?|d|day|days?|jours?)?$",
+    r"^(?:every|toutes les|chaque)\s+(\d+)\s*(s|sec|seconds?|secondes?|m|min|mins|minutes?|h|hr|hrs|hours?|heures?|d|day|days?|jours?|w|week|weeks?|semaines?|mo|month|months?|mois)?$",
     re.IGNORECASE
 )
 
@@ -142,6 +143,18 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
         expr = schedule.strip()
     elif isinstance(schedule, dict):
         if schedule.get("kind") == "interval":
+            if "months" in schedule and schedule["months"] is not None:
+                try:
+                    mos = max(1, int(schedule["months"]))
+                    return (now + timedelta(days=30 * mos)).isoformat()
+                except (ValueError, TypeError):
+                    logger.debug("Ignored error")
+            if "weeks" in schedule and schedule["weeks"] is not None:
+                try:
+                    wks = max(1, int(schedule["weeks"]))
+                    return (now + timedelta(weeks=wks)).isoformat()
+                except (ValueError, TypeError):
+                    logger.debug("Ignored error")
             if "days" in schedule and schedule["days"] is not None:
                 try:
                     dys = max(1, int(schedule["days"]))
@@ -176,7 +189,7 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
     if not expr:
         return None
 
-    # Syntaxes rapides : "every 10m", "hourly", "daily", "toutes les 30 min", "chaque 2 h"...
+    # Syntaxes rapides : "every 10m", "hourly", "daily", "monthly", "chaque mois"...
     lower = expr.lower().strip()
     if lower in ("every minute", "chaque minute", "toutes les minutes"):
         return (now + timedelta(minutes=1)).isoformat()
@@ -186,13 +199,19 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
         return (now + timedelta(days=1)).isoformat()
     if lower in ("every week", "weekly", "chaque semaine", "toutes les semaines"):
         return (now + timedelta(weeks=1)).isoformat()
+    if lower in ("every month", "monthly", "chaque mois", "tous les mois"):
+        return (now + timedelta(days=30)).isoformat()
 
     match = _SCHEDULE_INTERVAL_RE.match(lower)
     if match:
         try:
             val = max(1, int(match.group(1)))  # minimum 1 pour éviter une boucle d'exécution infinie
-            unit = match.group(2) or "m"
-            if unit.startswith("h"):
+            unit = (match.group(2) or "m").lower()
+            if unit.startswith(("mo", "mois")):
+                return (now + timedelta(days=30 * val)).isoformat()
+            elif unit.startswith(("w", "sem")):
+                return (now + timedelta(weeks=val)).isoformat()
+            elif unit.startswith("h"):
                 return (now + timedelta(hours=val)).isoformat()
             elif unit.startswith(("d", "j")):
                 return (now + timedelta(days=val)).isoformat()
