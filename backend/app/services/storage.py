@@ -941,7 +941,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
 
     # 3. Deep transcript scan for content if room left (scans recent active sessions)
     if len(matched) < limit:
-        recent_convs = list_conversations(limit=50)
+        recent_convs = list_conversations(limit=30)
         for c in recent_convs:
             cid = c["conversation_id"]
             if cid in seen_ids:
@@ -955,36 +955,46 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 continue
 
             try:
-                with open(t_file, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        if q_lower not in line.lower():
-                            continue
-                        try:
-                            s = json.loads(line)
-                            raw_content = s.get("content") or ""
-                            raw_thinking = s.get("thinking") or ""
-                            content_lower = raw_content.lower()
-                            thinking_lower = raw_thinking.lower()
-                            if q_lower in content_lower or q_lower in thinking_lower:
-                                if q_lower in content_lower:
-                                    idx = content_lower.find(q_lower)
-                                    start = max(0, idx - 40)
-                                    end = min(len(raw_content), idx + 80)
-                                    snippet = ("..." if start > 0 else "") + raw_content[start:end] + ("..." if end < len(raw_content) else "")
-                                else:
-                                    idx = thinking_lower.find(q_lower)
-                                    start = max(0, idx - 40)
-                                    end = min(len(raw_thinking), idx + 80)
-                                    snippet = "[Raisonnement] " + ("..." if start > 0 else "") + raw_thinking[start:end] + ("..." if end < len(raw_thinking) else "")
+                # Bound transcript scan to prevent blocking FastAPI event loop on massive files
+                file_size = t_file.stat().st_size
+                if file_size > 2 * 1024 * 1024:
+                    with open(t_file, "rb") as f:
+                        f.seek(file_size - 512 * 1024)
+                        raw_data = f.read().decode("utf-8", errors="ignore")
+                    lines = raw_data.splitlines()[1:]  # skip potential partial line
+                else:
+                    with open(t_file, "r", encoding="utf-8", errors="ignore") as f:
+                        lines = f.readlines()
 
-                                c_copy = dict(c)
-                                c_copy["match_type"] = "transcript"
-                                c_copy["match_snippet"] = snippet
-                                matched.append(c_copy)
-                                seen_ids.add(cid)
-                                break
-                        except Exception:
-                            continue
+                for line in lines:
+                    if q_lower not in line.lower():
+                        continue
+                    try:
+                        s = json.loads(line)
+                        raw_content = s.get("content") or ""
+                        raw_thinking = s.get("thinking") or ""
+                        content_lower = raw_content.lower()
+                        thinking_lower = raw_thinking.lower()
+                        if q_lower in content_lower or q_lower in thinking_lower:
+                            if q_lower in content_lower:
+                                idx = content_lower.find(q_lower)
+                                start = max(0, idx - 40)
+                                end = min(len(raw_content), idx + 80)
+                                snippet = ("..." if start > 0 else "") + raw_content[start:end] + ("..." if end < len(raw_content) else "")
+                            else:
+                                idx = thinking_lower.find(q_lower)
+                                start = max(0, idx - 40)
+                                end = min(len(raw_thinking), idx + 80)
+                                snippet = "[Raisonnement] " + ("..." if start > 0 else "") + raw_thinking[start:end] + ("..." if end < len(raw_thinking) else "")
+
+                            c_copy = dict(c)
+                            c_copy["match_type"] = "transcript"
+                            c_copy["match_snippet"] = snippet
+                            matched.append(c_copy)
+                            seen_ids.add(cid)
+                            break
+                    except Exception:
+                        continue
             except Exception:
                 continue
 
@@ -998,11 +1008,15 @@ def clean_user_prompt(raw: str) -> str:
         return ""
     m = re.search(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', raw, flags=re.IGNORECASE)
     if m:
-        return m.group(1).strip()
-    text = re.sub(r'<ADDITIONAL_METADATA>[\s\S]*?</ADDITIONAL_METADATA>', '', raw, flags=re.IGNORECASE)
-    text = re.sub(r'<USER_SETTINGS_CHANGE>[\s\S]*?</USER_SETTINGS_CHANGE>', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'<CONTEXT_SUMMARY>[\s\S]*?</CONTEXT_SUMMARY>', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE)>', '', text, flags=re.IGNORECASE)
+        text = m.group(1).strip()
+    else:
+        text = re.sub(r'<ADDITIONAL_METADATA>[\s\S]*?</ADDITIONAL_METADATA>', '', raw, flags=re.IGNORECASE)
+        text = re.sub(r'<USER_SETTINGS_CHANGE>[\s\S]*?</USER_SETTINGS_CHANGE>', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'<CONTEXT_SUMMARY>[\s\S]*?</CONTEXT_SUMMARY>', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE)>', '', text, flags=re.IGNORECASE)
+        text = text.strip()
+    # Strip steering/queued instruction prefixes so history stays pure and clean
+    text = re.sub(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+', '', text)
     return text.strip()
 
 def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:

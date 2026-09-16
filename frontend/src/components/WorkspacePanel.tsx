@@ -263,13 +263,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     setExpandedFolders((prev) => ({ ...prev, [folderPath]: !prev[folderPath] }));
   };
 
-  if (!isOpen) {
-    return (
-      <div className="hidden" aria-hidden="true">
-        <TerminalTab currentWorkspace={currentWorkspace} />
-      </div>
-    );
-  }
+
 
   // File Tree Recursive Renderer
   const renderTreeItems = (items: any[], level = 0) => {
@@ -340,10 +334,12 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   return (
     <>
       {/* Mobile Backdrop Overlay (< md) */}
-      <div
-        onClick={onClose}
-        className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-xs animate-fadeIn"
-      />
+      {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-xs animate-fadeIn"
+        />
+      )}
 
       <aside
         style={{
@@ -352,8 +348,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
           backgroundColor: 'var(--surface)',
           borderColor: 'var(--border)',
           color: 'var(--text)',
+          display: isOpen ? 'flex' : 'none',
         }}
-        className="fixed inset-y-0 right-0 z-50 w-full sm:w-[460px] border-l shadow-2xl flex flex-col select-none md:relative md:inset-auto md:z-20 md:shadow-none md:shrink-0 transition-all duration-75"
+        className="fixed inset-y-0 right-0 z-50 w-full sm:w-[460px] border-l shadow-2xl flex-col select-none md:relative md:inset-auto md:z-20 md:shadow-none md:shrink-0 transition-all duration-75"
+        aria-hidden={!isOpen}
       >
         {/* Left Resize Drag Bar - Desktop Only */}
         <div

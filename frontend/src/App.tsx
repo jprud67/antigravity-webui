@@ -136,7 +136,7 @@ export function App() {
       .map((m) => {
         let text = m.content;
         text = text.replace(/<\/?USER_REQUEST>/g, '');
-        text = text.replace(/^(⚡ \[Guidage\] |📥 \[En attente\] )/, '');
+        text = text.replace(/^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+/, '');
         if (text.includes('\n\n[Image attachée :')) {
           text = text.split('\n\n[Image attachée :')[0];
         }
@@ -1287,7 +1287,7 @@ export function App() {
     if (lastUserMsg && lastUserMsg.content) {
       let content = lastUserMsg.content;
       content = content.replace(/<\/?USER_REQUEST>/g, '');
-      content = content.replace(/^(?:⚡ \[Guidage\] |📥 \[En attente\] )+/, '');
+      content = content.replace(/^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+/, '');
       handleSendMessage(content.trim(), {
         model: selectedModel,
         effort: selectedEffort,
