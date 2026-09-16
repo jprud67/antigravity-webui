@@ -456,21 +456,21 @@ def is_tool_output_content(content: Any) -> bool:
     if not content:
         return False
     c = content.strip() if isinstance(content, str) else str(content).strip()
-    return (
-        c.startswith("Created At:")
-        or c.startswith("Completed At:")
-        or c.startswith("File Path:")
-        or c.startswith("The command exited with code")
-        or c.startswith("The command exited")
-        or c.startswith("Tool is running as a background task")
-        or c.startswith("Encountered error in tool execution:")
-        or c.startswith('{"File":')
-        or c.startswith('{"status":')
-        or c.startswith('{"event":')
-        or c.startswith('Task id "')
-        or c.startswith("[Active skills:")
-        or c.startswith("Starting background task")
-    )
+    return c.startswith((
+        "Created At:",
+        "Completed At:",
+        "File Path:",
+        "The command exited with code",
+        "The command exited",
+        "Tool is running as a background task",
+        "Encountered error in tool execution:",
+        '{"File":',
+        '{"status":',
+        '{"event":',
+        'Task id "',
+        "[Active skills:",
+        "Starting background task",
+    ))
 
 
 def fork_conversation(

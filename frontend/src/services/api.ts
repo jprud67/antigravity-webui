@@ -85,7 +85,7 @@ export async function searchConversations(query: string, limit = 50): Promise<Co
 }
 
 export async function fetchConversationTranscript(conversationId: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/conversations/${conversationId}`, {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}`, {
     headers: getHeaders()
   });
   if (!res.ok) throw new Error(`Failed to load transcript: ${res.statusText}`);
@@ -97,7 +97,7 @@ export async function forkConversation(
   upToStepIndex: number,
   newTitle?: string
 ): Promise<{ conversation_id: string; title: string; step_count: number; parent_conversation_id: string }> {
-  const res = await fetch(`${API_BASE}/conversations/${conversationId}/fork`, {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/fork`, {
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ up_to_step_index: upToStepIndex, new_title: newTitle })
@@ -113,7 +113,7 @@ export async function handoffConversation(
   conversationId: string,
   newTitle?: string
 ): Promise<{ conversation_id: string; title: string; step_count: number; parent_conversation_id: string; summary: string }> {
-  const res = await fetch(`${API_BASE}/conversations/${conversationId}/handoff`, {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/handoff`, {
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ new_title: newTitle })
@@ -126,7 +126,7 @@ export async function handoffConversation(
 }
 
 export async function updateConversationTitle(conversationId: string, title: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/conversations/${conversationId}/title`, {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/title`, {
     method: 'PUT',
     headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ title })
@@ -146,7 +146,7 @@ export async function updateConversationMetadata(
     archived?: boolean;
   }
 ): Promise<any> {
-  const res = await fetch(`${API_BASE}/conversations/${conversationId}/metadata`, {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/metadata`, {
     method: 'PUT',
     headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(metadata)
@@ -156,7 +156,7 @@ export async function updateConversationMetadata(
 }
 
 export async function deleteConversation(conversationId: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/conversations/${conversationId}`, {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}`, {
     method: 'DELETE',
     headers: getHeaders()
   });
@@ -165,7 +165,7 @@ export async function deleteConversation(conversationId: string): Promise<any> {
 }
 
 export async function undoConversationTurn(conversationId: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/conversations/${conversationId}/undo`, {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/undo`, {
     method: 'POST',
     headers: getHeaders()
   });
@@ -226,17 +226,17 @@ export async function bulkConversationExport(conversationIds: string[]): Promise
 
 export function getExportHtmlUrl(conversationId: string): string {
   const token = getAuthToken();
-  return `${API_BASE}/conversations/${conversationId}/export/html${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  return `${API_BASE}/conversations/${encodeURIComponent(conversationId)}/export/html${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 }
 
 export function getExportMarkdownUrl(conversationId: string): string {
   const token = getAuthToken();
-  return `${API_BASE}/conversations/${conversationId}/export/markdown${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  return `${API_BASE}/conversations/${encodeURIComponent(conversationId)}/export/markdown${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 }
 
 export function getExportJsonUrl(conversationId: string): string {
   const token = getAuthToken();
-  return `${API_BASE}/conversations/${conversationId}/export/json${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  return `${API_BASE}/conversations/${encodeURIComponent(conversationId)}/export/json${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 }
 
 // Artifacts
@@ -848,7 +848,7 @@ export async function importConversation(payload: any): Promise<{
 }
 
 export async function exportConversationHtml(conversationId: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/conversations/${conversationId}/export/html`, {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/export/html`, {
     headers: getHeaders()
   });
   if (!res.ok) throw new Error("Échec du téléchargement de l'export HTML");
@@ -856,7 +856,7 @@ export async function exportConversationHtml(conversationId: string): Promise<Bl
 }
 
 export async function exportConversationMarkdown(conversationId: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/conversations/${conversationId}/export/markdown`, {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/export/markdown`, {
     headers: getHeaders()
   });
   if (!res.ok) throw new Error("Échec du téléchargement de l'export Markdown");
@@ -864,7 +864,7 @@ export async function exportConversationMarkdown(conversationId: string): Promis
 }
 
 export async function exportConversationJSON(conversationId: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/conversations/${conversationId}/export/json`, {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/export/json`, {
     headers: getHeaders()
   });
   if (!res.ok) throw new Error("Échec du téléchargement de l'export JSON");

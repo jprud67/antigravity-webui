@@ -211,6 +211,7 @@ def test_bulk_import_cleanup_on_error():
 
 def test_git_diff_sanitization():
     from fastapi import HTTPException
+
     from app.api.git import get_git_diff
 
     # Path with leading slash should normalize without crashing or escaping target
@@ -260,6 +261,7 @@ def test_is_tool_output_content_and_clean_prompt():
 
 def test_session_meta_legacy_defaults():
     import uuid
+
     from app.services.session_metadata import save_all_session_metadata
     legacy_id = f"legacy_test_{uuid.uuid4().hex[:6]}"
     # Save sparse metadata missing standard keys
@@ -275,8 +277,9 @@ def test_session_meta_legacy_defaults():
 
 
 def test_skill_md_utf8_bom(tmp_path=None):
-    from app.api.skills import parse_skill_md
     import tempfile
+
+    from app.api.skills import parse_skill_md
 
     with tempfile.TemporaryDirectory() as td:
         skill_dir = Path(td) / "my-skill"

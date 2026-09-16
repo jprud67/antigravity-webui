@@ -50,11 +50,20 @@ def delete_workspace(path: str = Query(...), _ = Depends(require_auth)):
 
 @router.get("/explore")
 def explore_dir(path: str = Query(DEFAULT_WORKSPACE), _ = Depends(require_auth)) -> dict[str, Any]:
-    p = Path(path).resolve()
+    try:
+        p = Path(path).resolve()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Chemin invalide: {e}")
+
     if is_blocked_sensitive_path(p):
         raise HTTPException(status_code=403, detail="Accès refusé : répertoire système ou restreint.")
-    if not p.exists() or not p.is_dir():
-        raise HTTPException(status_code=404, detail="Path is not a valid directory")
+    try:
+        if not p.exists() or not p.is_dir():
+            raise HTTPException(status_code=404, detail="Path is not a valid directory")
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except OSError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     
     entries = []
     try:
@@ -83,6 +92,8 @@ def explore_dir(path: str = Query(DEFAULT_WORKSPACE), _ = Depends(require_auth))
                 continue
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Erreur d'accès au dossier : {e}")
 
     return {
         "current_path": str(p),
