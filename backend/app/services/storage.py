@@ -321,10 +321,14 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
                     "is_estimated": False,
                 }
         if isinstance(u, dict):
-            inp = u.get("input_tokens") if u.get("input_tokens") is not None else u.get("prompt_tokens")
-            out = u.get("output_tokens") if u.get("output_tokens") is not None else u.get("completion_tokens")
-            thk = u.get("thinking_tokens") or u.get("reasoning_tokens") or 0
-            tot = u.get("total_tokens")
+            inp = u.get("input_tokens") if u.get("input_tokens") is not None else (
+                u.get("prompt_tokens") if u.get("prompt_tokens") is not None else u.get("promptTokenCount")
+            )
+            out = u.get("output_tokens") if u.get("output_tokens") is not None else (
+                u.get("completion_tokens") if u.get("completion_tokens") is not None else u.get("candidatesTokenCount")
+            )
+            thk = u.get("thinking_tokens") or u.get("reasoning_tokens") or u.get("thinkingTokenCount") or 0
+            tot = u.get("total_tokens") if u.get("total_tokens") is not None else u.get("totalTokenCount")
             if tot is None or tot == 0:
                 tot = (inp or 0) + (out or 0) + (thk or 0)
             if tot > 0:

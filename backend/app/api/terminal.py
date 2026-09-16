@@ -335,6 +335,20 @@ async def terminal_websocket(
     workspace: str | None = None,
     session_id: str | None = None
 ):
+    # Support token extraction via Sec-WebSocket-Protocol header (e.g. token.<token>)
+    selected_subprotocol: str | None = None
+    raw_subprotocols = websocket.headers.get("sec-websocket-protocol", "")
+    if raw_subprotocols:
+        for sp in raw_subprotocols.split(","):
+            sp_clean = sp.strip()
+            if sp_clean.startswith("token."):
+                if not token:
+                    token = sp_clean[6:]
+                selected_subprotocol = sp_clean
+                break
+            elif sp_clean == "terminal":
+                selected_subprotocol = "terminal"
+
     # Verify authentication
     config = get_auth_config()
     if config.get("enabled", True) and not verify_access_token(token):
@@ -342,7 +356,7 @@ async def terminal_websocket(
         logger.warning("Unauthorized terminal websocket connection attempt")
         return
 
-    await websocket.accept()
+    await websocket.accept(subprotocol=selected_subprotocol)
 
     default_home = os.environ.get("HOME") or os.environ.get("USERPROFILE") or str(Path.home())
     cwd = workspace if workspace and os.path.isdir(workspace) else default_home

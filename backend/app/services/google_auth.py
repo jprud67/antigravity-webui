@@ -183,7 +183,9 @@ def switch_google_account(target_email: str) -> dict[str, Any]:
 
     # Backup current token if exists
     if TOKEN_FILE.exists():
-        shutil.copy2(TOKEN_FILE, GEMINI_DIR / "antigravity-oauth-token.bak")
+        bak_file = GEMINI_DIR / "antigravity-oauth-token.bak"
+        shutil.copy2(TOKEN_FILE, bak_file)
+        restrict_file_permissions(bak_file)
 
     # Copy target account to active
     # Écriture atomique (tmp + replace) : évite toute lecture partielle par agy

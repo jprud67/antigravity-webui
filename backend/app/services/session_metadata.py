@@ -64,14 +64,14 @@ def bulk_update_session_meta_batch(updates_per_id: dict[str, dict[str, Any]]) ->
         all_meta = get_all_session_metadata()
         results = {}
         for cid, updates in updates_per_id.items():
-            current = all_meta.get(cid, {
+            current = dict(all_meta.get(cid, {
                 "pinned": False,
                 "archived": False,
                 "tags": [],
                 "project": "",
                 "projectColor": "",
                 "customTitle": ""
-            })
+            }))
             current.update(updates)
             all_meta[cid] = current
             results[cid] = current

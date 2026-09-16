@@ -10,13 +10,27 @@ router = APIRouter(tags=["chat"])
 
 @router.websocket("/ws/chat")
 async def chat_websocket(websocket: WebSocket, token: str | None = None):
+    # Support token extraction via Sec-WebSocket-Protocol header (e.g. token.<token>)
+    selected_subprotocol: str | None = None
+    raw_subprotocols = websocket.headers.get("sec-websocket-protocol", "")
+    if raw_subprotocols:
+        for sp in raw_subprotocols.split(","):
+            sp_clean = sp.strip()
+            if sp_clean.startswith("token."):
+                if not token:
+                    token = sp_clean[6:]
+                selected_subprotocol = sp_clean
+                break
+            elif sp_clean == "antigravity":
+                selected_subprotocol = "antigravity"
+
     config = get_auth_config()
     if config.get("enabled", True) and not verify_access_token(token):
         await websocket.close(code=1008, reason="Unauthorized")
         logger.warning("Rejected unauthenticated WebSocket connection to /ws/chat")
         return
 
-    await websocket.accept()
+    await websocket.accept(subprotocol=selected_subprotocol)
     execution_manager.register_socket(websocket)
     logger.info("WebSocket client connected to /ws/chat")
 
@@ -26,7 +40,7 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
         _active_session = execution_manager.active_session
         active_turn = (
             _active_session.get_live_state()
-            if _active_session is not None and _active_session.is_running
+            if _active_session is not None and (_active_session.is_busy or _active_session.is_running)
             else None
         )
         await websocket.send_json({
