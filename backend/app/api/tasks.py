@@ -124,17 +124,36 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
     current_pid = os.getpid()
     parent_pid = os.getppid()
 
+    current_pgid = None
+    if hasattr(os, "getpgid"):
+        try:
+            current_pgid = os.getpgid(current_pid)
+        except Exception:
+            pass
+
     # Block killing system critical PIDs and backend server itself
-    if target_pid <= 100 or target_pid == current_pid or target_pid == parent_pid:
-        raise HTTPException(status_code=403, detail=f"Arrêt non autorisé pour le PID système critique {target_pid}")
+    if (
+        target_pid <= 100
+        or target_pid == current_pid
+        or target_pid == parent_pid
+        or (current_pgid is not None and target_pid == current_pgid)
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Arrêt non autorisé pour le PID système critique ou processus serveur {target_pid}"
+        )
 
     try:
         proc = psutil.Process(target_pid)
         proc_name = proc.name().lower()
         cmdline = " ".join(proc.cmdline()).lower()
 
-        # Disallow killing systemd or uvicorn backend
-        if "systemd" in proc_name or ("uvicorn" in cmdline and "backend" in cmdline):
+        # Disallow killing systemd or uvicorn/run.py backend
+        if (
+            "systemd" in proc_name
+            or ("uvicorn" in cmdline and "backend" in cmdline)
+            or ("antigravity-webui" in cmdline and "run.py" in cmdline)
+        ):
             raise HTTPException(status_code=403, detail="Arrêt non autorisé pour les services principaux du serveur")
 
         # Terminate process and its children cleanly

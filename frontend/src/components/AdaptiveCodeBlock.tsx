@@ -52,7 +52,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { DiffViewer } from './DiffViewer';
-import { PreContext, copyText } from '../utils/codeBlockUtils';
+import { PreContext, copyText, extractRawText } from '../utils/codeBlockUtils';
 
 const MermaidRenderer = React.lazy(() =>
   import('./MermaidRenderer').then((m) => ({ default: m.MermaidRenderer }))
@@ -199,18 +199,6 @@ function splitHtmlIntoLines(html: string): string[] {
   }
 
   return lines;
-}
-
-export function extractRawText(children: any): string {
-  if (typeof children === 'string') return children;
-  if (typeof children === 'number') return String(children);
-  if (Array.isArray(children)) {
-    return children.map(extractRawText).join('');
-  }
-  if (children && typeof children === 'object' && 'props' in children) {
-    return extractRawText(children.props?.children);
-  }
-  return children ? String(children) : '';
 }
 
 function parseCodeFenceMeta(className?: string, rawCode: string = '') {

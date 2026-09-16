@@ -94,6 +94,11 @@ def get_file_tree(
     _ = Depends(require_auth)
 ):
     target_path = Path(path) if path else Path(DEFAULT_WORKSPACE)
+    if not path and not target_path.exists():
+        try:
+            target_path.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"Could not create default workspace directory {target_path}: {e}")
     resolved_path = _validate_path_access(target_path)
     if not resolved_path.exists() or not resolved_path.is_dir():
         raise HTTPException(status_code=400, detail=f"Répertoire invalide : {target_path}")

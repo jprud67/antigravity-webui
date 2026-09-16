@@ -519,6 +519,8 @@ class ExecutionManager:
                 session.is_steering = True
                 if session.active_proc and session.active_proc.returncode is None:
                     await terminate_process_group_async(session.active_proc, grace=0.5)
+                session.active_proc = None
+                session.pending_approval = None
                 if session.active_task and not session.active_task.done():
                     session.active_task.cancel()
                     try:
@@ -579,6 +581,8 @@ class ExecutionManager:
                 pass
 
         session.is_running = False
+        session.active_proc = None
+        session.pending_approval = None
         await session.broadcast({
             "event": "interrupted",
             "conversation_id": session.conversation_id,

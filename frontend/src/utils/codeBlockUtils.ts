@@ -37,3 +37,18 @@ export const copyText = async (text: string): Promise<boolean> => {
     }
   }
 };
+
+/**
+ * Recursively extracts plain text from React children.
+ */
+export function extractRawText(children: any): string {
+  if (typeof children === 'string') return children;
+  if (typeof children === 'number') return String(children);
+  if (Array.isArray(children)) {
+    return children.map(extractRawText).join('');
+  }
+  if (children && typeof children === 'object' && 'props' in children) {
+    return extractRawText(children.props?.children);
+  }
+  return children ? String(children) : '';
+}
