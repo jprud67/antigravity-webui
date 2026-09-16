@@ -64,7 +64,11 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                     is_finished = (
                         "finished with result" in preview
                         or "exited with code" in preview
+                        or "exit code" in preview
                         or "Completed At:" in preview
+                        or "The command exited" in preview
+                        or "process terminated" in preview
+                        or "Task cancelled" in preview
                         or (now_ts - stat_mtime) > 1800
                     )
                     tasks.append({

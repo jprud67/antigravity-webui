@@ -234,7 +234,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
     );
 
     const isToolOutput = !isModelResponse && (
-      ['GENERIC', 'TOOL_OUTPUT', 'TOOL_RESULT', 'VIEW_FILE', 'RUN_COMMAND', 'CODE_ACTION', 'GREP_SEARCH', 'LIST_DIRECTORY'].includes(stype) ||
+      ['GENERIC', 'TOOL_OUTPUT', 'TOOL_RESULT', 'VIEW_FILE', 'RUN_COMMAND', 'CODE_ACTION', 'GREP_SEARCH', 'LIST_DIRECTORY'].includes(stype.toUpperCase()) ||
       (!toolCallsRaw.length && !thinking && isToolOutputContent(content))
     );
 

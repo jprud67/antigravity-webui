@@ -39,7 +39,7 @@ logger = logging.getLogger("antigravity.updater")
 REPO_DIR = Path(__file__).resolve().parent.parent.parent.parent
 CACHE_FILE = GEMINI_DIR / ".update_check"
 MARKER_FILE = GEMINI_DIR / ".update_incomplete"
-CURRENT_VERSION = "0.1.45"
+CURRENT_VERSION = "0.1.46"
 
 # Principe Hermes : cache de 6 h + rafraîchissement périodique de 6 h
 CACHE_DURATION_SECONDS = 6 * 3600
@@ -321,7 +321,7 @@ async def apply_update() -> dict[str, Any]:
     _write_update_marker()
 
     # 1. Refus si l'arbre git contient des modifications locales
-    dirty = _git_cmd(["status", "--porcelain"], timeout=10)
+    dirty = _git_cmd(["status", "--porcelain", "--untracked-files=no"], timeout=10)
     if dirty:
         _clear_update_marker()
         logger.warning("Update refused: dirty worktree.")

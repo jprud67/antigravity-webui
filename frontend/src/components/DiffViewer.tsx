@@ -43,7 +43,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     } else if (
       line.startsWith('---') ||
       line.startsWith('+++') ||
-      line.startsWith('diff --git') ||
+      line.startsWith('diff ') ||
       line.startsWith('index ') ||
       line.startsWith('new file mode') ||
       line.startsWith('deleted file mode') ||

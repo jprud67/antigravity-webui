@@ -446,6 +446,15 @@ def _extract_json_payload(raw: str) -> Any:
     except Exception:
         pass
 
+    # Détection des blocs de code Markdown (```json ... ``` ou ``` ... ```)
+    code_fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", trimmed, re.IGNORECASE)
+    if code_fence_match:
+        fence_content = code_fence_match.group(1).strip()
+        try:
+            return json.loads(fence_content)
+        except Exception:
+            pass
+
     first_brace = trimmed.find('{')
     last_brace = trimmed.rfind('}')
     first_bracket = trimmed.find('[')
@@ -499,6 +508,10 @@ async def get_usage_quota() -> dict[str, Any]:
                     if isinstance(data, dict):
                         _quota_cache = {"data": data, "timestamp": now}
                         return data
+                    elif isinstance(data, list):
+                        dict_payload = {"items": data}
+                        _quota_cache = {"data": dict_payload, "timestamp": now}
+                        return dict_payload
             except Exception:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)
@@ -537,6 +550,10 @@ async def get_credits() -> dict[str, Any]:
                     if isinstance(data, dict):
                         _credits_cache = {"data": data, "timestamp": now}
                         return data
+                    elif isinstance(data, list):
+                        dict_payload = {"items": data}
+                        _credits_cache = {"data": dict_payload, "timestamp": now}
+                        return dict_payload
             except Exception:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)
@@ -575,6 +592,10 @@ async def get_changelog() -> dict[str, Any]:
                     if isinstance(data, dict):
                         _changelog_cache = {"data": data, "timestamp": now}
                         return data
+                    elif isinstance(data, list):
+                        dict_payload = {"items": data}
+                        _changelog_cache = {"data": dict_payload, "timestamp": now}
+                        return dict_payload
             except Exception:
                 try:
                     await terminate_process_group_async(proc, grace=0.5)

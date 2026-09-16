@@ -198,10 +198,27 @@ def get_git_diff(
         args.extend(["--", path])
 
     res = run_git(args, target)
+    diff_text = res.stdout
+
+    # Fallback pour fichiers indexes ou non suivis si aucun diff standard n'est trouve
+    if not diff_text and path:
+        if not staged:
+            # Verifier si un diff indexe (staged) existe pour ce fichier
+            cached_res = run_git(["diff", "--cached", "--", path], target)
+            if cached_res.stdout:
+                diff_text = cached_res.stdout
+        # Si toujours vide, verifier si c'est un fichier non suivi (untracked) present sur le disque
+        if not diff_text:
+            file_on_disk = target / path
+            if file_on_disk.is_file():
+                untracked_res = run_git(["diff", "--no-index", "--", "/dev/null", path], target)
+                if untracked_res.stdout:
+                    diff_text = untracked_res.stdout
+
     return {
         "workspace": str(target),
         "path": path,
-        "diff": res.stdout
+        "diff": diff_text
     }
 
 @router.get("/branches")

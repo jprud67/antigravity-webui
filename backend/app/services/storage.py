@@ -1365,7 +1365,15 @@ def export_conversation_markdown(conversation_id: str) -> str:
             md_lines.append(f"<details><summary>⚡ Activité de l'agent ({len(tool_activities)} actions)</summary>\n")
             for act in tool_activities:
                 tname = act.get("name", "tool")
-                targs = json.dumps(act.get("args", {}), indent=2, ensure_ascii=False)
+                raw_args = act.get("args")
+                if isinstance(raw_args, (dict, list)):
+                    targs = json.dumps(raw_args, indent=2, ensure_ascii=False, default=str)
+                elif isinstance(raw_args, str):
+                    targs = raw_args
+                elif raw_args is None:
+                    targs = "{}"
+                else:
+                    targs = str(raw_args)
                 res = act.get("result", "")
                 md_lines.append(f"### Outil : `{tname}`")
                 md_lines.append(f"```json\n{targs}\n```")
@@ -1441,7 +1449,16 @@ def export_conversation_html(conversation_id: str) -> str:
             tools_rendered = []
             for act in tool_activities:
                 tname = html.escape(str(act.get("name") or "tool"), quote=True)
-                targs = html.escape(json.dumps(act.get("args") or {}, indent=2, ensure_ascii=False, default=str), quote=True)
+                raw_args = act.get("args")
+                if isinstance(raw_args, (dict, list)):
+                    targs_str = json.dumps(raw_args, indent=2, ensure_ascii=False, default=str)
+                elif isinstance(raw_args, str):
+                    targs_str = raw_args
+                elif raw_args is None:
+                    targs_str = "{}"
+                else:
+                    targs_str = str(raw_args)
+                targs = html.escape(targs_str, quote=True)
                 res = act.get("result", "")
                 res_html = ""
                 if res is not None and str(res):

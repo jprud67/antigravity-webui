@@ -25,6 +25,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
 
   // Selected file for diff
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [isDiffStaged, setIsDiffStaged] = useState<boolean>(false);
   const [activeDiff, setActiveDiff] = useState<string | null>(null);
   const [loadingDiff, setLoadingDiff] = useState(false);
 
@@ -41,12 +42,13 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     selectedFileRef.current = selectedFile;
   }, [selectedFile]);
 
-  const handleSelectFile = useCallback(async (filePath: string) => {
+  const handleSelectFile = useCallback(async (filePath: string, staged: boolean = false) => {
     setSelectedFile(filePath);
+    setIsDiffStaged(staged);
     setLoadingDiff(true);
     const reqId = ++diffRequestIdRef.current;
     try {
-      const res = await fetchGitDiff(currentWorkspace, filePath);
+      const res = await fetchGitDiff(currentWorkspace, filePath, staged);
       if (reqId === diffRequestIdRef.current) {
         setActiveDiff(res.diff);
       }
@@ -69,9 +71,11 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
       setStatus(data);
       if (autoSelect || !selectedFileRef.current) {
         if (data.modified.length > 0) {
-          handleSelectFile(data.modified[0]);
+          handleSelectFile(data.modified[0], false);
+        } else if (data.staged.length > 0) {
+          handleSelectFile(data.staged[0], true);
         } else if (data.untracked.length > 0) {
-          handleSelectFile(data.untracked[0]);
+          handleSelectFile(data.untracked[0], false);
         }
       }
       return data;
@@ -91,9 +95,11 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
           setStatus(data);
           if (!selectedFileRef.current) {
             if (data.modified.length > 0) {
-              handleSelectFile(data.modified[0]);
+              handleSelectFile(data.modified[0], false);
+            } else if (data.staged.length > 0) {
+              handleSelectFile(data.staged[0], true);
             } else if (data.untracked.length > 0) {
-              handleSelectFile(data.untracked[0]);
+              handleSelectFile(data.untracked[0], false);
             }
           }
         }
@@ -299,7 +305,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                 return (
                   <button
                     key={file.path}
-                    onClick={() => handleSelectFile(file.path)}
+                    onClick={() => handleSelectFile(file.path, file.type === 'S')}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
                       isSelected
                         ? 'bg-sky-500/15 border border-sky-500/30 text-sky-600 dark:text-sky-200'
@@ -347,10 +353,39 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                 color: 'var(--muted)'
               }}
             >
-              <span className="font-mono flex items-center gap-1.5">
-                <FileDiff className="w-3.5 h-3.5 text-sky-500" />
-                Diff : <strong style={{ color: 'var(--strong)' }}>{selectedFile}</strong>
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono flex items-center gap-1.5">
+                  <FileDiff className="w-3.5 h-3.5 text-sky-500" />
+                  Diff : <strong style={{ color: 'var(--strong)' }}>{selectedFile}</strong>
+                </span>
+                {isDiffStaged ? (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold">
+                    Indexé
+                  </span>
+                ) : (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-600 dark:text-slate-400">
+                    Non indexé
+                  </span>
+                )}
+                {allChangedFiles.find((f) => f.path === selectedFile)?.type === 'S+M' && (
+                  <div className="flex items-center gap-1 ml-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectFile(selectedFile, false)}
+                      className={`px-1.5 py-0.5 text-[10px] rounded cursor-pointer ${!isDiffStaged ? 'bg-sky-500/20 text-sky-600 dark:text-sky-400 font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-70'}`}
+                    >
+                      Non indexé
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectFile(selectedFile, true)}
+                      className={`px-1.5 py-0.5 text-[10px] rounded cursor-pointer ${isDiffStaged ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-70'}`}
+                    >
+                      Indexé
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => setSelectedFile(null)}
                 className="text-[10px] hover:underline cursor-pointer"
