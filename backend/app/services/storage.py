@@ -846,13 +846,20 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         last_step = remaining_steps[-1] if remaining_steps else {}
         new_preview = str(last_step.get("content") or last_step.get("thinking") or "")[:150]
 
+        new_last_user_idx = -1
+        for i in range(len(remaining_steps) - 1, -1, -1):
+            s = remaining_steps[i]
+            if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
+                new_last_user_idx = int(s.get("step_index", i))
+                break
+
         cursor.execute(
             """
             UPDATE conversation_summaries
-            SET step_count = ?, preview = ?, last_modified_time = ?
+            SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?
             WHERE conversation_id = ?
             """,
-            (len(remaining_steps), new_preview, now_str, conversation_id)
+            (len(remaining_steps), new_preview, now_str, new_last_user_idx, conversation_id)
         )
         conn.commit()
     finally:

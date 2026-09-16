@@ -17,7 +17,7 @@ const RulesEditorModal = lazy(() => import('./components/RulesEditorModal').then
 const HelpModal = lazy(() => import('./components/HelpModal').then(m => ({ default: m.HelpModal })));
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption } from './types';
-import { parseStepsToMessages } from './utils/transcriptParser';
+import { parseStepsToMessages, cleanUserPrompt } from './utils/transcriptParser';
 import { 
   fetchConversations, 
   fetchConversationTranscript, 
@@ -134,8 +134,7 @@ export function App() {
     return messages
       .filter((m) => m.role === 'user' && m.content)
       .map((m) => {
-        let text = m.content;
-        text = text.replace(/<\/?USER_REQUEST>/g, '');
+        let text = cleanUserPrompt(m.content);
         text = text.replace(/^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+/, '');
         if (text.includes('\n\n[Image attachée :')) {
           text = text.split('\n\n[Image attachée :')[0];
@@ -1286,9 +1285,14 @@ export function App() {
   const handleRetry = () => {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUserMsg && lastUserMsg.content) {
-      let content = lastUserMsg.content;
-      content = content.replace(/<\/?USER_REQUEST>/g, '');
+      let content = cleanUserPrompt(lastUserMsg.content);
       content = content.replace(/^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+/, '');
+      if (content.includes('\n\n[Image attachée :')) {
+        content = content.split('\n\n[Image attachée :')[0];
+      }
+      if (content.includes('\n\n[Fichier attaché :')) {
+        content = content.split('\n\n[Fichier attaché :')[0];
+      }
       handleSendMessage(content.trim(), {
         model: selectedModel,
         effort: selectedEffort,

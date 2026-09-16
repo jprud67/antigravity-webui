@@ -206,6 +206,7 @@ class ExecutionSession:
         self.live_thought = ""
         self.live_content = ""
         self.live_tool_calls = []
+        self.live_usage = None
         self.pending_approval = None
 
         prompt = params.get("prompt", "")
@@ -235,6 +236,7 @@ class ExecutionSession:
                 self.live_thought = ""
                 self.live_content = ""
                 self.live_tool_calls = []
+                self.live_usage = None
                 self.pending_approval = None
 
                 try:
@@ -451,7 +453,7 @@ class ExecutionManager:
                     self.active_session.worker_task = asyncio.create_task(self.active_session.queue_worker())
                 return self.active_session
 
-        if not conversation_id and self.active_session and self.active_session.is_running:
+        if not conversation_id and self.active_session and self.active_session.conversation_id is None and self.active_session.is_running:
             if workspace_path and not self.active_session.workspace_path:
                 self.active_session.workspace_path = workspace_path
             return self.active_session

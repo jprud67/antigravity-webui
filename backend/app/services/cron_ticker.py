@@ -151,12 +151,6 @@ async def run_agy_task(
     finally:
         if proc.returncode is None:
             await terminate_process_group_async(proc, grace=1.0)
-        for stream in (proc.stdout, proc.stderr):
-            if stream and not stream.at_eof():
-                try:
-                    stream.feed_eof()
-                except Exception:
-                    pass
         for t in pumps + [quota_task]:
             if not t.done():
                 t.cancel()

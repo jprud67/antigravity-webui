@@ -255,6 +255,19 @@ def _close_login_resources(master_fd, proc) -> None:
     _terminate_login_proc(proc)
 
 
+def _restore_stash(stash_path: Path) -> None:
+    """Restaure le token de secours de manière sûre et multiplateforme."""
+    if not stash_path.exists():
+        return
+    try:
+        if TOKEN_FILE.exists():
+            TOKEN_FILE.unlink(missing_ok=True)
+        shutil.move(stash_path, TOKEN_FILE)
+        restrict_file_permissions(TOKEN_FILE)
+    except Exception as e:
+        logger.warning(f"Failed to restore token stash {stash_path}: {e}")
+
+
 def _spawn_login_process(env):
     """
     Démarre `agy -p auth_login_init` en mode PTY.
@@ -388,9 +401,7 @@ def start_google_login_flow() -> dict[str, Any]:
         }
     except Exception:
         _close_login_resources(master_fd, proc)
-        if stash_path.exists():
-            shutil.move(stash_path, TOKEN_FILE)
-            restrict_file_permissions(TOKEN_FILE)
+        _restore_stash(stash_path)
         raise
 
 
@@ -445,9 +456,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
 
         if not TOKEN_FILE.exists():
             # Auth failed, restore previous token
-            if stash_path.exists():
-                shutil.move(stash_path, TOKEN_FILE)
-                restrict_file_permissions(TOKEN_FILE)
+            _restore_stash(stash_path)
             raise RuntimeError("Échec de l'échange du jeton avec Google: le token n'a pas été généré.")
 
         # Auth succeeded! Clean up stash
@@ -469,9 +478,7 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
         }
     except Exception:
         _close_login_resources(master_fd, proc)
-        if stash_path.exists():
-            shutil.move(stash_path, TOKEN_FILE)
-            restrict_file_permissions(TOKEN_FILE)
+        _restore_stash(stash_path)
         with _login_lock:
             _LOGIN_SESSIONS.pop(session_id, None)
         raise
@@ -483,9 +490,7 @@ def cancel_google_login_flow(session_id: str) -> dict[str, Any]:
     if session:
         _close_login_resources(session.get("master_fd"), session.get("proc"))
         stash_path = Path(session["stash_path"])
-        if stash_path.exists():
-            shutil.move(stash_path, TOKEN_FILE)
-            restrict_file_permissions(TOKEN_FILE)
+        _restore_stash(stash_path)
     return {"success": True, "message": "Session annulée"}
 
 
@@ -573,6 +578,7 @@ def import_raw_token(token_data: dict[str, Any]) -> dict[str, Any]:
 
 
 _account_exhaustion_tracker: dict[str, float] = {}
+_exhaustion_lock = threading.Lock()
 
 
 def is_quota_error(message: str) -> bool:
@@ -631,13 +637,15 @@ def is_hard_quota_error(message: str) -> bool:
 def mark_account_exhausted(email: str, duration_seconds: float = 900.0) -> None:
     """Mark an account as exhausted for a given duration (default 15 minutes)."""
     norm_email = email.strip().lower()
-    _account_exhaustion_tracker[norm_email] = time.time() + duration_seconds
+    with _exhaustion_lock:
+        _account_exhaustion_tracker[norm_email] = time.time() + duration_seconds
     logger.warning(f"Google account {norm_email} marked as quota-exhausted for {duration_seconds}s")
 
 
 def is_account_marked_exhausted(email: str) -> bool:
     norm_email = email.strip().lower()
-    exp = _account_exhaustion_tracker.get(norm_email, 0.0)
+    with _exhaustion_lock:
+        exp = _account_exhaustion_tracker.get(norm_email, 0.0)
     return time.time() < exp
 
 
