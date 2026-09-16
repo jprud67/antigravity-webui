@@ -69,6 +69,20 @@ def extract_conv_id(transcript_path: Path, brain_dir: Path | None = None) -> str
                 return cand
     return None
 
+
+def extract_conv_id_from_artifact(artifact_path: Path, brain_dir: Path) -> str | None:
+    """Extrait l'UUID de conversation d'un chemin d'artefact confiné dans brain_dir."""
+    try:
+        rel = artifact_path.resolve().relative_to(brain_dir.resolve())
+        if rel.parts:
+            cand = rel.parts[0]
+            if _UUID_PATTERN.match(cand):
+                return cand
+    except Exception:
+        pass
+    return None
+
+
 async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float = 1.5) -> None:
     """
     Async polling loop that detects changes in:
@@ -176,7 +190,7 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                 prev = artifact_mtimes.get(a_path, 0.0)
                 if a_mtime != prev:
                     p = Path(a_path)
-                    conv_id = p.parent.name
+                    conv_id = extract_conv_id_from_artifact(p, brain_dir) or p.parent.name
                     logger.debug(f"Artifact changed for conv {conv_id} ({p.name}) → broadcasting artifacts_updated")
                     await _broadcast({
                         "type": "artifacts_updated",
@@ -187,7 +201,10 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
             # Nettoyer les entrées obsolètes (fichiers supprimés) pour éviter une fuite mémoire
             removed_artifacts = set(artifact_mtimes) - set(cur_artifacts)
             if len(removed_artifacts) > 10:
-                conv_ids_affected = {Path(old_p).parent.name for old_p in removed_artifacts}
+                conv_ids_affected = {
+                    (extract_conv_id_from_artifact(Path(old_p), brain_dir) or Path(old_p).parent.name)
+                    for old_p in removed_artifacts
+                }
                 for cid in conv_ids_affected:
                     await _broadcast({
                         "type": "artifacts_updated",
@@ -198,7 +215,7 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
             else:
                 for old_path in removed_artifacts:
                     p = Path(old_path)
-                    conv_id = p.parent.name
+                    conv_id = extract_conv_id_from_artifact(p, brain_dir) or p.parent.name
                     logger.debug(f"Artifact supprimé pour conv {conv_id} ({p.name}) → broadcasting artifacts_updated")
                     await _broadcast({
                         "type": "artifacts_updated",

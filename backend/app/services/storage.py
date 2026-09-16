@@ -372,6 +372,8 @@ def fork_conversation(
     up_to_step_index: int,
     new_title: str | None = None
 ) -> dict[str, Any]:
+    if not is_safe_conversation_id(source_conversation_id):
+        raise ValueError("Identifiant de conversation source non valide")
     source_steps = get_conversation_transcript(source_conversation_id)
     if not source_steps:
         raise ValueError(f"Aucun historique trouvé pour la conversation {source_conversation_id}")
@@ -512,6 +514,8 @@ def create_conversation_handoff(
     source_conversation_id: str,
     new_title: str | None = None
 ) -> dict[str, Any]:
+    if not is_safe_conversation_id(source_conversation_id):
+        raise ValueError("Identifiant de conversation source non valide")
     source_steps = get_conversation_transcript(source_conversation_id)
     if not source_steps:
         raise ValueError(f"Aucun historique trouvé pour la conversation {source_conversation_id}")
@@ -1095,7 +1099,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
         if is_tool_output and current_asst:
             activities = current_asst.get("tool_activities", [])
             pending = None
-            for act in reversed(activities):
+            for act in activities:
                 if not act.get("result"):
                     pending = act
                     break
@@ -1571,7 +1575,7 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
                     artifacts.append({
                         "conversation_id": c_id,
                         "filename": p.name,
-                        "relative_path": str(p.relative_to(cdir)),
+                        "relative_path": p.relative_to(cdir).as_posix(),
                         "full_path": str(p),
                         "size": stat.st_size,
                         "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()

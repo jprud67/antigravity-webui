@@ -57,6 +57,36 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> list
     return items
 
 
+def _is_blocked_sensitive_path(resolved: Path) -> bool:
+    """
+    Vérifie avec précision si un chemin cible pointe vers un fichier ou dossier
+    sensible (clés SSH, tokens, identifiants, répertoires système critiques).
+    Évite les faux positifs des recherches de sous-chaînes sur des fichiers
+    légitimes de code source (ex: system.ts, processing.py, etc.).
+    """
+    parts = resolved.parts
+    # Répertoires système et dossiers cachés sensibles
+    if any(p in (".ssh", ".gnupg") for p in parts):
+        return True
+    # Points de montage système root
+    if len(parts) > 1 and parts[1] in ("proc", "sys"):
+        return True
+    if len(parts) > 2 and parts[1] == "etc" and parts[2] in ("shadow", "sudoers", "master.passwd"):
+        return True
+
+    # Fichiers de secrets et identifiants
+    name = resolved.name.lower()
+    if name in ("antigravity-oauth-token", "webui_auth.json", "webui_password.txt", "google_accounts.json"):
+        return True
+    if name in ("id_rsa", "id_ed25519", "id_dsa", "id_ecdsa") or name.startswith(("id_rsa.", "id_ed25519.")):
+        return True
+    if name == ".env" or name.startswith(".env."):
+        return True
+    if ".stash_" in name:
+        return True
+    return False
+
+
 def _validate_path_access(file_path: Path) -> Path:
     try:
         if not file_path.is_absolute():
@@ -65,14 +95,7 @@ def _validate_path_access(file_path: Path) -> Path:
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Chemin invalide : {e}")
 
-    resolved_str = str(resolved).replace("\\", "/")
-    # Prohibit sensitive system directories, credentials, and secrets
-    blocked_keywords = [
-        "/.ssh", "/.gnupg", "/etc/shadow", "/etc/sudoers", "/proc", "/sys",
-        "/google_accounts.json", "/webui_auth.json", "id_rsa", "id_ed25519",
-        "antigravity-oauth-token", "webui_password.txt", ".stash_", ".env"
-    ]
-    if any(kw in resolved_str for kw in blocked_keywords):
+    if _is_blocked_sensitive_path(resolved):
         raise HTTPException(status_code=403, detail="Accès refusé : fichier ou répertoire restreint.")
 
     settings = get_settings()

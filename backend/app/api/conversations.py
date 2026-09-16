@@ -23,6 +23,7 @@ from app.services.storage import (
     get_conversation_by_id,
     get_conversation_transcript,
     import_conversation,
+    is_safe_conversation_id,
     list_conversations,
     search_conversations,
     undo_conversation_turn,
@@ -258,6 +259,8 @@ def undo_turn(conversation_id: str, _ = Depends(require_auth)):
 
 @router.get("/{conversation_id}/export/html")
 def export_html(conversation_id: str, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     html_content = export_conversation_html(conversation_id)
     return Response(
         content=html_content,
@@ -269,6 +272,8 @@ def export_html(conversation_id: str, _ = Depends(require_auth)):
 
 @router.get("/{conversation_id}/export/markdown")
 def export_markdown(conversation_id: str, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     md_content = export_conversation_markdown(conversation_id)
     return Response(
         content=md_content,
@@ -280,6 +285,8 @@ def export_markdown(conversation_id: str, _ = Depends(require_auth)):
 
 @router.get("/{conversation_id}/export/json")
 def export_json(conversation_id: str, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     steps = get_conversation_transcript(conversation_id)
     meta = get_conversation_by_id(conversation_id) or get_session_meta(conversation_id)
     export_payload = {

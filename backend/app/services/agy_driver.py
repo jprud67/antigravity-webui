@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 import time
 from collections.abc import AsyncGenerator
 from pathlib import Path
@@ -11,6 +12,55 @@ from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
 from app.services.quota_watch import watch_agy_log_for_quota
 
 logger = logging.getLogger("antigravity.driver")
+
+DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
+    {
+        "id": "gemini-3.8-flash",
+        "name": "Gemini 3.8 Flash",
+        "default_effort": "high",
+        "supported_efforts": ["high", "medium", "low"],
+        "variants": {
+            "high": "gemini-3.8-flash-high",
+            "medium": "gemini-3.8-flash-medium",
+            "low": "gemini-3.8-flash-low",
+        },
+    },
+    {
+        "id": "gemini-3.8-pro",
+        "name": "Gemini 3.8 Pro",
+        "default_effort": "high",
+        "supported_efforts": ["high", "medium", "low"],
+        "variants": {
+            "high": "gemini-3.8-pro-high",
+            "medium": "gemini-3.8-pro-medium",
+            "low": "gemini-3.8-pro-low",
+        },
+    },
+    {
+        "id": "gemini-3.1-pro",
+        "name": "Gemini 3.1 Pro",
+        "default_effort": "high",
+        "supported_efforts": ["high", "low"],
+        "variants": {
+            "high": "gemini-3.1-pro-high",
+            "low": "gemini-3.1-pro-low",
+        },
+    },
+    {
+        "id": "claude-sonnet-4-6",
+        "name": "Claude Sonnet 4.6",
+        "default_effort": None,
+        "supported_efforts": [],
+        "variants": {"default": "claude-sonnet-4-6"},
+    },
+    {
+        "id": "claude-opus-4-6-thinking",
+        "name": "Claude Opus 4.6 (Thinking)",
+        "default_effort": None,
+        "supported_efforts": [],
+        "variants": {"default": "claude-opus-4-6-thinking"},
+    },
+]
 
 def parse_model_metadata(m_id: str, m_name: str) -> dict[str, Any]:
     effort = None
@@ -105,7 +155,8 @@ async def get_model_families() -> list[dict[str, Any]]:
             if _models_cache["data"] is not None:
                 logger.warning(f"agy models failed ({e}); returning stale cached model families.")
                 return _models_cache["data"]
-            raise
+            logger.warning(f"agy models failed ({e}); returning default known model families.")
+            return DEFAULT_MODEL_FAMILIES
 
         families: dict[str, dict[str, Any]] = {}
         for meta in models_raw:
@@ -178,12 +229,10 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
         else:
             tier = "flash"
 
-        if "3.6" in norm:
-            return f"gemini-3.6-{tier}-{eff}", None
-        elif "3.7" in norm:
-            return f"gemini-3.7-{tier}-{eff}", None
-        elif "3.8" in norm:
-            return f"gemini-3.8-{tier}-{eff}", None
+        m_ver = re.search(r"(\d+\.\d+)", norm)
+        if m_ver:
+            ver = m_ver.group(1)
+            return f"gemini-{ver}-{tier}-{eff}", None
         else:
             base = norm.removesuffix(f"-{eff}")
             return f"{base}-{eff}", None

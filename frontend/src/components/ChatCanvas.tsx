@@ -771,9 +771,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   useEffect(() => {
     if (isStreaming && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      setSpeakingMsgId(null);
     }
   }, [isStreaming]);
+
+  const activeSpeakingMsgId = isStreaming ? null : speakingMsgId;
 
   const toggleThought = (id: string) => {
     setExpandedThoughts((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -788,7 +789,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
       showToast('La synthèse vocale n\'est pas supportée par votre navigateur.', 'warning');
       return;
     }
-    if (speakingMsgId === msgId) {
+    if (activeSpeakingMsgId === msgId) {
       window.speechSynthesis.cancel();
       setSpeakingMsgId(null);
       return;
@@ -1634,7 +1635,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                           isSpeaking ? 'text-sky-500 bg-sky-500/10 border-sky-500/30' : 'hover:bg-surface-subtle'
                         }`}
                         style={{ borderColor: isSpeaking ? undefined : 'var(--border)' }}
-                        title={speakingMsgId === msg.id ? 'Arrêter la synthèse vocale' : 'Écouter la réponse'}
+                        title={isSpeaking ? 'Arrêter la synthèse vocale' : 'Écouter la réponse'}
                       >
                         {isSpeaking ? <VolumeX className="w-3 h-3 text-rose-400 animate-pulse" /> : <Volume2 className="w-3 h-3" />}
                         <span className="hidden sm:inline">{isSpeaking ? 'Arrêter' : 'Écouter'}</span>
