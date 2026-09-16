@@ -85,7 +85,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Antigravity WebUI",
     description="Web Interface to orchestrate Antigravity CLI without touching the terminal",
-    version="0.1.29",
+    version="0.1.30",
     lifespan=lifespan
 )
 

@@ -39,7 +39,7 @@ logger = logging.getLogger("antigravity.updater")
 REPO_DIR = Path(__file__).resolve().parent.parent.parent.parent
 CACHE_FILE = GEMINI_DIR / ".update_check"
 MARKER_FILE = GEMINI_DIR / ".update_incomplete"
-CURRENT_VERSION = "0.1.29"
+CURRENT_VERSION = "0.1.30"
 
 # Principe Hermes : cache de 6 h + rafraîchissement périodique de 6 h
 CACHE_DURATION_SECONDS = 6 * 3600
@@ -365,7 +365,8 @@ async def apply_update() -> dict[str, Any]:
                 *npm_argv("run", "build"),
                 cwd=str(frontend_dir),
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
+                env=os.environ
             )
             _b_out, b_err = await asyncio.wait_for(build_proc.communicate(), timeout=120.0)
             if build_proc.returncode != 0:
@@ -403,7 +404,8 @@ async def apply_update() -> dict[str, Any]:
             try:
                 rb = await asyncio.to_thread(
                     subprocess.run,
-                    npm_argv("run", "build"), cwd=str(frontend_dir), capture_output=True, timeout=120, check=False
+                    npm_argv("run", "build"), cwd=str(frontend_dir), capture_output=True, timeout=120, check=False,
+                    env=os.environ
                 )
                 hint = "frontend restauré" if rb.returncode == 0 else "relancez un build manuellement"
             except Exception:

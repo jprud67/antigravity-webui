@@ -306,6 +306,10 @@ class ExecutionSession:
                         logger.info(
                             f"[Session {self.conversation_id}] Auto-failover: Switched from {current_email} to {new_account}. Relaunching task immediately..."
                         )
+                        self.live_thought = ""
+                        self.live_content = ""
+                        self.live_tool_calls = []
+                        self.pending_approval = None
                         await self.broadcast({
                             "event": "account_failover",
                             "conversation_id": self.conversation_id,

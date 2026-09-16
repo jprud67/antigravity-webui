@@ -225,15 +225,33 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
 
       {/* Notifications */}
       {actionSuccess && (
-        <div className="p-2 bg-emerald-500/10 border-b border-emerald-500/30 text-emerald-600 dark:text-emerald-300 text-xs flex items-center gap-2 shrink-0">
-          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
-          <span>{actionSuccess}</span>
+        <div className="p-2 bg-emerald-500/10 border-b border-emerald-500/30 text-emerald-600 dark:text-emerald-300 text-xs flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+            <span className="truncate">{actionSuccess}</span>
+          </div>
+          <button
+            onClick={() => setActionSuccess(null)}
+            className="text-xs hover:opacity-80 p-0.5 rounded cursor-pointer shrink-0"
+            title="Fermer"
+          >
+            ✕
+          </button>
         </div>
       )}
       {error && (
-        <div className="p-2 bg-rose-500/10 border-b border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2 shrink-0">
-          <ShieldAlert className="w-4 h-4 shrink-0 text-rose-500" />
-          <span>{error}</span>
+        <div className="p-2 bg-rose-500/10 border-b border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <ShieldAlert className="w-4 h-4 shrink-0 text-rose-500" />
+            <span className="break-all">{error}</span>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="text-xs hover:opacity-80 p-0.5 rounded cursor-pointer shrink-0"
+            title="Fermer"
+          >
+            ✕
+          </button>
         </div>
       )}
 
