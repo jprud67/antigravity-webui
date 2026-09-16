@@ -13,7 +13,12 @@ from app.services.session_metadata import (
     bulk_update_session_meta_batch,
     get_session_meta,
 )
-from app.services.storage import _build_conversation_dict, calculate_conversation_tokens
+from app.services.storage import (
+    _build_conversation_dict,
+    aggregate_steps_into_turns,
+    calculate_conversation_tokens,
+    import_conversation,
+)
 from app.services.updater import CURRENT_VERSION
 
 
@@ -92,6 +97,76 @@ def test_build_conversation_dict_normalization():
     print("✓ test_build_conversation_dict_normalization passed")
 
 
+def test_aggregate_steps_tool_outputs():
+    raw_steps = [
+        {
+            "step_index": 0,
+            "source": "USER_EXPLICIT",
+            "type": "USER_INPUT",
+            "content": "List files",
+            "created_at": "2026-09-16T10:00:00Z"
+        },
+        {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "thinking": "I will run ls",
+            "content": "Running command...",
+            "tool_calls": [
+                {"name": "run_command", "args": {"CommandLine": "ls"}}
+            ],
+            "created_at": "2026-09-16T10:00:01Z"
+        },
+        {
+            "step_index": 2,
+            "source": "SYSTEM",
+            "type": "RUN_COMMAND",
+            "content": "file1.txt\nfile2.txt",
+            "created_at": "2026-09-16T10:00:02Z"
+        },
+        {
+            "step_index": 3,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "content": "Here are the files.",
+            "created_at": "2026-09-16T10:00:03Z"
+        }
+    ]
+    turns = aggregate_steps_into_turns(raw_steps)
+    assert len(turns) == 2, f"Expected 2 turns (user + assistant), got {len(turns)}"
+    asst_turn = turns[1]
+    assert asst_turn["role"] == "assistant"
+    acts = asst_turn["tool_activities"]
+    assert len(acts) == 1, f"Expected 1 tool activity, got {len(acts)}"
+    assert acts[0]["name"] == "run_command"
+    assert acts[0]["result"] == "file1.txt\nfile2.txt"
+    assert acts[0]["status"] == "done"
+    assert "file1.txt" not in asst_turn["content"], "Tool output leaked into assistant speech content"
+    print("✓ test_aggregate_steps_tool_outputs passed")
+
+
+def test_bulk_import_transaction():
+    import_payload = [
+        {
+            "title": "Batch Session 1",
+            "steps": [
+                {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Hello 1", "created_at": "2026-09-16T10:00:00Z"}
+            ]
+        },
+        {
+            "title": "Batch Session 2",
+            "steps": [
+                {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Hello 2", "created_at": "2026-09-16T10:00:00Z"}
+            ]
+        }
+    ]
+    res = import_conversation(import_payload)
+    assert res["success"] is True
+    assert res["count"] == 2
+    assert len(res["conversations"]) == 2
+    print("✓ test_bulk_import_transaction passed")
+
+
 def test_version_consistency():
     pkg_path = BACKEND_DIR.parent / "frontend" / "package.json"
     with open(pkg_path, "r", encoding="utf-8") as f:
@@ -104,7 +179,7 @@ def test_version_consistency():
     assert frontend_ver == backend_ver == updater_ver, (
         f"Version mismatch: frontend={frontend_ver}, backend={backend_ver}, updater={updater_ver}"
     )
-    assert frontend_ver == "0.1.54", f"Expected version 0.1.54, got {frontend_ver}"
+    assert frontend_ver == "0.1.55", f"Expected version 0.1.55, got {frontend_ver}"
     print(f"✓ test_version_consistency passed ({frontend_ver})")
 
 
@@ -114,5 +189,7 @@ if __name__ == "__main__":
     test_session_metadata_copy()
     test_get_session_meta_isolation()
     test_build_conversation_dict_normalization()
+    test_aggregate_steps_tool_outputs()
+    test_bulk_import_transaction()
     test_version_consistency()
     print("\nAll unit tests passed successfully!")

@@ -801,6 +801,27 @@ export function App() {
         }
       } else if (event.event === 'steered') {
         setIsStreaming(true);
+      } else if (event.event === 'model_failover') {
+        showToast(
+          `🔄 Quota atteint avec ${event.previous_model}. Basculement automatique sur ${event.new_model} et relance...`,
+          'info'
+        );
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant') {
+            const notice = `\n\n> 🔄 **Basculement automatique de modèle :** Quota atteint avec \`${event.previous_model}\`. Poursuite immédiate de l'exécution avec \`${event.new_model}\`...\n\n`;
+            return [
+              ...prev.slice(0, -1),
+              {
+                ...last,
+                thought: (last.thought || '') + notice,
+                isLive: true
+              }
+            ];
+          }
+          return prev;
+        });
+        setIsStreaming(true);
       } else if (event.event === 'account_failover') {
         showToast(
           `🔄 Quota atteint sur ${event.previous_account}. Basculement automatique sur ${event.new_account} et relance...`,

@@ -10,7 +10,7 @@ from app.platform_utils import (
     terminate_process_group_async,
     terminate_process_group_sync,
 )
-from app.services.agy_driver import stream_turn
+from app.services.agy_driver import get_model_families, stream_turn
 from app.services.google_auth import (
     get_active_account,
     is_quota_error,
@@ -243,6 +243,9 @@ class ExecutionSession:
 
         attempt = 0
         max_failover_attempts = 5
+        model_switched_on_current_account = False
+        current_model = model
+        current_effort = effort
 
         try:
             while attempt < max_failover_attempts:
@@ -261,8 +264,8 @@ class ExecutionSession:
                         prompt=prompt,
                         conversation_id=active_cid,
                         workspace_path=ws_path,
-                        model=model,
-                        effort=effort,
+                        model=current_model,
+                        effort=current_effort,
                         auto_approve=auto_approve,
                         agent_mode=agent_mode,
                         proc_callback=on_proc_spawned
@@ -326,8 +329,49 @@ class ExecutionSession:
                         f"[Session {self.conversation_id}] Google Account {current_email} reached quota limits. Triggering auto-failover..."
                     )
 
-                    new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=model)
-                    if new_account:
+                    # 1. Essayer de basculer sur un autre type de modèle (Gemini <-> Externe) avant de changer de compte
+                    if not model_switched_on_current_account:
+                        families = await get_model_families()
+                        is_gemini = "gemini" in str(current_model).lower()
+                        candidate_models = [
+                            f for f in families
+                            if ("gemini" not in f.get("id", "").lower() if is_gemini else "gemini" in f.get("id", "").lower())
+                        ]
+                        found_alternative = False
+                        for cand in candidate_models:
+                            variants = cand.get("variants") or {}
+                            cand_model = variants.get("default") or next(iter(variants.values()), None)
+                            if cand_model and cand_model != current_model:
+                                old_model = current_model
+                                current_model = cand_model
+                                current_effort = cand.get("default_effort")
+                                model_switched_on_current_account = True
+                                found_alternative = True
+                                logger.warning(
+                                    f"[Session {self.conversation_id}] Quota reached on {current_email} with {old_model} — switching to alternative model {current_model}..."
+                                )
+                                self.live_thought = ""
+                                self.live_content = ""
+                                self.live_tool_calls = []
+                                self.pending_approval = None
+                                await self.broadcast({
+                                    "event": "model_failover",
+                                    "conversation_id": self.conversation_id,
+                                    "previous_model": old_model,
+                                    "new_model": current_model,
+                                    "account": current_email,
+                                    "message": f"Quota atteint avec {old_model}. Basculement automatique sur {current_model} et relance de la tâche..."
+                                })
+                                break
+                        if found_alternative and attempt < max_failover_attempts:
+                            await asyncio.sleep(1.0)
+                            continue
+                        model_switched_on_current_account = True
+
+                    # 2. Si le modèle a déjà été basculé ou si c'est impossible, basculer le compte Google
+                    new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=current_model)
+                    if new_account and attempt < max_failover_attempts:
+                        model_switched_on_current_account = False
                         logger.info(
                             f"[Session {self.conversation_id}] Auto-failover: Switched from {current_email} to {new_account}. Relaunching task immediately..."
                         )

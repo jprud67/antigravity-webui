@@ -263,6 +263,10 @@ export class ChatWebSocketClient {
       mode: params.mode || 'normal',
     };
 
+    this.queueOrSend(payload);
+  }
+
+  private queueOrSend(payload: any) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       this.pendingPayloads.push(payload);
       if (this.pendingPayloads.length > 20) {
@@ -274,35 +278,32 @@ export class ChatWebSocketClient {
       return;
     }
 
-    this.ws.send(JSON.stringify(payload));
+    try {
+      this.ws.send(JSON.stringify(payload));
+    } catch (err) {
+      console.error('[WS] Error sending payload, queueing for reconnect:', err);
+      this.pendingPayloads.push(payload);
+    }
   }
 
   public sendInterrupt(conversationId?: string) {
     const cid = conversationId || this.currentConversationId;
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ action: 'interrupt', conversation_id: cid }));
-    }
+    this.queueOrSend({ action: 'interrupt', conversation_id: cid });
   }
 
   public sendClearQueue(conversationId?: string) {
     const cid = conversationId || this.currentConversationId;
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ action: 'clear_queue', conversation_id: cid }));
-    }
+    this.queueOrSend({ action: 'clear_queue', conversation_id: cid });
   }
 
   public sendApproval(decision: 'allow-once' | 'allow-session' | 'always-allow' | 'deny', rule?: string, conversationId?: string) {
     const cid = conversationId || this.currentConversationId;
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ action: 'approval', decision, rule, conversation_id: cid }));
-    }
+    this.queueOrSend({ action: 'approval', decision, rule, conversation_id: cid });
   }
 
   public sendInput(text: string, conversationId?: string) {
     const cid = conversationId || this.currentConversationId;
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ action: 'input', text, conversation_id: cid }));
-    }
+    this.queueOrSend({ action: 'input', text, conversation_id: cid });
   }
 
   public clearPendingPayloads() {

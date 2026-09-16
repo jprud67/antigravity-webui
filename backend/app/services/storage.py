@@ -1275,25 +1275,55 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
         # 4. Tool outputs (GENERIC / SYSTEM steps following a tool call)
         tool_calls = s.get("tool_calls") or []
         is_tool_output = (
-            stype in ["GENERIC", "SYSTEM", "TOOL_RESULT"]
+            stype.upper() in [
+                "GENERIC",
+                "SYSTEM",
+                "TOOL_RESULT",
+                "TOOL_OUTPUT",
+                "VIEW_FILE",
+                "RUN_COMMAND",
+                "CODE_ACTION",
+                "GREP_SEARCH",
+                "LIST_DIRECTORY",
+            ]
             and not tool_calls
             and not thinking
         )
 
-        if is_tool_output and current_asst:
-            activities = current_asst.get("tool_activities", [])
+        if is_tool_output:
+            if not current_asst:
+                current_asst = {
+                    "role": "assistant",
+                    "step_index": step_index,
+                    "timestamp": ts,
+                    "content": "",
+                    "thinking": "",
+                    "tool_activities": [],
+                }
+            activities = current_asst.setdefault("tool_activities", [])
             pending = None
             for act in activities:
                 if not act.get("result"):
                     pending = act
                     break
+            is_err = s.get("status") == "ERROR" or bool(s.get("error"))
+            status_val = "error" if is_err else "done"
+            out_content = content or (str(s.get("error")) if s.get("error") else "")
             if pending:
-                pending["result"] = content
-                pending["status"] = "done"
+                pending["result"] = out_content
+                pending["status"] = status_val
             else:
-                if content:
-                    existing = current_asst.get("content", "")
-                    current_asst["content"] = f"{existing}\n\n{content}".strip() if existing else content
+                act_name = (
+                    stype.lower()
+                    if stype.upper() not in ("GENERIC", "SYSTEM", "TOOL_RESULT", "TOOL_OUTPUT")
+                    else "action"
+                )
+                activities.append({
+                    "name": act_name,
+                    "args": {},
+                    "result": out_content,
+                    "status": status_val,
+                })
             continue
 
         # 4. Assistant actions
@@ -1895,7 +1925,7 @@ def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
             raise
         return current
 
-def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: str) -> dict[str, Any]:
+def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: str, conn: sqlite3.Connection | None = None) -> dict[str, Any]:
     new_id = str(uuid.uuid4())
     title = payload.get("title") or "Conversation importée"
     steps: list[dict[str, Any]] = []
@@ -1976,9 +2006,12 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
             preview = str(c)[:150]
             break
 
-    parent_conv_id = payload.get("parent_conversation_id") or meta_payload.get("parent_conversation_id") or None
+    parent_conv_id = payload.get("parent_conversation_id") or meta_payload.get("parent_conversation_id") or ""
 
-    conn = get_db_connection()
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
     try:
         cursor = conn.cursor()
         cursor.execute(
@@ -2011,9 +2044,11 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
                 0
             )
         )
-        conn.commit()
+        if should_close:
+            conn.commit()
     finally:
-        conn.close()
+        if should_close and conn is not None:
+            conn.close()
 
     return {
         "success": True,
@@ -2045,9 +2080,17 @@ def import_conversation(payload: dict[str, Any] | list[Any]) -> dict[str, Any]:
 
     if items_to_import is not None:
         imported = []
-        for item in items_to_import:
-            res = _import_single_conversation(item, now_iso, now_db)
-            imported.append(res)
+        conn = get_db_connection()
+        try:
+            for item in items_to_import:
+                res = _import_single_conversation(item, now_iso, now_db, conn=conn)
+                imported.append(res)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
         primary_id = imported[-1]["conversation_id"] if imported else ""
         return {
             "success": True,
