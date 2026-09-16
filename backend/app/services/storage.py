@@ -1246,7 +1246,7 @@ def export_conversation_html(conversation_id: str) -> str:
 
         thought_html = ""
         if thinking:
-            escaped_thought = html.escape(thinking)
+            escaped_thought = html.escape(thinking, quote=True)
             thought_html = f"""
             <details class="thought-block">
                 <summary>🧠 Raisonnement interne ({len(thinking)} car.)</summary>
@@ -1258,12 +1258,12 @@ def export_conversation_html(conversation_id: str) -> str:
         if tool_activities:
             tools_rendered = []
             for act in tool_activities:
-                tname = html.escape(act.get("name", "tool"))
-                targs = html.escape(json.dumps(act.get("args", {}), indent=2, ensure_ascii=False, default=str))
+                tname = html.escape(act.get("name", "tool"), quote=True)
+                targs = html.escape(json.dumps(act.get("args", {}), indent=2, ensure_ascii=False, default=str), quote=True)
                 res = act.get("result", "")
                 res_html = ""
                 if res:
-                    escaped_res = html.escape(res[:2000] + ("..." if len(res) > 2000 else ""))
+                    escaped_res = html.escape(res[:2000] + ("..." if len(res) > 2000 else ""), quote=True)
                     res_html = f'<div class="tool-result-header">Résultat :</div><pre class="tool-result">{escaped_res}</pre>'
 
                 tools_rendered.append(f"""
@@ -1283,7 +1283,7 @@ def export_conversation_html(conversation_id: str) -> str:
             </details>
             """
 
-        escaped_content = html.escape(content).replace("\n", "<br>")
+        escaped_content = html.escape(content, quote=True).replace("\n", "<br>")
 
         messages_html.append(f"""
         <div class="message-row {'row-user' if is_user else 'row-assistant'}">
@@ -1301,13 +1301,15 @@ def export_conversation_html(conversation_id: str) -> str:
         """)
 
     body_content = "\n".join(messages_html)
+    escaped_title = html.escape(title, quote=True)
+    escaped_conv_id = html.escape(conversation_id, quote=True)
 
     return f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{html.escape(title)} - Antigravity WebUI</title>
+    <title>{escaped_title} - Antigravity WebUI</title>
     <style>
         :root {{
             --bg-body: #080c16;
@@ -1524,8 +1526,8 @@ def export_conversation_html(conversation_id: str) -> str:
     <div class="container">
         <div class="header">
             <div>
-                <h1>{html.escape(title)}</h1>
-                <div class="meta">Session ID: {conversation_id} • Exporté le {date_str} • {len(turns)} échanges ({len(steps)} étapes)</div>
+                <h1>{escaped_title}</h1>
+                <div class="meta">Session ID: {escaped_conv_id} • Exporté le {date_str} • {len(turns)} échanges ({len(steps)} étapes)</div>
             </div>
             <button class="print-btn" onclick="window.print()">Imprimer / PDF</button>
         </div>

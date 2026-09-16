@@ -763,8 +763,17 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
+      setSpeakingMsgId(null);
     };
   }, [conversationId]);
+
+  // Cancel speech synthesis when a new streaming turn begins
+  useEffect(() => {
+    if (isStreaming && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setSpeakingMsgId(null);
+    }
+  }, [isStreaming]);
 
   const toggleThought = (id: string) => {
     setExpandedThoughts((prev) => ({ ...prev, [id]: !prev[id] }));
