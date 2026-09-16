@@ -205,6 +205,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
 
     // Accumulation des appels d'outils
     if (toolCallsRaw.length > 0) {
+      const isStepError = s.status === 'ERROR' || Boolean(s.error);
       for (const tc of toolCallsRaw) {
         if (!tc || typeof tc !== 'object') continue;
         currentAssistantMsg.toolCalls = currentAssistantMsg.toolCalls || [];
@@ -212,7 +213,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
           name: tc.name || tc.tool_name || tc.toolAction || 'tool',
           args: tc.args || tc.parameters || {},
           result: undefined,
-          status: s.status === 'DONE' ? 'done' : 'running'
+          status: isStepError ? 'error' : (s.status === 'DONE' ? 'done' : 'running')
         });
       }
     }
@@ -234,20 +235,22 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
     );
 
     if (isToolOutput) {
+      const isErr = s.status === 'ERROR' || Boolean(s.error);
+      const outputText = content || (s.error ? String(s.error) : '');
       const tools = currentAssistantMsg.toolCalls || [];
       // Appairer avec le premier outil en attente de résultat (FIFO)
       const targetTool = tools.find((t) => t.result === undefined);
       if (targetTool) {
-        targetTool.result = content;
-        targetTool.status = 'done';
+        targetTool.result = outputText;
+        targetTool.status = isErr ? 'error' : 'done';
       } else {
         // Sortie d'action implicite sans appel préalable (ex: amorce subagent)
         currentAssistantMsg.toolCalls = currentAssistantMsg.toolCalls || [];
         currentAssistantMsg.toolCalls.push({
           name: stype !== 'GENERIC' && stype !== 'TOOL_OUTPUT' && stype !== 'TOOL_RESULT' ? stype.toLowerCase() : 'action',
           args: {},
-          result: content,
-          status: 'done'
+          result: outputText,
+          status: isErr ? 'error' : 'done'
         });
       }
     } else if (isModelResponse) {

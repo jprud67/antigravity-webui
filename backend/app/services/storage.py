@@ -1759,7 +1759,7 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
                 json.dumps([get_default_workspace_uri()]),
                 "DONE",
                 "import",
-                None,
+                "",
                 now_db,
                 0
             )
@@ -1772,6 +1772,7 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
         "success": True,
         "conversation_id": new_id,
         "title": title,
+        "step_count": len(steps),
         "steps_count": len(steps)
     }
 

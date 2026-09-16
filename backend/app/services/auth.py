@@ -118,6 +118,8 @@ def verify_access_token(token: str | None) -> bool:
         return False
     
     user, exp_str, sig = parts
+    if user != "antigravity_user":
+        return False
     payload = f"{user}:{exp_str}"
     expected_sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(sig, expected_sig):

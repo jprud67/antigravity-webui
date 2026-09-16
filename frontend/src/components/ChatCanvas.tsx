@@ -387,6 +387,15 @@ const MarkdownContent = React.memo(
 /**
  * Specialized Micro-Card for single tool execution
  */
+const formatToolResult = (result: any): string => {
+  if (typeof result === 'string') return result;
+  try {
+    return JSON.stringify(result, null, 2);
+  } catch {
+    return String(result);
+  }
+};
+
 const ToolItemCard: React.FC<{ tool: ToolCallItem }> = ({ tool }) => {
   const [openDrawer, setOpenDrawer] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -396,7 +405,7 @@ const ToolItemCard: React.FC<{ tool: ToolCallItem }> = ({ tool }) => {
   const isFile = ['view_file', 'write_to_file', 'list_dir', 'find_by_name', 'grep_search'].includes(tool.name);
 
   const handleCopyResult = async () => {
-    const text = typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2);
+    const text = formatToolResult(tool.result);
     await copyTextToClipboard(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -486,7 +495,7 @@ const ToolItemCard: React.FC<{ tool: ToolCallItem }> = ({ tool }) => {
             </button>
           </div>
           <pre className="p-2.5 text-[10.5px] font-mono leading-relaxed overflow-x-auto max-h-56 bg-code-bg text-pre-text">
-            {typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2)}
+            {formatToolResult(tool.result)}
           </pre>
         </div>
       )}

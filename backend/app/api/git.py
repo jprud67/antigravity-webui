@@ -284,7 +284,11 @@ def git_push(req: PushRequest, _ = Depends(require_auth)):
 
     push_res = run_git(["push", req.remote, branch], target, timeout=35, env=git_env)
     if push_res.returncode != 0:
-        raise HTTPException(status_code=500, detail=f"Échec du push : {push_res.stderr or push_res.stdout}")
+        err_out = push_res.stderr or push_res.stdout or ""
+        if "has no upstream branch" in err_out or "--set-upstream" in err_out:
+            push_res = run_git(["push", "-u", req.remote, branch], target, timeout=35, env=git_env)
+        if push_res.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"Échec du push : {push_res.stderr or push_res.stdout}")
 
     return {
         "success": True,

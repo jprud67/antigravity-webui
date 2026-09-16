@@ -168,6 +168,9 @@ class SaveFileRequest(BaseModel):
 def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
     file_path = Path(req.path)
     resolved_path = _validate_path_access(file_path)
+    if resolved_path.exists() and resolved_path.is_dir():
+        raise HTTPException(status_code=400, detail="Impossible d'écrire un fichier sur un répertoire existant.")
+
     tmp_path: Path | None = None
     try:
         resolved_path.parent.mkdir(parents=True, exist_ok=True)
@@ -192,8 +195,10 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
 def download_file(path: str = Query(...), _ = Depends(require_auth)):
     file_path = Path(path)
     resolved_path = _validate_path_access(file_path)
-    if not resolved_path.exists() or not resolved_path.is_file():
+    if not resolved_path.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
+    if not resolved_path.is_file():
+        raise HTTPException(status_code=400, detail="La cible n'est pas un fichier.")
 
     return FileResponse(
         path=str(resolved_path),
