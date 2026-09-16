@@ -513,9 +513,9 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                       }}
                     >
                       <div className="flex items-start justify-between gap-3 mb-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>{job.name}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-xs truncate max-w-[150px] sm:max-w-[200px]" style={{ color: 'var(--strong)' }} title={job.name}>{job.name}</span>
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium ${
                                 isScheduled
@@ -539,7 +539,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center justify-end gap-1.5 shrink-0 flex-wrap">
                           <button
                             onClick={() => handleTriggerNow(job)}
                             className="p-1.5 rounded-lg border transition-colors cursor-pointer text-xs flex items-center gap-1"
