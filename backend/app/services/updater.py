@@ -323,17 +323,23 @@ async def apply_update() -> dict[str, Any]:
     # 1. Refus si l'arbre git contient des modifications locales
     dirty = _git_cmd(["status", "--porcelain", "--untracked-files=no"], timeout=10)
     if dirty:
-        _clear_update_marker()
-        logger.warning("Update refused: dirty worktree.")
-        return {
-            "ok": False,
-            "error": "dirty_worktree",
-            "message": "Des modifications locales non commitées bloquent la mise à jour. Committez-les d'abord (aucun changement appliqué)."
-        }
+        dirty_lines = [l.strip() for l in (dirty or "").splitlines() if l.strip()]
+        if dirty_lines and all("package-lock.json" in l for l in dirty_lines):
+            logger.info("Rétablissement automatique de package-lock.json propre avant mise à jour...")
+            _git_cmd(["checkout", "--", "frontend/package-lock.json"])
+            dirty = _git_cmd(["status", "--porcelain", "--untracked-files=no"], timeout=10)
+        if dirty:
+            _clear_update_marker()
+            logger.warning("Update refused: dirty worktree.")
+            return {
+                "ok": False,
+                "error": "dirty_worktree",
+                "message": "Des modifications locales non commitées bloquent la mise à jour. Committez-les d'abord (aucun changement appliqué)."
+            }
 
     prev_sha = _git_cmd(["rev-parse", "HEAD"], timeout=6)
 
-    # 2. Pull fast-forward uniquement (pas de merge surprise)
+    # 2. Pull fast-forward (avec tentative de rebase automatique si divergence sans conflit)
     git_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
     pull_proc = await asyncio.create_subprocess_exec(
         "git", "pull", "--ff-only", "origin", "main",
@@ -345,16 +351,40 @@ async def apply_update() -> dict[str, Any]:
     stdout, stderr = await pull_proc.communicate()
     if pull_proc.returncode != 0:
         err_msg = stderr.decode(errors="replace").strip()
-        _clear_update_marker()
-        logger.error(f"git pull --ff-only failed: {err_msg}")
-        return {
-            "ok": False,
-            "error": "git_pull_failed",
-            "message": f"Échec lors de la récupération Git : {err_msg}"
-        }
-
-    pull_output = stdout.decode(errors="replace").strip()
-    logger.info(f"git pull success: {pull_output}")
+        if "diverging" in err_msg.lower() or "not possible to fast-forward" in err_msg.lower():
+            logger.info("Divergence détectée, tentative de git pull --rebase origin main...")
+            rebase_proc = await asyncio.create_subprocess_exec(
+                "git", "pull", "--rebase", "origin", "main",
+                cwd=str(REPO_DIR),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=git_env
+            )
+            r_out, r_err = await rebase_proc.communicate()
+            if rebase_proc.returncode == 0:
+                pull_output = r_out.decode(errors="replace").strip()
+                logger.info(f"git pull --rebase success: {pull_output}")
+            else:
+                _git_cmd(["rebase", "--abort"])
+                _clear_update_marker()
+                err_msg = r_err.decode(errors="replace").strip()
+                logger.error(f"git pull --rebase failed: {err_msg}")
+                return {
+                    "ok": False,
+                    "error": "git_pull_failed",
+                    "message": f"Échec lors de la récupération Git (divergence non résolue) : {err_msg}"
+                }
+        else:
+            _clear_update_marker()
+            logger.error(f"git pull --ff-only failed: {err_msg}")
+            return {
+                "ok": False,
+                "error": "git_pull_failed",
+                "message": f"Échec lors de la récupération Git : {err_msg}"
+            }
+    else:
+        pull_output = stdout.decode(errors="replace").strip()
+        logger.info(f"git pull success: {pull_output}")
 
     # 3. Rebuild du frontend
     frontend_dir = REPO_DIR / "frontend"
@@ -367,7 +397,7 @@ async def apply_update() -> dict[str, Any]:
                 cwd=str(frontend_dir),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=os.environ
+                env=dict(os.environ)
             )
             _b_out, b_err = await asyncio.wait_for(build_proc.communicate(), timeout=300.0)
             if build_proc.returncode != 0:
@@ -406,7 +436,7 @@ async def apply_update() -> dict[str, Any]:
                 rb = await asyncio.to_thread(
                     subprocess.run,
                     npm_argv("run", "build"), cwd=str(frontend_dir), capture_output=True, timeout=120, check=False,
-                    env=os.environ
+                    env=dict(os.environ)
                 )
                 hint = "frontend restauré" if rb.returncode == 0 else "relancez un build manuellement"
             except Exception:
