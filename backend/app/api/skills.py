@@ -15,11 +15,29 @@ class SkillDirInfo(TypedDict):
     type: str
     dir: Path
 
-SKILL_DIRS: list[SkillDirInfo] = [
-    {"type": "user", "dir": HOME / ".gemini" / "config" / "skills"},
-    {"type": "hermes", "dir": HOME / ".hermes" / "skills"},
-    {"type": "builtin", "dir": GEMINI_DIR / "builtin" / "skills"},
-]
+
+def get_skill_dirs() -> list[SkillDirInfo]:
+    dirs: list[SkillDirInfo] = []
+    seen: set[str] = set()
+
+    candidates: list[tuple[str, Path]] = [
+        ("user", HOME / ".gemini" / "config" / "skills"),
+        ("user", GEMINI_DIR.parent / "config" / "skills"),
+        ("hermes", HOME / ".hermes" / "skills"),
+        ("builtin", GEMINI_DIR / "builtin" / "skills"),
+    ]
+    for s_type, p in candidates:
+        try:
+            resolved = str(p.resolve())
+        except Exception:
+            resolved = str(p)
+        if resolved not in seen:
+            seen.add(resolved)
+            dirs.append({"type": s_type, "dir": p})
+    return dirs
+
+
+SKILL_DIRS: list[SkillDirInfo] = get_skill_dirs()
 
 def parse_skill_md(skill_file: Path) -> dict[str, Any]:
     name = skill_file.parent.name
@@ -77,15 +95,16 @@ def parse_skill_md(skill_file: Path) -> dict[str, Any]:
 @router.get("")
 def list_skills(_ = Depends(require_auth)):
     skills = []
-    
-    for s_info in SKILL_DIRS:
+    seen_ids: set[str] = set()
+
+    for s_info in get_skill_dirs():
         base_dir = s_info["dir"]
         s_type = s_info["type"]
         if not base_dir.exists():
             continue
 
-        for folder in base_dir.iterdir():
-            if not folder.is_dir():
+        for folder in sorted(base_dir.iterdir()):
+            if not folder.is_dir() or folder.name in seen_ids:
                 continue
             skill_md = folder / "SKILL.md"
             if skill_md.exists():
@@ -94,6 +113,7 @@ def list_skills(_ = Depends(require_auth)):
                 has_examples = (folder / "examples").exists()
                 stat = skill_md.stat()
 
+                seen_ids.add(folder.name)
                 skills.append({
                     "id": folder.name,
                     "name": meta["name"],
@@ -114,7 +134,7 @@ def get_skill_detail(skill_id: str, _ = Depends(require_auth)):
     if not safe_id or safe_id != skill_id or ".." in skill_id:
         raise HTTPException(status_code=400, detail="Identifiant de skill non valide")
 
-    for s_info in SKILL_DIRS:
+    for s_info in get_skill_dirs():
         base_dir = Path(s_info["dir"])
         target = base_dir / safe_id / "SKILL.md"
         if target.exists():

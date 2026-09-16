@@ -57,12 +57,15 @@ async def event_stream(request: Request, token: str | None = None):
     # Auth check (same pattern as other endpoints)
     config = get_auth_config()
     if config.get("enabled", True):
-        if not token:
-            # Try header
+        raw_token = token
+        if not raw_token:
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
-                token = auth_header[7:]
-        if not verify_access_token(token):
+                raw_token = auth_header[7:]
+        elif raw_token.startswith("Bearer "):
+            raw_token = raw_token[7:]
+        clean_token = raw_token.strip() if raw_token else None
+        if not clean_token or not verify_access_token(clean_token):
             raise HTTPException(status_code=401, detail="Non authentifié")
 
     q: asyncio.Queue = asyncio.Queue(maxsize=50)

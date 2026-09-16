@@ -740,6 +740,14 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
     safe_ids = [cid for cid in conversation_ids if is_safe_conversation_id(cid)]
     if not safe_ids:
         return True
+
+    try:
+        from app.services.execution_manager import execution_manager
+        for cid in safe_ids:
+            execution_manager.remove_session(cid)
+    except Exception:
+        pass
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -757,6 +765,13 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
 def delete_conversation(conversation_id: str) -> bool:
     if not is_safe_conversation_id(conversation_id):
         return False
+
+    try:
+        from app.services.execution_manager import execution_manager
+        execution_manager.remove_session(conversation_id)
+    except Exception:
+        pass
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
