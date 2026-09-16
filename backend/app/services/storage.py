@@ -566,6 +566,7 @@ def create_conversation_handoff(
 
     now_iso = datetime.now(timezone.utc).isoformat()
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
 
     user_reqs_md = "\n".join([f"{i+1}. {req}" for i, req in enumerate(user_requests[-6:])]) if user_requests else "Poursuite de la session de développement."
     files_md = "\n".join([f"- `{f}`" for f in list(files_touched)[:12]]) if files_touched else "- Fichiers du workspace de travail"
@@ -669,12 +670,12 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
                 title,
                 preview,
                 2,
-                now_iso,
+                now_db,
                 source_workspace,
                 "DONE",
                 agent_name,
                 source_conversation_id,
-                now_iso,
+                now_db,
                 0
             )
         )
@@ -1644,6 +1645,7 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
     2. Hermes WebUI session format ({ session_id, title, messages, ... })
     """
     now_iso = datetime.now(timezone.utc).isoformat()
+    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
     new_id = str(uuid.uuid4())
 
     title = "Conversation importée"
@@ -1747,12 +1749,12 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
                 title,
                 preview,
                 len(steps),
-                now_iso,
+                now_db,
                 json.dumps([get_default_workspace_uri()]),
                 "DONE",
                 "import",
                 None,
-                now_iso,
+                now_db,
                 0
             )
         )

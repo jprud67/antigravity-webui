@@ -18,8 +18,6 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
 
     await websocket.accept()
     execution_manager.register_socket(websocket)
-    if execution_manager.active_session and execution_manager.active_session.is_running:
-        execution_manager.active_session.add_subscriber(websocket)
     logger.info("WebSocket client connected to /ws/chat")
 
     # Send connection handshake with server status

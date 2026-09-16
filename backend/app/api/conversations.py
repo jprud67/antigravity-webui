@@ -70,12 +70,17 @@ class BulkActionRequest(BaseModel):
     payload: dict[str, Any] | None = None
 
 @router.post("/bulk")
-def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
+async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
     action = req.action
     ids = req.conversation_ids
     results = {}
 
     if action == "delete":
+        for cid in ids:
+            try:
+                await execution_manager.interrupt(cid)
+            except Exception:
+                pass
         try:
             bulk_delete_conversations(ids)
             for cid in ids:
@@ -235,7 +240,11 @@ def update_metadata(conversation_id: str, req: MetadataUpdateRequest, _ = Depend
     return {"success": True, "conversation_id": conversation_id, "metadata": updated}
 
 @router.delete("/{conversation_id}")
-def remove_conversation(conversation_id: str, _ = Depends(require_auth)):
+async def remove_conversation(conversation_id: str, _ = Depends(require_auth)):
+    try:
+        await execution_manager.interrupt(conversation_id)
+    except Exception:
+        pass
     success = delete_conversation(conversation_id)
     return {"success": success, "conversation_id": conversation_id}
 

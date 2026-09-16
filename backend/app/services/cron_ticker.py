@@ -335,6 +335,9 @@ async def tick_once() -> int:
         changed = False
 
         for job in data.get("jobs", []):
+            job_id = job.get("id")
+            if not job_id:
+                continue
             if not job.get("enabled", True):
                 continue
             if job.get("state", "scheduled") != "scheduled":
@@ -342,7 +345,7 @@ async def tick_once() -> int:
             nxt = job.get("next_run_at")
             if not nxt:
                 continue
-            if job.get("id") in _running_jobs:
+            if job_id in _running_jobs:
                 continue
             try:
                 due = datetime.fromisoformat(str(nxt))
@@ -350,7 +353,7 @@ async def tick_once() -> int:
                     due = due.replace(tzinfo=timezone.utc)
             except (ValueError, TypeError) as parse_err:
                 logger.warning(
-                    f"[Cron] Date next_run_at invalide pour le job {job.get('id')} ('{nxt}': {parse_err}). Recalcul automatique."
+                    f"[Cron] Date next_run_at invalide pour le job {job_id} ('{nxt}': {parse_err}). Recalcul automatique."
                 )
                 computed_next = compute_next_run(job.get("schedule"))
                 if not computed_next:
@@ -363,11 +366,11 @@ async def tick_once() -> int:
                 job["last_started_at"] = now_iso()
                 computed_next = compute_next_run(job.get("schedule"))
                 if not computed_next:
-                    logger.warning(f"[Cron] Impossible de calculer le prochain run pour {job.get('id')}, repli sur +1h.")
+                    logger.warning(f"[Cron] Impossible de calculer le prochain run pour {job_id}, repli sur +1h.")
                     computed_next = (now + timedelta(hours=1)).isoformat()
                 job["next_run_at"] = computed_next
                 changed = True
-                _running_jobs.add(job.get("id"))
+                _running_jobs.add(job_id)
                 to_launch.append(dict(job))
 
         if changed:
