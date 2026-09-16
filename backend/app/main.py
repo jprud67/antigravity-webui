@@ -28,6 +28,7 @@ from app.api.updater import router as updater_router
 from app.api.workspaces import router as ws_router
 from app.config import BRAIN_DIR, CONVERSATION_DB
 from app.services.cron_ticker import cron_ticker_loop
+from app.services.execution_manager import execution_manager
 from app.services.fs_watcher import watch_filesystem
 from app.services.google_auth import restore_stashed_token_if_needed
 from app.services.storage import ensure_db_schema
@@ -75,6 +76,10 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
     try:
+        await execution_manager.close_all_sessions()
+    except Exception as e:
+        logger.debug(f"Erreur arrêt sessions execution: {e}")
+    try:
         await close_all_terminal_sessions()
     except Exception as e:
         logger.debug(f"Erreur arrêt sessions terminal: {e}")
@@ -85,7 +90,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Antigravity WebUI",
     description="Web Interface to orchestrate Antigravity CLI without touching the terminal",
-    version="0.1.33",
+    version="0.1.34",
     lifespan=lifespan
 )
 

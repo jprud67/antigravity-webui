@@ -444,20 +444,40 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
         elif master_fd is not None:
             os.write(master_fd, f"{code}\n".encode())
 
-        # Wait for agy to complete token exchange
+        # Wait for agy to complete token exchange and flush TOKEN_FILE
         start_wait = time.time()
+        token_ready = False
         while time.time() - start_wait < 20:
-            if TOKEN_FILE.exists() or not _proc_running(proc):
+            if TOKEN_FILE.exists() and TOKEN_FILE.stat().st_size > 0:
+                try:
+                    with open(TOKEN_FILE, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        if isinstance(data, dict) and data:
+                            token_ready = True
+                            break
+                except (json.JSONDecodeError, OSError):
+                    pass
+            if not _proc_running(proc):
+                time.sleep(0.2)
+                if TOKEN_FILE.exists() and TOKEN_FILE.stat().st_size > 0:
+                    try:
+                        with open(TOKEN_FILE, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            if isinstance(data, dict) and data:
+                                token_ready = True
+                                break
+                    except (json.JSONDecodeError, OSError):
+                        pass
                 break
             time.sleep(0.3)
 
         # Ensure login resources (PTY fd and child process) are fully closed
         _close_login_resources(master_fd, proc)
 
-        if not TOKEN_FILE.exists():
+        if not token_ready or not TOKEN_FILE.exists():
             # Auth failed, restore previous token
             _restore_stash(stash_path)
-            raise RuntimeError("Échec de l'échange du jeton avec Google: le token n'a pas été généré.")
+            raise RuntimeError("Échec de l'échange du jeton avec Google: le token n'a pas été généré ou est invalide.")
 
         # Auth succeeded! Clean up stash
         if stash_path.exists():

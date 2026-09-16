@@ -784,9 +784,4 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     </aside>
     </>
   );
-}, (prev, next) => {
-  return prev.isOpen === next.isOpen && 
-         prev.activeTab === next.activeTab && 
-         prev.currentWorkspace === next.currentWorkspace &&
-         prev.conversationId === next.conversationId;
 });

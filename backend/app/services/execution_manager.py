@@ -282,6 +282,9 @@ class ExecutionSession:
                 except asyncio.CancelledError:
                     # Note: the canceller (user "interrupt" or steering) is responsible for
                     # broadcasting the relevant event; avoid duplicating "interrupted" here.
+                    for tc in self.live_tool_calls:
+                        if isinstance(tc, dict) and tc.get("status") == "running":
+                            tc["status"] = "cancelled"
                     if not self.is_steering:
                         logger.info(f"[Session {self.conversation_id}] Turn cancelled by user interruption.")
                     else:
@@ -292,6 +295,9 @@ class ExecutionSession:
                     if is_quota_error(err_text):
                         quota_error_detected = True
                     else:
+                        for tc in self.live_tool_calls:
+                            if isinstance(tc, dict) and tc.get("status") == "running":
+                                tc["status"] = "error"
                         logger.error(f"[Session {self.conversation_id}] Error during turn execution: {e}")
                         await self.broadcast({
                             "event": "error",
@@ -327,6 +333,9 @@ class ExecutionSession:
                         await asyncio.sleep(1.0)
                         continue
                     else:
+                        for tc in self.live_tool_calls:
+                            if isinstance(tc, dict) and tc.get("status") == "running":
+                                tc["status"] = "error"
                         logger.error(f"[Session {self.conversation_id}] Auto-failover failed: No alternative healthy accounts.")
                         await self.broadcast({
                             "event": "error",
@@ -337,6 +346,9 @@ class ExecutionSession:
                 else:
                     logger.info(f"[Session {self.conversation_id}] Turn finished naturally.")
                     self.is_running = False
+                    for tc in self.live_tool_calls:
+                        if isinstance(tc, dict) and tc.get("status") == "running":
+                            tc["status"] = "done"
                     await self.broadcast({
                         "event": "done",
                         "conversation_id": self.conversation_id,
@@ -345,6 +357,9 @@ class ExecutionSession:
                     return
 
             # All failover attempts were exhausted without a conclusive outcome
+            for tc in self.live_tool_calls:
+                if isinstance(tc, dict) and tc.get("status") == "running":
+                    tc["status"] = "error"
             logger.error(f"[Session {self.conversation_id}] Auto-failover retries exhausted ({max_failover_attempts} attempts).")
             await self.broadcast({
                 "event": "error",
@@ -685,6 +700,40 @@ class ExecutionManager:
                 logger.info(f"Stdin input routed to active proc in session {session.conversation_id}")
             except Exception as e:
                 logger.warning(f"Error writing stdin input to proc stdin: {e}")
+
+    async def close_all_sessions(self):
+        """Cleanly terminates all active sessions, process groups, and background workers on server shutdown."""
+        async with self._lock:
+            sessions = list(self.sessions.values())
+            self.sessions.clear()
+
+        for session in sessions:
+            # 1. Drain queue
+            while not session.message_queue.empty():
+                try:
+                    session.message_queue.get_nowait()
+                    session.message_queue.task_done()
+                except (asyncio.QueueEmpty, ValueError):
+                    break
+
+            # 2. Terminate active process group
+            if session.active_proc and session.active_proc.returncode is None:
+                try:
+                    await terminate_process_group_async(session.active_proc, grace=0.5)
+                except Exception as e:
+                    logger.debug(f"Error terminating proc group for session {session.conversation_id}: {e}")
+
+            # 3. Cancel active task
+            if session.active_task and not session.active_task.done():
+                session.active_task.cancel()
+
+            # 4. Cancel worker task
+            if session.worker_task and not session.worker_task.done():
+                session.worker_task.cancel()
+
+            session.is_running = False
+            session.active_proc = None
+            session.pending_approval = None
 
 
 execution_manager = ExecutionManager()
