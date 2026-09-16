@@ -60,10 +60,10 @@ async def get_available_models() -> list[dict[str, Any]]:
         logger.error("Timeout fetching models via agy CLI")
         raise TimeoutError("agy models timed out after 12s")
     if proc.returncode != 0:
-        logger.error(f"Error fetching models: {stderr.decode()}")
-        raise RuntimeError(f"agy models failed: {stderr.decode()}")
+        logger.error(f"Error fetching models: {stderr.decode(errors='replace')}")
+        raise RuntimeError(f"agy models failed: {stderr.decode(errors='replace')}")
 
-    lines = stdout.decode().replace("\r\n", "\n").replace("\r", "\n").splitlines()
+    lines = stdout.decode(errors="replace").replace("\r\n", "\n").replace("\r", "\n").splitlines()
     models = []
     for line in lines:
         cleaned = line.strip()

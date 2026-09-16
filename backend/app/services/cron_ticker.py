@@ -252,11 +252,11 @@ async def _execute_job(job: dict[str, Any]) -> None:
     header = (
         f"Job: {name} ({job_id})\n"
         f"Début: {datetime.now(timezone.utc).isoformat()}\n"
-        f"Durée: {duration}s — Statut: {result['status']} — Tentatives: {result['attempts']}\n"
-        f"Basculements: {result['failovers'] or 'aucun'}\n"
+        f"Durée: {duration}s — Statut: {result.get('status', 'failed')} — Tentatives: {result.get('attempts', 1)}\n"
+        f"Basculements: {result.get('failovers') or 'aucun'}\n"
         f"{'-' * 60}\n"
     )
-    log_file.write_text(header + result["output"], encoding="utf-8")
+    log_file.write_text(header + str(result.get("output") or ""), encoding="utf-8")
     logger.info(f"[Cron] Journal écrit: {log_file}")
 
     # Mise à jour du job (verrou pour éviter les écritures concurrentes)
@@ -265,11 +265,12 @@ async def _execute_job(job: dict[str, Any]) -> None:
         for j in data.get("jobs", []):
             if j.get("id") == job_id:
                 j["last_run_at"] = now_iso()
-                j["last_status"] = result["status"]
+                j["last_status"] = result.get("status", "failed")
                 j["last_duration_seconds"] = duration
                 j["last_log"] = str(log_file)
-                if result["failovers"]:
-                    j["last_failover"] = result["failovers"][-1]
+                failovers = result.get("failovers")
+                if failovers:
+                    j["last_failover"] = failovers[-1]
                 # Ne recalculer next_run_at que s'il n'est pas déjà planifié dans le futur (évite la dérive de timing)
                 current_next = j.get("next_run_at")
                 is_future = False

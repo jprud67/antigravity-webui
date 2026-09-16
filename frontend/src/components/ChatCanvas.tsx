@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PreBlock, CodeOrInlineBlock } from './AdaptiveCodeBlock';
+import { extractRawText } from '../utils/codeBlockUtils';
 
 import { 
   ChevronDown, 
@@ -189,6 +190,8 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
     }
     cleanPath = cleanPath.replace(/^\/+([a-zA-Z]:)/, '$1');
     const filename = cleanPath.split(/[/\\]/).pop() || cleanPath;
+    const rawLabel = extractRawText(children).trim();
+    const displayLabel = rawLabel && rawLabel !== href ? rawLabel : filename;
     const normalizedSlashPath = cleanPath.replace(/\\/g, '/');
     const isArtifact = normalizedSlashPath.includes('/brain/') && cleanPath.endsWith('.md');
 
@@ -238,7 +241,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
                 className="text-[13px] font-semibold truncate block group-hover:opacity-90 transition-colors"
                 style={{ color: 'var(--strong)' }}
               >
-                {children && typeof children === 'string' && children !== href ? children : filename}
+                {displayLabel}
               </span>
             </span>
           </span>
@@ -295,7 +298,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
           <FileCode className="w-3 h-3" style={{ color: 'var(--accent)' }} />
         </span>
         <span className="font-semibold underline decoration-dotted underline-offset-2 truncate max-w-[280px]">
-          {children && typeof children === 'string' && children !== href ? children : filename}
+          {displayLabel}
         </span>
         {anchor && (
           <span
