@@ -69,13 +69,18 @@ export class ChatWebSocketClient {
           this.sendAttach(this.currentConversationId);
         }
         while (this.pendingPayloads.length > 0) {
+          if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            break;
+          }
           const item = this.pendingPayloads.shift();
           try {
-            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-              this.ws.send(JSON.stringify(item));
-            }
+            this.ws.send(JSON.stringify(item));
           } catch (e) {
             console.error('[WS] Failed to flush queued payload:', e);
+            if (item) {
+              this.pendingPayloads.unshift(item);
+            }
+            break;
           }
         }
       };

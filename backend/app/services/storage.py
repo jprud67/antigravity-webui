@@ -787,10 +787,12 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
 
     # Locate the last user input step
     last_user_idx = -1
+    last_user_step_index = None
     for i in range(len(steps) - 1, -1, -1):
         s = steps[i]
         if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
             last_user_idx = i
+            last_user_step_index = s.get("step_index")
             break
 
     if last_user_idx != -1:
@@ -822,16 +824,22 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
             full_steps = []
 
         if full_steps:
-            last_full_user_idx = -1
-            for i in range(len(full_steps) - 1, -1, -1):
-                s = full_steps[i]
-                if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
-                    last_full_user_idx = i
-                    break
-            if last_full_user_idx != -1:
-                remaining_full_steps = full_steps[:last_full_user_idx]
+            if isinstance(last_user_step_index, int):
+                remaining_full_steps = [
+                    s for s in full_steps
+                    if not (isinstance(s.get("step_index"), int) and s["step_index"] >= last_user_step_index)
+                ]
             else:
-                remaining_full_steps = full_steps[:-1]
+                last_full_user_idx = -1
+                for i in range(len(full_steps) - 1, -1, -1):
+                    s = full_steps[i]
+                    if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
+                        last_full_user_idx = i
+                        break
+                if last_full_user_idx != -1:
+                    remaining_full_steps = full_steps[:last_full_user_idx]
+                else:
+                    remaining_full_steps = full_steps[:-1]
         else:
             remaining_full_steps = remaining_steps
 
@@ -1030,8 +1038,18 @@ def clean_user_prompt(raw: str) -> str:
         text = m.group(1).strip()
     else:
         text = raw
-    text = re.sub(r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>', '', text, flags=re.IGNORECASE)
+    text = re.sub(
+        r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT)>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT)>',
+        '',
+        text,
+        flags=re.IGNORECASE
+    )
+    text = re.sub(
+        r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT)>',
+        '',
+        text,
+        flags=re.IGNORECASE
+    )
     # Strip steering/queued instruction prefixes so history stays pure and clean
     text = re.sub(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+', '', text)
     return text.strip()

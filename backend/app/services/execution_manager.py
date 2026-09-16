@@ -216,12 +216,16 @@ class ExecutionSession:
         effort = params.get("effort")
         auto_approve = params.get("auto_approve", True)
         agent_mode = params.get("agent_mode")
-        if not agent_mode:
-            try:
-                settings = get_settings()
+        try:
+            settings = get_settings()
+            if not agent_mode:
                 agent_mode = settings.get("agentMode")
-            except Exception:
-                agent_mode = None
+            if not model:
+                model = settings.get("model")
+            if not effort:
+                effort = settings.get("effort")
+        except Exception:
+            pass
 
         def on_proc_spawned(p: asyncio.subprocess.Process):
             self.active_proc = p
