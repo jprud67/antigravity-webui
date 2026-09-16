@@ -195,6 +195,9 @@ def get_git_diff(
     if staged:
         args.append("--cached")
     if path:
+        file_candidate = (target / path).resolve()
+        if not is_safe_path(file_candidate, [target]):
+            raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
         args.extend(["--", path])
 
     res = run_git(args, target)
@@ -209,9 +212,9 @@ def get_git_diff(
                 diff_text = cached_res.stdout
         # Si toujours vide, verifier si c'est un fichier non suivi (untracked) present sur le disque
         if not diff_text:
-            file_on_disk = target / path
-            if file_on_disk.is_file():
-                untracked_res = run_git(["diff", "--no-index", "--", "/dev/null", path], target)
+            file_on_disk = (target / path).resolve()
+            if is_safe_path(file_on_disk, [target]) and file_on_disk.is_file():
+                untracked_res = run_git(["diff", "--no-index", "--", os.devnull, path], target)
                 if untracked_res.stdout:
                     diff_text = untracked_res.stdout
 
