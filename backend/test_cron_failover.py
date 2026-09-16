@@ -1,11 +1,16 @@
 import asyncio
-import sys
-sys.path.insert(0, "/root/antigravity-webui/backend")
 import logging
-logging.basicConfig(level=logging.WARNING)
+import sys
+from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from app.services.cron_ticker import run_job_with_failover
-from app.services.google_auth import mark_account_exhausted
+
+logging.basicConfig(level=logging.WARNING)
+
 
 async def test():
     print("Testing Cron Failover Logic...")

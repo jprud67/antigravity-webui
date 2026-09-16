@@ -710,9 +710,10 @@ def switch_to_next_healthy_account(exclude_email: str | None = None, model: str 
     if exclude_email:
         mark_account_exhausted(exclude_email, duration_seconds=1800.0)
 
+    model_info = f" for model {model}" if model else ""
     candidates = get_candidate_accounts(exclude_email=exclude_email)
     if not candidates:
-        logger.warning("No candidate Google accounts available for auto-failover.")
+        logger.warning(f"No candidate Google accounts available for auto-failover{model_info}.")
         return None
 
     # Filter out accounts currently marked exhausted if any non-exhausted candidate exists
@@ -722,10 +723,10 @@ def switch_to_next_healthy_account(exclude_email: str | None = None, model: str 
     for target_email in target_list:
         try:
             switch_google_account(target_email)
-            logger.info(f"Auto-Failover: Switched active Google account to {target_email}")
+            logger.info(f"Auto-Failover: Switched active Google account to {target_email}{model_info}")
             return target_email
         except Exception as e:
-            logger.error(f"Auto-Failover: Failed switching to {target_email}: {e}")
+            logger.error(f"Auto-Failover: Failed switching to {target_email}{model_info}: {e}")
             continue
 
     return None

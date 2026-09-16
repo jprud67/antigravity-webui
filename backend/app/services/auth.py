@@ -17,7 +17,7 @@ logger = logging.getLogger("antigravity.auth")
 AUTH_CONFIG_FILE = GEMINI_DIR / "webui_auth.json"
 
 DEFAULT_SECRET = "antigravity-super-secret-webui-token-key-2026"
-DEFAULT_PASSWORD = os.environ.get("WEBUI_PASSWORD", "antigravity2026")
+DEFAULT_PASSWORD = os.environ.get("WEBUI_PASSWORD") or "antigravity2026"
 
 def hash_password(password: str, salt: str | None = None) -> str:
     if not salt:
