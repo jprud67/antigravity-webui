@@ -418,6 +418,7 @@ class ExecutionManager:
         self.sessions: dict[str, ExecutionSession] = {}
         self.active_session: ExecutionSession | None = None
         self.connected_sockets: set[WebSocket] = set()
+        self._background_tasks: set[asyncio.Task[Any]] = set()
         self._lock: asyncio.Lock = asyncio.Lock()
 
     def remove_session(self, conversation_id: str | None) -> None:
@@ -425,6 +426,8 @@ class ExecutionManager:
         if not conversation_id:
             return
         target_session = self.sessions.pop(conversation_id, None)
+        if not target_session and self.active_session and self.active_session.conversation_id == conversation_id:
+            target_session = self.active_session
         if target_session:
             if target_session is self.active_session:
                 self.active_session = None
@@ -432,7 +435,9 @@ class ExecutionManager:
                 target_session.active_task.cancel()
             if target_session.active_proc and target_session.active_proc.returncode is None:
                 try:
-                    asyncio.create_task(terminate_process_group_async(target_session.active_proc, grace=0.5))
+                    task = asyncio.create_task(terminate_process_group_async(target_session.active_proc, grace=0.5))
+                    self._background_tasks.add(task)
+                    task.add_done_callback(self._background_tasks.discard)
                 except RuntimeError:
                     try:
                         target_session.active_proc.kill()
@@ -485,7 +490,9 @@ class ExecutionManager:
                     target_session.active_task.cancel()
                 if target_session.active_proc and target_session.active_proc.returncode is None:
                     try:
-                        asyncio.create_task(terminate_process_group_async(target_session.active_proc, grace=0.5))
+                        task = asyncio.create_task(terminate_process_group_async(target_session.active_proc, grace=0.5))
+                        self._background_tasks.add(task)
+                        task.add_done_callback(self._background_tasks.discard)
                     except RuntimeError:
                         try:
                             target_session.active_proc.kill()

@@ -93,8 +93,8 @@ def parse_skill_md(skill_file: Path) -> dict[str, Any]:
     }
 
 @router.get("")
-def list_skills(_ = Depends(require_auth)):
-    skills = []
+def list_skills(_ = Depends(require_auth)) -> list[dict[str, Any]]:
+    skills: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
 
     for s_info in get_skill_dirs():

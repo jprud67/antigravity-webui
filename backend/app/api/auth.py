@@ -31,9 +31,10 @@ def get_current_token(
     token: str | None = Query(None)
 ) -> str | None:
     if authorization:
-        if authorization.startswith("Bearer "):
-            return authorization[7:].strip()
-        return authorization.strip()
+        auth_stripped = authorization.strip()
+        if auth_stripped.lower().startswith("bearer "):
+            return auth_stripped[7:].strip()
+        return auth_stripped
     if token:
         return token.strip()
     return None

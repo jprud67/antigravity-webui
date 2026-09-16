@@ -59,11 +59,13 @@ async def event_stream(request: Request, token: str | None = None):
     if config.get("enabled", True):
         raw_token = token
         if not raw_token:
-            auth_header = request.headers.get("Authorization", "")
-            if auth_header.startswith("Bearer "):
+            auth_header = request.headers.get("Authorization", "").strip()
+            if auth_header.lower().startswith("bearer "):
                 raw_token = auth_header[7:]
-        elif raw_token.startswith("Bearer "):
-            raw_token = raw_token[7:]
+            elif auth_header:
+                raw_token = auth_header
+        elif raw_token.strip().lower().startswith("bearer "):
+            raw_token = raw_token.strip()[7:]
         clean_token = raw_token.strip() if raw_token else None
         if not clean_token or not verify_access_token(clean_token):
             raise HTTPException(status_code=401, detail="Non authentifié")

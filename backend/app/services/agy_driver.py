@@ -90,7 +90,7 @@ def parse_model_metadata(m_id: str, m_name: str) -> dict[str, Any]:
             break
     
     family_name = m_name
-    for sfx_label in [' (High)', ' (Medium)', ' (Low)']:
+    for sfx_label in [' (High)', ' (Medium)', ' (Low)', ' (Thinking)']:
         if family_name.endswith(sfx_label):
             family_name = family_name[:-len(sfx_label)]
             break
