@@ -735,11 +735,18 @@ class ExecutionManager:
             except Exception as e:
                 logger.error(f"Failed to update settings for approval: {e}")
 
-        if session.active_proc and session.active_proc.stdin and session.active_proc.returncode is None:
+        if (
+            session.active_proc
+            and session.active_proc.stdin
+            and session.active_proc.returncode is None
+            and not session.active_proc.stdin.is_closing()
+        ):
             try:
                 input_char = "y\n" if decision in ["allow-once", "allow-session", "always-allow"] else "n\n"
                 session.active_proc.stdin.write(input_char.encode())
                 await session.active_proc.stdin.drain()
+            except (BrokenPipeError, ConnectionResetError):
+                logger.debug("Proc stdin was closed before approval could be delivered")
             except Exception as e:
                 logger.warning(f"Error writing approval to proc stdin: {e}")
 
@@ -755,12 +762,19 @@ class ExecutionManager:
         if not session:
             return
 
-        if session.active_proc and session.active_proc.stdin and session.active_proc.returncode is None:
+        if (
+            session.active_proc
+            and session.active_proc.stdin
+            and session.active_proc.returncode is None
+            and not session.active_proc.stdin.is_closing()
+        ):
             try:
                 payload = text if text.endswith("\n") else f"{text}\n"
                 session.active_proc.stdin.write(payload.encode("utf-8"))
                 await session.active_proc.stdin.drain()
                 logger.info(f"Stdin input routed to active proc in session {session.conversation_id}")
+            except (BrokenPipeError, ConnectionResetError):
+                logger.debug("Proc stdin was closed before stdin input could be delivered")
             except Exception as e:
                 logger.warning(f"Error writing stdin input to proc stdin: {e}")
 

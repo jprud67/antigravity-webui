@@ -276,7 +276,7 @@ async def _execute_job(job: dict[str, Any]) -> None:
                 is_future = False
                 if current_next:
                     try:
-                        due = datetime.fromisoformat(str(current_next))
+                        due = datetime.fromisoformat(str(current_next).replace("Z", "+00:00"))
                         if due.tzinfo is None:
                             due = due.replace(tzinfo=timezone.utc)
                         if due > datetime.now(timezone.utc):
@@ -342,7 +342,7 @@ async def tick_once() -> int:
             if job_id in _running_jobs:
                 continue
             try:
-                due = datetime.fromisoformat(str(nxt))
+                due = datetime.fromisoformat(str(nxt).replace("Z", "+00:00"))
                 if due.tzinfo is None:
                     due = due.replace(tzinfo=timezone.utc)
             except (ValueError, TypeError) as parse_err:

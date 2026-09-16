@@ -157,7 +157,8 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             for cid in ids:
                 results[cid] = False
         return {"success": True, "action": action, "count": len(ids), "results": results}
-
+    elif action == "export":
+        return bulk_export(req)
     else:
         raise HTTPException(status_code=400, detail=f"Action non supportée: {action}")
 

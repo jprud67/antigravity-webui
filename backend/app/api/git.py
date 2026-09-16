@@ -20,7 +20,8 @@ _COAUTHOR_RE = re.compile(r"co[-_ ]?authored[-_ ]?by", re.IGNORECASE)
 
 def _sanitize_git_message(msg: str) -> str:
     lines = [line for line in msg.strip().split("\n") if not _COAUTHOR_RE.search(line)]
-    return "\n".join(lines).strip()
+    clean = "\n".join(lines).strip()
+    return clean or "chore: update repository"
 
 def _validate_workspace(workspace: str | None) -> Path:
     target = Path(workspace) if workspace else Path(DEFAULT_WORKSPACE)

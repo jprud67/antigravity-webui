@@ -296,9 +296,9 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
                 tot = (u.get("input_tokens") or 0) + (u.get("output_tokens") or 0)
             if tot > 0:
                 return {
-                    "input_tokens": u.get("input_tokens", 0),
-                    "output_tokens": u.get("output_tokens", 0),
-                    "thinking_tokens": u.get("thinking_tokens", 0),
+                    "input_tokens": u.get("input_tokens") or 0,
+                    "output_tokens": u.get("output_tokens") or 0,
+                    "thinking_tokens": u.get("thinking_tokens") or 0,
                     "total_tokens": tot,
                     "is_estimated": False,
                 }
@@ -420,18 +420,20 @@ def fork_conversation(
         forked_full_steps = forked_steps
 
     forked_transcripts = []
-    for step in forked_steps:
+    for idx, step in enumerate(forked_steps):
         cloned = dict(step)
         if "conversation_id" in cloned:
             cloned["conversation_id"] = new_id
+        cloned["step_index"] = idx
         forked_transcripts.append(cloned)
     atomic_write_jsonl(transcript_path, forked_transcripts)
 
     forked_full_transcripts = []
-    for step in forked_full_steps:
+    for idx, step in enumerate(forked_full_steps):
         cloned = dict(step)
         if "conversation_id" in cloned:
             cloned["conversation_id"] = new_id
+        cloned["step_index"] = idx
         forked_full_transcripts.append(cloned)
     atomic_write_jsonl(transcript_full_path, forked_full_transcripts)
 

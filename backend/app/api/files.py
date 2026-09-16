@@ -193,6 +193,7 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
 
 @router.get("/download")
 def download_file(path: str = Query(...), _ = Depends(require_auth)):
+    import mimetypes
     file_path = Path(path)
     resolved_path = _validate_path_access(file_path)
     if not resolved_path.exists():
@@ -200,8 +201,10 @@ def download_file(path: str = Query(...), _ = Depends(require_auth)):
     if not resolved_path.is_file():
         raise HTTPException(status_code=400, detail="La cible n'est pas un fichier.")
 
+    media_type, _ = mimetypes.guess_type(resolved_path.name)
     return FileResponse(
         path=str(resolved_path),
-        filename=resolved_path.name
+        filename=resolved_path.name,
+        media_type=media_type or "application/octet-stream"
     )
 

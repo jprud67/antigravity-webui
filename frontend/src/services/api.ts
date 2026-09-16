@@ -214,7 +214,7 @@ export function triggerFileDownload(blob: Blob, filename: string): void {
 }
 
 export async function bulkConversationExport(conversationIds: string[]): Promise<void> {
-  const res = await fetch(`${API_BASE}/conversations/bulk`, {
+  const res = await fetch(`${API_BASE}/conversations/bulk/export`, {
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ action: 'export', conversation_ids: conversationIds })
