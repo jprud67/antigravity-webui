@@ -620,12 +620,15 @@ class ExecutionManager:
         if decision in ["allow-session", "always-allow"] and rule:
             try:
                 settings = get_settings()
-                allow_rules = settings.get("permissions", {}).get("allow", [])
+                perms = settings.get("permissions")
+                if not isinstance(perms, dict):
+                    perms = {}
+                    settings["permissions"] = perms
+                raw_allow = perms.get("allow")
+                allow_rules = list(raw_allow) if isinstance(raw_allow, list) else []
                 if rule not in allow_rules:
                     allow_rules.append(rule)
-                    if "permissions" not in settings:
-                        settings["permissions"] = {}
-                    settings["permissions"]["allow"] = allow_rules
+                    perms["allow"] = allow_rules
                     save_settings(settings)
                     logger.info(f"Rule {rule} permanently added to permissions")
             except Exception as e:

@@ -167,7 +167,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   const filtered = useMemo(() => {
     return conversations.filter((c) => {
       if (selectedTag) {
-        const hasTag = (c.tags || []).map((t) => t.toLowerCase()).includes(selectedTag.toLowerCase());
+        const hasTag = (c.tags || []).some((t) => typeof t === 'string' && t.toLowerCase() === selectedTag.toLowerCase());
         if (!hasTag) return false;
       }
       if (!searchFilter.trim()) return true;
@@ -175,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       const titleMatch = (c.customTitle || c.title || '').toLowerCase().includes(q);
       const previewMatch = (c.preview || '').toLowerCase().includes(q);
       const projectMatch = (c.project || '').toLowerCase().includes(q);
-      const tagsMatch = (c.tags || []).some((t) => t.toLowerCase().includes(q));
+      const tagsMatch = (c.tags || []).some((t) => typeof t === 'string' && t.toLowerCase().includes(q));
       const snippetMatch = (c.match_snippet || '').toLowerCase().includes(q);
       return titleMatch || previewMatch || projectMatch || tagsMatch || snippetMatch;
     });

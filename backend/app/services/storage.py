@@ -932,10 +932,13 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
 def clean_user_prompt(raw: str) -> str:
     if not raw:
         return ""
-    text = raw
-    text = re.sub(r'</?USER_REQUEST>', '', text)
-    text = re.sub(r'<ADDITIONAL_METADATA>[\s\S]*?</ADDITIONAL_METADATA>', '', text)
-    text = re.sub(r'<USER_SETTINGS_CHANGE>[\s\S]*?</USER_SETTINGS_CHANGE>', '', text)
+    m = re.search(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', raw, flags=re.IGNORECASE)
+    if m:
+        return m.group(1).strip()
+    text = re.sub(r'<ADDITIONAL_METADATA>[\s\S]*?</ADDITIONAL_METADATA>', '', raw, flags=re.IGNORECASE)
+    text = re.sub(r'<USER_SETTINGS_CHANGE>[\s\S]*?</USER_SETTINGS_CHANGE>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'<CONTEXT_SUMMARY>[\s\S]*?</CONTEXT_SUMMARY>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE)>', '', text, flags=re.IGNORECASE)
     return text.strip()
 
 def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1028,9 +1031,13 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
         # 4. Assistant actions
         mapped_tools = []
         for tc in tool_calls:
+            name = tc.get("name") or tc.get("tool_name") or tc.get("toolAction") or "tool"
+            raw_args = tc.get("args")
+            if raw_args is None:
+                raw_args = tc.get("parameters") or {}
             mapped_tools.append({
-                "name": tc.get("name", "tool"),
-                "args": tc.get("args", {}),
+                "name": name,
+                "args": raw_args if isinstance(raw_args, dict) else {},
                 "result": "",
                 "status": "done" if s.get("status") == "DONE" else "running"
             })

@@ -191,7 +191,7 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
     # For other models, preserve suffix or raw
     if model_suffix:
         return f"{norm}-{model_suffix}", None
-    return raw, None
+    return raw, effort
 
 async def stream_turn(
     prompt: str,

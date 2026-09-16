@@ -127,29 +127,37 @@ async def run_agy_task(
 
     timed_out = False
     try:
-        await asyncio.wait_for(proc.wait(), timeout=timeout)
-    except asyncio.TimeoutError:
-        timed_out = True
-        await terminate_process_group_async(proc, grace=2.0)
-
-    for t in pumps:
         try:
-            await asyncio.wait_for(t, timeout=3.0)
-        except Exception:
-            t.cancel()
+            await asyncio.wait_for(proc.wait(), timeout=timeout)
+        except asyncio.TimeoutError:
+            timed_out = True
+            await terminate_process_group_async(proc, grace=2.0)
 
-    if quota_seen["line"] is None:
-        try:
-            quota_line = await asyncio.wait_for(quota_task, timeout=2.0)
-            if quota_line:
-                quota_seen["line"] = quota_line
-        except Exception:
+        for t in pumps:
+            try:
+                await asyncio.wait_for(t, timeout=3.0)
+            except Exception:
+                t.cancel()
+
+        if quota_seen["line"] is None:
+            try:
+                quota_line = await asyncio.wait_for(quota_task, timeout=2.0)
+                if quota_line:
+                    quota_seen["line"] = quota_line
+            except Exception:
+                quota_task.cancel()
+        elif not quota_task.done():
             quota_task.cancel()
-    elif not quota_task.done():
-        quota_task.cancel()
 
-    # Reaping all background tasks to avoid unhandled CancelledError or dangling coroutines
-    await asyncio.gather(*pumps, quota_task, return_exceptions=True)
+        # Reaping all background tasks to avoid unhandled CancelledError or dangling coroutines
+        await asyncio.gather(*pumps, quota_task, return_exceptions=True)
+    finally:
+        if proc.returncode is None:
+            await terminate_process_group_async(proc, grace=1.0)
+        for t in pumps + [quota_task]:
+            if not t.done():
+                t.cancel()
+        await asyncio.gather(*pumps, quota_task, return_exceptions=True)
 
     out = "".join(stdout_chunks)
     err = "".join(stderr_chunks)

@@ -209,7 +209,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
         if (!tc || typeof tc !== 'object') continue;
         currentAssistantMsg.toolCalls = currentAssistantMsg.toolCalls || [];
         currentAssistantMsg.toolCalls.push({
-          name: tc.name || tc.tool_name || 'tool',
+          name: tc.name || tc.tool_name || tc.toolAction || 'tool',
           args: tc.args || tc.parameters || {},
           result: undefined,
           status: s.status === 'DONE' ? 'done' : 'running'
