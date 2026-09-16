@@ -124,7 +124,8 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
         return {"success": True, "action": action, "count": len(ids), "results": results}
 
     elif action == "tag":
-        tags = req.payload.get("tags", []) if req.payload else []
+        raw_tags = req.payload.get("tags", []) if req.payload else []
+        tags = [t.strip() for t in raw_tags if isinstance(t, str) and t.strip()] if isinstance(raw_tags, list) else []
         mode = req.payload.get("mode", "add") if req.payload else "add"
         updates_per_id = {}
         for cid in ids:
@@ -132,7 +133,8 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
                 merged = list(dict.fromkeys(tags))
             else:
                 current_meta = get_session_meta(cid)
-                existing_tags = current_meta.get("tags") or []
+                existing_raw = current_meta.get("tags") or []
+                existing_tags = [t.strip() for t in existing_raw if isinstance(t, str) and t.strip()] if isinstance(existing_raw, list) else []
                 merged = list(dict.fromkeys(existing_tags + tags))
             updates_per_id[cid] = {"tags": merged}
         
@@ -256,6 +258,8 @@ def update_metadata(conversation_id: str, req: MetadataUpdateRequest, _ = Depend
     if not is_safe_conversation_id(conversation_id):
         raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     updates = req.model_dump(exclude_unset=True)
+    if "tags" in updates and isinstance(updates["tags"], list):
+        updates["tags"] = [t.strip() for t in updates["tags"] if isinstance(t, str) and t.strip()]
     updated = update_session_meta(conversation_id, updates)
     return {"success": True, "conversation_id": conversation_id, "metadata": updated}
 

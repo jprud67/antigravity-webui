@@ -133,6 +133,8 @@ def list_google_accounts() -> dict[str, Any]:
 
     accounts = []
     for p in ACCOUNTS_DIR.glob("*.json"):
+        if p.name.startswith(".") or p.name.endswith(".tmp") or ".tmp." in p.name:
+            continue
         try:
             with open(p, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -166,6 +168,8 @@ def _validate_account_file(email: str) -> Path:
     if not target_file.exists() and ACCOUNTS_DIR.exists():
         cleaned_lower = cleaned.lower()
         for p in ACCOUNTS_DIR.glob("*.json"):
+            if p.name.startswith(".") or p.name.endswith(".tmp") or ".tmp." in p.name:
+                continue
             if p.stem.lower() == cleaned_lower:
                 return p.resolve()
     return target_file
@@ -676,6 +680,8 @@ def get_candidate_accounts(exclude_email: str | None = None) -> list[str]:
     candidates = []
     norm_exclude = exclude_email.strip().lower() if exclude_email else None
     for p in ACCOUNTS_DIR.glob("*.json"):
+        if p.name.startswith(".") or p.name.endswith(".tmp") or ".tmp." in p.name:
+            continue
         email = p.stem.strip()
         if "@" not in email:
             continue

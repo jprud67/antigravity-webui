@@ -39,6 +39,7 @@ from app.services.google_auth import (
     switch_to_next_healthy_account,
 )
 from app.services.quota_watch import watch_agy_log_for_quota
+from app.services.storage import get_settings
 
 logger = logging.getLogger("antigravity.cron_ticker")
 
@@ -183,6 +184,15 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
     skills = job.get("skills", [])
     model = job.get("model")
     effort = job.get("effort")
+    if not model or not str(model).strip() or not effort or not str(effort).strip():
+        try:
+            settings = get_settings()
+            if not model or not str(model).strip():
+                model = settings.get("model")
+            if not effort or not str(effort).strip():
+                effort = settings.get("effort")
+        except Exception:
+            pass
     while attempts < MAX_TASK_FAILOVER:
         attempts += 1
         try:

@@ -28,6 +28,8 @@ def is_safe_conversation_id(conversation_id: str) -> bool:
     """Verifies conversation_id is safe, contains no directory traversal elements, and stays inside BRAIN_DIR."""
     if not conversation_id or not isinstance(conversation_id, str):
         return False
+    if conversation_id.strip().lower() in {"null", "undefined", "none", ""}:
+        return False
     if ".." in conversation_id or "/" in conversation_id or "\\" in conversation_id:
         return False
     try:
@@ -311,6 +313,8 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
     thinking_chars = 0
     
     for s in steps:
+        if not isinstance(s, dict):
+            continue
         raw_c = s.get("content")
         try:
             content = raw_c if isinstance(raw_c, str) else (json.dumps(raw_c, ensure_ascii=False, default=str) if raw_c is not None else "")
@@ -507,8 +511,10 @@ def fork_conversation(
     # Inherit tags & project from source metadata
     source_meta = get_session_meta(source_conversation_id)
     if source_meta:
+        source_tags = source_meta.get("tags")
+        inherited_tags = list(source_tags) if isinstance(source_tags, list) else []
         update_session_meta(new_id, {
-            "tags": list(source_meta.get("tags", [])),
+            "tags": inherited_tags,
             "project": source_meta.get("project", ""),
             "projectColor": source_meta.get("projectColor", ""),
             "pinned": False,
@@ -701,7 +707,8 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
 
     # Inherit tags & project from source metadata
     source_meta = get_session_meta(source_conversation_id) or {}
-    new_tags = list(source_meta.get("tags", []))
+    source_tags = source_meta.get("tags")
+    new_tags = list(source_tags) if isinstance(source_tags, list) else []
     if "suite" not in new_tags:
         new_tags.append("suite")
     update_session_meta(new_id, {
@@ -993,7 +1000,8 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 continue
             custom_title = (meta.get("customTitle") or "").lower()
             project = (meta.get("project") or "").lower()
-            tags = [t.lower().strip() for t in meta.get("tags", []) if t and t.strip()]
+            raw_tags = meta.get("tags")
+            tags = [t.lower().strip() for t in raw_tags if isinstance(t, str) and t.strip()] if isinstance(raw_tags, list) else []
             if (
                 q_lower in custom_title
                 or q_lower in project
@@ -1092,9 +1100,14 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
 
     return matched[:limit]
 
-def clean_user_prompt(raw: str) -> str:
+def clean_user_prompt(raw: Any) -> str:
     if not raw:
         return ""
+    if not isinstance(raw, str):
+        try:
+            raw = str(raw)
+        except Exception:
+            return ""
     m = re.search(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', raw, flags=re.IGNORECASE)
     if m:
         text = m.group(1).strip()
@@ -1130,6 +1143,8 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
             current_asst = None
 
     for idx, s in enumerate(steps):
+        if not isinstance(s, dict):
+            continue
         stype = s.get("type", "")
         source = s.get("source", "")
         raw_c = s.get("content")
@@ -1211,17 +1226,20 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
 
         # 4. Assistant actions
         mapped_tools = []
-        for tc in tool_calls:
-            name = tc.get("name") or tc.get("tool_name") or tc.get("toolAction") or "tool"
-            raw_args = tc.get("args")
-            if raw_args is None:
-                raw_args = tc.get("parameters") or {}
-            mapped_tools.append({
-                "name": name,
-                "args": raw_args if isinstance(raw_args, dict) else {},
-                "result": "",
-                "status": "done" if s.get("status") == "DONE" else "running"
-            })
+        if isinstance(tool_calls, list):
+            for tc in tool_calls:
+                if not isinstance(tc, dict):
+                    continue
+                name = tc.get("name") or tc.get("tool_name") or tc.get("toolAction") or "tool"
+                raw_args = tc.get("args")
+                if raw_args is None:
+                    raw_args = tc.get("parameters") or {}
+                mapped_tools.append({
+                    "name": name,
+                    "args": raw_args if isinstance(raw_args, dict) else {},
+                    "result": "",
+                    "status": "done" if s.get("status") == "DONE" else "running"
+                })
 
         if current_asst:
             if thinking:

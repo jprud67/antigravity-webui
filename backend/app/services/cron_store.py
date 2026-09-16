@@ -23,6 +23,7 @@ from typing import Any
 from croniter import croniter
 
 from app.config import GEMINI_DIR
+from app.platform_utils import restrict_file_permissions
 
 logger = logging.getLogger("antigravity.cron_store")
 
@@ -78,7 +79,9 @@ def save_jobs(data: dict[str, Any]) -> None:
         try:
             with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
+            restrict_file_permissions(temp_path)
             temp_path.replace(JOBS_FILE)
+            restrict_file_permissions(JOBS_FILE)
         except Exception:
             if temp_path.exists():
                 try:

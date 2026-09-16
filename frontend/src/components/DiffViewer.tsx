@@ -28,9 +28,11 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   const parsedLines: DiffLine[] = [];
   let oldLine = 1;
   let newLine = 1;
+  let inHunk = false;
 
   for (const line of lines) {
     if (line.startsWith('@@')) {
+      inHunk = true;
       parsedLines.push({ type: 'meta', text: line });
       // Match @@ -oldStart,oldCount +newStart,newCount @@
       const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
@@ -38,13 +40,23 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         oldLine = parseInt(match[1], 10);
         newLine = parseInt(match[2], 10);
       }
-    } else if (line.startsWith('+') && !line.startsWith('+++')) {
+    } else if (
+      line.startsWith('---') ||
+      line.startsWith('+++') ||
+      line.startsWith('diff --git') ||
+      line.startsWith('index ') ||
+      line.startsWith('new file mode') ||
+      line.startsWith('deleted file mode') ||
+      line.startsWith('similarity index')
+    ) {
+      parsedLines.push({ type: 'meta', text: line });
+    } else if (line.startsWith('+')) {
       parsedLines.push({
         type: 'add',
         text: line.substring(1),
         newLineNum: newLine++,
       });
-    } else if (line.startsWith('-') && !line.startsWith('---')) {
+    } else if (line.startsWith('-')) {
       parsedLines.push({
         type: 'del',
         text: line.substring(1),
@@ -55,8 +67,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
       parsedLines.push({
         type: 'context',
         text: cleanLine,
-        oldLineNum: oldLine++,
-        newLineNum: newLine++,
+        oldLineNum: inHunk ? oldLine++ : undefined,
+        newLineNum: inHunk ? newLine++ : undefined,
       });
     }
   }
@@ -154,7 +166,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 } else if (line.type === 'meta') {
                   rowBg = 'bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold';
                   textCol = 'text-sky-600 dark:text-sky-400';
-                  sign = '@';
+                  sign = line.text.startsWith('@@') ? '@' : ' ';
                 }
 
                 return (

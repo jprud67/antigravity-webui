@@ -47,14 +47,13 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                         stat = tfile.stat()
                         stat_size = stat.st_size
                         stat_mtime = stat.st_mtime
-                        with open(tfile, "r", encoding="utf-8", errors="replace") as f:
+                        with open(tfile, "rb") as f:
                             if stat_size > 65536:
                                 f.seek(stat_size - 65536)
-                                lines = f.readlines()
-                                if len(lines) > 1:
-                                    lines = lines[1:]
-                            else:
-                                lines = f.readlines()
+                            raw = f.read().decode("utf-8", errors="replace")
+                            lines = raw.splitlines(keepends=True)
+                            if stat_size > 65536 and len(lines) > 1:
+                                lines = lines[1:]
                             preview = "".join(lines[-10:]) if lines else ""
                     except Exception:
                         preview = ""
@@ -127,8 +126,8 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
     running_processes.sort(key=lambda p: float(p.get("created_at") or 0.0), reverse=True)
 
     return {
-        "tasks": tasks[:20],
-        "subagents": subagents[:20],
+        "tasks": tasks[:50],
+        "subagents": subagents[:50],
         "processes": running_processes
     }
 

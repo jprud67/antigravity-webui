@@ -50,13 +50,11 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
     try {
       const res = await fetchRulesFiles(currentWorkspace);
       setFileList(res.files);
-      if (res.files.length > 0 && !res.files.some(f => f.id === selectedFileId)) {
-        setSelectedFileId(res.files[0].id);
-      }
+      setSelectedFileId((prev) => (res.files.length > 0 && !res.files.some(f => f.id === prev) ? res.files[0].id : prev));
     } catch (e) {
       console.error('Failed to load rules files list', e);
     }
-  }, [currentWorkspace, selectedFileId]);
+  }, [currentWorkspace]);
 
   // Load content of selected file
   const loadContent = useCallback(async (fileId: string) => {
@@ -82,14 +80,12 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
       .then((res) => {
         if (active) {
           setFileList(res.files);
-          if (res.files.length > 0 && !res.files.some(f => f.id === selectedFileId)) {
-            setSelectedFileId(res.files[0].id);
-          }
+          setSelectedFileId((prev) => (res.files.length > 0 && !res.files.some(f => f.id === prev) ? res.files[0].id : prev));
         }
       })
       .catch((e) => console.error('Failed to load rules files list', e));
     return () => { active = false; };
-  }, [isOpen, currentWorkspace, selectedFileId]);
+  }, [isOpen, currentWorkspace]);
 
   useEffect(() => {
     if (!isOpen || !selectedFileId) return;

@@ -18,7 +18,7 @@ if [ ! -d "$SCRIPT_DIR/backend/venv" ]; then
 fi
 
 # Build frontend si absent
-if [ ! -d "$SCRIPT_DIR/frontend/dist" ]; then
+if [ ! -f "$SCRIPT_DIR/frontend/dist/index.html" ]; then
     echo "⚡ Construction du frontend..."
     cd "$SCRIPT_DIR/frontend"
     npm install

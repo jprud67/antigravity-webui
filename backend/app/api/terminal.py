@@ -131,7 +131,7 @@ class PersistentTerminalSession:
                         self.scrollback = self.scrollback[-self.max_scrollback:]
 
                     ws = self.active_websocket
-                    if ws and self.loop:
+                    if ws and self.loop and not self.loop.is_closed():
                         self.loop.create_task(_safe_send_bytes(ws, data))
                 else:
                     self._handle_eof_or_exit()
@@ -140,7 +140,7 @@ class PersistentTerminalSession:
             except OSError:
                 self._handle_eof_or_exit()
 
-        if self.loop:
+        if self.loop and not self.loop.is_closed():
             self.loop.add_reader(self.master_fd, on_master_read)
         logger.info(f"Persistent PTY session started: {self.session_id} (pid={proc.pid}, cwd={self.cwd})")
 
@@ -148,7 +148,7 @@ class PersistentTerminalSession:
         fd = self.master_fd
         if fd > 0:
             self.master_fd = -1
-            if self.loop:
+            if self.loop and not self.loop.is_closed():
                 try:
                     self.loop.remove_reader(fd)
                 except Exception:
@@ -158,7 +158,7 @@ class PersistentTerminalSession:
             except Exception:
                 pass
         ws = self.active_websocket
-        if ws and self.loop:
+        if ws and self.loop and not self.loop.is_closed():
             self.loop.create_task(_safe_send_bytes(ws, b"\r\n\x1b[33m\xe2\x9a\xa1 Session terminal ferm\xc3\xa9e.\x1b[0m\r\n"))
 
     async def _start_windows(self):
@@ -221,16 +221,21 @@ class PersistentTerminalSession:
             return
         offset = 0
         total = len(data)
-        while offset < total:
+        retries = 0
+        while offset < total and retries < 50:
             try:
                 written = os.write(self.master_fd, data[offset:])
                 offset += written
+                retries = 0
             except (BlockingIOError, InterruptedError):
+                retries += 1
                 await asyncio.sleep(0.01)
             except OSError as e:
                 # PTY fermé de l'autre côté (EPIPE/EIO) — abandonner proprement
                 logger.debug(f"terminal write interrompu (PTY fermé ?) : {e}")
                 return
+        if retries >= 50:
+            logger.warning("terminal write dropped remaining bytes after 50 retries")
 
     async def resize(self, rows: Any, cols: Any):
         try:
