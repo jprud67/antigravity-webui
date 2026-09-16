@@ -290,14 +290,18 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
             u = s["result"].get("usage")
         if not u and isinstance(s.get("step_update"), dict):
             u = s["step_update"].get("usage")
-        if isinstance(u, dict) and u.get("total_tokens", 0) > 0:
-            return {
-                "input_tokens": u.get("input_tokens", 0),
-                "output_tokens": u.get("output_tokens", 0),
-                "thinking_tokens": u.get("thinking_tokens", 0),
-                "total_tokens": u.get("total_tokens", 0),
-                "is_estimated": False
-            }
+        if isinstance(u, dict):
+            tot = u.get("total_tokens")
+            if tot is None or tot == 0:
+                tot = (u.get("input_tokens") or 0) + (u.get("output_tokens") or 0)
+            if tot > 0:
+                return {
+                    "input_tokens": u.get("input_tokens", 0),
+                    "output_tokens": u.get("output_tokens", 0),
+                    "thinking_tokens": u.get("thinking_tokens", 0),
+                    "total_tokens": tot,
+                    "is_estimated": False,
+                }
 
     # Antigravity base system context (system prompt + 30+ tool definitions + schemas)
     base_sys_tokens = 13370
@@ -1331,7 +1335,7 @@ def export_conversation_html(conversation_id: str) -> str:
             </details>
             """
 
-        escaped_content = html.escape(content, quote=True).replace("\n", "<br>")
+        escaped_content = html.escape(content, quote=True)
 
         messages_html.append(f"""
         <div class="message-row {'row-user' if is_user else 'row-assistant'}">

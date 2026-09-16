@@ -469,7 +469,7 @@ class ExecutionManager:
                 to_prune.append(cid)
 
         for cid in to_prune:
-            target_session = self.sessions.pop(cid) if cid in self.sessions else None
+            target_session = self.sessions.pop(cid, None)
             if target_session:
                 if target_session is self.active_session:
                     self.active_session = None
@@ -487,7 +487,12 @@ class ExecutionManager:
                     target_session.worker_task.cancel()
             logger.info(f"Pruned inactive execution session for conversation {cid} from memory.")
 
-    def get_or_create_session(self, conversation_id: str | None, workspace_path: str | None = None) -> ExecutionSession:
+    def get_or_create_session(
+        self,
+        conversation_id: str | None,
+        workspace_path: str | None = None,
+        ws: WebSocket | None = None,
+    ) -> ExecutionSession:
         self.prune_inactive_sessions()
         if conversation_id:
             if conversation_id in self.sessions:
@@ -507,9 +512,10 @@ class ExecutionManager:
                 return self.active_session
 
         if not conversation_id and self.active_session and self.active_session.conversation_id is None and self.active_session.is_running:
-            if workspace_path and not self.active_session.workspace_path:
-                self.active_session.workspace_path = workspace_path
-            return self.active_session
+            if ws is None or ws in self.active_session.subscribers:
+                if workspace_path and not self.active_session.workspace_path:
+                    self.active_session.workspace_path = workspace_path
+                return self.active_session
 
         if self.active_session and (not self.active_session.conversation_id or self.active_session.conversation_id not in self.sessions):
             if not self.active_session.is_running and self.active_session.worker_task and not self.active_session.worker_task.done():
@@ -600,7 +606,7 @@ class ExecutionManager:
         ws_path = data.get("workspace_path")
         mode = data.get("mode", "normal")
 
-        session = self.get_or_create_session(conv_id, ws_path)
+        session = self.get_or_create_session(conv_id, ws_path, ws=ws)
         session.add_subscriber(ws)
         session.last_active_at = time.time()
         self.active_session = session

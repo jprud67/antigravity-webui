@@ -270,6 +270,11 @@ async def remove_conversation(conversation_id: str, _ = Depends(require_auth)):
 def undo_turn(conversation_id: str, _ = Depends(require_auth)):
     if not is_safe_conversation_id(conversation_id):
         raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
+    if execution_manager.is_running(conversation_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Impossible d'annuler un tour pendant qu'une tâche est en cours d'exécution. Veuillez d'abord l'interrompre."
+        )
     try:
         res = undo_conversation_turn(conversation_id)
         return res
