@@ -253,11 +253,19 @@ def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
     transcript_full_file = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
     legacy_file = conv_dir / "transcript.jsonl"
 
-    target_file = (
-        transcript_full_file
-        if transcript_full_file.exists()
-        else (transcript_file if transcript_file.exists() else (legacy_file if legacy_file.exists() else None))
-    )
+    target_file = None
+    if transcript_full_file.exists() and transcript_full_file.stat().st_size > 0:
+        target_file = transcript_full_file
+    elif transcript_file.exists() and transcript_file.stat().st_size > 0:
+        target_file = transcript_file
+    elif legacy_file.exists() and legacy_file.stat().st_size > 0:
+        target_file = legacy_file
+    elif transcript_full_file.exists():
+        target_file = transcript_full_file
+    elif transcript_file.exists():
+        target_file = transcript_file
+    elif legacy_file.exists():
+        target_file = legacy_file
 
     if not target_file:
         return []
@@ -311,14 +319,17 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
                     "is_estimated": False,
                 }
         if isinstance(u, dict):
+            inp = u.get("input_tokens") if u.get("input_tokens") is not None else u.get("prompt_tokens")
+            out = u.get("output_tokens") if u.get("output_tokens") is not None else u.get("completion_tokens")
+            thk = u.get("thinking_tokens") or u.get("reasoning_tokens") or 0
             tot = u.get("total_tokens")
             if tot is None or tot == 0:
-                tot = (u.get("input_tokens") or 0) + (u.get("output_tokens") or 0)
+                tot = (inp or 0) + (out or 0) + (thk or 0)
             if tot > 0:
                 return {
-                    "input_tokens": u.get("input_tokens") or 0,
-                    "output_tokens": u.get("output_tokens") or 0,
-                    "thinking_tokens": u.get("thinking_tokens") or 0,
+                    "input_tokens": inp or 0,
+                    "output_tokens": out or 0,
+                    "thinking_tokens": thk or 0,
                     "total_tokens": tot,
                     "is_estimated": False,
                 }
@@ -1875,25 +1886,16 @@ def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
             raise
         return current
 
-def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
-    """
-    Import a conversation from JSON payload.
-    Supports:
-    1. Antigravity JSON export format ({ conversation_id, metadata, steps })
-    2. Hermes WebUI session format ({ session_id, title, messages, ... })
-    """
-    now_iso = datetime.now(timezone.utc).isoformat()
-    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
+def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: str) -> dict[str, Any]:
     new_id = str(uuid.uuid4())
-
-    title = "Conversation importée"
-    steps = []
+    title = payload.get("title") or "Conversation importée"
+    steps: list[dict[str, Any]] = []
 
     # Format 1: Antigravity export
     if "steps" in payload and isinstance(payload["steps"], list):
         steps = payload["steps"]
         meta = payload.get("metadata") or {}
-        title = meta.get("customTitle") or meta.get("title") or title
+        title = meta.get("customTitle") or meta.get("title") or payload.get("title") or title
     # Format 2: Hermes session format
     elif "messages" in payload and isinstance(payload["messages"], list):
         title = payload.get("title") or title
@@ -1946,13 +1948,15 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
     atomic_write_jsonl(transcript_path, cloned_steps)
     atomic_write_jsonl(transcript_full_path, cloned_steps)
 
+    meta_raw = payload.get("metadata")
+    meta_payload: dict[str, Any] = meta_raw if isinstance(meta_raw, dict) else {}
     update_session_meta(new_id, {
         "customTitle": title,
         "title": title,
-        "pinned": False,
-        "archived": False,
-        "tags": payload.get("tags") or ["importé"],
-        "project": payload.get("project") or ""
+        "pinned": bool(meta_payload.get("pinned", False)),
+        "archived": bool(meta_payload.get("archived", False)),
+        "tags": payload.get("tags") or meta_payload.get("tags") or ["importé"],
+        "project": payload.get("project") or meta_payload.get("project") or ""
     })
 
     # Persist summary in SQLite database so the imported session appears in session lists
@@ -2007,4 +2011,46 @@ def import_conversation(payload: dict[str, Any]) -> dict[str, Any]:
         "step_count": len(steps),
         "steps_count": len(steps)
     }
+
+
+def import_conversation(payload: dict[str, Any] | list[Any]) -> dict[str, Any]:
+    """
+    Import a conversation or bulk export from JSON payload.
+    Supports:
+    1. Bulk export format ({ exported_at, count, conversations: [...] })
+    2. Direct list of conversations ([ {...}, {...} ])
+    3. Antigravity JSON export format ({ conversation_id, metadata, steps })
+    4. Hermes WebUI session format ({ session_id, title, messages, ... })
+    """
+    now_iso = datetime.now(timezone.utc).isoformat()
+    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
+
+    # Bulk export or list of conversations
+    items_to_import: list[dict[str, Any]] | None = None
+    if isinstance(payload, list):
+        items_to_import = [item for item in payload if isinstance(item, dict)]
+    elif isinstance(payload, dict) and isinstance(payload.get("conversations"), list):
+        items_to_import = [item for item in payload["conversations"] if isinstance(item, dict)]
+
+    if items_to_import is not None:
+        imported = []
+        for item in items_to_import:
+            res = _import_single_conversation(item, now_iso, now_db)
+            imported.append(res)
+        primary_id = imported[-1]["conversation_id"] if imported else ""
+        return {
+            "success": True,
+            "conversation_id": primary_id,
+            "count": len(imported),
+            "imported_count": len(imported),
+            "conversations": imported,
+            "title": f"{len(imported)} conversations importées",
+            "step_count": sum(c.get("step_count", 0) for c in imported),
+            "steps_count": sum(c.get("step_count", 0) for c in imported)
+        }
+
+    if not isinstance(payload, dict):
+        raise TypeError("Format de payload non valide pour l'import de conversation")
+
+    return _import_single_conversation(payload, now_iso, now_db)
 

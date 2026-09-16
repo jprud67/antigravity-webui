@@ -472,13 +472,23 @@ def _extract_json_payload(raw: str) -> Any:
         except Exception:
             pass
 
-    for line in trimmed.splitlines():
+    # Search lines for JSON payloads, prioritizing lines with command-specific keys or traversing in reverse (most recent output first)
+    preferred_keys = {"groups", "buckets", "remaining_credits", "changelog", "entries", "data", "models", "quota"}
+    parsed_lines = []
+    for line in reversed(trimmed.splitlines()):
         line = line.strip()
         if (line.startswith('{') and line.endswith('}')) or (line.startswith('[') and line.endswith(']')):
             try:
-                return json.loads(line)
+                parsed = json.loads(line)
+                if isinstance(parsed, dict) and any(k in parsed for k in preferred_keys):
+                    return parsed
+                parsed_lines.append(parsed)
             except Exception:
                 pass
+
+    if parsed_lines:
+        return parsed_lines[0]
+
     raise json.JSONDecodeError("No valid JSON found", raw, 0)
 
 

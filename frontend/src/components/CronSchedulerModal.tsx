@@ -471,7 +471,20 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
               </h3>
             </div>
 
-            {cronData?.jobs.length === 0 ? (
+            {loading || cronData === null ? (
+              <div
+                className="p-8 text-center rounded-xl border flex flex-col items-center justify-center gap-2"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)'
+                }}
+              >
+                <RefreshCw className="w-5 h-5 animate-spin" style={{ color: 'var(--accent)' }} />
+                <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+                  Chargement des tâches planifiées...
+                </p>
+              </div>
+            ) : cronData.jobs.length === 0 ? (
               <div
                 className="p-8 text-center rounded-xl border"
                 style={{

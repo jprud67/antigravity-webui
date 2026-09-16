@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
@@ -337,8 +337,10 @@ def export_json(conversation_id: str, _ = Depends(require_auth)):
     )
 
 @router.post("/import")
-def import_session(payload: dict[str, Any], _ = Depends(require_auth)):
+def import_session(payload: Any = Body(...), _ = Depends(require_auth)):
     try:
+        if not isinstance(payload, (dict, list)):
+            raise TypeError("Le payload doit être un objet JSON ou une liste d'objets JSON")
         res = import_conversation(payload)
         return res
     except Exception as e:

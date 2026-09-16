@@ -663,16 +663,24 @@ def is_hard_quota_error(message: str) -> bool:
 def mark_account_exhausted(email: str, duration_seconds: float = 900.0) -> None:
     """Mark an account as exhausted for a given duration (default 15 minutes)."""
     norm_email = email.strip().lower()
+    now = time.time()
     with _exhaustion_lock:
-        _account_exhaustion_tracker[norm_email] = time.time() + duration_seconds
+        expired = [e for e, exp in _account_exhaustion_tracker.items() if exp <= now]
+        for e in expired:
+            _account_exhaustion_tracker.pop(e, None)
+        _account_exhaustion_tracker[norm_email] = now + duration_seconds
     logger.warning(f"Google account {norm_email} marked as quota-exhausted for {duration_seconds}s")
 
 
 def is_account_marked_exhausted(email: str) -> bool:
     norm_email = email.strip().lower()
+    now = time.time()
     with _exhaustion_lock:
+        expired = [e for e, exp in _account_exhaustion_tracker.items() if exp <= now]
+        for e in expired:
+            _account_exhaustion_tracker.pop(e, None)
         exp = _account_exhaustion_tracker.get(norm_email, 0.0)
-    return time.time() < exp
+    return now < exp
 
 
 def get_candidate_accounts(exclude_email: str | None = None) -> list[str]:
