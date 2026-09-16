@@ -136,11 +136,11 @@ def list_tasks(
             query = "SELECT * FROM tasks WHERE 1=1"
             params: list = []
             if status:
-                query += " AND status = ?"
-                params.append(status)
+                query += " AND LOWER(status) = ?"
+                params.append(status.lower().strip())
             if project_id:
                 query += " AND project_id = ?"
-                params.append(project_id)
+                params.append(project_id.strip())
             
             query += " ORDER BY priority DESC, created_at DESC"
             cur = conn.cursor()

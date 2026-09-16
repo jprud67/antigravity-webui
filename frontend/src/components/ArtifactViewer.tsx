@@ -38,7 +38,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
     setSelectedArtifact(art);
     setLoading(true);
     try {
-      const text = await fetchArtifactContent(art.conversation_id, art.filename);
+      const text = await fetchArtifactContent(art.conversation_id, art.relative_path || art.filename);
       setContent(text);
     } finally {
       setLoading(false);

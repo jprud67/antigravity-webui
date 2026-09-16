@@ -42,11 +42,7 @@ def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
                 except Exception as e:
                     logger.debug(f"Ignored error: {e}")
 
-def get_session_meta(conversation_id: str) -> dict[str, Any]:
-    all_meta = get_all_session_metadata()
-    existing = all_meta.get(conversation_id)
-    if existing:
-        return dict(existing)
+def make_default_meta() -> dict[str, Any]:
     return {
         "pinned": False,
         "archived": False,
@@ -55,6 +51,15 @@ def get_session_meta(conversation_id: str) -> dict[str, Any]:
         "projectColor": "",
         "customTitle": ""
     }
+
+def get_session_meta(conversation_id: str) -> dict[str, Any]:
+    all_meta = get_all_session_metadata()
+    existing = all_meta.get(conversation_id)
+    merged = make_default_meta()
+    if isinstance(existing, dict):
+        merged.update(existing)
+    merged["tags"] = list(merged.get("tags") or []) if isinstance(merged.get("tags"), list) else []
+    return merged
 
 def update_session_meta(conversation_id: str, updates: dict[str, Any]) -> dict[str, Any]:
     return bulk_update_session_meta([conversation_id], updates)[conversation_id]
@@ -67,15 +72,12 @@ def bulk_update_session_meta_batch(updates_per_id: dict[str, dict[str, Any]]) ->
         all_meta = get_all_session_metadata()
         results = {}
         for cid, updates in updates_per_id.items():
-            current = dict(all_meta.get(cid, {
-                "pinned": False,
-                "archived": False,
-                "tags": [],
-                "project": "",
-                "projectColor": "",
-                "customTitle": ""
-            }))
+            current = make_default_meta()
+            existing = all_meta.get(cid)
+            if isinstance(existing, dict):
+                current.update(existing)
             current.update(updates)
+            current["tags"] = list(current.get("tags") or []) if isinstance(current.get("tags"), list) else []
             all_meta[cid] = current
             results[cid] = current
         if updates_per_id:

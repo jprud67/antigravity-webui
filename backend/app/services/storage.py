@@ -216,10 +216,13 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
     finally:
         conn.close()
 
-def get_conversation_by_id(conversation_id: str) -> dict[str, Any] | None:
+def get_conversation_by_id(conversation_id: str, conn: Any = None) -> dict[str, Any] | None:
     if not CONVERSATION_DB.exists():
         return None
-    conn = get_db_connection()
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
     try:
         cursor = conn.cursor()
         cursor.execute(
@@ -246,7 +249,8 @@ def get_conversation_by_id(conversation_id: str) -> dict[str, Any] | None:
         meta = get_session_meta(conversation_id)
         return _build_conversation_dict(r, meta)
     finally:
-        conn.close()
+        if should_close:
+            conn.close()
 
 
 def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
@@ -418,6 +422,57 @@ def atomic_write_jsonl(target_path: Path, items: list[dict[str, Any]]) -> None:
                 logger.debug(f"Ignored error: {e}")
         raise
 
+def clean_user_prompt(raw: Any) -> str:
+    if not raw:
+        return ""
+    if not isinstance(raw, str):
+        try:
+            raw = str(raw)
+        except Exception:
+            return ""
+    m = re.search(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', raw, flags=re.IGNORECASE)
+    if m:
+        text = m.group(1).strip()
+    else:
+        text = raw
+    text = re.sub(
+        r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>',
+        '',
+        text,
+        flags=re.IGNORECASE
+    )
+    text = re.sub(
+        r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>',
+        '',
+        text,
+        flags=re.IGNORECASE
+    )
+    # Strip steering/queued instruction prefixes so history stays pure and clean
+    text = re.sub(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+', '', text)
+    return text.strip()
+
+
+def is_tool_output_content(content: Any) -> bool:
+    if not content:
+        return False
+    c = content.strip() if isinstance(content, str) else str(content).strip()
+    return (
+        c.startswith("Created At:")
+        or c.startswith("Completed At:")
+        or c.startswith("File Path:")
+        or c.startswith("The command exited with code")
+        or c.startswith("The command exited")
+        or c.startswith("Tool is running as a background task")
+        or c.startswith("Encountered error in tool execution:")
+        or c.startswith('{"File":')
+        or c.startswith('{"status":')
+        or c.startswith('{"event":')
+        or c.startswith('Task id "')
+        or c.startswith("[Active skills:")
+        or c.startswith("Starting background task")
+    )
+
+
 def fork_conversation(
     source_conversation_id: str,
     up_to_step_index: int,
@@ -509,7 +564,13 @@ def fork_conversation(
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
         
         last_step = forked_steps[-1]
-        preview = str(last_step.get("content") or last_step.get("thinking") or "")[:150]
+        raw_preview = str(last_step.get("content") or last_step.get("thinking") or "")
+        stype = last_step.get("type", "")
+        source = last_step.get("source", "")
+        if stype == "USER_INPUT" or source == "USER_EXPLICIT" or "<USER_REQUEST>" in raw_preview:
+            preview = clean_user_prompt(raw_preview)[:150]
+        else:
+            preview = raw_preview[:150]
 
         cursor.execute(
             """
@@ -601,7 +662,9 @@ def create_conversation_handoff(
         content = s.get("content", "")
         if stype == "USER_INPUT" or source == "USER_EXPLICIT":
             if content and content.strip():
-                user_requests.append(content.strip()[:300])
+                clean_req = clean_user_prompt(content)
+                if clean_req:
+                    user_requests.append(clean_req[:300])
         elif source == "MODEL":
             tool_calls = s.get("tool_calls", [])
             for tc in tool_calls:
@@ -845,35 +908,6 @@ def update_conversation_title(conversation_id: str, new_title: str) -> bool:
         conn.close()
     return True
 
-def clean_user_prompt(raw: Any) -> str:
-    if not raw:
-        return ""
-    if not isinstance(raw, str):
-        try:
-            raw = str(raw)
-        except Exception:
-            return ""
-    m = re.search(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', raw, flags=re.IGNORECASE)
-    if m:
-        text = m.group(1).strip()
-    else:
-        text = raw
-    text = re.sub(
-        r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>',
-        '',
-        text,
-        flags=re.IGNORECASE
-    )
-    text = re.sub(
-        r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>',
-        '',
-        text,
-        flags=re.IGNORECASE
-    )
-    # Strip steering/queued instruction prefixes so history stays pure and clean
-    text = re.sub(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+', '', text)
-    return text.strip()
-
 def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
     if not is_safe_conversation_id(conversation_id):
         raise ValueError("Invalid conversation_id")
@@ -1061,31 +1095,31 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
             }
             matched.append(c)
             seen_ids.add(cid)
+
+        # 2. Match customTitle, tags, project from session metadata for convs not yet matched
+        if len(matched) < limit:
+            for cid, meta in all_meta.items():
+                if cid in seen_ids:
+                    continue
+                custom_title = (meta.get("customTitle") or "").lower()
+                project = (meta.get("project") or "").lower()
+                raw_tags = meta.get("tags")
+                tags = [t.lower().strip() for t in raw_tags if isinstance(t, str) and t.strip()] if isinstance(raw_tags, list) else []
+                if (
+                    q_lower in custom_title
+                    or q_lower in project
+                    or any(q_lower in t for t in tags)
+                ):
+                    c_item = get_conversation_by_id(cid, conn=conn)
+                    if c_item:
+                        c_item["match_type"] = "metadata"
+                        c_item["match_snippet"] = meta.get("customTitle") or meta.get("project") or c_item.get("preview")
+                        matched.append(c_item)
+                        seen_ids.add(cid)
+                        if len(matched) >= limit:
+                            break
     finally:
         conn.close()
-
-    # 2. Match customTitle, tags, project from session metadata for convs not yet matched
-    if len(matched) < limit:
-        for cid, meta in all_meta.items():
-            if cid in seen_ids:
-                continue
-            custom_title = (meta.get("customTitle") or "").lower()
-            project = (meta.get("project") or "").lower()
-            raw_tags = meta.get("tags")
-            tags = [t.lower().strip() for t in raw_tags if isinstance(t, str) and t.strip()] if isinstance(raw_tags, list) else []
-            if (
-                q_lower in custom_title
-                or q_lower in project
-                or any(q_lower in t for t in tags)
-            ):
-                c_item = get_conversation_by_id(cid)
-                if c_item:
-                    c_item["match_type"] = "metadata"
-                    c_item["match_snippet"] = meta.get("customTitle") or meta.get("project") or c_item.get("preview")
-                    matched.append(c_item)
-                    seen_ids.add(cid)
-                    if len(matched) >= limit:
-                        break
 
     # 3. Deep transcript scan for content if room left (scans recent active sessions)
     if len(matched) < limit:
@@ -1275,17 +1309,20 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
         # 4. Tool outputs (GENERIC / SYSTEM steps following a tool call)
         tool_calls = s.get("tool_calls") or []
         is_tool_output = (
-            stype.upper() in [
-                "GENERIC",
-                "SYSTEM",
-                "TOOL_RESULT",
-                "TOOL_OUTPUT",
-                "VIEW_FILE",
-                "RUN_COMMAND",
-                "CODE_ACTION",
-                "GREP_SEARCH",
-                "LIST_DIRECTORY",
-            ]
+            (
+                stype.upper() in [
+                    "GENERIC",
+                    "SYSTEM",
+                    "TOOL_RESULT",
+                    "TOOL_OUTPUT",
+                    "VIEW_FILE",
+                    "RUN_COMMAND",
+                    "CODE_ACTION",
+                    "GREP_SEARCH",
+                    "LIST_DIRECTORY",
+                ]
+                or is_tool_output_content(content)
+            )
             and not tool_calls
             and not thinking
         )

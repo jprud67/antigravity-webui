@@ -162,7 +162,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const handleSelectArtifact = useCallback(async (art: ArtifactItem) => {
     setSelectedArtifact(art);
     try {
-      const content = await fetchArtifactContent(art.conversation_id, art.filename);
+      const content = await fetchArtifactContent(art.conversation_id, art.relative_path || art.filename);
       setArtifactMarkdown(content);
     } catch {
       setArtifactMarkdown('Impossible de charger le contenu de cet artifact.');

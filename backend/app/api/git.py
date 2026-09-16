@@ -104,6 +104,7 @@ def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth
     ahead = 0
     behind = 0
 
+    conflicts = []
     modified = []
     staged = []
     untracked = []
@@ -147,6 +148,8 @@ def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth
 
         if x == "?" and y == "?":
             untracked.append(path)
+        elif x == "U" or y == "U" or (x == "A" and y == "A") or (x == "D" and y == "D"):
+            conflicts.append(path)
         else:
             if x in ["M", "A", "R", "C", "D"]:
                 staged.append(path)
@@ -175,7 +178,8 @@ def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth
         "tracking": tracking,
         "ahead": ahead,
         "behind": behind,
-        "clean": len(modified) == 0 and len(staged) == 0 and len(untracked) == 0 and len(deleted) == 0,
+        "clean": len(modified) == 0 and len(staged) == 0 and len(untracked) == 0 and len(deleted) == 0 and len(conflicts) == 0,
+        "conflicts": conflicts,
         "modified": modified,
         "staged": staged,
         "untracked": untracked,

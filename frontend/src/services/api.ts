@@ -252,7 +252,8 @@ export async function fetchArtifacts(conversationId?: string): Promise<ArtifactI
 }
 
 export async function fetchArtifactContent(conversationId: string, filename: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/artifacts/${conversationId}/${filename}`, {
+  const encodedPath = filename.split('/').map(encodeURIComponent).join('/');
+  const res = await fetch(`${API_BASE}/artifacts/${encodeURIComponent(conversationId)}/${encodedPath}`, {
     headers: getHeaders()
   });
   if (!res.ok) throw new Error(`Failed to read artifact: ${res.statusText}`);
@@ -398,6 +399,7 @@ export interface GitStatusResult {
   ahead: number;
   behind: number;
   clean: boolean;
+  conflicts?: string[];
   modified: string[];
   staged: string[];
   untracked: string[];

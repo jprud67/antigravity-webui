@@ -70,7 +70,9 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
       const data = await fetchGitStatus(currentWorkspace);
       setStatus(data);
       if (autoSelect || !selectedFileRef.current) {
-        if (data.modified.length > 0) {
+        if (data.conflicts && data.conflicts.length > 0) {
+          handleSelectFile(data.conflicts[0], false);
+        } else if (data.modified.length > 0) {
           handleSelectFile(data.modified[0], false);
         } else if (data.staged.length > 0) {
           handleSelectFile(data.staged[0], true);
@@ -94,7 +96,9 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
         if (active) {
           setStatus(data);
           if (!selectedFileRef.current) {
-            if (data.modified.length > 0) {
+            if (data.conflicts && data.conflicts.length > 0) {
+              handleSelectFile(data.conflicts[0], false);
+            } else if (data.modified.length > 0) {
               handleSelectFile(data.modified[0], false);
             } else if (data.staged.length > 0) {
               handleSelectFile(data.staged[0], true);
@@ -158,17 +162,20 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
   const allChangedFiles = React.useMemo(() => {
     if (!status) return [];
     const map = new Map<string, { path: string; type: string }>();
-    (status.staged || []).forEach((f) => map.set(f, { path: f, type: 'S' }));
+    (status.conflicts || []).forEach((f) => map.set(f, { path: f, type: 'U' }));
+    (status.staged || []).forEach((f) => {
+      if (!map.has(f)) map.set(f, { path: f, type: 'S' });
+    });
     (status.modified || []).forEach((f) => {
       const existing = map.get(f);
       if (existing) {
-        existing.type = 'S+M';
+        if (existing.type === 'S') existing.type = 'S+M';
       } else {
         map.set(f, { path: f, type: 'M' });
       }
     });
     (status.deleted || []).forEach((f) => {
-      map.set(f, { path: f, type: 'D' });
+      if (!map.has(f)) map.set(f, { path: f, type: 'D' });
     });
     (status.untracked || []).forEach((f) => {
       if (!map.has(f)) {
@@ -277,6 +284,13 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
         </div>
       )}
 
+      {status?.conflicts && status.conflicts.length > 0 && (
+        <div className="p-2 bg-rose-500/15 border-b border-rose-500/40 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2 shrink-0 font-medium">
+          <ShieldAlert className="w-4 h-4 shrink-0 text-rose-500 animate-pulse" />
+          <span>{status.conflicts.length} conflit(s) de fusion non résolu(s). Résolvez-les avant de committer.</span>
+        </div>
+      )}
+
       {/* Main Content Area: Split File List & Diff */}
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
         {/* Changed Files Section */}
@@ -319,7 +333,9 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                     </div>
                     <span
                       className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        file.type === 'S+M'
+                        file.type === 'U'
+                          ? 'bg-rose-500/25 text-rose-600 dark:text-rose-400 border border-rose-500/40'
+                          : file.type === 'S+M'
                           ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400'
                           : file.type === 'S'
                           ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'

@@ -46,9 +46,10 @@ def parse_skill_md(skill_file: Path) -> dict[str, Any]:
     try:
         with open(skill_file, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
-        
+        content = content.lstrip("\ufeff")
+
         # Parse YAML frontmatter if present
-        fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n(.*)$", content, re.DOTALL)
+        fm_match = re.match(r"^\s*---\s*\n(.*?)\n---\s*\n(.*)$", content, re.DOTALL)
         if fm_match:
             fm_text = fm_match.group(1)
             body = fm_match.group(2)

@@ -238,8 +238,59 @@ def test_version_consistency():
     assert frontend_ver == backend_ver == updater_ver, (
         f"Version mismatch: frontend={frontend_ver}, backend={backend_ver}, updater={updater_ver}"
     )
-    assert frontend_ver == "0.1.56", f"Expected version 0.1.56, got {frontend_ver}"
+    assert frontend_ver == "0.1.57", f"Expected version 0.1.57, got {frontend_ver}"
     print(f"✓ test_version_consistency passed ({frontend_ver})")
+
+
+def test_is_tool_output_content_and_clean_prompt():
+    from app.services.storage import clean_user_prompt, is_tool_output_content
+
+    # Tool output detection
+    assert is_tool_output_content("Created At: 2026-09-16T12:00:00") is True
+    assert is_tool_output_content("The command exited with code 0") is True
+    assert is_tool_output_content('{"File":"/path/to/file.py"}') is True
+    assert is_tool_output_content("Bonjour le monde") is False
+
+    # Prompt cleaning
+    raw_prompt = "<USER_REQUEST>Fix the task ID issue</USER_REQUEST><ADDITIONAL_METADATA>meta</ADDITIONAL_METADATA>"
+    clean = clean_user_prompt(raw_prompt)
+    assert clean == "Fix the task ID issue", f"Unexpected clean prompt: {clean}"
+    print("✓ test_is_tool_output_content_and_clean_prompt passed")
+
+
+def test_session_meta_legacy_defaults():
+    import uuid
+    from app.services.session_metadata import save_all_session_metadata
+    legacy_id = f"legacy_test_{uuid.uuid4().hex[:6]}"
+    # Save sparse metadata missing standard keys
+    save_all_session_metadata({legacy_id: {"pinned": True}})
+
+    meta = get_session_meta(legacy_id)
+    assert meta["pinned"] is True
+    assert meta["archived"] is False
+    assert meta["tags"] == []
+    assert meta["project"] == ""
+    assert meta["customTitle"] == ""
+    print("✓ test_session_meta_legacy_defaults passed")
+
+
+def test_skill_md_utf8_bom(tmp_path=None):
+    from app.api.skills import parse_skill_md
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td:
+        skill_dir = Path(td) / "my-skill"
+        skill_dir.mkdir()
+        skill_file = skill_dir / "SKILL.md"
+        # Write with UTF-8 BOM
+        content = "\ufeff---\nname: my-skill\ndescription: A test skill with BOM\n---\n# My Skill Documentation\n"
+        with open(skill_file, "wb") as f:
+            f.write(content.encode("utf-8"))
+
+        parsed = parse_skill_md(skill_file)
+        assert parsed["name"] == "my-skill", f"Expected name 'my-skill', got {parsed['name']}"
+        assert parsed["description"] == "A test skill with BOM", f"Expected description, got {parsed['description']}"
+    print("✓ test_skill_md_utf8_bom passed")
 
 
 if __name__ == "__main__":
@@ -254,5 +305,8 @@ if __name__ == "__main__":
     test_bulk_import_cleanup_on_error()
     test_git_diff_sanitization()
     test_version_consistency()
+    test_is_tool_output_content_and_clean_prompt()
+    test_session_meta_legacy_defaults()
+    test_skill_md_utf8_bom()
     print("\nAll unit tests passed successfully!")
 

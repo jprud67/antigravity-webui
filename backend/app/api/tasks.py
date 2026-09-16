@@ -149,8 +149,11 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
         if req.task_id:
             try:
                 clean_tid = req.task_id.strip()
-                escaped_tid = re.escape(clean_tid)
-                tid_regex = re.compile(rf"(?:^|[\s\"'=/]){escaped_tid}(?:[\s\"'/]|$)")
+                pure_tid = clean_tid.split("/")[-1].strip() if "/" in clean_tid else clean_tid
+                candidate_tids = [clean_tid]
+                if pure_tid and pure_tid != clean_tid:
+                    candidate_tids.append(pure_tid)
+
                 for p in psutil.process_iter(['pid', 'cmdline']):
                     try:
                         p_info = p.info
@@ -158,12 +161,19 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
                             continue
                         cmdline_list = p_info.get('cmdline') or []
                         cmd_str = " ".join(cmdline_list)
-                        # Match exact token, key=value pair, or word-boundary delimited regex
-                        matches_task = (
-                            clean_tid in cmdline_list
-                            or any(clean_tid in arg.split("=") for arg in cmdline_list)
-                            or bool(tid_regex.search(cmd_str))
-                        )
+
+                        matches_task = False
+                        for tid_cand in candidate_tids:
+                            escaped_tid = re.escape(tid_cand)
+                            tid_regex = re.compile(rf"(?:^|[\s\"'=/]){escaped_tid}(?:[\s\"'/]|$)")
+                            if (
+                                tid_cand in cmdline_list
+                                or any(tid_cand in arg.split("=") for arg in cmdline_list)
+                                or bool(tid_regex.search(cmd_str))
+                            ):
+                                matches_task = True
+                                break
+
                         if matches_task:
                             candidate_pid = p_info.get('pid')
                             if candidate_pid and candidate_pid > 100:
