@@ -41,6 +41,8 @@ async def _broadcast(event: dict[str, Any]) -> None:
                 q.put_nowait(event)
             except Exception:
                 dead.add(q)
+        except Exception:
+            dead.add(q)
     for q in dead:
         _subscribers.discard(q)
 

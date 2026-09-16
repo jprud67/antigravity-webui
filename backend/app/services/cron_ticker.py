@@ -47,6 +47,7 @@ JOB_TIMEOUT_SECONDS = 20 * 60
 MAX_TASK_FAILOVER = 5
 
 _running_jobs: set[str] = set()
+_background_tasks: set[asyncio.Task[None]] = set()
 _jobs_write_lock = asyncio.Lock()
 
 
@@ -298,6 +299,20 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
     job_id = job.get("id")
     try:
         await _execute_job(job)
+    except asyncio.CancelledError:
+        logger.warning(f"[Cron] Job {job_id} annulé.")
+        try:
+            async with _jobs_write_lock:
+                data = load_jobs()
+                for j in data.get("jobs", []):
+                    if j.get("id") == job_id and j.get("last_status") == "running":
+                        j["last_status"] = "interrupted"
+                        j["last_run_at"] = now_iso()
+                        break
+                save_jobs(data)
+        except Exception as save_err:
+            logger.error(f"[Cron] Impossible de marquer le job {job_id} comme interrompu: {save_err}")
+        raise
     except Exception as e:
         logger.error(f"[Cron] Erreur pendant l'exécution du job {job_id}: {e}", exc_info=True)
         try:
@@ -371,7 +386,9 @@ async def tick_once() -> int:
             save_jobs(data)
 
     for job in to_launch:
-        asyncio.create_task(_guarded_execute(job))
+        task = asyncio.create_task(_guarded_execute(job))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
     return len(to_launch)
 
@@ -395,10 +412,18 @@ async def cron_ticker_loop() -> None:
         logger.warning(f"[Cron] Erreur lors du nettoyage initial des jobs: {e}")
 
     logger.info(f"Cron ticker Antigravity WebUI démarré (tick={TICK_SECONDS}s, dossier={CRON_DIR}).")
-    while True:
-        try:
-            write_heartbeat()
-            await tick_once()
-        except Exception as e:
-            logger.error(f"Cron ticker: erreur de tick: {e}", exc_info=True)
-        await asyncio.sleep(TICK_SECONDS)
+    try:
+        while True:
+            try:
+                write_heartbeat()
+                await tick_once()
+            except Exception as e:
+                logger.error(f"Cron ticker: erreur de tick: {e}", exc_info=True)
+            await asyncio.sleep(TICK_SECONDS)
+    except asyncio.CancelledError:
+        logger.info("[Cron] Arrêt du ticker planifié, annulation des jobs d'arrière-plan...")
+        if _background_tasks:
+            for t in list(_background_tasks):
+                t.cancel()
+            await asyncio.gather(*list(_background_tasks), return_exceptions=True)
+        raise

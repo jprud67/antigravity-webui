@@ -1040,8 +1040,28 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                         continue
                     try:
                         s = json.loads(line)
-                        raw_content = s.get("content") or ""
-                        raw_thinking = s.get("thinking") or ""
+                        val_content = s.get("content")
+                        if isinstance(val_content, str):
+                            raw_content = val_content
+                        elif val_content is None:
+                            raw_content = ""
+                        else:
+                            try:
+                                raw_content = json.dumps(val_content, ensure_ascii=False)
+                            except Exception:
+                                raw_content = str(val_content)
+
+                        val_thinking = s.get("thinking")
+                        if isinstance(val_thinking, str):
+                            raw_thinking = val_thinking
+                        elif val_thinking is None:
+                            raw_thinking = ""
+                        else:
+                            try:
+                                raw_thinking = json.dumps(val_thinking, ensure_ascii=False)
+                            except Exception:
+                                raw_thinking = str(val_thinking)
+
                         content_lower = raw_content.lower()
                         thinking_lower = raw_thinking.lower()
                         if q_lower in content_lower or q_lower in thinking_lower:

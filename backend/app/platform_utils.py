@@ -160,3 +160,41 @@ def is_safe_path(target: os.PathLike[Any] | str, allowed_roots: Sequence[os.Path
         return False
     return False
 
+
+def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
+    """
+    Vérifie avec précision si un chemin cible pointe vers un fichier ou répertoire
+    sensible (clés SSH, tokens, identifiants, répertoires système critiques).
+    Évite les faux positifs des recherches de sous-chaînes sur des fichiers
+    légitimes de code source (ex: system.ts, processing.py, etc.).
+    """
+    if not target:
+        return False
+    try:
+        resolved = Path(target).resolve()
+        parts = resolved.parts
+        # Répertoires système et dossiers cachés sensibles
+        if any(p in (".ssh", ".gnupg") for p in parts):
+            return True
+        # Points de montage système root
+        if len(parts) > 1 and parts[1] in ("proc", "sys", "dev"):
+            return True
+        if len(parts) > 2 and parts[1] == "etc" and parts[2] in ("passwd", "shadow", "sudoers", "master.passwd"):
+            return True
+
+        # Fichiers de secrets et identifiants
+        name = resolved.name.lower()
+        if any(p == ".git" for p in parts):
+            return True
+        if name in ("antigravity-oauth-token", "webui_auth.json", "webui_password.txt", "google_accounts.json"):
+            return True
+        if name in ("id_rsa", "id_ed25519", "id_dsa", "id_ecdsa") or name.startswith(("id_rsa.", "id_ed25519.")):
+            return True
+        if name == ".env" or name.startswith(".env."):
+            return True
+        if ".stash_" in name:
+            return True
+    except Exception:
+        return False
+    return False
+

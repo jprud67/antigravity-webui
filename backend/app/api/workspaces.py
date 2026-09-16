@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
+from app.platform_utils import is_blocked_sensitive_path
 from app.services.storage import get_settings, save_settings
 
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
@@ -20,6 +21,8 @@ def list_workspaces(_ = Depends(require_auth)) -> list[str]:
 @router.post("")
 def add_workspace(path: str = Query(...), _ = Depends(require_auth)):
     p = Path(path).resolve()
+    if is_blocked_sensitive_path(p):
+        raise HTTPException(status_code=403, detail="Accès refusé : répertoire système ou restreint.")
     if not p.is_dir():
         raise HTTPException(status_code=400, detail=f"Directory '{path}' does not exist")
     settings = get_settings()
@@ -48,6 +51,8 @@ def delete_workspace(path: str = Query(...), _ = Depends(require_auth)):
 @router.get("/explore")
 def explore_dir(path: str = Query(DEFAULT_WORKSPACE), _ = Depends(require_auth)) -> dict[str, Any]:
     p = Path(path).resolve()
+    if is_blocked_sensitive_path(p):
+        raise HTTPException(status_code=403, detail="Accès refusé : répertoire système ou restreint.")
     if not p.exists() or not p.is_dir():
         raise HTTPException(status_code=404, detail="Path is not a valid directory")
     
@@ -62,6 +67,8 @@ def explore_dir(path: str = Query(DEFAULT_WORKSPACE), _ = Depends(require_auth))
 
         for item in sorted(raw_entries, key=_safe_sort_key):
             if item.name.startswith(".") and item.name not in [".gemini", ".hermes"]:
+                continue
+            if is_blocked_sensitive_path(item):
                 continue
             try:
                 is_dir = item.is_dir()

@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
+from app.platform_utils import is_safe_path
 from app.services.cron_store import (
     HEARTBEAT_FILE,
     JOBS_FILE,
@@ -243,15 +244,17 @@ def get_cron_job_log(job_id: str, _ = Depends(require_auth)):
     log_path: Path | None = None
     if target.get("last_log"):
         p = Path(target["last_log"])
-        if p.exists() and p.is_file():
+        if is_safe_path(p, [OUTPUT_DIR]) and p.exists() and p.is_file():
             log_path = p
 
     if not log_path and OUTPUT_DIR.exists():
         matching = sorted(OUTPUT_DIR.glob(f"{job_id}_*.log"), key=lambda f: f.stat().st_mtime, reverse=True)
         if matching:
-            log_path = matching[0]
+            candidate = matching[0]
+            if is_safe_path(candidate, [OUTPUT_DIR]):
+                log_path = candidate
 
-    if not log_path:
+    if not log_path or not is_safe_path(log_path, [OUTPUT_DIR]):
         return {
             "job_id": job_id,
             "has_log": False,

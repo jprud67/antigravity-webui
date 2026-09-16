@@ -63,7 +63,11 @@ def get_conversations(limit: int = 100, q: str | None = None, _ = Depends(requir
 
 @router.get("/search", response_model=list[dict[str, Any]])
 def search(q: str = Query(..., min_length=1), limit: int = 50, _ = Depends(require_auth)):
-    return search_conversations(query=q, limit=limit)
+    items = search_conversations(query=q, limit=limit)
+    running_set = set(execution_manager.get_running_conversations())
+    for c in items:
+        c["is_running"] = c.get("conversation_id") in running_set
+    return items
 
 class BulkActionRequest(BaseModel):
     action: str  # "delete", "pin", "unpin", "tag", "project"

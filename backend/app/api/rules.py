@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -225,8 +226,7 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
             pass
 
     # Save content atomically with unique temp name to prevent concurrent write collisions
-    import uuid as _uuid
-    tmp_path = target_path.parent / f".{target_path.name}.tmp.{_uuid.uuid4().hex[:8]}"
+    tmp_path = target_path.parent / f".{target_path.name}.tmp.{uuid.uuid4().hex[:8]}"
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(req.content)

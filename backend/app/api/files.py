@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
-from app.platform_utils import is_safe_path
+from app.platform_utils import is_blocked_sensitive_path, is_safe_path
 from app.services.storage import get_settings
 
 logger = logging.getLogger("antigravity.files")
@@ -58,33 +58,7 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2) -> list
 
 
 def _is_blocked_sensitive_path(resolved: Path) -> bool:
-    """
-    Vérifie avec précision si un chemin cible pointe vers un fichier ou dossier
-    sensible (clés SSH, tokens, identifiants, répertoires système critiques).
-    Évite les faux positifs des recherches de sous-chaînes sur des fichiers
-    légitimes de code source (ex: system.ts, processing.py, etc.).
-    """
-    parts = resolved.parts
-    # Répertoires système et dossiers cachés sensibles
-    if any(p in (".ssh", ".gnupg") for p in parts):
-        return True
-    # Points de montage système root
-    if len(parts) > 1 and parts[1] in ("proc", "sys"):
-        return True
-    if len(parts) > 2 and parts[1] == "etc" and parts[2] in ("passwd", "shadow", "sudoers", "master.passwd"):
-        return True
-
-    # Fichiers de secrets et identifiants
-    name = resolved.name.lower()
-    if any(p == ".git" for p in parts):
-        return True
-    if name in ("antigravity-oauth-token", "webui_auth.json", "webui_password.txt", "google_accounts.json"):
-        return True
-    if name in ("id_rsa", "id_ed25519", "id_dsa", "id_ecdsa") or name.startswith(("id_rsa.", "id_ed25519.")):
-        return True
-    if name == ".env" or name.startswith(".env."):
-        return True
-    return ".stash_" in name
+    return is_blocked_sensitive_path(resolved)
 
 
 def _validate_path_access(file_path: Path) -> Path:
