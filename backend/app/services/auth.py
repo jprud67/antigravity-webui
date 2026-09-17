@@ -157,3 +157,135 @@ def update_password(new_password: str):
     config["password"] = hash_password(new_password.strip())
     config["secret_key"] = secrets.token_hex(32)  # Invalidate previous tokens
     save_auth_config(config)
+
+
+# ============================================================================
+# API Key Management for External Applications (OpenAI / Agent SDKs / Scripts)
+# ============================================================================
+
+ENV_API_KEY = os.environ.get("ANTIGRAVITY_API_KEY", "").strip()
+
+
+def _ensure_api_keys_storage(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Garantit la présence d'au moins une clé d'API par défaut pour les apps externes."""
+    keys = config.get("api_keys")
+    if not isinstance(keys, list):
+        keys = []
+        config["api_keys"] = keys
+
+    if len(keys) == 0:
+        default_key = f"agy_sk_{secrets.token_hex(24)}"
+        keys.append({
+            "id": "master-default",
+            "name": "Clé Maîtresse Principale",
+            "key": default_key,
+            "created_at": int(time.time()),
+            "last_used_at": None,
+        })
+        save_auth_config(config)
+    return keys
+
+
+def get_api_keys() -> list[dict[str, Any]]:
+    """Retourne la liste des clés d'API configurées pour les apps externes."""
+    config = get_auth_config()
+    keys = _ensure_api_keys_storage(config)
+    result = []
+    for k in keys:
+        raw_key = k.get("key", "")
+        # Masquage partiel pour l'affichage public
+        masked = f"{raw_key[:10]}...{raw_key[-4:]}" if len(raw_key) > 14 else raw_key
+        result.append({
+            "id": k.get("id"),
+            "name": k.get("name", "Sans nom"),
+            "masked_key": masked,
+            "key": raw_key,  # Disponible pour affichage/copie dans la WebUI
+            "created_at": k.get("created_at"),
+            "last_used_at": k.get("last_used_at"),
+        })
+    return result
+
+
+def create_api_key(name: str = "Application Externe") -> dict[str, Any]:
+    """Génère une nouvelle clé d'API sécurisée pour une application externe."""
+    config = get_auth_config()
+    keys = _ensure_api_keys_storage(config)
+    new_id = f"key_{uuid.uuid4().hex[:8]}"
+    raw_key = f"agy_sk_{secrets.token_hex(24)}"
+    now = int(time.time())
+    new_entry = {
+        "id": new_id,
+        "name": name.strip() or "Application Externe",
+        "key": raw_key,
+        "created_at": now,
+        "last_used_at": None,
+    }
+    keys.append(new_entry)
+    config["api_keys"] = keys
+    save_auth_config(config)
+    return {
+        "id": new_id,
+        "name": new_entry["name"],
+        "key": raw_key,
+        "created_at": now,
+    }
+
+
+def delete_api_key(key_id: str) -> bool:
+    """Supprime une clé d'API par son identifiant."""
+    config = get_auth_config()
+    keys = _ensure_api_keys_storage(config)
+    initial_count = len(keys)
+    keys = [k for k in keys if k.get("id") != key_id]
+    if len(keys) < initial_count:
+        config["api_keys"] = keys
+        save_auth_config(config)
+        return True
+    return False
+
+
+def verify_api_key(key: str | None) -> bool:
+    """
+    Vérifie si la clé passée correspond à l'environnement ANTIGRAVITY_API_KEY
+    ou à une des clés enregistrées dans auth_config.
+    """
+    if not key:
+        return False
+    key = key.strip()
+    if key.lower().startswith("bearer "):
+        key = key[7:].strip()
+    if not key:
+        return False
+
+    # 1. Vérification avec variable d'environnement maîtresse
+    if ENV_API_KEY and hmac.compare_digest(key, ENV_API_KEY):
+        return True
+
+    # 2. Vérification dans le fichier de configuration auth
+    config = get_auth_config()
+    keys = _ensure_api_keys_storage(config)
+    for k in keys:
+        stored = k.get("key", "")
+        if stored and hmac.compare_digest(key, stored):
+            now = int(time.time())
+            last_used = k.get("last_used_at") or 0
+            # Mettre à jour last_used_at et persister si plus de 60 secondes se sont écoulées
+            if now - last_used > 60:
+                k["last_used_at"] = now
+                try:
+                    save_auth_config(config)
+                except Exception as e:
+                    logger.debug(f"Impossible de sauvegarder last_used_at: {e}")
+            else:
+                k["last_used_at"] = now
+            return True
+
+    return False
+
+
+def verify_token_or_api_key(token_or_key: str | None) -> bool:
+    """Valide soit un token de session WebUI, soit une clé d'API externe."""
+    if not token_or_key:
+        return False
+    return verify_api_key(token_or_key) or verify_access_token(token_or_key)
+

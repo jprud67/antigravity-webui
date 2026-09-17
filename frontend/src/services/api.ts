@@ -77,6 +77,49 @@ export async function updatePassword(oldPassword: string, newPassword: string): 
   return data;
 }
 
+// API Keys for External Applications
+export interface ApiKeyItem {
+  id: string;
+  name: string;
+  masked_key: string;
+  key: string;
+  created_at: number;
+  last_used_at?: number | null;
+}
+
+export async function fetchApiKeys(): Promise<{ api_keys: ApiKeyItem[] }> {
+  const res = await fetch(`${API_BASE}/auth/api-keys`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error('Impossible de charger les clés d\'API');
+  return res.json();
+}
+
+export async function createApiKey(name: string): Promise<{ success: boolean; api_key: ApiKeyItem }> {
+  const res = await fetch(`${API_BASE}/auth/api-keys`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ name })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec création clé d\'API' }));
+    throw new Error(err.detail || 'Erreur lors de la création de la clé');
+  }
+  return res.json();
+}
+
+export async function deleteApiKey(keyId: string): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/auth/api-keys/${encodeURIComponent(keyId)}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec suppression clé' }));
+    throw new Error(err.detail || 'Erreur lors de la suppression de la clé');
+  }
+  return res.json();
+}
+
 // Conversations
 export async function fetchConversations(limit = 100, q?: string): Promise<Conversation[]> {
   const url = q && q.trim() 

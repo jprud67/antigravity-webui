@@ -2894,6 +2894,135 @@ def test_storage_calculate_tokens_with_steered_prompt():
     print("✓ test_storage_calculate_tokens_with_steered_prompt passed")
 
 
+def test_api_key_generation_and_verification():
+    from app.services.auth import (
+        create_access_token,
+        create_api_key,
+        delete_api_key,
+        get_api_keys,
+        verify_api_key,
+        verify_token_or_api_key,
+    )
+
+    # 1. Creation
+    key_info = create_api_key("Test Integration Key")
+    assert key_info["key"].startswith("agy_sk_")
+    key_id = key_info["id"]
+    raw_key = key_info["key"]
+
+    # 2. Listed keys have masked_key and proper metadata
+    keys_list = get_api_keys()
+    matching = [k for k in keys_list if k["id"] == key_id]
+    assert len(matching) == 1
+    assert "..." in matching[0]["masked_key"]
+
+    # 3. Verification with and without Bearer prefix
+    assert verify_api_key(raw_key) is True
+    assert verify_api_key(f"Bearer {raw_key}") is True
+    assert verify_api_key("invalid_key_random_string") is False
+    assert verify_api_key("") is False
+    assert verify_api_key(None) is False
+
+    # 4. Hybrid verify_token_or_api_key with both session token and API key
+    session_token = create_access_token()
+    assert verify_token_or_api_key(session_token) is True
+    assert verify_token_or_api_key(raw_key) is True
+    assert verify_token_or_api_key("completely_invalid_token") is False
+
+    # 5. Deletion
+    deleted = delete_api_key(key_id)
+    assert deleted is True
+    assert verify_api_key(raw_key) is False
+    print("✓ test_api_key_generation_and_verification passed")
+
+
+def test_api_key_last_used_at_throttling():
+    from app.services.auth import create_api_key, delete_api_key, get_auth_config, verify_api_key
+
+    key_info = create_api_key("Throttled Key Test")
+    raw_key = key_info["key"]
+    key_id = key_info["id"]
+
+    try:
+        # First verification should set last_used_at
+        assert verify_api_key(raw_key) is True
+        config = get_auth_config()
+        stored_entry = next(k for k in config.get("api_keys", []) if k["id"] == key_id)
+        first_used = stored_entry.get("last_used_at")
+        assert first_used is not None
+
+        # Immediate re-verification (<60s) updates memory without failing
+        assert verify_api_key(raw_key) is True
+    finally:
+        delete_api_key(key_id)
+    print("✓ test_api_key_last_used_at_throttling passed")
+
+
+def test_execution_manager_submit_prompt_ws_none():
+    import asyncio
+    from app.services.execution_manager import ExecutionSession, execution_manager
+
+    # 1. Empty prompt with ws=None should return cleanly without AttributeError
+    asyncio.run(execution_manager.submit_prompt(None, {"prompt": "", "conversation_id": "test_ws_none_empty"}))
+
+    # 2. ExecutionSession.add_subscriber(None) and remove_subscriber(None)
+    session = ExecutionSession(conversation_id="test_sub_null")
+    session.add_subscriber(None)
+    assert None not in session.subscribers
+    assert len(session.subscribers) == 0
+    session.remove_subscriber(None)
+
+    # 3. submit_prompt with valid prompt and ws=None
+    cid = "test_ws_none_valid"
+    asyncio.run(execution_manager.submit_prompt(None, {
+        "prompt": "Test instruction for agent",
+        "conversation_id": cid,
+        "mode": "normal"
+    }))
+    sess = execution_manager.get_session(cid)
+    assert sess is not None
+    assert None not in sess.subscribers
+    execution_manager.remove_session(cid)
+    print("✓ test_execution_manager_submit_prompt_ws_none passed")
+
+
+def test_openai_messages_to_prompt_resolution():
+    from app.api.openai_compat import ChatMessage, _messages_to_prompt
+
+    # Single user message
+    msgs1 = [ChatMessage(role="user", content="Bonjour Antigravity")]
+    assert _messages_to_prompt(msgs1) == "Bonjour Antigravity"
+
+    # Multi-turn history without existing conv_id (formats context)
+    msgs2 = [
+        ChatMessage(role="system", content="Tu es un assistant utile"),
+        ChatMessage(role="user", content="Comment vas-tu ?"),
+        ChatMessage(role="assistant", content="Très bien, merci !"),
+        ChatMessage(role="user", content="Quel temps fait-il ?")
+    ]
+    formatted = _messages_to_prompt(msgs2, has_conv_id=False)
+    assert "[Directives Système / Contexte]:" in formatted
+    assert "[Assistant Antigravity]:" in formatted
+    assert "Quel temps fait-il ?" in formatted
+
+    # Multi-turn history with existing conv_id (only extracts latest user message to avoid duplicate transcript)
+    latest_only = _messages_to_prompt(msgs2, has_conv_id=True)
+    assert latest_only == "Quel temps fait-il ?"
+    print("✓ test_openai_messages_to_prompt_resolution passed")
+
+
+def test_agy_subcommand_add_mcp_server_default_isolation():
+    import inspect
+    from app.services.agy_subcommand import add_mcp_server
+
+    sig = inspect.signature(add_mcp_server)
+    # Default values must NOT be mutable lists
+    assert sig.parameters["args"].default is None or not isinstance(sig.parameters["args"].default, list)
+    assert sig.parameters["env"].default is None or not isinstance(sig.parameters["env"].default, list)
+    assert sig.parameters["headers"].default is None or not isinstance(sig.parameters["headers"].default, list)
+    print("✓ test_agy_subcommand_add_mcp_server_default_isolation passed")
+
+
 if __name__ == "__main__":
     test_file_download_unicode_and_special_chars()
     test_token_calculation()
@@ -3012,4 +3141,9 @@ if __name__ == "__main__":
     test_execution_manager_pending_approval_cleared_on_failover()
     test_scan_dir_children_key_consistency()
     test_storage_calculate_tokens_with_steered_prompt()
+    test_api_key_generation_and_verification()
+    test_api_key_last_used_at_throttling()
+    test_execution_manager_submit_prompt_ws_none()
+    test_openai_messages_to_prompt_resolution()
+    test_agy_subcommand_add_mcp_server_default_isolation()
     print("\nAll unit tests passed successfully!")

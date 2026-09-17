@@ -3,7 +3,7 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from app.services.auth import get_auth_config, verify_access_token
+from app.services.auth import get_auth_config, verify_token_or_api_key
 from app.services.execution_manager import execution_manager
 
 logger = logging.getLogger("antigravity.chat")
@@ -24,12 +24,12 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
                         rem = len(raw_token) % 4
                         padded = raw_token + ("=" * ((4 - rem) % 4))
                         decoded = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
-                        if verify_access_token(decoded):
+                        if verify_token_or_api_key(decoded):
                             token = decoded
-                        elif verify_access_token(raw_token):
+                        elif verify_token_or_api_key(raw_token):
                             token = raw_token
                     except Exception:
-                        if verify_access_token(raw_token):
+                        if verify_token_or_api_key(raw_token):
                             token = raw_token
                 selected_subprotocol = sp_clean
                 break
@@ -37,7 +37,7 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
                 selected_subprotocol = "antigravity"
 
     config = get_auth_config()
-    if config.get("enabled", True) and not verify_access_token(token):
+    if config.get("enabled", True) and not verify_token_or_api_key(token):
         await websocket.close(code=1008, reason="Unauthorized")
         logger.warning("Rejected unauthenticated WebSocket connection to /ws/chat")
         return

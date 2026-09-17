@@ -18,7 +18,7 @@ from app.platform_utils import (
     spawn_group_kwargs,
     terminate_process_group_async,
 )
-from app.services.auth import get_auth_config, verify_access_token
+from app.services.auth import get_auth_config, verify_token_or_api_key
 
 # Modules POSIX uniquement — absents de Windows (import conditionnel obligatoire).
 try:
@@ -385,12 +385,12 @@ async def terminal_websocket(
                         rem = len(raw_token) % 4
                         padded = raw_token + ("=" * ((4 - rem) % 4))
                         decoded = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
-                        if verify_access_token(decoded):
+                        if verify_token_or_api_key(decoded):
                             token = decoded
-                        elif verify_access_token(raw_token):
+                        elif verify_token_or_api_key(raw_token):
                             token = raw_token
                     except Exception:
-                        if verify_access_token(raw_token):
+                        if verify_token_or_api_key(raw_token):
                             token = raw_token
                 selected_subprotocol = sp_clean
                 break
@@ -399,7 +399,7 @@ async def terminal_websocket(
 
     # Verify authentication
     config = get_auth_config()
-    if config.get("enabled", True) and not verify_access_token(token):
+    if config.get("enabled", True) and not verify_token_or_api_key(token):
         await websocket.close(code=1008, reason="Unauthorized")
         logger.warning("Unauthorized terminal websocket connection attempt")
         return

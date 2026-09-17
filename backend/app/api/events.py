@@ -14,7 +14,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from app.services.auth import get_auth_config, verify_access_token
+from app.services.auth import get_auth_config, verify_token_or_api_key
 from app.services.fs_watcher import add_subscriber, remove_subscriber
 
 logger = logging.getLogger("antigravity.events")
@@ -65,7 +65,7 @@ async def event_stream(request: Request, token: str | None = None):
         elif raw_token.strip().lower().startswith("bearer "):
             raw_token = raw_token.strip()[7:]
         clean_token = raw_token.strip() if raw_token else None
-        if not clean_token or not verify_access_token(clean_token):
+        if not clean_token or not verify_token_or_api_key(clean_token):
             raise HTTPException(status_code=401, detail="Non authentifié")
 
     q: asyncio.Queue = asyncio.Queue(maxsize=50)

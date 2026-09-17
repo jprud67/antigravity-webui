@@ -59,14 +59,17 @@ class ExecutionSession:
         self.pending_approval: dict[str, Any] | None = None
         self.recent_events: deque[dict[str, Any]] = deque(maxlen=50)
 
-    def add_subscriber(self, ws: WebSocket):
-        self.subscribers.add(ws)
+    def add_subscriber(self, ws: WebSocket | None):
+        if ws is not None:
+            self.subscribers.add(ws)
         self.last_active_at = time.time()
 
-    def remove_subscriber(self, ws: WebSocket):
-        self.subscribers.discard(ws)
+    def remove_subscriber(self, ws: WebSocket | None):
+        if ws is not None:
+            self.subscribers.discard(ws)
         if not self.subscribers:
             self.last_active_at = time.time()
+
 
     @property
     def is_busy(self) -> bool:
@@ -775,10 +778,11 @@ class ExecutionManager:
             "recent_events": []
         }
 
-    async def submit_prompt(self, ws: WebSocket, data: dict[str, Any]):
+    async def submit_prompt(self, ws: WebSocket | None, data: dict[str, Any]):
         prompt = data.get("prompt", "").strip()
         if not prompt:
-            await ws.send_json({"event": "error", "message": "Le prompt ne peut pas être vide."})
+            if ws:
+                await ws.send_json({"event": "error", "message": "Le prompt ne peut pas être vide."})
             return
 
         conv_id = _clean_cid(data.get("conversation_id"))
@@ -786,7 +790,8 @@ class ExecutionManager:
         mode = data.get("mode", "normal")
 
         session = self.get_or_create_session(conv_id, ws_path, ws=ws)
-        session.add_subscriber(ws)
+        if ws is not None:
+            session.add_subscriber(ws)
         session.last_active_at = time.time()
         self.active_session = session
 

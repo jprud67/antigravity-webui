@@ -34,7 +34,11 @@ import {
   Folder,
   FileText,
   Keyboard,
-  RotateCcw
+  RotateCcw,
+  Code2,
+  Copy,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import type { AppSettings, ModelOption, Conversation } from '../types';
 import { 
@@ -59,6 +63,10 @@ import {
   fetchSystemVersion,
   checkSystemUpdate,
   applySystemUpdate,
+  fetchApiKeys,
+  createApiKey,
+  deleteApiKey,
+  type ApiKeyItem,
   type GoogleAccountInfo,
   type GoogleAccountsResponse,
   type SystemVersionInfo,
@@ -88,7 +96,7 @@ export const GoogleIcon = ({ className = "w-4 h-4" }: { className?: string }) =>
   </svg>
 );
 
-export type SettingsTab = 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates';
+export type SettingsTab = 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates' | 'api_keys';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -367,6 +375,71 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [googleSuccess, setGoogleSuccess] = useState<string | null>(null);
+
+  // API Keys state for External Applications (Cursor, LangChain, OpenAI compat)
+  const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([]);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [loadingApiKeys, setLoadingApiKeys] = useState(false);
+  const [creatingApiKey, setCreatingApiKey] = useState(false);
+  const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
+
+  const loadApiKeys = useCallback(async () => {
+    setLoadingApiKeys(true);
+    try {
+      const res = await fetchApiKeys();
+      setApiKeys(res.api_keys || []);
+    } catch (e: any) {
+      showToast(`Erreur chargement clés API: ${e.message}`, 'error');
+    } finally {
+      setLoadingApiKeys(false);
+    }
+  }, []);
+
+  const handleCreateApiKey = async () => {
+    if (!newKeyName.trim()) {
+      showToast('Veuillez saisir un nom pour la clé (ex: Cursor, LangChain)', 'info');
+      return;
+    }
+    setCreatingApiKey(true);
+    try {
+      const res = await createApiKey(newKeyName.trim());
+      setNewKeyName('');
+      showToast(`Clé d'API "${res.api_key.name}" générée avec succès !`, 'success');
+      await loadApiKeys();
+    } catch (e: any) {
+      showToast(`Erreur création clé API: ${e.message}`, 'error');
+    } finally {
+      setCreatingApiKey(false);
+    }
+  };
+
+  const handleDeleteApiKey = async (keyId: string, name: string) => {
+    const ok = await showConfirm({
+      title: 'Révoquer la clé d\'API',
+      message: `Voulez-vous vraiment révoquer la clé "${name}" ? Les applications externes l'utilisant perdront leur accès.`,
+      confirmText: 'Révoquer la clé',
+      destructive: true
+    });
+    if (!ok) return;
+    try {
+      await deleteApiKey(keyId);
+      showToast('Clé d\'API révoquée avec succès.', 'success');
+      await loadApiKeys();
+    } catch (e: any) {
+      showToast(`Erreur suppression: ${e.message}`, 'error');
+    }
+  };
+
+  const handleCopyText = (text: string, label: string = 'Texte') => {
+    navigator.clipboard.writeText(text);
+    showToast(`${label} copié dans le presse-papiers !`, 'success');
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      loadApiKeys();
+    }
+  }, [isOpen, loadApiKeys]);
 
   // Horizontal tabs scroll management
   const tabsContainerRef = useRef<HTMLDivElement>(null);
@@ -822,6 +895,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               <KeyRound className="w-4 h-4" />
               <span>Sécurité & Accès</span>
+            </button>
+
+            <button
+              onClick={(e) => {
+                handleTabClick('api_keys', e);
+                loadApiKeys();
+              }}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'api_keys'
+                  ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <Code2 className="w-4 h-4 text-emerald-500" />
+              <span>Clés d'API Externe</span>
+              <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60 px-1.5 py-0.2 rounded-full font-mono font-bold">
+                {apiKeys.length}
+              </span>
             </button>
 
             <button
@@ -2595,6 +2686,294 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                   <span className="font-semibold text-sky-400">Architecture de mise à jour synchronisée : </span>
                   Ce module reprend le protocole d'Hermes Agent : les vérifications s'exécutent de façon asynchrone en arrière-plan sans bloquer l'UI, avec un cache local de 1 heure pour préserver le réseau. La mise à jour effectue un pull sécurisé, recompile le frontend Vite et relance le service systemd.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB: CLÉS D'API EXTERNE                                    */}
+          {/* ========================================================= */}
+          {activeTab === 'api_keys' && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div
+                className="p-5 rounded-2xl border"
+                style={{
+                  backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                  borderColor: 'rgba(16, 185, 129, 0.25)',
+                }}
+              >
+                <div className="flex items-start gap-3.5">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0 border border-emerald-500/20">
+                    <Code2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                      Passerelle API Universelle pour Applications Externes
+                    </h3>
+                    <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--muted)' }}>
+                      Connectez n'importe quelle application (Cursor, Continue.dev, LangChain, OpenWebUI, LibreChat, scripts Python/Node.js) à Antigravity en utilisant le protocole standard <strong>OpenAI (<code className="text-emerald-400">/v1/chat/completions</code>)</strong> ou l'API Agent native <strong>(<code className="text-emerald-400">/api/v1/agent/run</code>)</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Endpoints & URLs Quick Reference */}
+              <div
+                className="p-4 rounded-2xl border space-y-3"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)',
+                }}
+              >
+                <div className="text-xs font-bold flex items-center justify-between" style={{ color: 'var(--strong)' }}>
+                  <span>Points de Terminaison (Endpoints)</span>
+                  <a
+                    href="/docs"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-sky-400 hover:underline flex items-center gap-1 font-mono font-medium"
+                  >
+                    <span>Documentation Swagger interactive (/docs)</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div
+                    className="p-3 rounded-xl border flex items-center justify-between gap-2"
+                    style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-subtle)' }}
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-semibold text-emerald-500">BASE URL COMPATIBLE OPENAI</div>
+                      <div className="font-mono text-xs truncate mt-0.5" style={{ color: 'var(--text)' }}>
+                        {typeof window !== 'undefined' ? `${window.location.origin}/v1` : 'http://localhost:8000/v1'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleCopyText(typeof window !== 'undefined' ? `${window.location.origin}/v1` : 'http://localhost:8000/v1', 'Base URL OpenAI')}
+                      className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-100 transition-colors shrink-0"
+                      title="Copier l'URL"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div
+                    className="p-3 rounded-xl border flex items-center justify-between gap-2"
+                    style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-subtle)' }}
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-semibold text-sky-500">API AGENT NATIF ANTIGRAVITY</div>
+                      <div className="font-mono text-xs truncate mt-0.5" style={{ color: 'var(--text)' }}>
+                        {typeof window !== 'undefined' ? `${window.location.origin}/api/v1/agent/run` : 'http://localhost:8000/api/v1/agent/run'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleCopyText(typeof window !== 'undefined' ? `${window.location.origin}/api/v1/agent/run` : 'http://localhost:8000/api/v1/agent/run', 'URL Agent')}
+                      className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-100 transition-colors shrink-0"
+                      title="Copier l'URL"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Generate New API Key */}
+              <div
+                className="p-4 rounded-2xl border"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)',
+                }}
+              >
+                <div className="text-xs font-bold mb-2.5" style={{ color: 'var(--strong)' }}>
+                  Générer une Nouvelle Clé d'API
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <input
+                    type="text"
+                    placeholder="Nom de l'application (ex: Cursor, LangChain, Script Python...)"
+                    value={newKeyName}
+                    onChange={(e) => setNewKeyName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCreateApiKey();
+                    }}
+                    className="flex-1 px-3.5 py-2 rounded-xl text-xs border outline-none transition-all"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--text)',
+                    }}
+                  />
+                  <button
+                    onClick={handleCreateApiKey}
+                    disabled={creatingApiKey || !newKeyName.trim()}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-600/20 shrink-0 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{creatingApiKey ? 'Génération...' : 'Générer la clé'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* API Keys List */}
+              <div
+                className="p-4 rounded-2xl border space-y-3"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)',
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold" style={{ color: 'var(--strong)' }}>
+                    Clés d'API Actives ({apiKeys.length})
+                  </div>
+                  <button
+                    onClick={loadApiKeys}
+                    disabled={loadingApiKeys}
+                    className="text-[11px] text-slate-400 hover:text-slate-200 flex items-center gap-1 transition-colors"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${loadingApiKeys ? 'animate-spin' : ''}`} />
+                    <span>Actualiser</span>
+                  </button>
+                </div>
+
+                {loadingApiKeys && apiKeys.length === 0 ? (
+                  <div className="py-8 text-center text-xs opacity-50">Chargement des clés d'API...</div>
+                ) : apiKeys.length === 0 ? (
+                  <div className="py-8 text-center text-xs opacity-50">Aucune clé d'API configurée.</div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {apiKeys.map((k) => {
+                      const isRevealed = !!revealedKeys[k.id];
+                      return (
+                        <div
+                          key={k.id}
+                          className="p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                          style={{
+                            backgroundColor: 'var(--surface)',
+                            borderColor: 'var(--border-subtle)',
+                          }}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs" style={{ color: 'var(--text)' }}>
+                                {k.name}
+                              </span>
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold">
+                                ACTIVE
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <code className="font-mono text-xs bg-black/10 dark:bg-white/5 px-2 py-0.5 rounded border border-black/5 dark:border-white/10 text-emerald-600 dark:text-emerald-400 select-all">
+                                {isRevealed ? k.key : k.masked_key}
+                              </code>
+                              <button
+                                onClick={() => setRevealedKeys(prev => ({ ...prev, [k.id]: !prev[k.id] }))}
+                                className="p-1 text-slate-400 hover:text-slate-200 transition-colors"
+                                title={isRevealed ? "Masquer la clé" : "Afficher la clé"}
+                              >
+                                {isRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                              <button
+                                onClick={() => handleCopyText(k.key, `Clé d'API "${k.name}"`)}
+                                className="p-1 text-slate-400 hover:text-slate-200 transition-colors"
+                                title="Copier la clé"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <div className="text-[10px] opacity-40 mt-1">
+                              Créée le {new Date(k.created_at * 1000).toLocaleDateString()}
+                              {k.last_used_at ? ` • Dernière utilisation : ${new Date(k.last_used_at * 1000).toLocaleString()}` : ' • Jamais utilisée'}
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleDeleteApiKey(k.id, k.name)}
+                            className="p-2 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-transparent hover:border-rose-500/20 transition-colors self-end sm:self-center shrink-0 cursor-pointer"
+                            title="Révoquer cette clé"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Code Integration Examples */}
+              <div
+                className="p-4 rounded-2xl border space-y-3"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)',
+                }}
+              >
+                <div className="text-xs font-bold" style={{ color: 'var(--strong)' }}>
+                  Exemples d'Intégration Rapide
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  {/* Python OpenAI SDK */}
+                  <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
+                    <div className="px-3 py-2 bg-black/10 dark:bg-white/5 flex items-center justify-between border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                      <span className="font-bold text-[11px] text-sky-400">🐍 Python (Bibliothèque standard `openai`)</span>
+                      <button
+                        onClick={() => handleCopyText(`from openai import OpenAI\n\nclient = OpenAI(\n    base_url="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'}/v1",\n    api_key="${apiKeys[0]?.key || 'agy_sk_votre_cle'}"\n)\n\nresponse = client.chat.completions.create(\n    model="gemini-3.8-flash",\n    messages=[{"role": "user", "content": "Bonjour !"}],\n    stream=True\n)\n\nfor chunk in response:\n    if chunk.choices[0].delta.content:\n        print(chunk.choices[0].delta.content, end="", flush=True)\n`, 'Code Python')}
+                        className="text-[10px] text-slate-400 hover:text-slate-100 flex items-center gap-1"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Copier</span>
+                      </button>
+                    </div>
+                    <pre className="p-3 bg-black/20 text-[11px] font-mono overflow-x-auto text-slate-300 leading-relaxed">
+{`from openai import OpenAI
+
+client = OpenAI(
+    base_url="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'}/v1",
+    api_key="${apiKeys[0]?.key || 'agy_sk_votre_cle'}"
+)
+
+response = client.chat.completions.create(
+    model="gemini-3.8-flash",
+    messages=[{"role": "user", "content": "Bonjour !"}],
+    stream=True
+)
+
+for chunk in response:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="", flush=True)`}
+                    </pre>
+                  </div>
+
+                  {/* cURL Example */}
+                  <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
+                    <div className="px-3 py-2 bg-black/10 dark:bg-white/5 flex items-center justify-between border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                      <span className="font-bold text-[11px] text-emerald-400">⚡ cURL / Bash (Streaming SSE)</span>
+                      <button
+                        onClick={() => handleCopyText(`curl -N -X POST ${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'}/v1/chat/completions \\\n  -H "Authorization: Bearer ${apiKeys[0]?.key || 'agy_sk_votre_cle'}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "model": "gemini-3.8-flash",\n    "messages": [{"role": "user", "content": "Explique le concept d'Antigravity"}],\n    "stream": true\n  }'`, 'Commande cURL')}
+                        className="text-[10px] text-slate-400 hover:text-slate-100 flex items-center gap-1"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Copier</span>
+                      </button>
+                    </div>
+                    <pre className="p-3 bg-black/20 text-[11px] font-mono overflow-x-auto text-slate-300 leading-relaxed">
+{`curl -N -X POST ${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'}/v1/chat/completions \\
+  -H "Authorization: Bearer ${apiKeys[0]?.key || 'agy_sk_votre_cle'}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "gemini-3.8-flash",
+    "messages": [{"role": "user", "content": "Explique le concept d'Antigravity"}],
+    "stream": true
+  }'`}
+                    </pre>
+                  </div>
                 </div>
               </div>
             </div>

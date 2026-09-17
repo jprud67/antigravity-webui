@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.agent_api import router as agent_api_router
 from app.api.artifacts import router as art_router
 from app.api.auth import router as auth_router
 from app.api.chat import router as chat_router
@@ -18,6 +19,7 @@ from app.api.files import router as files_router
 from app.api.git import router as git_router
 from app.api.google_accounts import router as google_router
 from app.api.kanban import router as kanban_router
+from app.api.openai_compat import router as openai_router
 from app.api.rules import router as rules_router
 from app.api.settings import router as set_router
 from app.api.skills import router as skills_router
@@ -104,6 +106,8 @@ app.add_middleware(
 
 
 app.include_router(auth_router)
+app.include_router(openai_router)     # OpenAI-compatible API (/v1/chat/completions, /v1/models)
+app.include_router(agent_api_router)  # Native Antigravity Agent API (/api/v1/agent/run)
 app.include_router(conv_router)
 app.include_router(art_router)
 app.include_router(set_router)
@@ -134,8 +138,8 @@ if FRONTEND_DIST.exists():
     @app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
     async def serve_frontend(full_path: str):
         if (
-            full_path in ("api", "ws", "docs", "redoc", "openapi.json")
-            or full_path.startswith(("api/", "ws/", "docs/", "redoc/"))
+            full_path in ("api", "ws", "v1", "docs", "redoc", "openapi.json")
+            or full_path.startswith(("api/", "ws/", "v1/", "docs/", "redoc/"))
         ):
             raise HTTPException(status_code=404, detail="API route not found")
         
