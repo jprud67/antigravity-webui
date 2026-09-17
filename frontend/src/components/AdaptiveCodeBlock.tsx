@@ -218,6 +218,14 @@ function parseCodeFenceMeta(className?: string, rawCode: string = '') {
         const titleMatch = /title=["']?([^"'\s]+)["']?/.exec(fullMeta);
         rawLang = fullMeta.split(/[_\s-]/)[0];
         if (titleMatch) filename = titleMatch[1];
+      } else if (fullMeta.includes('file=')) {
+        const fileMatch = /file=["']?([^"'\s]+)["']?/.exec(fullMeta);
+        rawLang = fullMeta.split(/[_\s-]/)[0];
+        if (fileMatch) filename = fileMatch[1];
+      } else if (fullMeta.includes('filepath=')) {
+        const filepathMatch = /filepath=["']?([^"'\s]+)["']?/.exec(fullMeta);
+        rawLang = fullMeta.split(/[_\s-]/)[0];
+        if (filepathMatch) filename = filepathMatch[1];
       } else {
         rawLang = fullMeta;
       }

@@ -160,8 +160,13 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       const res = await fetchFileContent(path);
       setFileContent(res.content);
       setEditedFileContent(res.content);
-    } catch {
-      setFileContent('Erreur lors du chargement du fichier.');
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('volumineux') || msg.includes('2 Mo') || msg.toLowerCase().includes('large')) {
+        setFileContent('⚠️ Ce fichier dépasse la limite de 2 Mo pour l\'éditeur intégré.\nVeuillez utiliser le bouton « Télécharger » ci-dessus pour le consulter ou le manipuler sur votre machine.');
+      } else {
+        setFileContent(`Erreur lors du chargement du fichier : ${msg || 'Erreur inconnue'}`);
+      }
       setEditedFileContent('');
     } finally {
       setLoadingContent(false);

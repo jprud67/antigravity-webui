@@ -141,13 +141,21 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     display_title = custom_title or r["title"] or "Nouvelle session"
     raw_tags = meta.get("tags")
     safe_tags = list(raw_tags) if isinstance(raw_tags, list) else []
+    raw_lmt = r["last_modified_time"]
+    if hasattr(raw_lmt, "isoformat"):
+        safe_lmt = raw_lmt.isoformat()
+    elif isinstance(raw_lmt, (int, float)):
+        safe_lmt = datetime.fromtimestamp(raw_lmt, tz=timezone.utc).isoformat()
+    else:
+        safe_lmt = str(raw_lmt) if raw_lmt is not None else ""
+
     return {
         "conversation_id": cid,
         "title": display_title,
         "raw_title": r["title"] or "Nouvelle session",
         "preview": r["preview"],
         "step_count": r["step_count"],
-        "last_modified_time": r["last_modified_time"],
+        "last_modified_time": safe_lmt,
         "workspace_uris": r["workspace_uris"],
         "status": r["status"],
         "agent_name": r["agent_name"],
@@ -1265,9 +1273,9 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 if file_size > 512 * 1024:
                     with open(t_file, "rb") as f:
                         f.seek(file_size - 512 * 1024)
+                        f.readline()  # Skip partial line and align cleanly on UTF-8 line boundary
                         raw_data = f.read().decode("utf-8", errors="replace")
-                    split_lines = raw_data.splitlines()
-                    lines = split_lines[1:] if len(split_lines) > 1 else split_lines  # skip potential partial line only if multiple lines
+                    lines = raw_data.splitlines()
                     if len(lines) > 500:
                         lines = lines[-500:]
                 else:

@@ -976,6 +976,14 @@ export const ChatInput = React.memo<ChatInputProps>(({
     savePromptToHistory(textToSend);
     historyIndexRef.current = -1;
     draftRef.current = '';
+    basePromptRef.current = '';
+    finalSpeechRef.current = '';
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      setIsListening(false);
+    }
 
     let finalText = textToSend.trim();
     if (attachments.length > 0) {
