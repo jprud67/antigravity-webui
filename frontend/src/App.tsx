@@ -130,7 +130,7 @@ export function App() {
   const [metaTargetConversation, setMetaTargetConversation] = useState<Conversation | null>(null);
 
   const [models, setModels] = useState<ModelOption[]>([]);
-  const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash-high');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
   const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
   const [quickPrompt, setQuickPrompt] = useState('');
 
@@ -1046,7 +1046,9 @@ export function App() {
 
   const handleSelectEffort = (newEffort: 'low' | 'medium' | 'high') => {
     setSelectedEffort(newEffort);
-    const currentModelObj = models.find((m) => m.id === selectedModel);
+    const currentModelObj = models.find((m) => m.id === selectedModel) ||
+      models.find((m) => selectedModel.startsWith(m.id)) ||
+      models[0];
     if (currentModelObj) {
       fetchSettings().then((currentSettings) => {
         saveSettings({ ...currentSettings, model: currentModelObj.name, effort: newEffort }).catch(console.error);
@@ -1115,7 +1117,9 @@ export function App() {
   };
 
   const handleShowStatusCard = () => {
-    const currentModelObj = models.find((m) => m.id === selectedModel);
+    const currentModelObj = models.find((m) => m.id === selectedModel) ||
+      models.find((m) => selectedModel.startsWith(m.id)) ||
+      models[0];
     const statusContent = [
       '### 📊 État du Serveur Antigravity & Session',
       `- **ID Session :** \`${activeConversationId || 'Session locale / Active'}\``,
@@ -1389,9 +1393,11 @@ export function App() {
     }
   };
 
-  const currentModelObj = models.find((m) => m.id === selectedModel);
+  const currentModelObj = models.find((m) => m.id === selectedModel) ||
+    models.find((m) => selectedModel.startsWith(m.id)) ||
+    models[0];
   const displayModelName = currentModelObj ? currentModelObj.name : 'Gemini 3.8 Flash';
-  const displayEffort = currentModelObj && currentModelObj.supported_efforts.length > 0 ? selectedEffort : undefined;
+  const displayEffort = currentModelObj && currentModelObj.supported_efforts?.length > 0 ? selectedEffort : undefined;
 
   const stableOpenCrons = useCallback(() => setIsCronModalOpen(true), []);
   const stableOpenRules = useCallback(() => setIsRulesModalOpen(true), []);

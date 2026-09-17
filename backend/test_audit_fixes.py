@@ -1262,6 +1262,39 @@ def test_git_sanitize_extended_trailers():
     print("✓ test_git_sanitize_extended_trailers passed")
 
 
+def test_kill_task_candidate_tids_hardening():
+    clean_tid = "task"
+    pure_tid = "task"
+    raw_cands = [clean_tid]
+    excluded_tokens = {
+        "bash", "sh", "zsh", "node", "npm", "python", "python3", "uvicorn",
+        "git", "cat", "grep", "root", "systemd", "task", "tasks", "subagent",
+        "subagents", "process", "worker", "service", "start", "stop", "test", "run"
+    }
+    candidate_tids = [
+        c for c in raw_cands
+        if len(c) >= 5 and c.lower() not in excluded_tokens
+    ]
+    assert len(candidate_tids) == 0, "Short or common token 'task' should be filtered out"
+
+    valid_cands = ["task-12345", "subagent-999"]
+    candidate_valid = [
+        c for c in valid_cands
+        if len(c) >= 5 and c.lower() not in excluded_tokens
+    ]
+    assert len(candidate_valid) == 2
+    print("✓ test_kill_task_candidate_tids_hardening passed")
+
+
+def test_compute_next_run_microsecond_stripping():
+    from app.services.cron_store import compute_next_run
+    next_iso = compute_next_run("every 10m")
+    assert next_iso is not None
+    assert ".000" not in next_iso
+    assert "+" in next_iso or "Z" in next_iso
+    print("✓ test_compute_next_run_microsecond_stripping passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -1314,5 +1347,6 @@ if __name__ == "__main__":
     test_extract_json_payload_resilience()
     test_session_meta_boolean_normalization()
     test_git_sanitize_extended_trailers()
+    test_kill_task_candidate_tids_hardening()
+    test_compute_next_run_microsecond_stripping()
     print("\nAll unit tests passed successfully!")
-

@@ -146,7 +146,7 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
     """Calcule la prochaine date d'exécution depuis une expression cron ou un intervalle."""
     if not schedule:
         return None
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
     expr = ""
     if isinstance(schedule, str):
         expr = schedule.strip()

@@ -1165,11 +1165,13 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
             try:
                 # Bound transcript scan to prevent blocking FastAPI event loop on massive files
                 file_size = t_file.stat().st_size
-                if file_size > 2 * 1024 * 1024:
+                if file_size > 512 * 1024:
                     with open(t_file, "rb") as f:
                         f.seek(file_size - 512 * 1024)
                         raw_data = f.read().decode("utf-8", errors="replace")
                     lines = raw_data.splitlines()[1:]  # skip potential partial line
+                    if len(lines) > 500:
+                        lines = lines[-500:]
                 else:
                     with open(t_file, "r", encoding="utf-8", errors="replace") as f:
                         lines = f.readlines()[-500:]

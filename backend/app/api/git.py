@@ -252,10 +252,17 @@ def get_git_diff(
                 if untracked_res.stdout:
                     diff_text = untracked_res.stdout
 
+    MAX_DIFF_BYTES = 2 * 1024 * 1024  # 2 Mo
+    truncated = False
+    if diff_text and len(diff_text) > MAX_DIFF_BYTES:
+        diff_text = diff_text[:MAX_DIFF_BYTES] + "\n\n... [Diff tronqué car supérieur à 2 Mo] ..."
+        truncated = True
+
     return {
         "workspace": str(target),
         "path": norm_path or path,
-        "diff": diff_text
+        "diff": diff_text,
+        "truncated": truncated
     }
 
 @router.get("/branches")

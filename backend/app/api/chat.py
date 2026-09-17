@@ -1,3 +1,4 @@
+import base64
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -19,7 +20,6 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
             if sp_clean.startswith("token."):
                 raw_token = sp_clean[6:]
                 if not token:
-                    import base64
                     try:
                         rem = len(raw_token) % 4
                         padded = raw_token + ("=" * ((4 - rem) % 4))

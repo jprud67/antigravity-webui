@@ -75,7 +75,11 @@ export class ChatWebSocketClient {
     let protocols: string[] | undefined;
     if (token) {
       try {
-        const safeToken = btoa(token).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        // Safe UTF-8 to base64 encoding avoiding Latin1 DOMException
+        const utf8Bytes = encodeURIComponent(token).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+          String.fromCharCode(parseInt(p1, 16))
+        );
+        const safeToken = btoa(utf8Bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         protocols = [`token.${safeToken}`];
       } catch {
         protocols = undefined;

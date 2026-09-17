@@ -289,7 +289,7 @@ class PersistentTerminalSession:
                 logger.debug(f"Ignored error: {e}")
 
         if self.proc:
-            await terminate_process_group_async(self.proc, grace=0.1)
+            await terminate_process_group_async(self.proc, grace=0.5)
             self.proc = None
         logger.info(f"Persistent PTY session terminated: {self.session_id}")
 

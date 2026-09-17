@@ -107,7 +107,7 @@ def _ensure_schema(conn: sqlite3.Connection):
     for col, col_type in expected_cols.items():
         if col not in existing_cols:
             try:
-                conn.execute(f"ALTER TABLE tasks ADD COLUMN {col} {col_type}")
+                conn.execute(f'ALTER TABLE tasks ADD COLUMN "{col}" {col_type}')
             except Exception as e:
                 logger.debug(f"Ignored error: {e}")
     conn.commit()
@@ -301,7 +301,10 @@ def update_task(task_id: str, req: UpdateTaskRequest, _ = Depends(require_auth))
                 conn.commit()
 
             cur.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
-            updated = dict(cur.fetchone())
+            updated_row = cur.fetchone()
+            if not updated_row:
+                raise HTTPException(status_code=404, detail="Tâche introuvable")
+            updated = dict(updated_row)
         return {"success": True, "task": updated}
     except HTTPException:
         raise
