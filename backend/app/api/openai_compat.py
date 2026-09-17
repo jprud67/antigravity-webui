@@ -1,20 +1,20 @@
-import asyncio
 import json
 import logging
 import time
 import uuid
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api.auth import require_auth
 from app.services.agy_driver import (
     get_model_families,
-    resolve_model_and_effort,
     stream_turn,
 )
+from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.openai_compat")
 router = APIRouter(prefix="/v1", tags=["openai-compatibility"])
@@ -186,7 +186,7 @@ async def list_models(_: bool = Depends(require_auth)):
                 "root": fid,
                 "parent": None,
             })
-        for variant_name, variant_id in (f.get("variants") or {}).items():
+        for variant_id in (f.get("variants") or {}).values():
             if variant_id and variant_id != fid:
                 model_entries.append({
                     "id": variant_id,
@@ -229,7 +229,8 @@ async def create_chat_completion(
     Gère à la fois le mode synchrone (JSON complet) et le mode streaming (SSE).
     Transmet le raisonnement (thinking) dans reasoning_content (standard DeepSeek R1 / o1).
     """
-    conv_id = req.conversation_id or x_conversation_id
+    raw_cid = req.conversation_id or x_conversation_id
+    conv_id = raw_cid.strip() if raw_cid and is_safe_conversation_id(raw_cid) else None
     prompt = _messages_to_prompt(req.messages, has_conv_id=bool(conv_id))
     if not prompt:
         raise HTTPException(
@@ -377,7 +378,7 @@ async def create_chat_completion(
                     "choices": [
                         {
                             "index": 0,
-                            "delta": {"content": f"\n\n[Erreur interne]: {str(ex)}"},
+                            "delta": {"content": f"\n\n[Erreur interne]: {ex!s}"},
                             "finish_reason": "error"
                         }
                     ]

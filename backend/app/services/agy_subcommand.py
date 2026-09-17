@@ -1,9 +1,7 @@
 import asyncio
 import json
 import logging
-import os
 from pathlib import Path
-from typing import Any
 
 from app.config import AGY_BIN
 from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
@@ -21,7 +19,8 @@ async def run_agy_subcommand(args: list[str], timeout: float = 15.0) -> tuple[in
             **spawn_group_kwargs()
         )
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        return proc.returncode, stdout.decode(errors="replace"), stderr.decode(errors="replace")
+        ret_code = proc.returncode if proc.returncode is not None else -1
+        return ret_code, stdout.decode(errors="replace"), stderr.decode(errors="replace")
     except asyncio.TimeoutError:
         logger.error(f"Timeout executing agy {' '.join(args)}")
         try:
@@ -220,7 +219,7 @@ async def stop_remote_control() -> dict:
     return {"status": "success", "message": stdout.strip()}
 
 async def get_agy_info() -> dict:
-    code, stdout, stderr = await run_agy_subcommand(["--version"])
+    code, stdout, _stderr = await run_agy_subcommand(["--version"])
     version = stdout.strip() if code == 0 else "unknown"
     bin_exists = Path(AGY_BIN).exists()
     return {

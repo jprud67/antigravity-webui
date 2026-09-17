@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.config import BRAIN_DIR
+from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.tasks")
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -25,8 +26,11 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
 
     # 1. Scan background tasks from brain
     if BRAIN_DIR.exists():
-        if conversation_id and (BRAIN_DIR / conversation_id).exists():
-            conv_dirs = [BRAIN_DIR / conversation_id]
+        if conversation_id:
+            if not is_safe_conversation_id(conversation_id):
+                raise HTTPException(status_code=400, detail="Identifiant de conversation invalide.")
+            target_dir = BRAIN_DIR / conversation_id
+            conv_dirs = [target_dir] if target_dir.exists() else []
         else:
             try:
                 all_dirs = [d for d in BRAIN_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")]

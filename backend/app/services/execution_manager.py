@@ -20,7 +20,7 @@ from app.services.google_auth import (
     is_quota_error,
     switch_to_next_healthy_account,
 )
-from app.services.storage import get_settings, save_settings
+from app.services.storage import get_settings, is_safe_conversation_id, save_settings
 
 logger = logging.getLogger("antigravity.execution")
 
@@ -29,7 +29,11 @@ def _clean_cid(cid: Any) -> str | None:
     if not cid or not isinstance(cid, str):
         return None
     c = cid.strip()
-    return None if c in ("", "null", "undefined", "None") else c
+    if c.lower() in ("", "null", "undefined", "none"):
+        return None
+    if not is_safe_conversation_id(c):
+        return None
+    return c
 
 
 class ExecutionSession:
@@ -790,7 +794,14 @@ class ExecutionManager:
                 await ws.send_json({"event": "error", "message": "Le prompt ne peut pas être vide."})
             return
 
-        conv_id = _clean_cid(data.get("conversation_id"))
+        raw_cid = data.get("conversation_id")
+        if raw_cid and isinstance(raw_cid, str) and raw_cid.strip().lower() not in ("", "null", "undefined", "none"):
+            if not is_safe_conversation_id(raw_cid.strip()):
+                if ws:
+                    await ws.send_json({"event": "error", "message": "Identifiant de conversation invalide."})
+                return
+
+        conv_id = _clean_cid(raw_cid)
         ws_path = data.get("workspace_path")
         mode = data.get("mode", "normal")
 

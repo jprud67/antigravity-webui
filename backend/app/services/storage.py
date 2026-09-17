@@ -2016,10 +2016,13 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
     else:
         if BRAIN_DIR.exists():
             dirs_to_scan = [p for p in BRAIN_DIR.iterdir() if p.is_dir() and is_safe_conversation_id(p.name)]
-            try:
-                dirs_to_scan.sort(key=lambda d: d.stat().st_mtime, reverse=True)
-            except OSError:
-                pass
+            def _safe_mtime(d: Path) -> float:
+                try:
+                    return d.stat().st_mtime
+                except OSError:
+                    return 0.0
+
+            dirs_to_scan.sort(key=_safe_mtime, reverse=True)
             dirs_to_scan = dirs_to_scan[:50]
         else:
             dirs_to_scan = []
@@ -2072,10 +2075,21 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
     if not is_safe_conversation_id(conversation_id):
         raise ValueError("Identifiant de conversation non valide")
     base_dir = (BRAIN_DIR / conversation_id).resolve()
+    clean_filename = filename
     try:
-        target_path = (base_dir / filename).resolve()
+        target_path = (base_dir / clean_filename).resolve()
     except (RuntimeError, OSError):
         raise FileNotFoundError(f"Artifact introuvable ou lien symbolique invalide : {filename}")
+    if not target_path.exists() and "%" in clean_filename:
+        from urllib.parse import unquote
+        try:
+            unquoted = unquote(clean_filename)
+            cand = (base_dir / unquoted).resolve()
+            if cand.exists():
+                target_path = cand
+                clean_filename = unquoted
+        except (RuntimeError, OSError):
+            pass
     if not is_safe_path(target_path, [base_dir]):
         raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
     if is_blocked_sensitive_path(target_path):

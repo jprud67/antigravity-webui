@@ -80,6 +80,20 @@ def delete_account(email: str = Query(..., min_length=1, description="Google acc
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/accounts/{email:path}")
+def delete_account_by_path(email: str, _ = Depends(require_auth)):
+    try:
+        res = delete_google_account(email)
+        return res
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deleting Google account: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/accounts/login/start")
 async def start_login(_ = Depends(require_auth)):
     try:

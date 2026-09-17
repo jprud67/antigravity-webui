@@ -2937,7 +2937,12 @@ def test_api_key_generation_and_verification():
 
 
 def test_api_key_last_used_at_throttling():
-    from app.services.auth import create_api_key, delete_api_key, get_auth_config, verify_api_key
+    from app.services.auth import (
+        create_api_key,
+        delete_api_key,
+        get_auth_config,
+        verify_api_key,
+    )
 
     key_info = create_api_key("Throttled Key Test")
     raw_key = key_info["key"]
@@ -2960,6 +2965,7 @@ def test_api_key_last_used_at_throttling():
 
 def test_execution_manager_submit_prompt_ws_none():
     import asyncio
+
     from app.services.execution_manager import ExecutionSession, execution_manager
 
     # 1. Empty prompt with ws=None should return cleanly without AttributeError
@@ -3013,6 +3019,7 @@ def test_openai_messages_to_prompt_resolution():
 
 def test_agy_subcommand_add_mcp_server_default_isolation():
     import inspect
+
     from app.services.agy_subcommand import add_mcp_server
 
     sig = inspect.signature(add_mcp_server)
@@ -3025,6 +3032,7 @@ def test_agy_subcommand_add_mcp_server_default_isolation():
 
 def test_auth_dynamic_env_api_key():
     import os
+
     from app.services.auth import verify_api_key
 
     secret = "agy_test_dynamic_env_key_12345"
@@ -3085,7 +3093,11 @@ def test_openai_extract_usage_info():
 
 def test_session_metadata_cid_sanitization():
     import pytest
-    from app.services.session_metadata import bulk_update_session_meta_batch, update_session_meta
+
+    from app.services.session_metadata import (
+        bulk_update_session_meta_batch,
+        update_session_meta,
+    )
 
     # 1. Direct update with invalid conversation_id raises ValueError
     with pytest.raises(ValueError):
@@ -3114,11 +3126,183 @@ def test_session_metadata_cid_sanitization():
 
 def test_git_run_git_gpgsign_disabled():
     import inspect
+
     from app.api.git import run_git
 
     src = inspect.getsource(run_git)
     assert "commit.gpgsign=false" in src
     print("✓ test_git_run_git_gpgsign_disabled passed")
+
+
+def test_agy_subcommand_returncode_type():
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.agy_subcommand import get_agy_info, run_agy_subcommand
+
+    # Mock proc with returncode = 0
+    mock_proc = AsyncMock()
+    mock_proc.communicate.return_value = (b"v1.0.0\n", b"")
+    mock_proc.returncode = 0
+
+    with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        code, out, _err = asyncio.run(run_agy_subcommand(["--version"]))
+        assert isinstance(code, int)
+        assert code == 0
+        assert "v1.0.0" in out
+
+    # Test when returncode is None
+    mock_proc_none = AsyncMock()
+    mock_proc_none.communicate.return_value = (b"", b"")
+    mock_proc_none.returncode = None
+    with patch("asyncio.create_subprocess_exec", return_value=mock_proc_none):
+        code, _out, _err = asyncio.run(run_agy_subcommand(["dummy"]))
+        assert isinstance(code, int)
+        assert code == -1
+
+    # Test get_agy_info
+    with patch("app.services.agy_subcommand.run_agy_subcommand", AsyncMock(return_value=(0, "antigravity 2.4.0\n", ""))):
+        info = asyncio.run(get_agy_info())
+        assert info["version"] == "antigravity 2.4.0"
+    print("✓ test_agy_subcommand_returncode_type passed")
+
+
+def test_agent_api_conversation_id_validation():
+    import asyncio
+
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.agent_api import (
+        AgentInterruptRequest,
+        AgentRunRequest,
+        AgentSteerRequest,
+        interrupt_agent,
+        run_agent_turn,
+        steer_agent,
+    )
+
+    # Malicious or unsafe cids
+    bad_cids = ["../traversal", "../../etc/passwd", "has/slash", "has\\backslash", "null", "undefined", ".dotfile"]
+    for bad_cid in bad_cids:
+        # 1. run_agent_turn
+        req_run = AgentRunRequest(prompt="hello", conversation_id=bad_cid)
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(run_agent_turn(req_run, True))
+        assert exc_info.value.status_code == 400
+
+        # 2. interrupt_agent
+        req_int = AgentInterruptRequest(conversation_id=bad_cid)
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(interrupt_agent(req_int, True))
+        assert exc_info.value.status_code == 400
+
+        # 3. steer_agent
+        req_steer = AgentSteerRequest(conversation_id=bad_cid, instruction="focus")
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(steer_agent(req_steer, True))
+        assert exc_info.value.status_code == 400
+    print("✓ test_agent_api_conversation_id_validation passed")
+
+
+def test_tasks_conversation_id_validation():
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.tasks import list_active_tasks
+
+    bad_cids = ["../traversal", "../../etc/passwd", "has/slash", "has\\backslash", "null", "undefined"]
+    for bad_cid in bad_cids:
+        with pytest.raises(HTTPException) as exc_info:
+            list_active_tasks(conversation_id=bad_cid, _=True)
+        assert exc_info.value.status_code == 400
+    print("✓ test_tasks_conversation_id_validation passed")
+
+
+def test_execution_manager_cid_sanitization():
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    from app.services.execution_manager import _clean_cid, execution_manager
+
+    # _clean_cid returns None for invalid or traversal cids
+    assert _clean_cid(None) is None
+    assert _clean_cid("") is None
+    assert _clean_cid("   ") is None
+    assert _clean_cid("null") is None
+    assert _clean_cid("undefined") is None
+    assert _clean_cid("None") is None
+    assert _clean_cid("../../etc/passwd") is None
+    assert _clean_cid("safe-session-123_abc") == "safe-session-123_abc"
+
+    # submit_prompt sends error event on bad cid
+    mock_ws = AsyncMock()
+    asyncio.run(execution_manager.submit_prompt(mock_ws, {
+        "prompt": "test",
+        "conversation_id": "../../etc/passwd"
+    }))
+    mock_ws.send_json.assert_called_once()
+    sent = mock_ws.send_json.call_args[0][0]
+    assert sent["event"] == "error"
+    assert "invalide" in sent["message"]
+    print("✓ test_execution_manager_cid_sanitization passed")
+
+
+def test_storage_artifacts_resilience_and_url_decoding():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    import app.services.storage as storage_mod
+    from app.services.storage import list_artifacts, read_artifact_content
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_brain = Path(tmp_dir) / "brain"
+        tmp_brain.mkdir()
+
+        # Create a valid conversation dir and an artifact with special characters / spaces
+        conv_dir = tmp_brain / "session_art_test"
+        conv_dir.mkdir()
+        art_file = conv_dir / "my artifact report.md"
+        art_file.write_text("# Test Artifact Content", encoding="utf-8")
+
+        with patch.object(storage_mod, "BRAIN_DIR", tmp_brain):
+            # Test listing
+            arts = list_artifacts("session_art_test")
+            assert len(arts) == 1
+            assert arts[0]["filename"] == "my artifact report.md"
+
+            # Test reading with exact name
+            content = read_artifact_content("session_art_test", "my artifact report.md")
+            assert "# Test Artifact Content" in content
+
+            # Test reading with URL encoded filename
+            content_encoded = read_artifact_content("session_art_test", "my%20artifact%20report.md")
+            assert "# Test Artifact Content" in content_encoded
+    print("✓ test_storage_artifacts_resilience_and_url_decoding passed")
+
+
+def test_google_accounts_delete_route():
+    from unittest.mock import patch
+
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app)
+    with patch("app.api.google_accounts.delete_google_account", return_value={"status": "deleted", "email": "test@example.com"}):
+        from app.services.auth import create_access_token
+        token = create_access_token()
+        # 1. Query parameter DELETE
+        res1 = client.delete("/api/google/accounts?email=test@example.com", headers={"Authorization": f"Bearer {token}"})
+        assert res1.status_code == 200
+        assert res1.json()["status"] == "deleted"
+
+        # 2. Path parameter DELETE
+        res2 = client.delete("/api/google/accounts/test@example.com", headers={"Authorization": f"Bearer {token}"})
+        assert res2.status_code == 200
+        assert res2.json()["status"] == "deleted"
+    print("✓ test_google_accounts_delete_route passed")
 
 
 if __name__ == "__main__":
@@ -3249,4 +3433,10 @@ if __name__ == "__main__":
     test_openai_extract_usage_info()
     test_session_metadata_cid_sanitization()
     test_git_run_git_gpgsign_disabled()
+    test_agy_subcommand_returncode_type()
+    test_agent_api_conversation_id_validation()
+    test_tasks_conversation_id_validation()
+    test_execution_manager_cid_sanitization()
+    test_storage_artifacts_resilience_and_url_decoding()
+    test_google_accounts_delete_route()
     print("\nAll unit tests passed successfully!")

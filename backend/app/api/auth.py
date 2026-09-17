@@ -9,7 +9,6 @@ from app.services.auth import (
     get_auth_config,
     save_auth_config,
     update_password,
-    verify_access_token,
     verify_password,
 )
 

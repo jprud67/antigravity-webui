@@ -5,6 +5,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.services.auth import get_auth_config, verify_token_or_api_key
 from app.services.execution_manager import execution_manager
+from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.chat")
 router = APIRouter(tags=["chat"])
@@ -83,6 +84,9 @@ async def chat_websocket(
                 conv_id = conv_id.strip()
                 if conv_id in ("", "null", "undefined", "None"):
                     conv_id = None
+            if conv_id and not is_safe_conversation_id(conv_id):
+                await websocket.send_json({"event": "error", "message": "Identifiant de conversation invalide."})
+                continue
             data["conversation_id"] = conv_id
 
             if action == "prompt":

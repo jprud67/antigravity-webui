@@ -1,9 +1,10 @@
 import asyncio
 import json
 import logging
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -17,6 +18,7 @@ from app.services.agy_driver import (
 )
 from app.services.execution_manager import execution_manager
 from app.services.google_auth import get_active_account
+from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.agent_api")
 router = APIRouter(prefix="/api/v1/agent", tags=["agent-api"])
@@ -110,6 +112,11 @@ async def run_agent_turn(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Le paramètre 'prompt' est obligatoire et ne peut être vide."
+        )
+    if req.conversation_id and not is_safe_conversation_id(req.conversation_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="L'identifiant de conversation (conversation_id) est invalide."
         )
 
     # 1. Mode Streaming SSE
@@ -307,6 +314,11 @@ async def interrupt_agent(
     _: bool = Depends(require_auth)
 ):
     """Interrompt immédiatement l'exécution en cours d'une session agent."""
+    if req.conversation_id and not is_safe_conversation_id(req.conversation_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="L'identifiant de conversation (conversation_id) est invalide."
+        )
     await execution_manager.interrupt(req.conversation_id)
     return {
         "success": True,
@@ -323,6 +335,11 @@ async def steer_agent(
     Injecte une consigne prioritaire de guidage (steer) dans une session en cours,
     ce qui réoriente immédiatement l'agent sans perdre le fil du dialogue.
     """
+    if req.conversation_id and not is_safe_conversation_id(req.conversation_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="L'identifiant de conversation (conversation_id) est invalide."
+        )
     session = execution_manager.get_session(req.conversation_id)
     if not session:
         raise HTTPException(
