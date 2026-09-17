@@ -15,7 +15,7 @@ export class ChatWebSocketClient {
 
   // Heartbeat config
   private static readonly HEARTBEAT_INTERVAL = 5000; // 5s ping
-  private static readonly HEARTBEAT_TIMEOUT = 10000;  // 10s before considering dead
+  private static readonly HEARTBEAT_TIMEOUT = 15000;  // 15s before considering dead (resilient to heavy tool executions)
 
   constructor() {
     // Connect if token exists or will be connected on login

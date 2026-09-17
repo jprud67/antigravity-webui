@@ -460,7 +460,12 @@ async def terminal_websocket(
                             data = msg_obj.get("data", "")
                             await session.write(data.encode("utf-8", errors="replace"))
                             continue
-                        elif action in ("restart", "reset", "kill"):
+                        elif action == "kill":
+                            await kill_session(sid)
+                            await websocket.send_text("\r\n\x1b[33m⚡ Session terminal fermée.\x1b[0m\r\n")
+                            await websocket.close()
+                            break
+                        elif action in ("restart", "reset"):
                             await kill_session(sid)
                             session, _ = await get_or_create_session(sid, cwd)
                             session.active_websocket = websocket

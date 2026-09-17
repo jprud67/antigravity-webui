@@ -760,6 +760,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const userScrolledUpRef = useRef(false);
+  const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -808,6 +809,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
+      activeUtteranceRef.current = null;
     };
     window.addEventListener('beforeunload', handleUnload);
     return () => {
@@ -815,6 +817,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
+      activeUtteranceRef.current = null;
       setSpeakingMsgId(null);
     };
   }, [conversationId]);
@@ -823,6 +826,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   useEffect(() => {
     if (isStreaming && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
+      activeUtteranceRef.current = null;
     }
   }, [isStreaming]);
 
@@ -843,11 +847,13 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
     }
     if (activeSpeakingMsgId === msgId) {
       window.speechSynthesis.cancel();
+      activeUtteranceRef.current = null;
       setSpeakingMsgId(null);
       return;
     }
 
     window.speechSynthesis.cancel();
+    activeUtteranceRef.current = null;
     const cleanText = text
       .replace(/```[\s\S]*?```/g, 'Bloc de code omis.')
       .replace(/`([^`]+)`/g, '$1')
@@ -857,8 +863,15 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = currentLangObj?.speech || 'fr-FR';
     utterance.rate = 1.0;
-    utterance.onend = () => setSpeakingMsgId(null);
-    utterance.onerror = () => setSpeakingMsgId(null);
+    utterance.onend = () => {
+      activeUtteranceRef.current = null;
+      setSpeakingMsgId(null);
+    };
+    utterance.onerror = () => {
+      activeUtteranceRef.current = null;
+      setSpeakingMsgId(null);
+    };
+    activeUtteranceRef.current = utterance;
     setSpeakingMsgId(msgId);
     window.speechSynthesis.speak(utterance);
   };

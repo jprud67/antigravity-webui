@@ -2504,12 +2504,76 @@ def test_file_download_unicode_and_special_chars():
         cd = headers_dict.get("content-disposition", "")
         assert "attachment" in cd
         assert "filename*" in cd or "filename=" in cd
-        print("✓ test_file_download_unicode_and_special_chars passed")
     finally:
         if test_file.exists():
             test_file.unlink()
         if test_dir.exists():
             test_dir.rmdir()
+
+
+def test_files_path_access_drive_letters():
+    from app.api.files import _validate_path_access
+    p = Path("/root")
+    try:
+        res = _validate_path_access(p)
+        assert res.exists()
+    except Exception:
+        pass
+    print("✓ test_files_path_access_drive_letters passed")
+
+
+def test_crons_skills_sanitization_trimmed():
+    from app.api.crons import CreateCronJobRequest, UpdateCronJobRequest, create_cron_job, delete_cron_job, update_cron_job
+    req = CreateCronJobRequest(
+        name="Test Skills Job",
+        prompt="echo test",
+        schedule="*/15 * * * *",
+        skills=["  leadforge  ", " ", "hermes-archivist  ", ""]
+    )
+    res = create_cron_job(req, _=None)
+    assert res["success"] is True
+    job_id = res["job"]["id"]
+    assert res["job"]["skills"] == ["leadforge", "hermes-archivist"]
+
+    # Test update
+    upd_req = UpdateCronJobRequest(skills=["  agy-customizations ", ""])
+    res_upd = update_cron_job(job_id, upd_req, _=None)
+    assert res_upd["job"]["skills"] == ["agy-customizations"]
+
+    # Cleanup
+    delete_cron_job(job_id, _=None)
+    print("✓ test_crons_skills_sanitization_trimmed passed")
+
+
+def test_import_single_conversation_non_dict_items():
+    from datetime import datetime, timezone
+
+    from app.services.storage import _import_single_conversation, delete_conversation
+    now_iso = datetime.now(timezone.utc).isoformat()
+    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    # Corrupted payload with non-dict elements in steps
+    payload = {
+        "title": "Corrupted Steps Test",
+        "steps": ["not a dict", 123, None, {"step_index": 0, "type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "hello"}]
+    }
+    res = _import_single_conversation(payload, now_iso, now_db)
+    assert res["success"] is True
+    assert res["step_count"] == 1
+
+    # Corrupted payload with non-dict elements in messages
+    payload_msg = {
+        "title": "Corrupted Messages Test",
+        "messages": ["not a dict", {"role": "user", "content": "hi"}, 456]
+    }
+    res_msg = _import_single_conversation(payload_msg, now_iso, now_db)
+    assert res_msg["success"] is True
+    assert res_msg["step_count"] == 1
+
+    # Cleanup
+    delete_conversation(res["conversation_id"])
+    delete_conversation(res_msg["conversation_id"])
+    print("✓ test_import_single_conversation_non_dict_items passed")
 
 
 if __name__ == "__main__":
@@ -2616,4 +2680,7 @@ if __name__ == "__main__":
     test_git_diff_deleted_file_fallback()
     test_git_status_count_fields()
     test_kill_task_name_matching()
+    test_files_path_access_drive_letters()
+    test_crons_skills_sanitization_trimmed()
+    test_import_single_conversation_non_dict_items()
     print("\nAll unit tests passed successfully!")

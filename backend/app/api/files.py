@@ -88,14 +88,20 @@ def _validate_path_access(file_path: Path) -> Path:
             p_str = p_str[12:].lstrip("/")
             file_path = Path(DEFAULT_WORKSPACE) / p_str
         elif p_str.startswith("file:///"):
-            p_str = "/" + p_str[8:].lstrip("/")
-            file_path = Path(p_str)
+            p_clean = p_str[8:]
+            if not (len(p_clean) > 1 and p_clean[1] == ":"):
+                p_clean = "/" + p_clean.lstrip("/")
+            file_path = Path(p_clean)
         elif p_str.startswith("file://"):
-            p_str = "/" + p_str[7:].lstrip("/")
-            file_path = Path(p_str)
+            p_clean = p_str[7:]
+            if not (len(p_clean) > 1 and p_clean[1] == ":"):
+                p_clean = "/" + p_clean.lstrip("/")
+            file_path = Path(p_clean)
         elif p_str.startswith("file:/"):
-            p_str = "/" + p_str[6:].lstrip("/")
-            file_path = Path(p_str)
+            p_clean = p_str[6:]
+            if not (len(p_clean) > 1 and p_clean[1] == ":"):
+                p_clean = "/" + p_clean.lstrip("/")
+            file_path = Path(p_clean)
         elif not file_path.is_absolute():
             file_path = Path(DEFAULT_WORKSPACE) / file_path
         resolved = file_path.resolve()
@@ -199,7 +205,18 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
                 tmp_path.chmod(existing_mode)
             except Exception as e:
                 logger.debug(f"Ignored chmod error: {e}")
-        tmp_path.replace(resolved_path)
+        for attempt in range(3):
+            try:
+                tmp_path.replace(resolved_path)
+                break
+            except (PermissionError, OSError):
+                if attempt == 2:
+                    import shutil
+                    shutil.copy2(tmp_path, resolved_path)
+                    tmp_path.unlink(missing_ok=True)
+                    break
+                import time
+                time.sleep(0.05)
         stat = resolved_path.stat()
         return {
             "success": True,

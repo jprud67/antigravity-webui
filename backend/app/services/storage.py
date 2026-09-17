@@ -1238,8 +1238,8 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 if file_size > 512 * 1024:
                     with open(t_file, "rb") as f:
                         f.seek(file_size - 512 * 1024)
-                        raw_data = f.read().decode("utf-8", errors="replace")
-                    lines = raw_data.splitlines()[1:]  # skip potential partial line
+                    split_lines = raw_data.splitlines()
+                    lines = split_lines[1:] if len(split_lines) > 1 else split_lines  # skip potential partial line only if multiple lines
                     if len(lines) > 500:
                         lines = lines[-500:]
                 else:
@@ -1601,6 +1601,12 @@ def export_conversation_html(conversation_id: str) -> str:
     date_str = datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M:%S UTC')
     turns = aggregate_steps_into_turns(steps)
 
+    def _clean_html_text(val: Any) -> str:
+        if val is None:
+            return ""
+        s = str(val).replace("\x00", "")
+        return html.escape(s, quote=True)
+
     messages_html = []
     for turn in turns:
         role = turn["role"]
@@ -1617,7 +1623,7 @@ def export_conversation_html(conversation_id: str) -> str:
         if role == "system":
             subtype = turn.get("subtype", "system")
             label = f"⚙️ Tâche [{turn.get('task_id', 'Tâche')}]" if subtype == "task" else "ℹ️ Notification Système"
-            escaped_sys = html.escape(str(turn.get("content", "")), quote=True)
+            escaped_sys = _clean_html_text(turn.get("content", ""))
             messages_html.append(f"""
             <div class="system-divider">
                 <span>{label} — Étape #{idx}</span>
@@ -1637,7 +1643,7 @@ def export_conversation_html(conversation_id: str) -> str:
 
         thought_html = ""
         if thinking:
-            escaped_thought = html.escape(str(thinking or ""), quote=True)
+            escaped_thought = _clean_html_text(thinking)
             thought_html = f"""
             <details class="thought-block">
                 <summary>🧠 Raisonnement interne ({len(str(thinking))} car.)</summary>
@@ -1649,17 +1655,15 @@ def export_conversation_html(conversation_id: str) -> str:
         if tool_activities:
             tools_rendered = []
             for act in tool_activities:
-                tname = html.escape(str(act.get("name") or "tool"), quote=True)
+                tname = _clean_html_text(act.get("name") or "tool")
                 raw_args = act.get("args")
                 if isinstance(raw_args, (dict, list)):
                     targs_str = json.dumps(raw_args, indent=2, ensure_ascii=False, default=str)
-                elif isinstance(raw_args, str):
-                    targs_str = raw_args
                 elif raw_args is None:
                     targs_str = "{}"
                 else:
                     targs_str = str(raw_args)
-                targs = html.escape(targs_str, quote=True)
+                targs = _clean_html_text(targs_str)
                 res = act.get("result", "")
                 res_html = ""
                 if res is not None and (res or res == 0):
@@ -1668,7 +1672,7 @@ def export_conversation_html(conversation_id: str) -> str:
                     else:
                         res_str = str(res)
                     if res_str:
-                        escaped_res = html.escape(res_str[:2000] + ("..." if len(res_str) > 2000 else ""), quote=True)
+                        escaped_res = _clean_html_text(res_str[:2000] + ("..." if len(res_str) > 2000 else ""))
                         res_html = f'<div class="tool-result-header">Résultat :</div><pre class="tool-result">{escaped_res}</pre>'
 
                 tools_rendered.append(f"""
@@ -1688,7 +1692,7 @@ def export_conversation_html(conversation_id: str) -> str:
             </details>
             """
 
-        escaped_content = html.escape(str(content or ""), quote=True)
+        escaped_content = _clean_html_text(content)
 
         messages_html.append(f"""
         <div class="message-row {'row-user' if is_user else 'row-assistant'}">
@@ -2107,13 +2111,15 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
 
     # Format 1: Antigravity export
     if "steps" in payload and isinstance(payload["steps"], list):
-        steps = payload["steps"]
+        steps = [s for s in payload["steps"] if isinstance(s, dict)]
         meta = payload.get("metadata") or {}
         title = meta.get("customTitle") or meta.get("title") or payload.get("title") or title
     # Format 2: Hermes session format
     elif "messages" in payload and isinstance(payload["messages"], list):
         title = payload.get("title") or title
         for idx, m in enumerate(payload["messages"]):
+            if not isinstance(m, dict):
+                continue
             role = m.get("role", "user")
             content = m.get("content", "")
             if role == "user":
