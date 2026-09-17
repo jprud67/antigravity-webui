@@ -99,25 +99,38 @@ def get_session_meta(conversation_id: str) -> dict[str, Any]:
     return _normalize_meta(merged)
 
 def update_session_meta(conversation_id: str, updates: dict[str, Any]) -> dict[str, Any]:
-    return bulk_update_session_meta([conversation_id], updates)[conversation_id]
+    if not conversation_id or not isinstance(conversation_id, str) or not conversation_id.strip():
+        raise ValueError("Invalid conversation_id")
+    cleaned_cid = conversation_id.strip()
+    res = bulk_update_session_meta([cleaned_cid], updates)
+    return res.get(cleaned_cid, make_default_meta())
 
 def bulk_update_session_meta(conversation_ids: list[str], updates: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return bulk_update_session_meta_batch({cid: updates for cid in conversation_ids})
+    return bulk_update_session_meta_batch({cid: updates for cid in conversation_ids if cid and isinstance(cid, str) and cid.strip()})
 
 def bulk_update_session_meta_batch(updates_per_id: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     with _meta_lock:
         all_meta = get_all_session_metadata()
         results = {}
+        changed = False
         for cid, updates in updates_per_id.items():
+            if not cid or not isinstance(cid, str):
+                continue
+            clean_cid = cid.strip()
+            if not clean_cid or clean_cid.lower() in ("none", "null", "undefined"):
+                continue
+            if not isinstance(updates, dict):
+                continue
             current = make_default_meta()
-            existing = all_meta.get(cid)
+            existing = all_meta.get(clean_cid)
             if isinstance(existing, dict):
                 current.update(existing)
             current.update(updates)
             current = _normalize_meta(current)
-            all_meta[cid] = current
-            results[cid] = current
-        if updates_per_id:
+            all_meta[clean_cid] = current
+            results[clean_cid] = current
+            changed = True
+        if changed:
             save_all_session_metadata(all_meta)
     return results
 
@@ -129,8 +142,11 @@ def bulk_delete_session_meta(conversation_ids: list[str]) -> None:
         all_meta = get_all_session_metadata()
         changed = False
         for cid in conversation_ids:
-            if cid in all_meta:
-                del all_meta[cid]
+            if not cid or not isinstance(cid, str):
+                continue
+            clean_cid = cid.strip()
+            if clean_cid in all_meta:
+                del all_meta[clean_cid]
                 changed = True
         if changed:
             save_all_session_metadata(all_meta)

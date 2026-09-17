@@ -167,23 +167,18 @@ ENV_API_KEY = os.environ.get("ANTIGRAVITY_API_KEY", "").strip()
 
 
 def _ensure_api_keys_storage(config: dict[str, Any]) -> list[dict[str, Any]]:
-    """Garantit la présence d'au moins une clé d'API par défaut pour les apps externes."""
-    keys = config.get("api_keys")
-    if not isinstance(keys, list):
-        keys = []
-        config["api_keys"] = keys
-
-    if len(keys) == 0:
+    """Garantit la présence d'au moins une clé d'API par défaut lors de la configuration initiale."""
+    if "api_keys" not in config or not isinstance(config.get("api_keys"), list):
         default_key = f"agy_sk_{secrets.token_hex(24)}"
-        keys.append({
+        config["api_keys"] = [{
             "id": "master-default",
             "name": "Clé Maîtresse Principale",
             "key": default_key,
             "created_at": int(time.time()),
             "last_used_at": None,
-        })
+        }]
         save_auth_config(config)
-    return keys
+    return config["api_keys"]
 
 
 def get_api_keys() -> list[dict[str, Any]]:
@@ -258,7 +253,8 @@ def verify_api_key(key: str | None) -> bool:
         return False
 
     # 1. Vérification avec variable d'environnement maîtresse
-    if ENV_API_KEY and hmac.compare_digest(key, ENV_API_KEY):
+    env_api_key = os.environ.get("ANTIGRAVITY_API_KEY", "").strip() or ENV_API_KEY
+    if env_api_key and hmac.compare_digest(key, env_api_key):
         return True
 
     # 2. Vérification dans le fichier de configuration auth

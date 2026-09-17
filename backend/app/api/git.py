@@ -79,6 +79,7 @@ def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | 
         "-c", "committer.name=jprud67",
         "-c", "committer.email=jprud67@gmail.com",
         "-c", "format.signoff=false",
+        "-c", "commit.gpgsign=false",
         "-c", "trailer.co-authored-by.key=",
     ] + args
     merged_env = {

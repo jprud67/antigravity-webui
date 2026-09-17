@@ -3023,6 +3023,104 @@ def test_agy_subcommand_add_mcp_server_default_isolation():
     print("✓ test_agy_subcommand_add_mcp_server_default_isolation passed")
 
 
+def test_auth_dynamic_env_api_key():
+    import os
+    from app.services.auth import verify_api_key
+
+    secret = "agy_test_dynamic_env_key_12345"
+    old = os.environ.get("ANTIGRAVITY_API_KEY")
+    try:
+        os.environ["ANTIGRAVITY_API_KEY"] = secret
+        assert verify_api_key(secret) is True
+        assert verify_api_key(f"Bearer {secret}") is True
+        assert verify_api_key("wrong_key") is False
+    finally:
+        if old is not None:
+            os.environ["ANTIGRAVITY_API_KEY"] = old
+        else:
+            os.environ.pop("ANTIGRAVITY_API_KEY", None)
+    print("✓ test_auth_dynamic_env_api_key passed")
+
+
+def test_auth_ensure_api_keys_storage_no_resurrect():
+    from app.services.auth import _ensure_api_keys_storage
+
+    # When api_keys key is present and empty (user deleted all keys), it should remain empty
+    cfg = {"enabled": True, "api_keys": []}
+    result = _ensure_api_keys_storage(cfg)
+    assert result == []
+    assert len(cfg["api_keys"]) == 0
+
+    # When api_keys key is missing or not a list, it should initialize default key
+    cfg2 = {"enabled": True}
+    result2 = _ensure_api_keys_storage(cfg2)
+    assert len(result2) == 1
+    assert result2[0]["id"] == "master-default"
+    print("✓ test_auth_ensure_api_keys_storage_no_resurrect passed")
+
+
+def test_openai_extract_usage_info():
+    from app.api.openai_compat import _extract_usage_info
+
+    # 1. Non-dict input
+    assert _extract_usage_info(None) == {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+    # 2. CLI inputTokens/outputTokens/totalTokens format
+    u1 = {"inputTokens": 150, "outputTokens": 80, "totalTokens": 230}
+    assert _extract_usage_info(u1) == {"prompt_tokens": 150, "completion_tokens": 80, "total_tokens": 230}
+
+    # 3. Snake_case format
+    u2 = {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150}
+    assert _extract_usage_info(u2) == {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+
+    # 4. Google Cloud TokenCount format
+    u3 = {"promptTokenCount": 200, "candidatesTokenCount": 75, "totalTokenCount": 275}
+    assert _extract_usage_info(u3) == {"prompt_tokens": 200, "completion_tokens": 75, "total_tokens": 275}
+
+    # 5. Missing total calculation
+    u4 = {"inputTokens": 60, "outputTokens": 40}
+    assert _extract_usage_info(u4) == {"prompt_tokens": 60, "completion_tokens": 40, "total_tokens": 100}
+    print("✓ test_openai_extract_usage_info passed")
+
+
+def test_session_metadata_cid_sanitization():
+    import pytest
+    from app.services.session_metadata import bulk_update_session_meta_batch, update_session_meta
+
+    # 1. Direct update with invalid conversation_id raises ValueError
+    with pytest.raises(ValueError):
+        update_session_meta("", {"pinned": True})
+    with pytest.raises(ValueError):
+        update_session_meta("   ", {"pinned": True})
+
+    # 2. Batch update skips empty/none/null conversation IDs
+    batch = {
+        "": {"pinned": True},
+        "   ": {"pinned": True},
+        "null": {"pinned": True},
+        "None": {"pinned": True},
+        "undefined": {"pinned": True},
+        "valid_cid_test_sanitization": {"pinned": True, "project": "Audit"}
+    }
+    res = bulk_update_session_meta_batch(batch)
+    assert "" not in res
+    assert "null" not in res
+    assert "None" not in res
+    assert "undefined" not in res
+    assert "valid_cid_test_sanitization" in res
+    assert res["valid_cid_test_sanitization"]["pinned"] is True
+    print("✓ test_session_metadata_cid_sanitization passed")
+
+
+def test_git_run_git_gpgsign_disabled():
+    import inspect
+    from app.api.git import run_git
+
+    src = inspect.getsource(run_git)
+    assert "commit.gpgsign=false" in src
+    print("✓ test_git_run_git_gpgsign_disabled passed")
+
+
 if __name__ == "__main__":
     test_file_download_unicode_and_special_chars()
     test_token_calculation()
@@ -3146,4 +3244,9 @@ if __name__ == "__main__":
     test_execution_manager_submit_prompt_ws_none()
     test_openai_messages_to_prompt_resolution()
     test_agy_subcommand_add_mcp_server_default_isolation()
+    test_auth_dynamic_env_api_key()
+    test_auth_ensure_api_keys_storage_no_resurrect()
+    test_openai_extract_usage_info()
+    test_session_metadata_cid_sanitization()
+    test_git_run_git_gpgsign_disabled()
     print("\nAll unit tests passed successfully!")

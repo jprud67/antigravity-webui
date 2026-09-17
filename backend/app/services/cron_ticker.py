@@ -268,7 +268,12 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
                 found_alternative = False
                 for cand in candidate_models:
                     variants = cand.get("variants") or {}
-                    cand_model = variants.get("default") or next(iter(variants.values()), None)
+                    cand_model = (
+                        variants.get(cand.get("default_effort") or "")
+                        or variants.get("default")
+                        or next(iter(variants.values()), None)
+                        or cand.get("id")
+                    )
                     if cand_model:
                         norm_cand_model, norm_effort = resolve_model_and_effort(cand_model, cand.get("default_effort"))
                         target_model = norm_cand_model or cand_model

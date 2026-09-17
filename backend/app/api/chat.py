@@ -10,7 +10,18 @@ logger = logging.getLogger("antigravity.chat")
 router = APIRouter(tags=["chat"])
 
 @router.websocket("/ws/chat")
-async def chat_websocket(websocket: WebSocket, token: str | None = None):
+async def chat_websocket(
+    websocket: WebSocket,
+    token: str | None = None,
+    api_key: str | None = None
+):
+    # Support token / API key extraction from query params or headers
+    effective_token = token or api_key or websocket.query_params.get("token") or websocket.query_params.get("api_key")
+    if not effective_token:
+        x_api_key = websocket.headers.get("x-api-key", "").strip()
+        if x_api_key:
+            effective_token = x_api_key
+
     # Support token extraction via Sec-WebSocket-Protocol header (e.g. token.<token>)
     selected_subprotocol: str | None = None
     raw_subprotocols = websocket.headers.get("sec-websocket-protocol", "")
@@ -19,25 +30,25 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
             sp_clean = sp.strip()
             if sp_clean.startswith("token."):
                 raw_token = sp_clean[6:]
-                if not token:
+                if not effective_token:
                     try:
                         rem = len(raw_token) % 4
                         padded = raw_token + ("=" * ((4 - rem) % 4))
                         decoded = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
                         if verify_token_or_api_key(decoded):
-                            token = decoded
+                            effective_token = decoded
                         elif verify_token_or_api_key(raw_token):
-                            token = raw_token
+                            effective_token = raw_token
                     except Exception:
                         if verify_token_or_api_key(raw_token):
-                            token = raw_token
+                            effective_token = raw_token
                 selected_subprotocol = sp_clean
                 break
             elif sp_clean == "antigravity":
                 selected_subprotocol = "antigravity"
 
     config = get_auth_config()
-    if config.get("enabled", True) and not verify_token_or_api_key(token):
+    if config.get("enabled", True) and not verify_token_or_api_key(effective_token):
         await websocket.close(code=1008, reason="Unauthorized")
         logger.warning("Rejected unauthenticated WebSocket connection to /ws/chat")
         return
@@ -93,8 +104,13 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
                 await execution_manager.handle_approval(conv_id, decision, rule)
 
             elif action in ["input", "answer", "stdin"]:
-                input_text = data.get("text", "") or data.get("input", "") or data.get("answer", "")
-                await execution_manager.handle_stdin_input(conv_id, str(input_text))
+                input_val = None
+                for k in ("text", "input", "answer"):
+                    if k in data and data[k] is not None:
+                        input_val = data[k]
+                        break
+                input_text = str(input_val) if input_val is not None else ""
+                await execution_manager.handle_stdin_input(conv_id, input_text)
 
             elif action == "ping":
                 session = execution_manager.get_session(conv_id)

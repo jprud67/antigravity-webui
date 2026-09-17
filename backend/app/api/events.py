@@ -46,22 +46,30 @@ async def _sse_generator(request: Request, q: asyncio.Queue):
 
 
 @router.get("/stream")
-async def event_stream(request: Request, token: str | None = None):
+async def event_stream(
+    request: Request,
+    token: str | None = None,
+    api_key: str | None = None
+):
     """
     SSE endpoint that streams filesystem change events to the WebUI.
     The WebUI subscribes on load and receives push notifications whenever
     the CLI creates or updates conversations/transcripts.
     """
-    # Auth check (same pattern as other endpoints)
+    # Auth check (same pattern as other endpoints: token, api_key, Authorization header, X-API-Key)
     config = get_auth_config()
     if config.get("enabled", True):
-        raw_token = token
+        raw_token = token or api_key or request.query_params.get("api_key")
         if not raw_token:
-            auth_header = request.headers.get("Authorization", "").strip()
-            if auth_header.lower().startswith("bearer "):
-                raw_token = auth_header[7:]
-            elif auth_header:
-                raw_token = auth_header
+            x_api_key = request.headers.get("X-API-Key", "").strip()
+            if x_api_key:
+                raw_token = x_api_key
+            else:
+                auth_header = request.headers.get("Authorization", "").strip()
+                if auth_header.lower().startswith("bearer "):
+                    raw_token = auth_header[7:]
+                elif auth_header:
+                    raw_token = auth_header
         elif raw_token.strip().lower().startswith("bearer "):
             raw_token = raw_token.strip()[7:]
         clean_token = raw_token.strip() if raw_token else None

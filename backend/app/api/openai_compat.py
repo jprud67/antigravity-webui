@@ -88,6 +88,37 @@ class ChatCompletionRequest(BaseModel):
 # Helpers
 # ============================================================================
 
+def _extract_usage_info(raw_u: Any) -> dict[str, int]:
+    """Extrait et normalise les métriques de tokens à partir des différents formats de retour du CLI."""
+    if not isinstance(raw_u, dict):
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    prompt_tokens = (
+        raw_u.get("inputTokens")
+        or raw_u.get("input_tokens")
+        or raw_u.get("prompt_tokens")
+        or raw_u.get("promptTokenCount")
+        or 0
+    )
+    completion_tokens = (
+        raw_u.get("outputTokens")
+        or raw_u.get("output_tokens")
+        or raw_u.get("completion_tokens")
+        or raw_u.get("candidatesTokenCount")
+        or 0
+    )
+    total_tokens = (
+        raw_u.get("totalTokens")
+        or raw_u.get("total_tokens")
+        or raw_u.get("totalTokenCount")
+        or (prompt_tokens + completion_tokens)
+    )
+    return {
+        "prompt_tokens": int(prompt_tokens),
+        "completion_tokens": int(completion_tokens),
+        "total_tokens": int(total_tokens),
+    }
+
+
 def _messages_to_prompt(messages: list[ChatMessage], has_conv_id: bool = False) -> str:
     """
     Transforme la liste de messages OpenAI en prompt unifié pour le CLI Antigravity.
@@ -240,6 +271,7 @@ async def create_chat_completion(
                                 "object": "chat.completion.chunk",
                                 "created": created_ts,
                                 "model": req.model,
+                                "system_fingerprint": "fp_antigravity",
                                 "choices": [
                                     {
                                         "index": 0,
@@ -264,6 +296,7 @@ async def create_chat_completion(
                                     "object": "chat.completion.chunk",
                                     "created": created_ts,
                                     "model": req.model,
+                                    "system_fingerprint": "fp_antigravity",
                                     "choices": [
                                         {
                                             "index": 0,
@@ -279,10 +312,7 @@ async def create_chat_completion(
                                 yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
 
                         if su.get("usage"):
-                            raw_u = su["usage"]
-                            usage_info["prompt_tokens"] = raw_u.get("inputTokens") or raw_u.get("prompt_tokens") or 0
-                            usage_info["completion_tokens"] = raw_u.get("outputTokens") or raw_u.get("completion_tokens") or 0
-                            usage_info["total_tokens"] = raw_u.get("totalTokens") or raw_u.get("total_tokens") or 0
+                            usage_info = _extract_usage_info(su["usage"])
 
                     elif evt_type == "result":
                         res = event.get("result", {})
@@ -294,6 +324,7 @@ async def create_chat_completion(
                                 "object": "chat.completion.chunk",
                                 "created": created_ts,
                                 "model": req.model,
+                                "system_fingerprint": "fp_antigravity",
                                 "choices": [
                                     {
                                         "index": 0,
@@ -308,10 +339,7 @@ async def create_chat_completion(
                             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
 
                         if res.get("usage"):
-                            raw_u = res["usage"]
-                            usage_info["prompt_tokens"] = raw_u.get("inputTokens") or raw_u.get("prompt_tokens") or 0
-                            usage_info["completion_tokens"] = raw_u.get("outputTokens") or raw_u.get("completion_tokens") or 0
-                            usage_info["total_tokens"] = raw_u.get("totalTokens") or raw_u.get("total_tokens") or 0
+                            usage_info = _extract_usage_info(res["usage"])
 
                     elif evt_type == "error":
                         has_error = True
@@ -322,6 +350,7 @@ async def create_chat_completion(
                             "object": "chat.completion.chunk",
                             "created": created_ts,
                             "model": req.model,
+                            "system_fingerprint": "fp_antigravity",
                             "choices": [
                                 {
                                     "index": 0,
@@ -344,6 +373,7 @@ async def create_chat_completion(
                     "object": "chat.completion.chunk",
                     "created": created_ts,
                     "model": req.model,
+                    "system_fingerprint": "fp_antigravity",
                     "choices": [
                         {
                             "index": 0,
@@ -361,6 +391,7 @@ async def create_chat_completion(
                     "object": "chat.completion.chunk",
                     "created": created_ts,
                     "model": req.model,
+                    "system_fingerprint": "fp_antigravity",
                     "choices": [
                         {
                             "index": 0,
@@ -406,20 +437,14 @@ async def create_chat_completion(
                 if su.get("step_type") == "agent_response" and su.get("text_delta"):
                     full_content.append(su["text_delta"])
                 if su.get("usage"):
-                    u = su["usage"]
-                    usage_data["prompt_tokens"] = u.get("inputTokens") or u.get("prompt_tokens") or 0
-                    usage_data["completion_tokens"] = u.get("outputTokens") or u.get("completion_tokens") or 0
-                    usage_data["total_tokens"] = u.get("totalTokens") or u.get("total_tokens") or 0
+                    usage_data = _extract_usage_info(su["usage"])
             elif evt_type == "result":
                 res = event.get("result", {})
                 resp = res.get("response")
                 if resp and not full_content:
                     full_content.append(resp)
                 if res.get("usage"):
-                    u = res["usage"]
-                    usage_data["prompt_tokens"] = u.get("inputTokens") or u.get("prompt_tokens") or 0
-                    usage_data["completion_tokens"] = u.get("outputTokens") or u.get("completion_tokens") or 0
-                    usage_data["total_tokens"] = u.get("totalTokens") or u.get("total_tokens") or 0
+                    usage_data = _extract_usage_info(res["usage"])
             elif evt_type == "error":
                 raise RuntimeError(event.get("message") or "Erreur CLI Antigravity")
 
@@ -437,6 +462,7 @@ async def create_chat_completion(
         "object": "chat.completion",
         "created": created_ts,
         "model": req.model,
+        "system_fingerprint": "fp_antigravity",
         "choices": [
             {
                 "index": 0,
