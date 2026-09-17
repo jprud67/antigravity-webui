@@ -80,6 +80,10 @@ class BulkActionRequest(BaseModel):
 async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
     action = req.action
     ids = req.conversation_ids
+    if len(ids) > 500:
+        raise HTTPException(status_code=400, detail="Nombre maximal de conversations dépassé pour une action groupée (max 500).")
+    if not ids:
+        return {"success": True, "action": action, "count": 0, "results": {}}
     for cid in ids:
         if not is_safe_conversation_id(cid):
             raise HTTPException(status_code=400, detail=f"Identifiant de conversation non valide : {cid}")
@@ -174,6 +178,8 @@ def _do_bulk_export(req: "BulkActionRequest") -> Response:
     """Internal bulk export logic (auth already verified by caller)."""
     import json
     import time
+    if len(req.conversation_ids) > 500:
+        raise HTTPException(status_code=400, detail="Nombre maximal de conversations dépassé pour un export groupé (max 500).")
     ids = [cid for cid in req.conversation_ids if is_safe_conversation_id(cid)]
     exported = []
     for cid in ids:

@@ -187,23 +187,10 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
             for i in range(0, len(missing_pinned), chunk_size):
                 chunk = missing_pinned[i : i + chunk_size]
                 placeholders = ",".join("?" * len(chunk))
-                cursor.execute(
-                    f"""
-                    SELECT 
-                        conversation_id,
-                        title,
-                        preview,
-                        step_count,
-                        last_modified_time,
-                        workspace_uris,
-                        status,
-                        agent_name,
-                        parent_conversation_id
-                    FROM conversation_summaries
-                    WHERE conversation_id IN ({placeholders})
-                    """,
-                    tuple(chunk)
+                query_sql = (
+                    f"SELECT conversation_id, title, preview, step_count, last_modified_time, workspace_uris, status, agent_name, parent_conversation_id FROM conversation_summaries WHERE conversation_id IN ({placeholders})"  # nosec B608
                 )
+                cursor.execute(query_sql, tuple(chunk))
                 rows.extend(cursor.fetchall())
 
         result = []
@@ -1146,7 +1133,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
             if metadata_cids:
                 placeholders = ",".join(["?"] * len(metadata_cids))
                 cursor.execute(
-                    f"SELECT * FROM conversation_summaries WHERE conversation_id IN ({placeholders})",
+                    f"SELECT * FROM conversation_summaries WHERE conversation_id IN ({placeholders})",  # nosec B608
                     tuple(metadata_cids)
                 )
                 for r in cursor.fetchall():
@@ -1236,9 +1223,11 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                             matched.append(c_copy)
                             seen_ids.add(cid)
                             break
-                    except Exception:
+                    except Exception as step_err:
+                        logger.debug(f"Error checking transcript step: {step_err}")
                         continue
-            except Exception:
+            except Exception as conv_err:
+                logger.debug(f"Error reading transcript for {cid}: {conv_err}")
                 continue
 
             if len(matched) >= limit:
@@ -2144,8 +2133,8 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
         if should_close and conn is not None:
             try:
                 conn.rollback()
-            except Exception:
-                pass
+            except Exception as roll_err:
+                logger.debug(f"Fork rollback error: {roll_err}")
             delete_session_meta(new_id)
             if new_conv_dir.exists():
                 shutil.rmtree(new_conv_dir, ignore_errors=True)

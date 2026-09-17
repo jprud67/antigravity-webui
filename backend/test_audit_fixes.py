@@ -1026,6 +1026,42 @@ def test_cron_delete_cancels_running_job():
     print("✓ test_cron_delete_cancels_running_job passed")
 
 
+def test_bulk_conversations_empty_and_limit():
+    import asyncio
+    from fastapi import HTTPException
+    from app.api.conversations import bulk_conversations, BulkActionRequest
+
+    # Empty IDs should return count 0 immediately
+    req_empty = BulkActionRequest(action="pin", conversation_ids=[])
+    res = asyncio.run(bulk_conversations(req_empty, _=None))
+    assert res["count"] == 0
+    assert res["success"] is True
+
+    # More than 500 IDs should raise HTTPException(400)
+    req_overflow = BulkActionRequest(action="pin", conversation_ids=[f"cid_{i}" for i in range(501)])
+    try:
+        asyncio.run(bulk_conversations(req_overflow, _=None))
+        assert False, "Should have raised HTTPException for > 500 conversation IDs"
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "max 500" in exc.detail
+    print("✓ test_bulk_conversations_empty_and_limit passed")
+
+
+def test_bulk_export_limit():
+    from fastapi import HTTPException
+    from app.api.conversations import _do_bulk_export, BulkActionRequest
+
+    req_overflow = BulkActionRequest(action="export", conversation_ids=[f"cid_{i}" for i in range(501)])
+    try:
+        _do_bulk_export(req_overflow)
+        assert False, "Should have raised HTTPException for > 500 conversation IDs in bulk export"
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "max 500" in exc.detail
+    print("✓ test_bulk_export_limit passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -1066,5 +1102,7 @@ if __name__ == "__main__":
     test_kill_task_rejects_system_words()
     test_undo_conversation_turn_nullifies_last_user_time()
     test_cron_delete_cancels_running_job()
+    test_bulk_conversations_empty_and_limit()
+    test_bulk_export_limit()
     print("\nAll unit tests passed successfully!")
 

@@ -176,14 +176,16 @@ async def run_agy_task(
         elif not quota_task.done():
             quota_task.cancel()
     finally:
-        if proc.returncode is None:
-            await terminate_process_group_async(proc, grace=1.0)
-        for t in pumps + [quota_task]:
-            if not t.done():
-                t.cancel()
-        await asyncio.gather(*pumps, quota_task, return_exceptions=True)
-        if job_id and _running_job_procs.get(job_id) is proc:
-            _running_job_procs.pop(job_id, None)
+        try:
+            if proc.returncode is None:
+                await asyncio.shield(terminate_process_group_async(proc, grace=1.0))
+            for t in pumps + [quota_task]:
+                if not t.done():
+                    t.cancel()
+            await asyncio.shield(asyncio.gather(*pumps, quota_task, return_exceptions=True))
+        finally:
+            if job_id and _running_job_procs.get(job_id) is proc:
+                _running_job_procs.pop(job_id, None)
 
     out = "".join(stdout_chunks)
     err = "".join(stderr_chunks)

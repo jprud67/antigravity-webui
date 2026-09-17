@@ -297,7 +297,7 @@ def update_task(task_id: str, req: UpdateTaskRequest, _ = Depends(require_auth))
 
             if updates:
                 params.append(task_id)
-                cur.execute(f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params)
+                cur.execute(f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params)  # nosec B608
                 conn.commit()
 
             cur.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
