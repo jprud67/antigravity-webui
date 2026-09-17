@@ -119,6 +119,9 @@ export class ChatWebSocketClient {
           } catch (e) {
             console.error('[WS] Failed to flush queued payload:', e);
             this.pendingPayloads.unshift(item);
+            if (this.pendingPayloads.length > 20) {
+              this.pendingPayloads.length = 20;
+            }
             break;
           }
         }
@@ -294,8 +297,10 @@ export class ChatWebSocketClient {
   }
 
   private queueOrSend(payload: any) {
+    const isDeduplicable = ['interrupt', 'clear_queue'].includes(payload.action);
+
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      if (['interrupt', 'clear_queue'].includes(payload.action)) {
+      if (isDeduplicable) {
         this.pendingPayloads = this.pendingPayloads.filter(
           (p) => p.action !== payload.action || p.conversation_id !== payload.conversation_id
         );
@@ -314,6 +319,11 @@ export class ChatWebSocketClient {
       this.ws.send(JSON.stringify(payload));
     } catch (err) {
       console.error('[WS] Error sending payload, queueing for reconnect:', err);
+      if (isDeduplicable) {
+        this.pendingPayloads = this.pendingPayloads.filter(
+          (p) => p.action !== payload.action || p.conversation_id !== payload.conversation_id
+        );
+      }
       this.pendingPayloads.push(payload);
       if (this.pendingPayloads.length > 20) {
         this.pendingPayloads.shift();

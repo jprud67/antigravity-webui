@@ -141,6 +141,7 @@ def get_file_content(path: str = Query(...), _ = Depends(require_auth)):
     try:
         with open(resolved_path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
+        content = content.lstrip("\ufeff")
 
         return {
             "path": str(resolved_path),

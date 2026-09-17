@@ -2300,6 +2300,104 @@ def test_execution_session_remove_subscriber_last_active_at():
     print("✓ test_execution_session_remove_subscriber_last_active_at passed")
 
 
+def test_cron_get_job_log_special_chars():
+    import uuid
+
+    from app.api.crons import get_cron_job_log
+    from app.services.cron_store import OUTPUT_DIR, update_jobs
+
+    special_id = f"[job-test-{uuid.uuid4().hex[:6]}]"
+    update_jobs(lambda data: data["jobs"].append({"id": special_id, "name": "Special Cron", "schedule": "daily"}))
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    test_log = OUTPUT_DIR / f"{special_id}_20260917.log"
+    test_log.write_text("Execution log for bracket job", encoding="utf-8")
+
+    try:
+        res = get_cron_job_log(special_id, _=None)
+        assert res["job_id"] == special_id
+        assert res["has_log"] is True
+        assert "Execution log for bracket job" in res["content"]
+    finally:
+        test_log.unlink(missing_ok=True)
+        update_jobs(lambda data: [data["jobs"].remove(j) for j in list(data["jobs"]) if j.get("id") == special_id])
+    print("✓ test_cron_get_job_log_special_chars passed")
+
+
+def test_aggregate_steps_ghost_turns_suppressed():
+    from app.services.storage import aggregate_steps_into_turns
+
+    steps = [
+        {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Hello", "step_index": 0},
+        {"type": "PLANNER_RESPONSE", "source": "MODEL", "content": "", "thinking": "", "tool_calls": [], "step_index": 1},
+        {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Follow up", "step_index": 2},
+    ]
+    turns = aggregate_steps_into_turns(steps)
+    assert len(turns) == 2, f"Expected 2 user turns, got {len(turns)}"
+    assert turns[0]["content"] == "Hello"
+    assert turns[1]["content"] == "Follow up"
+    print("✓ test_aggregate_steps_ghost_turns_suppressed passed")
+
+
+def test_read_artifact_content_utf8_bom():
+    from app.config import BRAIN_DIR
+    from app.services.storage import read_artifact_content
+
+    test_cid = "test-bom-artifact-cid"
+    art_dir = BRAIN_DIR / test_cid
+    art_dir.mkdir(parents=True, exist_ok=True)
+    art_file = art_dir / "test_doc.md"
+    art_file.write_bytes(b"\xef\xbb\xbf# Title\nThis is document content with BOM.")
+
+    try:
+        content = read_artifact_content(test_cid, "test_doc.md")
+        assert not content.startswith("\ufeff"), "BOM was not stripped from artifact content"
+        assert content.startswith("# Title"), f"Unexpected content: {content}"
+    finally:
+        art_file.unlink(missing_ok=True)
+        try:
+            art_dir.rmdir()
+        except Exception:
+            pass
+    print("✓ test_read_artifact_content_utf8_bom passed")
+
+
+def test_get_file_content_utf8_bom():
+    from app.api.files import get_file_content
+    from app.config import DEFAULT_WORKSPACE
+
+    target_dir = Path(DEFAULT_WORKSPACE)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    f_path = target_dir / "test_bom_file.txt"
+    f_path.write_bytes(b"\xef\xbb\xbfLine 1\nLine 2")
+
+    try:
+        res = get_file_content(path="test_bom_file.txt", _=None)
+        assert not res["content"].startswith("\ufeff"), "BOM was not stripped in get_file_content"
+        assert res["content"].startswith("Line 1")
+    finally:
+        f_path.unlink(missing_ok=True)
+    print("✓ test_get_file_content_utf8_bom passed")
+
+
+def test_git_diff_untracked_fallback_resilience():
+    from app.api.git import get_git_diff
+    from app.config import DEFAULT_WORKSPACE
+
+    target_dir = Path(DEFAULT_WORKSPACE)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    untracked_file = target_dir / "untracked_diff_test.txt"
+    untracked_file.write_text("Hello from untracked file\nNew line\n", encoding="utf-8")
+
+    try:
+        diff_res = get_git_diff(workspace=DEFAULT_WORKSPACE, path="untracked_diff_test.txt", staged=False, _=None)
+        assert diff_res["path"] == "untracked_diff_test.txt"
+        assert "Hello from untracked file" in diff_res["diff"]
+    finally:
+        untracked_file.unlink(missing_ok=True)
+    print("✓ test_git_diff_untracked_fallback_resilience passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -2394,4 +2492,9 @@ if __name__ == "__main__":
     test_cron_skills_string_coercion()
     test_cron_prune_job_logs_special_chars()
     test_execution_session_remove_subscriber_last_active_at()
+    test_cron_get_job_log_special_chars()
+    test_aggregate_steps_ghost_turns_suppressed()
+    test_read_artifact_content_utf8_bom()
+    test_get_file_content_utf8_bom()
+    test_git_diff_untracked_fallback_resilience()
     print("\nAll unit tests passed successfully!")

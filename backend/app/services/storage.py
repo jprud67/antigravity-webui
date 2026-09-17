@@ -1305,7 +1305,8 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
             for act in current_asst.get("tool_activities", []):
                 if act.get("result") is None:
                     act["result"] = ""
-            turns.append(current_asst)
+            if current_asst.get("content") or current_asst.get("thinking") or current_asst.get("tool_activities"):
+                turns.append(current_asst)
             current_asst = None
 
     for idx, s in enumerate(steps):
@@ -2037,7 +2038,8 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
             return f"[Fichier binaire ou non lisible : {file_size} octets]"
 
     try:
-        return target_path.read_text(encoding="utf-8")
+        content = target_path.read_text(encoding="utf-8")
+        return content.lstrip("\ufeff")
     except UnicodeDecodeError:
         return f"[Fichier binaire : {file_size} octets]"
 

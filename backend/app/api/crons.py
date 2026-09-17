@@ -270,7 +270,12 @@ def get_cron_job_log(job_id: str, _ = Depends(require_auth)):
             except (OSError, RuntimeError):
                 return 0.0
 
-        matching = sorted(OUTPUT_DIR.glob(f"{job_id}_*.log"), key=_safe_mtime, reverse=True)
+        prefix = f"{job_id}_"
+        matching = sorted(
+            [p for p in OUTPUT_DIR.iterdir() if p.is_file() and p.name.startswith(prefix) and p.name.endswith(".log")],
+            key=_safe_mtime,
+            reverse=True
+        )
         if matching:
             candidate = matching[0]
             if is_safe_path(candidate, [OUTPUT_DIR]) and candidate.is_file():

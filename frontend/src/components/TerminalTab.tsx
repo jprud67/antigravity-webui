@@ -140,21 +140,35 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
   useEffect(() => {
     connectTerminal();
 
+    let lastCols = 0;
+    let lastRows = 0;
+    let resizeTimer: number | null = null;
+
     const handleResize = () => {
-      if (fitAddonRef.current && xtermRef.current && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        try {
-          fitAddonRef.current.fit();
-          if (xtermRef.current.cols > 0 && xtermRef.current.rows > 0) {
-            wsRef.current.send(
-              JSON.stringify({
-                action: 'resize',
-                cols: xtermRef.current.cols,
-                rows: xtermRef.current.rows,
-              })
-            );
-          }
-        } catch {}
+      if (resizeTimer !== null) {
+        cancelAnimationFrame(resizeTimer);
       }
+      resizeTimer = requestAnimationFrame(() => {
+        resizeTimer = null;
+        if (fitAddonRef.current && xtermRef.current && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          try {
+            fitAddonRef.current.fit();
+            const cols = xtermRef.current.cols;
+            const rows = xtermRef.current.rows;
+            if (cols > 0 && rows > 0 && (cols !== lastCols || rows !== lastRows)) {
+              lastCols = cols;
+              lastRows = rows;
+              wsRef.current.send(
+                JSON.stringify({
+                  action: 'resize',
+                  cols,
+                  rows,
+                })
+              );
+            }
+          } catch {}
+        }
+      });
     };
 
     window.addEventListener('resize', handleResize);
@@ -168,6 +182,9 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
     }
 
     return () => {
+      if (resizeTimer !== null) {
+        cancelAnimationFrame(resizeTimer);
+      }
       window.removeEventListener('resize', handleResize);
       if (resizeObserver) {
         resizeObserver.disconnect();
