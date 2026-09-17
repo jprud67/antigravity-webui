@@ -36,7 +36,14 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2, visited
 
     items = []
     try:
-        entries = sorted(dir_path.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
+        def _safe_sort_key(e: Path) -> tuple[bool, str]:
+            try:
+                is_directory = e.is_dir()
+            except (OSError, RuntimeError):
+                is_directory = False
+            return (not is_directory, e.name.lower())
+
+        entries = sorted(dir_path.iterdir(), key=_safe_sort_key)
         for entry in entries:
             name = entry.name
             if name.startswith(".") and name != ".gitignore":

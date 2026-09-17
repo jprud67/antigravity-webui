@@ -1406,7 +1406,7 @@ export function App() {
   
   const stableAnswerQuestion = useCallback((ans: string) => {
     if (isStreamingRef.current) {
-      chatSocket.sendInput(ans);
+      chatSocket.sendInput(ans, activeConversationIdRef.current || undefined);
       const userMsg: ChatMessage = {
         id: `usr-${Date.now()}`,
         role: 'user',

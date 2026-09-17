@@ -1372,6 +1372,160 @@ def test_kanban_update_task_rejects_empty_title():
     print("✓ test_kanban_update_task_rejects_empty_title passed")
 
 
+def test_update_conversation_title_rejects_empty_whitespace():
+    from app.services.storage import update_conversation_title
+
+    assert update_conversation_title("conv_123", "") is False
+    assert update_conversation_title("conv_123", "   ") is False
+    assert update_conversation_title("conv_123", "\t\n") is False
+    print("✓ test_update_conversation_title_rejects_empty_whitespace passed")
+
+
+def test_safe_copy_artifacts_excludes_symlinks_and_sensitive_paths():
+    import tempfile
+    from pathlib import Path
+
+    from app.services.storage import _safe_copy_artifacts
+
+    with tempfile.TemporaryDirectory() as td:
+        src = Path(td) / "src_session"
+        dst = Path(td) / "dst_session"
+        src.mkdir()
+        dst.mkdir()
+
+        (src / "notes.txt").write_text("hello world")
+        sub = src / "subfolder"
+        sub.mkdir()
+        (sub / "inner.txt").write_text("inner content")
+
+        ext_file = Path(td) / "external.txt"
+        ext_file.write_text("external secret")
+        symlink = src / "symlink_secret.txt"
+        try:
+            symlink.symlink_to(ext_file)
+        except OSError:
+            pass
+
+        (src / ".env").write_text("SECRET=123")
+        (src / ".system_generated").mkdir()
+        (src / "scratch").mkdir()
+
+        _safe_copy_artifacts(src, dst)
+
+        assert (dst / "notes.txt").exists()
+        assert (dst / "notes.txt").read_text() == "hello world"
+        assert (dst / "subfolder" / "inner.txt").exists()
+        assert not (dst / "symlink_secret.txt").exists()
+        assert not (dst / ".env").exists()
+        assert not (dst / ".system_generated").exists()
+        assert not (dst / "scratch").exists()
+    print("✓ test_safe_copy_artifacts_excludes_symlinks_and_sensitive_paths passed")
+
+
+def test_import_single_conversation_cleanup_on_db_failure():
+    from unittest.mock import MagicMock
+
+    from app.services.storage import BRAIN_DIR, _import_single_conversation
+
+    before_dirs = {d.name for d in BRAIN_DIR.iterdir()} if BRAIN_DIR.exists() else set()
+
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_cursor.execute.side_effect = RuntimeError("Simulated DB failure")
+    mock_conn.cursor.return_value = mock_cursor
+
+    payload = {
+        "title": "Failing Session Test",
+        "steps": [{"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Hello"}]
+    }
+
+    try:
+        _import_single_conversation(payload, "2026-09-17T00:00:00Z", "2026-09-17 00:00:00.000000+00:00", conn=mock_conn)
+        assert False, "Should have raised RuntimeError"
+    except RuntimeError:
+        pass
+
+    after_dirs = {d.name for d in BRAIN_DIR.iterdir()} if BRAIN_DIR.exists() else set()
+    assert after_dirs == before_dirs, f"New orphaned directory remained: {after_dirs - before_dirs}"
+    print("✓ test_import_single_conversation_cleanup_on_db_failure passed")
+
+
+def test_scan_dir_defensive_sorting_broken_symlink():
+    import tempfile
+    from pathlib import Path
+
+    from app.api.files import scan_dir
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "workspace"
+        root.mkdir()
+        (root / "valid_file.txt").write_text("data")
+        (root / "alpha_dir").mkdir()
+
+        broken_sym = root / "broken_link.txt"
+        try:
+            broken_sym.symlink_to(root / "does_not_exist.txt")
+        except OSError:
+            pass
+
+        items = scan_dir(root, current_depth=0, max_depth=2)
+        names = [item["name"] for item in items]
+        assert "valid_file.txt" in names
+        assert "alpha_dir" in names
+    print("✓ test_scan_dir_defensive_sorting_broken_symlink passed")
+
+
+def test_cron_log_sorting_resilience():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.api.crons import get_cron_job_log
+
+    with tempfile.TemporaryDirectory() as td:
+        out_dir = Path(td) / "cron_outputs"
+        out_dir.mkdir()
+
+        log1 = out_dir / "job123_20260917_000000.log"
+        log1.write_text("Sample log output")
+
+        broken = out_dir / "job123_20260917_999999.log"
+        try:
+            broken.symlink_to(out_dir / "non_existent.log")
+        except OSError:
+            pass
+
+        with patch("app.api.crons.OUTPUT_DIR", out_dir), \
+             patch("app.api.crons.load_jobs", return_value={"jobs": [{"id": "job123", "name": "Test"}]}):
+            res = get_cron_job_log("job123", _=None)
+            assert res["has_log"] is True
+            assert "Sample log output" in res["content"]
+    print("✓ test_cron_log_sorting_resilience passed")
+
+
+def test_prune_inactive_sessions_sync_terminate_on_runtime_error():
+    from unittest.mock import MagicMock, patch
+
+    from app.services.execution_manager import ExecutionManager, ExecutionSession
+
+    em = ExecutionManager()
+    session = ExecutionSession("test_prune_cid")
+    session.is_running = False
+    session.last_active_at = 0.0
+    mock_proc = MagicMock()
+    mock_proc.returncode = None
+    session.active_proc = mock_proc
+    em.sessions["test_prune_cid"] = session
+
+    with patch("app.services.execution_manager.terminate_process_group_async", new_callable=MagicMock), \
+         patch("asyncio.create_task", side_effect=RuntimeError("no event loop")), \
+         patch("app.services.execution_manager.terminate_process_group_sync") as mock_sync_term:
+        em.prune_inactive_sessions()
+        mock_sync_term.assert_called_once_with(mock_proc, force=True)
+    assert "test_prune_cid" not in em.sessions
+    print("✓ test_prune_inactive_sessions_sync_terminate_on_runtime_error passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -1429,4 +1583,10 @@ if __name__ == "__main__":
     test_list_artifacts_sensitive_and_traversal_filtering()
     test_remove_session_drains_message_queue()
     test_kanban_update_task_rejects_empty_title()
+    test_update_conversation_title_rejects_empty_whitespace()
+    test_safe_copy_artifacts_excludes_symlinks_and_sensitive_paths()
+    test_import_single_conversation_cleanup_on_db_failure()
+    test_scan_dir_defensive_sorting_broken_symlink()
+    test_cron_log_sorting_resilience()
+    test_prune_inactive_sessions_sync_terminate_on_runtime_error()
     print("\nAll unit tests passed successfully!")

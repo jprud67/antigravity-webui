@@ -510,6 +510,32 @@ def is_tool_output_content(content: Any) -> bool:
     ))
 
 
+def _safe_copy_artifacts(source_dir: Path, target_dir: Path) -> None:
+    """
+    Copie de façon sécurisée les artefacts d'une session source vers une session cible.
+    Exclut les dossiers système, fichiers temporaires, fichiers sensibles et liens symboliques.
+    """
+    if not source_dir.exists() or not source_dir.is_dir():
+        return
+    for item in source_dir.iterdir():
+        if item.name in (".system_generated", "scratch") or item.name.startswith((".", ".tmp", ".lock")):
+            continue
+        try:
+            # Ne jamais suivre de lien symbolique (évite les traversées et boucles)
+            if item.is_symlink():
+                continue
+            resolved_item = item.resolve()
+            if not is_safe_path(resolved_item, [source_dir]) or is_blocked_sensitive_path(resolved_item):
+                continue
+            target = target_dir / item.name
+            if item.is_file():
+                shutil.copy2(item, target, follow_symlinks=False)
+            elif item.is_dir():
+                shutil.copytree(item, target, dirs_exist_ok=True, symlinks=False)
+        except Exception as e:
+            logger.warning(f"Failed to copy artifact {item.name}: {e}")
+
+
 def fork_conversation(
     source_conversation_id: str,
     up_to_step_index: int,
@@ -570,20 +596,9 @@ def fork_conversation(
         forked_full_transcripts.append(cloned)
     atomic_write_jsonl(transcript_full_path, forked_full_transcripts)
 
-    # Copy artifacts if present
+    # Copy artifacts safely if present
     source_dir = BRAIN_DIR / source_conversation_id
-    if source_dir.exists():
-        for item in source_dir.iterdir():
-            # Exclude internal system folders, scratch, and temp/lock files
-            if item.name not in [".system_generated", "scratch"] and not item.name.startswith((".tmp", ".lock")):
-                try:
-                    target = new_conv_dir / item.name
-                    if item.is_file():
-                        shutil.copy2(item, target)
-                    elif item.is_dir():
-                        shutil.copytree(item, target, dirs_exist_ok=True)
-                except Exception as e:
-                    logger.warning(f"Failed to copy artifact {item.name}: {e}")
+    _safe_copy_artifacts(source_dir, new_conv_dir)
 
     # Fetch source record from SQLite
     conn = get_db_connection()
@@ -640,6 +655,12 @@ def fork_conversation(
             )
         )
         conn.commit()
+    except Exception:
+        conn.rollback()
+        delete_session_meta(new_id)
+        if new_conv_dir.exists():
+            shutil.rmtree(new_conv_dir, ignore_errors=True)
+        raise
     finally:
         conn.close()
 
@@ -757,19 +778,8 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
     new_logs_dir = new_conv_dir / ".system_generated" / "logs"
     new_logs_dir.mkdir(parents=True, exist_ok=True)
 
-    # Copy artifacts if present
-    if source_dir.exists():
-        for item in source_dir.iterdir():
-            # Exclude internal system folders, scratch, and temp/lock files
-            if item.name not in [".system_generated", "scratch"] and not item.name.startswith((".tmp", ".lock")):
-                try:
-                    target = new_conv_dir / item.name
-                    if item.is_file():
-                        shutil.copy2(item, target)
-                    elif item.is_dir():
-                        shutil.copytree(item, target, dirs_exist_ok=True)
-                except Exception as e:
-                    logger.warning(f"Failed to copy artifact {item.name} during handoff: {e}")
+    # Copy artifacts safely if present
+    _safe_copy_artifacts(source_dir, new_conv_dir)
 
     # Prepare initial steps:
     # Step 0: System Context Summary
@@ -839,6 +849,12 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
             )
         )
         conn.commit()
+    except Exception:
+        conn.rollback()
+        delete_session_meta(new_id)
+        if new_conv_dir.exists():
+            shutil.rmtree(new_conv_dir, ignore_errors=True)
+        raise
     finally:
         conn.close()
 
@@ -935,11 +951,13 @@ def update_conversation_title(conversation_id: str, new_title: str) -> bool:
     if not is_safe_conversation_id(conversation_id):
         return False
     clean_title = new_title.strip() if new_title else ""
+    if not clean_title:
+        return False
     update_session_meta(conversation_id, {"customTitle": clean_title})
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("UPDATE conversation_summaries SET title = ? WHERE conversation_id = ?", (clean_title or "Nouvelle session", conversation_id))
+        cursor.execute("UPDATE conversation_summaries SET title = ? WHERE conversation_id = ?", (clean_title, conversation_id))
         conn.commit()
     finally:
         conn.close()
@@ -2141,14 +2159,14 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
         if should_close:
             conn.commit()
     except Exception:
+        delete_session_meta(new_id)
+        if new_conv_dir.exists():
+            shutil.rmtree(new_conv_dir, ignore_errors=True)
         if should_close and conn is not None:
             try:
                 conn.rollback()
             except Exception as roll_err:
                 logger.debug(f"Import rollback error: {roll_err}")
-            delete_session_meta(new_id)
-            if new_conv_dir.exists():
-                shutil.rmtree(new_conv_dir, ignore_errors=True)
         raise
     finally:
         if should_close and conn is not None:

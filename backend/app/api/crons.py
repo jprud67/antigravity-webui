@@ -264,10 +264,16 @@ def get_cron_job_log(job_id: str, _ = Depends(require_auth)):
             log_path = p
 
     if not log_path and OUTPUT_DIR.exists():
-        matching = sorted(OUTPUT_DIR.glob(f"{job_id}_*.log"), key=lambda f: f.stat().st_mtime, reverse=True)
+        def _safe_mtime(f: Path) -> float:
+            try:
+                return f.stat().st_mtime
+            except (OSError, RuntimeError):
+                return 0.0
+
+        matching = sorted(OUTPUT_DIR.glob(f"{job_id}_*.log"), key=_safe_mtime, reverse=True)
         if matching:
             candidate = matching[0]
-            if is_safe_path(candidate, [OUTPUT_DIR]):
+            if is_safe_path(candidate, [OUTPUT_DIR]) and candidate.is_file():
                 log_path = candidate
 
     if not log_path or not is_safe_path(log_path, [OUTPUT_DIR]):
@@ -283,11 +289,16 @@ def get_cron_job_log(job_id: str, _ = Depends(require_auth)):
         content = log_path.read_text(encoding="utf-8", errors="replace")
         if len(content) > 50_000:
             content = content[-50_000:]
+        mtime = None
+        try:
+            mtime = log_path.stat().st_mtime
+        except OSError:
+            pass
         return {
             "job_id": job_id,
             "has_log": True,
             "file": log_path.name,
-            "mtime": log_path.stat().st_mtime,
+            "mtime": mtime,
             "content": content
         }
     except Exception as e:

@@ -599,10 +599,7 @@ class ExecutionManager:
                         self._background_tasks.add(task)
                         task.add_done_callback(self._background_tasks.discard)
                     except RuntimeError:
-                        try:
-                            target_session.active_proc.kill()
-                        except Exception as e:
-                            logger.debug(f"Ignored error: {e}")
+                        terminate_process_group_sync(target_session.active_proc, force=True)
                 if target_session.worker_task and not target_session.worker_task.done():
                     target_session.worker_task.cancel()
                 while not target_session.message_queue.empty():
