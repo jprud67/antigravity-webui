@@ -38,6 +38,16 @@ ACCOUNTS_DIR = GEMINI_DIR / "accounts"
 _LOGIN_SESSIONS: dict[str, dict[str, Any]] = {}
 _login_lock = threading.Lock()
 
+_account_exhaustion_tracker: dict[str, float] = {}
+_exhaustion_lock = threading.Lock()
+_QUOTA_429_RE = re.compile(r"(?:code|status|http|error)[\s:=]+429\b|\b429\s+(?:too many|rate|quota|error)\b")
+
+
+def clear_account_exhaustion(email: str) -> None:
+    norm_email = email.strip().lower()
+    with _exhaustion_lock:
+        _account_exhaustion_tracker.pop(norm_email, None)
+
 
 def ensure_dirs():
     GEMINI_DIR.mkdir(parents=True, exist_ok=True)
@@ -202,6 +212,7 @@ def switch_google_account(target_email: str) -> dict[str, Any]:
             except Exception as e:
                 logger.debug(f"Ignored error: {e}")
 
+    clear_account_exhaustion(target_email)
     active_meta = get_active_account()
     logger.info(f"Switched Google account to {target_email}")
     return {
@@ -606,15 +617,12 @@ def import_raw_token(token_data: dict[str, Any]) -> dict[str, Any]:
             except Exception as e:
                 logger.debug(f"Ignored error: {e}")
 
+    clear_account_exhaustion(email)
     return {
         "success": True,
         "active_account": get_active_account(),
         "message": f"Compte {email} importé et activé avec succès."
     }
-
-
-_account_exhaustion_tracker: dict[str, float] = {}
-_exhaustion_lock = threading.Lock()
 
 
 def is_quota_error(message: str) -> bool:
@@ -624,7 +632,8 @@ def is_quota_error(message: str) -> bool:
     patterns = [
         "resource_exhausted",
         "code 429",
-        "429",
+        "status 429",
+        "http 429",
         "quota reached",
         "quota exceeded",
         "quota limit",
@@ -644,7 +653,7 @@ def is_quota_error(message: str) -> bool:
         "resource has been exhausted",
         "quota_error"
     ]
-    return any(p in lower for p in patterns)
+    return any(p in lower for p in patterns) or bool(_QUOTA_429_RE.search(lower))
 
 
 # Limites DURABLES (compte épuisé, réinitialisation à des heures/jours) —

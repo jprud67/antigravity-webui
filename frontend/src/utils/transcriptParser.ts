@@ -172,8 +172,9 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
       continue;
     }
 
-    // 3. Message d'erreur API ou d'exécution
-    if (stype === 'ERROR_MESSAGE' || error) {
+    // 3. Message d'erreur API ou d'exécution (hors erreurs d'outils traitées dans les toolCalls)
+    const isToolStep = TOOL_STEP_TYPES.has(stype.toUpperCase()) || isToolOutputContent(content);
+    if (stype === 'ERROR_MESSAGE' || (error && !isToolStep && toolCallsRaw.length === 0)) {
       const errText = error || content || 'Une erreur est survenue lors du traitement de la requête.';
       if (!currentAssistantMsg) {
         currentAssistantMsg = {

@@ -16,7 +16,7 @@ logger = logging.getLogger("antigravity.git")
 router = APIRouter(prefix="/api/git", tags=["git"])
 
 GIT_TIMEOUT = 12
-_COAUTHOR_RE = re.compile(r"(?:co[-_ ]?authored[-_ ]?by|co[-_ ]?author:?|claude)", re.IGNORECASE)
+_COAUTHOR_RE = re.compile(r"(?:co[-_ ]?authored[-_ ]?by|co[-_ ]?author:?|signed[-_ ]?off[-_ ]?by|claude|anthropic)", re.IGNORECASE)
 
 def _sanitize_git_message(msg: str) -> str:
     lines = [line for line in msg.strip().split("\n") if not _COAUTHOR_RE.search(line)]
@@ -34,7 +34,8 @@ def _validate_workspace(workspace: str | None) -> Path:
         raise HTTPException(status_code=400, detail=f"Dossier introuvable : {resolved}")
         
     settings = get_settings()
-    workspaces = settings.get("trustedWorkspaces", [])
+    raw_workspaces = settings.get("trustedWorkspaces", [])
+    workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
     allowed_roots = [Path(DEFAULT_WORKSPACE).resolve()]
     for ws in workspaces:
         try:

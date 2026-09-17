@@ -202,8 +202,9 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
     Prevents CLI errors like 'invalid model selection' or 'model conflicts with --effort'.
     Ensures model identifiers are normalized to valid CLI model slugs.
     """
-    if not model:
-        return None, effort
+    if not model or not model.strip():
+        eff_clean = effort.strip() if (effort and effort.strip()) else None
+        return None, eff_clean
 
     raw = model.strip()
     norm = raw.lower().replace(" ", "-").replace("(", "").replace(")", "").strip()
@@ -396,7 +397,11 @@ async def stream_turn(
                 }
 
         returncode = await proc.wait()
-        stderr_output = await stderr_task if stderr_task else ""
+        try:
+            stderr_output = await asyncio.wait_for(stderr_task, timeout=3.0) if stderr_task else ""
+        except (asyncio.TimeoutError, Exception) as err:
+            logger.warning(f"stderr_task timed out or errored: {err}")
+            stderr_output = ""
         # La ligne de quota est disponible même si la terminaison est encore en cours
         quota_line = quota_detected["line"]
         if quota_line is None and quota_task:
@@ -556,25 +561,43 @@ def _extract_json_payload(raw: str) -> Any:
         except Exception as e:
             logger.debug(f"Ignored error: {e}")
 
-    first_brace = trimmed.find('{')
-    last_brace = trimmed.rfind('}')
-    first_bracket = trimmed.find('[')
-    last_bracket = trimmed.rfind(']')
-
-    candidates: list[str] = []
-    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-        candidates.append(trimmed[first_brace : last_brace + 1])
-    if first_bracket != -1 and last_bracket != -1 and last_bracket > first_bracket:
-        candidates.append(trimmed[first_bracket : last_bracket + 1])
-
-    for c in candidates:
-        try:
-            return json.loads(c)
-        except Exception as e:
-            logger.debug(f"Ignored error: {e}")
-
-    # Search lines for JSON payloads, prioritizing lines with command-specific keys or traversing in reverse (most recent output first)
     preferred_keys = {"groups", "buckets", "remaining_credits", "changelog", "entries", "data", "models", "quota"}
+
+    # Analyse robuste avec raw_decode pour extraire les objets JSON valides sans troncation
+    decoder = json.JSONDecoder()
+    candidates: list[Any] = []
+    pos = 0
+    length = len(trimmed)
+    while pos < length:
+        brace_pos = trimmed.find('{', pos)
+        bracket_pos = trimmed.find('[', pos)
+        if brace_pos == -1 and bracket_pos == -1:
+            break
+        if brace_pos != -1 and bracket_pos != -1:
+            next_pos = min(brace_pos, bracket_pos)
+        elif brace_pos != -1:
+            next_pos = brace_pos
+        else:
+            next_pos = bracket_pos
+
+        try:
+            obj, end_idx = decoder.raw_decode(trimmed, next_pos)
+            if isinstance(obj, (dict, list)):
+                if isinstance(obj, dict) and any(k in obj for k in preferred_keys):
+                    return obj
+                candidates.append(obj)
+            pos = max(next_pos + 1, end_idx)
+        except Exception:
+            pos = next_pos + 1
+
+    if candidates:
+        # Priorité aux dictionnaires avec clés préférées ou au dernier payload pertinent
+        for c in reversed(candidates):
+            if isinstance(c, dict) and any(k in c for k in preferred_keys):
+                return c
+        return candidates[-1]
+
+    # Repli : lignes individuelles en sens inverse
     parsed_lines = []
     for line in reversed(trimmed.splitlines()):
         line = line.strip()

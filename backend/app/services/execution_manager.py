@@ -828,7 +828,7 @@ class ExecutionManager:
             return
 
         logger.info(f"Approval decision: {decision} for rule: {rule} in session {session.conversation_id}")
-        if decision in ["allow-session", "always-allow"] and rule:
+        if decision == "always-allow" and rule:
             try:
                 settings = get_settings()
                 perms = settings.get("permissions")

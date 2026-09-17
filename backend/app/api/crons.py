@@ -142,6 +142,11 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
                 detail=f"Expression de planification invalide : '{sched_raw}'."
             )
 
+    if req.name is not None and not req.name.strip():
+        raise HTTPException(status_code=400, detail="Le nom du job ne peut pas être vide")
+    if req.prompt is not None and not req.prompt.strip():
+        raise HTTPException(status_code=400, detail="L'instruction du prompt ne peut pas être vide")
+
     from croniter import croniter
 
     def _modify(data):

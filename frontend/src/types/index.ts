@@ -62,6 +62,7 @@ export interface AppSettings {
   agentMode?: string;
   colorScheme?: string;
   model?: string;
+  effort?: string;
   permissions?: {
     allow?: string[];
     deny?: string[];

@@ -62,6 +62,24 @@ def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
                     logger.debug(f"Ignored cleanup error: {clean_err}")
             raise
 
+def _to_bool(val: Any) -> bool:
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        return val.strip().lower() in ("true", "1", "yes")
+    return bool(val)
+
+
+def _normalize_meta(meta: dict[str, Any]) -> dict[str, Any]:
+    meta["pinned"] = _to_bool(meta.get("pinned", False))
+    meta["archived"] = _to_bool(meta.get("archived", False))
+    meta["tags"] = [str(t) for t in meta.get("tags", [])] if isinstance(meta.get("tags"), list) else []
+    meta["project"] = str(meta.get("project") or "")
+    meta["projectColor"] = str(meta.get("projectColor") or "")
+    meta["customTitle"] = str(meta.get("customTitle") or "")
+    return meta
+
+
 def make_default_meta() -> dict[str, Any]:
     return {
         "pinned": False,
@@ -78,8 +96,7 @@ def get_session_meta(conversation_id: str) -> dict[str, Any]:
     merged = make_default_meta()
     if isinstance(existing, dict):
         merged.update(existing)
-    merged["tags"] = list(merged.get("tags") or []) if isinstance(merged.get("tags"), list) else []
-    return merged
+    return _normalize_meta(merged)
 
 def update_session_meta(conversation_id: str, updates: dict[str, Any]) -> dict[str, Any]:
     return bulk_update_session_meta([conversation_id], updates)[conversation_id]
@@ -97,7 +114,7 @@ def bulk_update_session_meta_batch(updates_per_id: dict[str, dict[str, Any]]) ->
             if isinstance(existing, dict):
                 current.update(existing)
             current.update(updates)
-            current["tags"] = list(current.get("tags") or []) if isinstance(current.get("tags"), list) else []
+            current = _normalize_meta(current)
             all_meta[cid] = current
             results[cid] = current
         if updates_per_id:

@@ -215,6 +215,7 @@ export function App() {
     if (updateUrl) {
       navigateToConversation(convId);
     }
+    activeConversationIdRef.current = convId;
     setActiveConversationId(convId);
     chatSocket.setCurrentConversation(convId);
     setPendingApproval(null);
@@ -288,13 +289,17 @@ export function App() {
         );
         if (found) {
           setSelectedModel(found.id);
-          const lowerModel = settings.model.toLowerCase();
-          if (lowerModel.includes('low')) {
-            setSelectedEffort('low');
-          } else if (lowerModel.includes('medium') || lowerModel.includes('med')) {
-            setSelectedEffort('medium');
+          if (settings.effort && ['low', 'medium', 'high'].includes(settings.effort)) {
+            setSelectedEffort(settings.effort as any);
           } else {
-            setSelectedEffort((found.default_effort as any) || 'high');
+            const lowerModel = settings.model.toLowerCase();
+            if (lowerModel.includes('low')) {
+              setSelectedEffort('low');
+            } else if (lowerModel.includes('medium') || lowerModel.includes('med')) {
+              setSelectedEffort('medium');
+            } else {
+              setSelectedEffort((found.default_effort as any) || 'high');
+            }
           }
         } else {
           setSelectedModel(mods[0].id);
@@ -432,6 +437,7 @@ export function App() {
   const handleNewConversation = () => {
     setIsMobileSidebarOpen(false);
     navigateToConversation(null);
+    activeConversationIdRef.current = null;
     setActiveConversationId(null);
     chatSocket.setCurrentConversation(null);
     setMessages([]);
@@ -929,7 +935,7 @@ export function App() {
           setQueueCount(event.queue_size);
         }
         if (typeof event.is_running === 'boolean' && event.conversation_id === activeConversationIdRef.current) {
-          if (!event.is_running && isStreamingRef.current === false) {
+          if (!event.is_running && isStreamingRef.current) {
             setIsStreaming(false);
           }
         }
@@ -1025,13 +1031,15 @@ export function App() {
     setSelectedModel(newModelId);
     const found = models.find((m) => m.id === newModelId);
     if (found) {
+      let nextEffort = selectedEffort;
       if (found.supported_efforts && found.supported_efforts.length > 0) {
         if (!found.supported_efforts.includes(selectedEffort)) {
-          setSelectedEffort((found.default_effort as any) || found.supported_efforts[0]);
+          nextEffort = (found.default_effort as any) || found.supported_efforts[0];
+          setSelectedEffort(nextEffort);
         }
       }
       fetchSettings().then((currentSettings) => {
-        saveSettings({ ...currentSettings, model: found.name }).catch(console.error);
+        saveSettings({ ...currentSettings, model: found.name, effort: nextEffort }).catch(console.error);
       }).catch(console.error);
     }
   };
@@ -1041,7 +1049,7 @@ export function App() {
     const currentModelObj = models.find((m) => m.id === selectedModel);
     if (currentModelObj) {
       fetchSettings().then((currentSettings) => {
-        saveSettings({ ...currentSettings, model: currentModelObj.name }).catch(console.error);
+        saveSettings({ ...currentSettings, model: currentModelObj.name, effort: newEffort }).catch(console.error);
       }).catch(console.error);
     }
   };

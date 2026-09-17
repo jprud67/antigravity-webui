@@ -91,8 +91,10 @@ async def run_agy_task(
     """
     effective_prompt = prompt
     if skills:
-        skills_prefix = f"[Active skills: {', '.join(skills)}]\n"
-        effective_prompt = f"{skills_prefix}{prompt}"
+        valid_skills = [str(s).strip() for s in skills if s and str(s).strip()]
+        if valid_skills:
+            skills_prefix = f"[Active skills: {', '.join(valid_skills)}]\n"
+            effective_prompt = f"{skills_prefix}{prompt}"
     cmd = [AGY_BIN, "--dangerously-skip-permissions", "--print-timeout", "20m"]
     resolved_model, resolved_effort = resolve_model_and_effort(model, effort)
     if resolved_model and resolved_model.strip():

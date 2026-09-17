@@ -13,7 +13,8 @@ router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 @router.get("")
 def list_workspaces(_ = Depends(require_auth)) -> list[str]:
     settings = get_settings()
-    workspaces = settings.get("trustedWorkspaces", [])
+    raw = settings.get("trustedWorkspaces", [])
+    workspaces = list(raw) if isinstance(raw, list) else []
     if DEFAULT_WORKSPACE not in workspaces:
         workspaces.insert(0, DEFAULT_WORKSPACE)
     return workspaces
@@ -26,7 +27,8 @@ def add_workspace(path: str = Query(...), _ = Depends(require_auth)):
     if not p.is_dir():
         raise HTTPException(status_code=400, detail=f"Directory '{path}' does not exist")
     settings = get_settings()
-    workspaces = settings.get("trustedWorkspaces", [])
+    raw = settings.get("trustedWorkspaces", [])
+    workspaces = list(raw) if isinstance(raw, list) else []
     str_p = str(p)
     if str_p not in workspaces:
         workspaces.append(str_p)
@@ -40,7 +42,8 @@ def delete_workspace(path: str = Query(...), _ = Depends(require_auth)):
     if p == str(Path(DEFAULT_WORKSPACE).resolve()):
         raise HTTPException(status_code=400, detail="Cannot delete default workspace")
     settings = get_settings()
-    workspaces = settings.get("trustedWorkspaces", [])
+    raw = settings.get("trustedWorkspaces", [])
+    workspaces = list(raw) if isinstance(raw, list) else []
     workspaces = [w for w in workspaces if str(Path(w).resolve()) != p]
     if DEFAULT_WORKSPACE not in workspaces:
         workspaces.insert(0, DEFAULT_WORKSPACE)

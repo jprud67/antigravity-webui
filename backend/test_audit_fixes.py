@@ -1138,6 +1138,130 @@ def test_git_anti_trailer_args():
     print("✓ test_git_anti_trailer_args passed")
 
 
+def test_is_quota_error_no_false_positive_429():
+    from app.services.google_auth import is_quota_error
+
+    # False positive test cases that caused unwanted failovers previously
+    assert not is_quota_error("Commit a429fd8b1 merged into main")
+    assert not is_quota_error("Found 429 files in directory")
+    assert not is_quota_error("SyntaxError at line 429 in module.py")
+    assert not is_quota_error("Listening on port 4290")
+    assert not is_quota_error("Processed 42900 bytes")
+
+    # True quota errors
+    assert is_quota_error("API Error: HTTP 429 Too Many Requests")
+    assert is_quota_error("Google API status: 429")
+    assert is_quota_error("Error code 429 rate limit reached")
+    assert is_quota_error("RESOURCE_EXHAUSTED")
+    assert is_quota_error("Exceeded your quota limit")
+    print("✓ test_is_quota_error_no_false_positive_429 passed")
+
+
+def test_clear_account_exhaustion():
+    from app.services.google_auth import (
+        clear_account_exhaustion,
+        is_account_marked_exhausted,
+        mark_account_exhausted,
+    )
+
+    test_email = "audit_test_exhaustion@gmail.com"
+    mark_account_exhausted(test_email, duration_seconds=600.0)
+    assert is_account_marked_exhausted(test_email) is True
+
+    clear_account_exhaustion(test_email)
+    assert is_account_marked_exhausted(test_email) is False
+    print("✓ test_clear_account_exhaustion passed")
+
+
+def test_resolve_model_and_effort_whitespace():
+    from app.services.agy_driver import resolve_model_and_effort
+
+    m, e = resolve_model_and_effort("   ", "   ")
+    assert m is None
+    assert e is None
+
+    m, e = resolve_model_and_effort(None, "medium")
+    assert m is None
+    assert e == "medium"
+
+    m, e = resolve_model_and_effort("claude-sonnet-4-6", "high")
+    assert m == "claude-sonnet-4-6"
+    assert e is None
+    print("✓ test_resolve_model_and_effort_whitespace passed")
+
+
+def test_extract_json_payload_resilience():
+    from app.services.agy_driver import _extract_json_payload
+
+    # Multi-line JSON with preceding metadata `{}`
+    log_output = (
+        "[INFO] Initialized runtime with context {}\n"
+        "{\n"
+        '  "groups": [{"name": "Gemini", "quota": 100}]\n'
+        "}\n"
+        "[DEBUG] Done parsing"
+    )
+    result = _extract_json_payload(log_output)
+    assert isinstance(result, dict)
+    assert "groups" in result
+    assert result["groups"][0]["quota"] == 100
+
+    # Markdown code fence JSON
+    fence_output = (
+        "Here is the quota:\n"
+        "```json\n"
+        '{\n  "remaining_credits": 42\n}\n'
+        "```\n"
+    )
+    res_fence = _extract_json_payload(fence_output)
+    assert res_fence["remaining_credits"] == 42
+    print("✓ test_extract_json_payload_resilience passed")
+
+
+def test_session_meta_boolean_normalization():
+    from app.services.session_metadata import _normalize_meta, _to_bool
+
+    assert _to_bool("false") is False
+    assert _to_bool("False") is False
+    assert _to_bool("0") is False
+    assert _to_bool(False) is False
+    assert _to_bool("true") is True
+    assert _to_bool(True) is True
+
+    meta = {
+        "pinned": "false",
+        "archived": "False",
+        "tags": ["alpha", 123],
+        "project": "audit",
+    }
+    normalized = _normalize_meta(meta)
+    assert normalized["pinned"] is False
+    assert normalized["archived"] is False
+    assert normalized["tags"] == ["alpha", "123"]
+    assert normalized["project"] == "audit"
+    print("✓ test_session_meta_boolean_normalization passed")
+
+
+def test_git_sanitize_extended_trailers():
+    from app.api.git import _sanitize_git_message
+
+    dirty = (
+        "feat: add shiny feature\n"
+        "\n"
+        "Signed-off-by: Developer <dev@example.com>\n"
+        "Co-Authored-By: Claude <claude@anthropic.com>\n"
+        "co-author: assistant\n"
+        "Co-authored by: Robot\n"
+    )
+    cleaned = _sanitize_git_message(dirty)
+    assert "Signed-off-by" not in cleaned
+    assert "Co-Authored-By" not in cleaned
+    assert "co-author" not in cleaned
+    assert "Claude" not in cleaned
+    assert cleaned == "feat: add shiny feature"
+    print("✓ test_git_sanitize_extended_trailers passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -1184,5 +1308,11 @@ if __name__ == "__main__":
     test_cron_model_and_effort_whitespace_cleaning()
     test_clean_cid_sanitization()
     test_git_anti_trailer_args()
+    test_is_quota_error_no_false_positive_429()
+    test_clear_account_exhaustion()
+    test_resolve_model_and_effort_whitespace()
+    test_extract_json_payload_resilience()
+    test_session_meta_boolean_normalization()
+    test_git_sanitize_extended_trailers()
     print("\nAll unit tests passed successfully!")
 
