@@ -683,8 +683,8 @@ class ExecutionManager:
                     self.active_session.worker_task = asyncio.create_task(self.active_session.queue_worker())
                 return self.active_session
 
-        if not conversation_id and self.active_session and self.active_session.conversation_id is None and self.active_session.is_busy:
-            if ws is None or ws in self.active_session.subscribers:
+        if not conversation_id and self.active_session and self.active_session.is_busy:
+            if ws is None or ws in self.active_session.subscribers or self.active_session.conversation_id is None:
                 if workspace_path and not self.active_session.workspace_path:
                     self.active_session.workspace_path = workspace_path
                 return self.active_session

@@ -323,21 +323,35 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
                     "is_estimated": False,
                 }
         if isinstance(u, dict):
-            inp = u.get("input_tokens") if u.get("input_tokens") is not None else (
+            def _to_int(val: Any) -> int:
+                if val is None:
+                    return 0
+                try:
+                    return int(val)
+                except (ValueError, TypeError):
+                    return 0
+
+            inp_val = u.get("input_tokens") if u.get("input_tokens") is not None else (
                 u.get("prompt_tokens") if u.get("prompt_tokens") is not None else u.get("promptTokenCount")
             )
-            out = u.get("output_tokens") if u.get("output_tokens") is not None else (
+            out_val = u.get("output_tokens") if u.get("output_tokens") is not None else (
                 u.get("completion_tokens") if u.get("completion_tokens") is not None else u.get("candidatesTokenCount")
             )
-            thk = u.get("thinking_tokens") or u.get("reasoning_tokens") or u.get("thinkingTokenCount") or 0
-            tot = u.get("total_tokens") if u.get("total_tokens") is not None else u.get("totalTokenCount")
-            if tot is None or tot == 0:
-                tot = (inp or 0) + (out or 0) + (thk or 0)
+            thk_val = u.get("thinking_tokens") or u.get("reasoning_tokens") or u.get("thinkingTokenCount") or 0
+            tot_val = u.get("total_tokens") if u.get("total_tokens") is not None else u.get("totalTokenCount")
+
+            inp = _to_int(inp_val)
+            out = _to_int(out_val)
+            thk = _to_int(thk_val)
+            tot = _to_int(tot_val)
+
+            if tot == 0:
+                tot = inp + out + thk
             if tot > 0:
                 return {
-                    "input_tokens": inp or 0,
-                    "output_tokens": out or 0,
-                    "thinking_tokens": thk or 0,
+                    "input_tokens": inp,
+                    "output_tokens": out,
+                    "thinking_tokens": thk,
                     "total_tokens": tot,
                     "is_estimated": False,
                 }
@@ -1229,6 +1243,8 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
             t_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
             if not t_file.exists():
                 t_file = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
+            if not t_file.exists():
+                t_file = conv_dir / "transcript.jsonl"
             if not t_file.exists():
                 continue
 

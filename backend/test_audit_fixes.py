@@ -2524,7 +2524,13 @@ def test_files_path_access_drive_letters():
 
 
 def test_crons_skills_sanitization_trimmed():
-    from app.api.crons import CreateCronJobRequest, UpdateCronJobRequest, create_cron_job, delete_cron_job, update_cron_job
+    from app.api.crons import (
+        CreateCronJobRequest,
+        UpdateCronJobRequest,
+        create_cron_job,
+        delete_cron_job,
+        update_cron_job,
+    )
     req = CreateCronJobRequest(
         name="Test Skills Job",
         prompt="echo test",
@@ -2580,7 +2586,6 @@ def test_import_single_conversation_non_dict_items():
 def test_search_conversations_large_transcript():
     """Verify that search_conversations handles transcripts > 512KB without NameError on raw_data."""
     import shutil
-    import tempfile
     import uuid
     from unittest.mock import patch
 
@@ -2625,6 +2630,141 @@ def test_search_conversations_large_transcript():
     finally:
         if conv_dir.exists():
             shutil.rmtree(conv_dir, ignore_errors=True)
+
+
+def test_execution_manager_get_or_create_busy_active_session():
+    """Verify that get_or_create_session attaches to busy active session with empty conversation_id."""
+    import asyncio
+
+    from app.services.execution_manager import ExecutionManager
+
+    async def _run():
+        em = ExecutionManager()
+        sess = em.get_or_create_session(None)
+        sess.is_running = True
+        sess.conversation_id = "test-cid-12345"
+        em.register_session_cid(sess, "test-cid-12345")
+
+        class MockWS:
+            pass
+
+        ws = MockWS()
+        sess.add_subscriber(ws)  # type: ignore
+
+        attached_sess = em.get_or_create_session(None, ws=ws)  # type: ignore
+        assert attached_sess is sess
+        assert attached_sess.conversation_id == "test-cid-12345"
+
+        attached_sess_no_ws = em.get_or_create_session(None, ws=None)
+        assert attached_sess_no_ws is sess
+
+        if sess.worker_task and not sess.worker_task.done():
+            sess.worker_task.cancel()
+
+    asyncio.run(_run())
+    print("✓ test_execution_manager_get_or_create_busy_active_session passed")
+
+
+def test_storage_calculate_tokens_string_resilience():
+    """Verify calculate_conversation_tokens handles string/mismatched values without TypeError."""
+    from app.services.storage import calculate_conversation_tokens
+    steps = [
+        {
+            "step_index": 0,
+            "type": "agent_response",
+            "metadata": {
+                "usage": {
+                    "input_tokens": "150",
+                    "output_tokens": "42",
+                    "thinking_tokens": "10",
+                    "total_tokens": "202",
+                }
+            },
+        }
+    ]
+    res = calculate_conversation_tokens(steps)
+    assert res["input_tokens"] == 150
+    assert res["output_tokens"] == 42
+    assert res["thinking_tokens"] == 10
+    assert res["total_tokens"] == 202
+    assert res["is_estimated"] is False
+
+    steps2 = [
+        {
+            "step_index": 0,
+            "type": "agent_response",
+            "metadata": {
+                "usage": {
+                    "input_tokens": "100",
+                    "output_tokens": "50",
+                    "total_tokens": "0",
+                }
+            },
+        }
+    ]
+    res2 = calculate_conversation_tokens(steps2)
+    assert res2["total_tokens"] == 150
+    print("✓ test_storage_calculate_tokens_string_resilience passed")
+
+
+def test_storage_search_conversations_legacy_transcript():
+    """Verify search_conversations finds needle in legacy transcript.jsonl at root of conv dir."""
+    import json
+    import shutil
+    import uuid
+    from unittest.mock import patch
+
+    from app.config import BRAIN_DIR
+    from app.services.storage import search_conversations
+
+    cid = f"test-legacy-search-{uuid.uuid4().hex[:8]}"
+    conv_dir = BRAIN_DIR / cid
+    conv_dir.mkdir(parents=True, exist_ok=True)
+    legacy_file = conv_dir / "transcript.jsonl"
+    needle = f"legacy_needle_{uuid.uuid4().hex[:6]}"
+
+    step_data = {
+        "step_index": 0,
+        "type": "agent_response",
+        "source": "MODEL",
+        "content": f"Here is the secret: {needle}",
+    }
+    with open(legacy_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps(step_data) + "\n")
+
+    try:
+        with patch("app.services.storage.list_conversations") as mock_list:
+            mock_list.return_value = [{"conversation_id": cid, "title": "Legacy Test"}]
+            matches = search_conversations(query=needle, limit=10)
+            assert any(m.get("conversation_id") == cid for m in matches)
+    finally:
+        if conv_dir.exists():
+            shutil.rmtree(conv_dir, ignore_errors=True)
+    print("✓ test_storage_search_conversations_legacy_transcript passed")
+
+
+def test_git_push_empty_error_fallback():
+    """Verify git_push fallback error formatting when git stderr/stdout are empty."""
+    from unittest.mock import MagicMock, patch
+
+    from fastapi import HTTPException
+
+    from app.api.git import PushRequest, git_push
+
+    req = PushRequest(remote="origin", branch="main")
+    mock_res = MagicMock()
+    mock_res.returncode = 128
+    mock_res.stdout = ""
+    mock_res.stderr = ""
+
+    with patch("app.api.git.run_git", return_value=mock_res):
+        try:
+            git_push(req, _=None)
+            assert False, "Should have raised HTTPException"
+        except HTTPException as exc:
+            assert exc.status_code == 500
+            assert exc.detail == "Échec du push (code 128)"
+    print("✓ test_git_push_empty_error_fallback passed")
 
 
 if __name__ == "__main__":
@@ -2735,4 +2875,8 @@ if __name__ == "__main__":
     test_crons_skills_sanitization_trimmed()
     test_import_single_conversation_non_dict_items()
     test_search_conversations_large_transcript()
+    test_execution_manager_get_or_create_busy_active_session()
+    test_storage_calculate_tokens_string_resilience()
+    test_storage_search_conversations_legacy_transcript()
+    test_git_push_empty_error_fallback()
     print("\nAll unit tests passed successfully!")
