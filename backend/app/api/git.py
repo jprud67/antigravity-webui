@@ -16,7 +16,22 @@ logger = logging.getLogger("antigravity.git")
 router = APIRouter(prefix="/api/git", tags=["git"])
 
 GIT_TIMEOUT = 12
-_COAUTHOR_RE = re.compile(r"(?:co[-_ ]?authored[-_ ]?by|co[-_ ]?author:?|signed[-_ ]?off[-_ ]?by|claude|anthropic)", re.IGNORECASE)
+_COAUTHOR_RE = re.compile(
+    r"(?:co[-_ ]?authored[-_ ]?by|co[-_ ]?author:?|co[-_ ]?committer:?|signed[-_ ]?off[-_ ]?by|assisted[-_ ]?by|claude|anthropic)",
+    re.IGNORECASE
+)
+_URL_CRED_RE = re.compile(r"https?://([^/@:]+):([^/@:]+)@", re.IGNORECASE)
+_TOKEN_CRED_RE = re.compile(r"https?://([^/@:]+)@", re.IGNORECASE)
+
+
+def _mask_git_output(text: str) -> str:
+    """Masque les identifiants ou jetons secrets présents dans les URLs Git."""
+    if not text:
+        return ""
+    masked = _URL_CRED_RE.sub(r"https://***:***@", text)
+    masked = _TOKEN_CRED_RE.sub(r"https://***@", masked)
+    return masked
+
 
 def _sanitize_git_message(msg: str) -> str:
     normalized = msg.replace("\r\n", "\n").replace("\r", "\n")
@@ -322,7 +337,7 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
         err_msg = commit_res.stderr or commit_res.stdout or ""
         if "nothing to commit" in err_msg.lower() or "working tree clean" in err_msg.lower():
             raise HTTPException(status_code=400, detail="Rien à commiter, l'arbre de travail est propre.")
-        raise HTTPException(status_code=500, detail=f"Échec du commit : {err_msg}")
+        raise HTTPException(status_code=500, detail=f"Échec du commit : {_mask_git_output(err_msg)}")
 
     return {
         "success": True,
@@ -362,7 +377,7 @@ def git_push(req: PushRequest, _ = Depends(require_auth)):
         if "has no upstream branch" in err_out or "--set-upstream" in err_out:
             push_res = run_git(["push", "-u", remote, branch], target, timeout=35, env=git_env)
         if push_res.returncode != 0:
-            raise HTTPException(status_code=500, detail=f"Échec du push : {push_res.stderr or push_res.stdout}")
+            raise HTTPException(status_code=500, detail=f"Échec du push : {_mask_git_output(push_res.stderr or push_res.stdout)}")
 
     return {
         "success": True,
@@ -413,7 +428,7 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
         err_out = res_tag.stderr or res_tag.stdout or ""
         if "already exists" in err_out.lower():
             raise HTTPException(status_code=409, detail=f"Le tag '{tag_name}' existe déjà.")
-        raise HTTPException(status_code=400, detail=f"Échec de la création du tag : {err_out.strip()}")
+        raise HTTPException(status_code=400, detail=f"Échec de la création du tag : {_mask_git_output(err_out.strip())}")
 
     push_output = None
     if req.push:
@@ -421,7 +436,7 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
         git_env["GIT_TERMINAL_PROMPT"] = "0"
         push_res = run_git(["push", remote, tag_name], target, timeout=35, env=git_env)
         if push_res.returncode != 0:
-            raise HTTPException(status_code=400, detail=f"Tag créé mais échec du push : {(push_res.stderr or push_res.stdout or '').strip()}")
+            raise HTTPException(status_code=400, detail=f"Tag créé mais échec du push : {_mask_git_output((push_res.stderr or push_res.stdout or '').strip())}")
         push_output = push_res.stdout.strip() or push_res.stderr.strip()
 
     return {

@@ -346,7 +346,7 @@ async def _execute_job(job: dict[str, Any]) -> None:
         f"{'-' * 60}\n"
     )
     try:
-        log_file.write_text(header + str(result.get("output") or ""), encoding="utf-8")
+        await asyncio.to_thread(log_file.write_text, header + str(result.get("output") or ""), encoding="utf-8")
         logger.info(f"[Cron] Journal écrit: {log_file}")
     except Exception as log_err:
         logger.warning(f"[Cron] Impossible d'écrire le journal {log_file}: {log_err}")

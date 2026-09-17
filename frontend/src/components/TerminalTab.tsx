@@ -102,10 +102,14 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
 
     ws.onmessage = (e) => {
       if (!xtermRef.current) return;
-      if (typeof e.data === 'string') {
-        xtermRef.current.write(e.data);
-      } else if (e.data instanceof ArrayBuffer) {
-        xtermRef.current.write(new Uint8Array(e.data));
+      try {
+        if (typeof e.data === 'string') {
+          xtermRef.current.write(e.data);
+        } else if (e.data instanceof ArrayBuffer) {
+          xtermRef.current.write(new Uint8Array(e.data));
+        }
+      } catch (err) {
+        console.warn('Terminal write error:', err);
       }
     };
 

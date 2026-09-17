@@ -819,15 +819,15 @@ def test_cron_update_jobs_atomic():
 def test_session_metadata_save_failure_reraised():
     from unittest.mock import patch
 
-    import pytest
-
     from app.services.session_metadata import save_all_session_metadata
 
-    with (
-        patch("pathlib.Path.replace", side_effect=OSError("Disk full or permission denied")),
-        pytest.raises(OSError),
-    ):
-        save_all_session_metadata({"test": {"pinned": True}})
+    with patch("pathlib.Path.replace", side_effect=OSError("Disk full or permission denied")):
+        raised = False
+        try:
+            save_all_session_metadata({"test": {"pinned": True}})
+        except OSError:
+            raised = True
+        assert raised, "Expected OSError when Path.replace fails"
     print("✓ test_session_metadata_save_failure_reraised passed")
 
 
@@ -858,7 +858,6 @@ def test_is_safe_conversation_id_hardened():
 def test_rules_hermes_write_restricted():
     import os
 
-    import pytest
     from fastapi import HTTPException
 
     from app.api.rules import SaveRuleRequest, save_rule_content
@@ -867,14 +866,22 @@ def test_rules_hermes_write_restricted():
     assert os.environ.get("ENABLE_HERMES_WRITE", "0") != "1"
 
     req_arch = SaveRuleRequest(file_id="hermes_arch", content="# New Arch")
-    with pytest.raises(HTTPException) as exc_info:
+    raised_arch = False
+    try:
         save_rule_content(req_arch, _=None)
-    assert exc_info.value.status_code == 403
+    except HTTPException as exc_info:
+        raised_arch = True
+        assert exc_info.status_code == 403
+    assert raised_arch, "Expected HTTPException 403 for hermes_arch"
 
     req_journal = SaveRuleRequest(file_id="hermes_journal", content="# New Journal")
-    with pytest.raises(HTTPException) as exc_info2:
+    raised_journal = False
+    try:
         save_rule_content(req_journal, _=None)
-    assert exc_info2.value.status_code == 403
+    except HTTPException as exc_info2:
+        raised_journal = True
+        assert exc_info2.status_code == 403
+    assert raised_journal, "Expected HTTPException 403 for hermes_journal"
     print("✓ test_rules_hermes_write_restricted passed")
 
 
@@ -1910,6 +1917,73 @@ def test_model_failover_gemini_detection():
     print("✓ test_model_failover_gemini_detection passed")
 
 
+def test_git_mask_credentials():
+    from app.api.git import _mask_git_output
+
+    raw_err = "fatal: unable to access 'https://x-access-token:ghp_1234567890abcdef@github.com/repo.git/': 403"
+    masked = _mask_git_output(raw_err)
+    assert "ghp_1234567890abcdef" not in masked
+    assert "https://***:***@github.com/repo.git/" in masked
+
+    raw_token = "fatal: clone failed from https://ghp_secretToken@github.com/user/repo"
+    masked_token = _mask_git_output(raw_token)
+    assert "ghp_secretToken" not in masked_token
+    assert "https://***@github.com/user/repo" in masked_token
+    print("✓ test_git_mask_credentials passed")
+
+
+def test_live_tool_calls_reversed_matching():
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession("test-cid")
+    session._update_live_state({
+        "event": "step_update",
+        "step_update": {
+            "step_type": "tool",
+            "tool_name": "run_command",
+            "parameters": {"command": "ls"},
+            "state": "DONE",
+            "tool_info": {"output": "file1\nfile2"}
+        }
+    })
+    session._update_live_state({
+        "event": "step_update",
+        "step_update": {
+            "step_type": "tool",
+            "tool_name": "run_command",
+            "parameters": {"command": "git status"},
+            "state": "RUNNING"
+        }
+    })
+    assert len(session.live_tool_calls) == 2
+    assert session.live_tool_calls[0]["status"] == "done"
+    assert session.live_tool_calls[1]["status"] == "running"
+    assert session.live_tool_calls[1]["args"] == {"command": "git status"}
+
+    session._update_live_state({
+        "event": "step_update",
+        "step_update": {
+            "step_type": "tool",
+            "tool_name": "run_command",
+            "state": "DONE",
+            "tool_info": {"output": "On branch main"}
+        }
+    })
+    assert session.live_tool_calls[1]["status"] == "done"
+    assert session.live_tool_calls[1]["result"] == "On branch main"
+    print("✓ test_live_tool_calls_reversed_matching passed")
+
+
+def test_cron_store_deepcopy_isolation():
+    from app.services.cron_store import load_jobs
+
+    jobs1 = load_jobs()
+    jobs1["jobs"].append({"id": "mutated_dummy"})
+    jobs2 = load_jobs()
+    assert not any(j.get("id") == "mutated_dummy" for j in jobs2.get("jobs", []))
+    print("✓ test_cron_store_deepcopy_isolation passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -1989,4 +2063,7 @@ if __name__ == "__main__":
     test_git_diff_removeprefix_dotfiles()
     test_kill_task_candidate_tids_short_valid_ids()
     test_model_failover_gemini_detection()
+    test_git_mask_credentials()
+    test_live_tool_calls_reversed_matching()
+    test_cron_store_deepcopy_isolation()
     print("\nAll unit tests passed successfully!")

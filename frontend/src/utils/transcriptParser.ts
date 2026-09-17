@@ -309,7 +309,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
           status: isErr ? 'error' : 'done'
         });
       }
-    } else if (isModelResponse) {
+    } else if (isModelResponse || (!isToolOutput && content && !isToolOutputContent(content))) {
       // Accumuler le contenu de dialogue de l'assistant
       if (content) {
         currentAssistantMsg.content = currentAssistantMsg.content

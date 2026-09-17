@@ -68,9 +68,9 @@ def load_jobs() -> dict[str, Any]:
 
         if isinstance(data, dict):
             data.setdefault("jobs", [])
-            return data
+            return copy.deepcopy(data)
         if isinstance(data, list):
-            return {"jobs": data, "updated_at": now_iso()}
+            return {"jobs": copy.deepcopy(data), "updated_at": now_iso()}
         return {"jobs": [], "updated_at": now_iso()}
 
 
@@ -78,11 +78,12 @@ def save_jobs(data: dict[str, Any]) -> None:
     """Écrit jobs.json de façon atomique."""
     with _jobs_lock:
         ensure_dirs()
-        data["updated_at"] = now_iso()
+        payload = copy.deepcopy(data)
+        payload["updated_at"] = now_iso()
         temp_path = JOBS_FILE.parent / f"{JOBS_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
         try:
             with open(temp_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                json.dump(payload, f, indent=2, ensure_ascii=False)
             restrict_file_permissions(temp_path)
             temp_path.replace(JOBS_FILE)
             restrict_file_permissions(JOBS_FILE)
@@ -116,7 +117,7 @@ def update_jobs(modifier: Callable[[dict[str, Any]], T]) -> T:
 
         # Si les données n'ont subi aucune modification, éviter une réécriture inutile du disque
         if data == snapshot:
-            return result
+            return copy.deepcopy(result) if isinstance(result, (dict, list)) else result
         
         data["updated_at"] = now_iso()
         temp_path = JOBS_FILE.parent / f"{JOBS_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
@@ -133,7 +134,7 @@ def update_jobs(modifier: Callable[[dict[str, Any]], T]) -> T:
                 except Exception as e:
                     logger.debug(f"Ignored error: {e}")
             raise
-        return result
+        return copy.deepcopy(result) if isinstance(result, (dict, list)) else result
 
 
 _SCHEDULE_INTERVAL_RE = re.compile(

@@ -150,48 +150,63 @@ export const ChatInput = React.memo<ChatInputProps>(({
 
   const handleAddFiles = useCallback((files: File[]) => {
     if (!files || files.length === 0) return;
-    for (const file of files) {
-      const isImg = file.type.startsWith('image/');
-      const reader = new FileReader();
-      const id = createAttachmentId();
-      reader.onerror = () => {
-        showToast(`Impossible de lire le fichier "${file.name}"`, 'error');
-      };
-      if (isImg) {
-        reader.onload = (e) => {
-          const content = e.target?.result as string;
-          setAttachments((prev) => [
-            ...prev,
-            {
-              id,
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              content,
-              isImage: true,
-              previewUrl: content
-            }
-          ]);
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 Mo
+    const MAX_ATTACHMENTS = 10;
+
+    setAttachments((prev) => {
+      let current = [...prev];
+      for (const file of files) {
+        if (current.length >= MAX_ATTACHMENTS) {
+          showToast(`Limite maximale de ${MAX_ATTACHMENTS} pièces jointes atteinte.`, 'info');
+          break;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+          showToast(`Le fichier "${file.name}" dépasse la limite autorisée de 10 Mo.`, 'error');
+          continue;
+        }
+        const isImg = file.type.startsWith('image/');
+        const reader = new FileReader();
+        const id = createAttachmentId();
+        reader.onerror = () => {
+          showToast(`Impossible de lire le fichier "${file.name}"`, 'error');
         };
-        reader.readAsDataURL(file);
-      } else {
-        reader.onload = (e) => {
-          const content = (e.target?.result as string) || '';
-          setAttachments((prev) => [
-            ...prev,
-            {
-              id,
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              content,
-              isImage: false
-            }
-          ]);
-        };
-        reader.readAsText(file);
+        if (isImg) {
+          reader.onload = (e) => {
+            const content = e.target?.result as string;
+            setAttachments((latest) => [
+              ...latest,
+              {
+                id,
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                content,
+                isImage: true,
+                previewUrl: content
+              }
+            ]);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          reader.onload = (e) => {
+            const content = (e.target?.result as string) || '';
+            setAttachments((latest) => [
+              ...latest,
+              {
+                id,
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                content,
+                isImage: false
+              }
+            ]);
+          };
+          reader.readAsText(file);
+        }
       }
-    }
+      return current;
+    });
   }, [showToast]);
 
   const handleRemoveAttachment = useCallback((id: string) => {
@@ -207,6 +222,12 @@ export const ChatInput = React.memo<ChatInputProps>(({
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+        recognitionRef.current = null;
+      }
     };
   }, []);
 
@@ -214,6 +235,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
     if (isListening) {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
+        recognitionRef.current = null;
       }
       setIsListening(false);
       basePromptRef.current = '';
@@ -261,12 +283,14 @@ export const ChatInput = React.memo<ChatInputProps>(({
         setIsListening(false);
         basePromptRef.current = '';
         finalSpeechRef.current = '';
+        recognitionRef.current = null;
       };
 
       recognition.onend = () => {
         setIsListening(false);
         basePromptRef.current = '';
         finalSpeechRef.current = '';
+        recognitionRef.current = null;
       };
 
       recognitionRef.current = recognition;
@@ -276,6 +300,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
       setIsListening(false);
       basePromptRef.current = '';
       finalSpeechRef.current = '';
+      recognitionRef.current = null;
     }
   };
 

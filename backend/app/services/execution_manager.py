@@ -150,11 +150,16 @@ class ExecutionSession:
                 is_done = update.get("state") == "DONE"
 
                 found = False
-                for t in self.live_tool_calls:
+                for t in reversed(self.live_tool_calls):
                     if t.get("name") == tool_name and t.get("status") == "running":
+                        if tool_args and not t.get("args"):
+                            t["args"] = tool_args
+                        if tool_output is not None and not t.get("result"):
+                            t["result"] = tool_output
                         if is_done:
                             t["status"] = "done"
-                            t["result"] = tool_output
+                            if tool_output is not None:
+                                t["result"] = tool_output
                         found = True
                         break
                 if not found:
