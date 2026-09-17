@@ -1975,6 +1975,8 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
     target_path = (base_dir / filename).resolve()
     if not is_safe_path(target_path, [base_dir]):
         raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
+    if is_blocked_sensitive_path(target_path):
+        raise PermissionError("Accès refusé : ce fichier est sensible ou restreint.")
     rel_parts = target_path.relative_to(base_dir).parts
     if ".system_generated" in rel_parts or "scratch" in rel_parts:
         raise PermissionError("Accès refusé : les fichiers système internes ou temporaires ne sont pas accessibles via les artefacts.")

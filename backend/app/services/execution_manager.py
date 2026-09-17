@@ -110,6 +110,7 @@ class ExecutionSession:
                 dead.add(ws)
         for ws in dead:
             self.subscribers.discard(ws)
+            execution_manager.connected_sockets.discard(ws)
 
     def _update_live_state(self, event: dict[str, Any]):
         evt_type = event.get("event")
@@ -490,6 +491,7 @@ class ExecutionSession:
                 except Exception as e:
                     logger.error(f"[Session {self.conversation_id}] Worker task error: {e}")
             finally:
+                self.active_task = None
                 self.last_active_at = time.time()
                 self.message_queue.task_done()
 
@@ -551,6 +553,7 @@ class ExecutionManager:
                 except (asyncio.QueueEmpty, ValueError):
                     break
             target_session.is_running = False
+            target_session.active_proc = None
             logger.info(f"Removed execution session for conversation {conversation_id} from memory.")
 
     def register_socket(self, ws: WebSocket):
@@ -608,6 +611,8 @@ class ExecutionManager:
                         target_session.message_queue.task_done()
                     except (asyncio.QueueEmpty, ValueError):
                         break
+                target_session.is_running = False
+                target_session.active_proc = None
             logger.info(f"Pruned inactive execution session for conversation {cid} from memory.")
 
     def get_or_create_session(

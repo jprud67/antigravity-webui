@@ -1526,6 +1526,142 @@ def test_prune_inactive_sessions_sync_terminate_on_runtime_error():
     print("✓ test_prune_inactive_sessions_sync_terminate_on_runtime_error passed")
 
 
+def test_read_artifact_content_blocks_sensitive_files():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.services.storage import read_artifact_content
+
+    with tempfile.TemporaryDirectory() as td:
+        brain = Path(td)
+        cid = "conv_test_sensitive"
+        conv_dir = brain / cid
+        conv_dir.mkdir(parents=True)
+        (conv_dir / ".env").write_text("API_SECRET=12345")
+        (conv_dir / "antigravity-oauth-token").write_text("oauth_secret")
+        (conv_dir / "valid_doc.md").write_text("# Valid Document")
+
+        with patch("app.services.storage.BRAIN_DIR", brain):
+            # Normal document should be readable
+            doc = read_artifact_content(cid, "valid_doc.md")
+            assert "# Valid Document" in doc
+
+            # Sensitive files must raise PermissionError
+            try:
+                read_artifact_content(cid, ".env")
+                assert False, "Should raise PermissionError for .env"
+            except PermissionError as e:
+                assert "sensible ou restreint" in str(e)
+
+            try:
+                read_artifact_content(cid, "antigravity-oauth-token")
+                assert False, "Should raise PermissionError for antigravity-oauth-token"
+            except PermissionError as e:
+                assert "sensible ou restreint" in str(e)
+    print("✓ test_read_artifact_content_blocks_sensitive_files passed")
+
+
+def test_save_file_content_max_size_enforcement():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from fastapi import HTTPException
+
+    from app.api.files import SaveFileRequest, save_file_content
+
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "large_file.txt"
+        # 5 MB + 1 byte
+        oversized = "a" * (5 * 1024 * 1024 + 1)
+        req = SaveFileRequest(path=str(target), content=oversized)
+        try:
+            save_file_content(req)
+            assert False, "Should raise HTTPException 413 for oversized file"
+        except HTTPException as e:
+            assert e.status_code == 413
+            assert "excessive" in e.detail
+
+        # Normal file within limit
+        with patch("app.api.files.get_settings", return_value={"trustedWorkspaces": [td]}):
+            normal_req = SaveFileRequest(path=str(target), content="Normal text")
+            res = save_file_content(normal_req)
+            assert res["success"] is True
+            assert target.read_text() == "Normal text"
+    print("✓ test_save_file_content_max_size_enforcement passed")
+
+
+def test_queue_worker_active_task_cleanup():
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession(conversation_id="conv_cleanup_test")
+    session.run_turn = AsyncMock(return_value=None)  # type: ignore[method-assign]
+
+    async def run_test():
+        worker = asyncio.create_task(session.queue_worker())
+        await session.message_queue.put({"prompt": "hello"})
+        await session.message_queue.join()
+        assert session.active_task is None, f"active_task should be None, got {session.active_task}"
+        worker.cancel()
+        try:
+            await worker
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(run_test())
+    print("✓ test_queue_worker_active_task_cleanup passed")
+
+
+def test_prune_inactive_sessions_resets_is_running_and_active_proc():
+    import time
+    from unittest.mock import MagicMock
+
+    from app.services.execution_manager import ExecutionManager, ExecutionSession
+
+    em = ExecutionManager()
+    session = ExecutionSession(conversation_id="conv_prune_state")
+    session.is_running = False
+    session.last_active_at = time.time() - 7200
+    mock_proc = MagicMock()
+    mock_proc.returncode = 0
+    session.active_proc = mock_proc
+    em.sessions["conv_prune_state"] = session
+
+    em.prune_inactive_sessions(max_idle_seconds=3600)
+    assert "conv_prune_state" not in em.sessions
+    assert session.is_running is False
+    assert session.active_proc is None
+    print("✓ test_prune_inactive_sessions_resets_is_running_and_active_proc passed")
+
+
+def test_broadcast_cleans_up_dead_sockets_from_connected_sockets():
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from app.services.execution_manager import ExecutionManager, ExecutionSession
+
+    em = ExecutionManager()
+    session = ExecutionSession(conversation_id="conv_bcast")
+    em.sessions["conv_bcast"] = session
+
+    dead_ws = MagicMock()
+    dead_ws.send_json = AsyncMock(side_effect=ConnectionResetError("Socket disconnected"))
+
+    session.subscribers.add(dead_ws)
+    em.connected_sockets.add(dead_ws)
+
+    with patch("app.services.execution_manager.execution_manager", em):
+        asyncio.run(session.broadcast({"event": "test"}))
+
+    assert dead_ws not in session.subscribers
+    assert dead_ws not in em.connected_sockets
+    print("✓ test_broadcast_cleans_up_dead_sockets_from_connected_sockets passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -1589,4 +1725,9 @@ if __name__ == "__main__":
     test_scan_dir_defensive_sorting_broken_symlink()
     test_cron_log_sorting_resilience()
     test_prune_inactive_sessions_sync_terminate_on_runtime_error()
+    test_read_artifact_content_blocks_sensitive_files()
+    test_save_file_content_max_size_enforcement()
+    test_queue_worker_active_task_cleanup()
+    test_prune_inactive_sessions_resets_is_running_and_active_proc()
+    test_broadcast_cleans_up_dead_sockets_from_connected_sockets()
     print("\nAll unit tests passed successfully!")

@@ -157,8 +157,16 @@ class SaveFileRequest(BaseModel):
     path: str
     content: str
 
+MAX_FILE_SAVE_BYTES = 5 * 1024 * 1024  # 5 Mo max
+
 @router.post("/save")
 def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
+    if len(req.content.encode("utf-8")) > MAX_FILE_SAVE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Taille du fichier excessive : la taille maximale autorisée est de {MAX_FILE_SAVE_BYTES // (1024 * 1024)} Mo."
+        )
+
     file_path = Path(req.path)
     resolved_path = _validate_path_access(file_path)
     if resolved_path.exists() and resolved_path.is_dir():
@@ -184,6 +192,8 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
             "size": stat.st_size,
             "last_modified": stat.st_mtime
         }
+    except HTTPException:
+        raise
     except Exception as e:
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)
