@@ -2770,6 +2770,7 @@ def test_git_push_empty_error_fallback():
 def test_git_run_askpass_env():
     from pathlib import Path
     from unittest.mock import MagicMock, patch
+
     from app.api.git import run_git
 
     with patch("subprocess.run") as mock_run:
@@ -2786,6 +2787,7 @@ def test_git_run_askpass_env():
 
 def test_execution_manager_interrupt_clears_running_tool_calls():
     import asyncio
+
     from app.services.execution_manager import ExecutionManager, ExecutionSession
 
     manager = ExecutionManager()
@@ -2803,6 +2805,93 @@ def test_execution_manager_interrupt_clears_running_tool_calls():
     assert session.live_tool_calls[0]["status"] == "cancelled"
     assert session.live_tool_calls[1]["status"] == "done"
     print("✓ test_execution_manager_interrupt_clears_running_tool_calls passed")
+
+
+def test_agy_driver_workspace_path_canonical_resolution():
+    import asyncio
+    from pathlib import Path
+    from unittest.mock import AsyncMock, patch
+
+    from app.config import DEFAULT_WORKSPACE
+    from app.services.agy_driver import stream_turn
+
+    with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+        mock_proc = AsyncMock()
+        mock_proc.stdout.readline = AsyncMock(side_effect=[b"", b""])
+        mock_proc.stderr.read = AsyncMock(return_value=b"")
+        mock_proc.stderr.readline = AsyncMock(return_value=b"")
+        mock_proc.wait = AsyncMock(return_value=0)
+        mock_proc.returncode = 0
+        mock_exec.return_value = mock_proc
+
+        async def run_driver(ws):
+            async for _ in stream_turn(prompt="hi", workspace_path=ws):
+                pass
+
+        same_path = str(Path(DEFAULT_WORKSPACE).resolve()) + "/"
+        asyncio.run(run_driver(same_path))
+
+        assert mock_exec.called
+        cmd_args = list(mock_exec.call_args[0])
+        assert "--add-dir" not in cmd_args
+    print("✓ test_agy_driver_workspace_path_canonical_resolution passed")
+
+
+def test_execution_manager_pending_approval_cleared_on_failover():
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession("test-cid-failover")
+    session.pending_approval = {
+        "toolName": "dangerous_action",
+        "command": "rm -rf /",
+        "path": None
+    }
+
+    session._update_live_state({"event": "model_failover"})
+    assert session.pending_approval is None
+
+    session.pending_approval = {
+        "toolName": "another_action",
+        "command": "reboot",
+        "path": None
+    }
+
+    session._update_live_state({"event": "account_failover"})
+    assert session.pending_approval is None
+    print("✓ test_execution_manager_pending_approval_cleared_on_failover passed")
+
+
+def test_scan_dir_children_key_consistency():
+    import tempfile
+    from pathlib import Path
+
+    from app.api.files import scan_dir
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        sub = root / "subdir"
+        sub.mkdir()
+        (sub / "file.txt").write_text("content", encoding="utf-8")
+
+        items = scan_dir(root, current_depth=0, max_depth=0)
+        assert len(items) == 1
+        assert items[0]["name"] == "subdir"
+        assert items[0]["is_dir"] is True
+        assert "children" in items[0]
+        assert items[0]["children"] == []
+    print("✓ test_scan_dir_children_key_consistency passed")
+
+
+def test_storage_calculate_tokens_with_steered_prompt():
+    from app.services.storage import calculate_conversation_tokens
+
+    steered_content = "⚡ [Guidage] [Instruction Prioritaire de Guidage]: Hello world"
+    steps = [
+        {"source": "USER_EXPLICIT", "type": "USER_INPUT", "content": steered_content}
+    ]
+    calc = calculate_conversation_tokens(steps)
+    assert calc["input_tokens"] < 13370 + 10
+    print("✓ test_storage_calculate_tokens_with_steered_prompt passed")
 
 
 if __name__ == "__main__":
@@ -2919,4 +3008,8 @@ if __name__ == "__main__":
     test_git_push_empty_error_fallback()
     test_git_run_askpass_env()
     test_execution_manager_interrupt_clears_running_tool_calls()
+    test_agy_driver_workspace_path_canonical_resolution()
+    test_execution_manager_pending_approval_cleared_on_failover()
+    test_scan_dir_children_key_consistency()
+    test_storage_calculate_tokens_with_steered_prompt()
     print("\nAll unit tests passed successfully!")

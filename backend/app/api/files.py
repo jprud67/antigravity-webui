@@ -64,8 +64,11 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2, visited
                     "last_modified": stat.st_mtime,
                 }
 
-                if is_dir and not entry.is_symlink() and current_depth < max_depth:
-                    item["children"] = scan_dir(entry, current_depth + 1, max_depth, visited)
+                if is_dir:
+                    if not entry.is_symlink() and current_depth < max_depth:
+                        item["children"] = scan_dir(entry, current_depth + 1, max_depth, visited)
+                    else:
+                        item["children"] = []
 
                 items.append(item)
             except (PermissionError, OSError):

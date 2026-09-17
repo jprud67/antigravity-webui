@@ -812,6 +812,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
       if (showHistoryMenu) {
         e.preventDefault();
         setShowHistoryMenu(false);
+        historyIndexRef.current = -1;
         return;
       }
       if (historyIndexRef.current !== -1) {

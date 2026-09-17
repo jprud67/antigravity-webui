@@ -363,7 +363,21 @@ async def apply_update() -> dict[str, Any]:
         stderr=asyncio.subprocess.PIPE,
         env=git_env
     )
-    stdout, stderr = await pull_proc.communicate()
+    try:
+        stdout, stderr = await asyncio.wait_for(pull_proc.communicate(), timeout=45.0)
+    except asyncio.TimeoutError:
+        try:
+            pull_proc.kill()
+        except Exception:
+            pass
+        _clear_update_marker()
+        logger.error("git pull --ff-only timed out after 45s.")
+        return {
+            "ok": False,
+            "error": "git_pull_timeout",
+            "message": "Délai d'attente dépassé lors de la récupération Git (45s)."
+        }
+
     if pull_proc.returncode != 0:
         err_msg = stderr.decode(errors="replace").strip()
         if "diverging" in err_msg.lower() or "not possible to fast-forward" in err_msg.lower():
@@ -375,7 +389,22 @@ async def apply_update() -> dict[str, Any]:
                 stderr=asyncio.subprocess.PIPE,
                 env=git_env
             )
-            r_out, r_err = await rebase_proc.communicate()
+            try:
+                r_out, r_err = await asyncio.wait_for(rebase_proc.communicate(), timeout=45.0)
+            except asyncio.TimeoutError:
+                try:
+                    rebase_proc.kill()
+                except Exception:
+                    pass
+                _git_cmd(["rebase", "--abort"])
+                _clear_update_marker()
+                logger.error("git pull --rebase timed out after 45s.")
+                return {
+                    "ok": False,
+                    "error": "git_pull_timeout",
+                    "message": "Délai d'attente dépassé lors du rebase Git (45s)."
+                }
+
             if rebase_proc.returncode == 0:
                 pull_output = r_out.decode(errors="replace").strip()
                 logger.info(f"git pull --rebase success: {pull_output}")
@@ -429,22 +458,27 @@ async def apply_update() -> dict[str, Any]:
     # 3b. Rollback automatique si le build échoue (ne pas laisser un état bancal)
     if not build_ok and prev_sha:
         logger.warning(f"Build en échec après mise à jour — rollback vers {prev_sha[:8]}...")
-        rollback = await asyncio.to_thread(
-            subprocess.run,
-            ["git", "reset", "--keep", prev_sha],
-            cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20, check=False,
-            env=git_env
-        )
-        rolled = rollback.returncode == 0
-        if not rolled:
-            logger.error(f"Rollback --keep impossible ({rollback.stderr.strip()}), tentative --hard...")
-            hard = await asyncio.to_thread(
+        rolled = False
+        try:
+            rollback = await asyncio.to_thread(
                 subprocess.run,
-                ["git", "reset", "--hard", prev_sha],
+                ["git", "reset", "--keep", prev_sha],
                 cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20, check=False,
                 env=git_env
             )
-            rolled = hard.returncode == 0
+            rolled = rollback.returncode == 0
+            if not rolled:
+                logger.error(f"Rollback --keep impossible ({rollback.stderr.strip()}), tentative --hard...")
+                hard = await asyncio.to_thread(
+                    subprocess.run,
+                    ["git", "reset", "--hard", prev_sha],
+                    cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20, check=False,
+                    env=git_env
+                )
+                rolled = hard.returncode == 0
+        except Exception as rb_err:
+            logger.error(f"Exception during rollback: {rb_err}")
+            rolled = False
 
         if rolled:
             try:

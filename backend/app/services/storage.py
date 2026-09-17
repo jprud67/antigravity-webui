@@ -289,6 +289,39 @@ def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
         logger.debug(f"Ignored error: {e}")
     return steps
 
+
+_USER_REQUEST_RE = re.compile(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', re.IGNORECASE)
+_XML_BLOCKS_RE = re.compile(
+    r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>',
+    re.IGNORECASE,
+)
+_XML_TAGS_RE = re.compile(
+    r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>',
+    re.IGNORECASE,
+)
+_STEERING_PREFIX_RE = re.compile(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+')
+
+
+def clean_user_prompt(raw: Any) -> str:
+    if not raw:
+        return ""
+    if not isinstance(raw, str):
+        try:
+            raw = str(raw)
+        except Exception:
+            return ""
+    m = _USER_REQUEST_RE.search(raw)
+    if m:
+        text = m.group(1).strip()
+    else:
+        text = raw
+    text = _XML_BLOCKS_RE.sub('', text)
+    text = _XML_TAGS_RE.sub('', text)
+    # Strip steering/queued instruction prefixes so history stays pure and clean
+    text = _STEERING_PREFIX_RE.sub('', text)
+    return text.strip()
+
+
 def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]:
     if not steps:
         return {
@@ -387,7 +420,8 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
         stype = s.get("type") or ""
         
         if src == "USER_EXPLICIT" or stype == "USER_INPUT":
-            prompt_chars += len(content)
+            clean_p = clean_user_prompt(content)
+            prompt_chars += len(clean_p) if clean_p else len(content)
         else:
             response_chars += len(content) + len(tool_calls)
             thinking_chars += len(thinking)
@@ -434,16 +468,6 @@ def atomic_write_jsonl(target_path: Path, items: list[dict[str, Any]]) -> None:
                 logger.debug(f"Ignored error: {e}")
         raise
 
-_USER_REQUEST_RE = re.compile(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', re.IGNORECASE)
-_XML_BLOCKS_RE = re.compile(
-    r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>',
-    re.IGNORECASE,
-)
-_XML_TAGS_RE = re.compile(
-    r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>',
-    re.IGNORECASE,
-)
-_STEERING_PREFIX_RE = re.compile(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+')
 _USER_METADATA_CHECK_RE = re.compile(
     r'<(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>',
     re.IGNORECASE,
@@ -475,26 +499,6 @@ TOOL_STEP_TYPES: set[str] = {
     "DEFINE_SUBAGENT",
     "GENERATE_IMAGE",
 }
-
-
-def clean_user_prompt(raw: Any) -> str:
-    if not raw:
-        return ""
-    if not isinstance(raw, str):
-        try:
-            raw = str(raw)
-        except Exception:
-            return ""
-    m = _USER_REQUEST_RE.search(raw)
-    if m:
-        text = m.group(1).strip()
-    else:
-        text = raw
-    text = _XML_BLOCKS_RE.sub('', text)
-    text = _XML_TAGS_RE.sub('', text)
-    # Strip steering/queued instruction prefixes so history stays pure and clean
-    text = _STEERING_PREFIX_RE.sub('', text)
-    return text.strip()
 
 
 def is_tool_output_content(content: Any) -> bool:

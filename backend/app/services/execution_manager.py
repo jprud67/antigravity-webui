@@ -258,7 +258,7 @@ class ExecutionSession:
                 "command": event.get("command"),
                 "path": event.get("path")
             }
-        elif evt_type == "approval_resolved" or evt_type in ("done", "interrupted", "error"):
+        elif evt_type == "approval_resolved" or evt_type in ("done", "interrupted", "error", "model_failover", "account_failover"):
             self.pending_approval = None
 
     async def run_turn(self, params: dict[str, Any]):
