@@ -65,6 +65,8 @@ class ExecutionSession:
 
     def remove_subscriber(self, ws: WebSocket):
         self.subscribers.discard(ws)
+        if not self.subscribers:
+            self.last_active_at = time.time()
 
     @property
     def is_busy(self) -> bool:

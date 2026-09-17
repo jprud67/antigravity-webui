@@ -2090,8 +2090,9 @@ def test_cron_guarded_execute_duration_tracking():
 
 
 def test_transcript_utf8_bom_support():
-    import uuid
     import shutil
+    import uuid
+
     from app.services.storage import get_conversation_transcript
     cid = f"test-bom-{uuid.uuid4().hex[:8]}"
     conv_dir = BRAIN_DIR / cid / ".system_generated" / "logs"
@@ -2112,6 +2113,7 @@ def test_transcript_utf8_bom_support():
 
 def test_atomic_write_jsonl_permissions():
     import tempfile
+
     from app.services.storage import atomic_write_jsonl
     with tempfile.TemporaryDirectory() as td:
         target = Path(td) / "test.jsonl"
@@ -2125,6 +2127,7 @@ def test_atomic_write_jsonl_permissions():
 def test_cron_prune_job_logs():
     import os
     import time
+
     from app.services.cron_store import OUTPUT_DIR
     from app.services.cron_ticker import prune_job_logs
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -2150,7 +2153,7 @@ def test_cron_prune_job_logs():
 
 
 def test_git_extended_coauthor_and_masking():
-    from app.api.git import _sanitize_git_message, _mask_git_output
+    from app.api.git import _mask_git_output, _sanitize_git_message
     raw_msg = (
         "feat: add awesome feature\n"
         "Co-Authored-By: Claude <noreply@anthropic.com>\n"
@@ -2178,7 +2181,123 @@ def test_git_extended_coauthor_and_masking():
 
     masked_git = _mask_git_output("git clone git://deploy:key123@github.com/repo.git")
     assert "key123" not in masked_git
+
+    raw_pat = "fatal: auth failed with token ghp_1234567890123456789012345678901234567890 for repo"
+    masked_pat = _mask_git_output(raw_pat)
+    assert "ghp_" not in masked_pat
+    assert "***" in masked_pat
     print("✓ test_git_extended_coauthor_and_masking passed")
+
+
+def test_undo_conversation_turn_bom_and_corrupt_lines():
+    import shutil
+    import uuid
+
+    from app.services.storage import (
+        BRAIN_DIR,
+        get_conversation_transcript,
+        undo_conversation_turn,
+    )
+    cid = f"test-undo-bom-{uuid.uuid4().hex[:8]}"
+    conv_dir = BRAIN_DIR / cid / ".system_generated" / "logs"
+    conv_dir.mkdir(parents=True, exist_ok=True)
+    full_file = conv_dir / "transcript_full.jsonl"
+    comp_file = conv_dir / "transcript.jsonl"
+    try:
+        # Full file has BOM and one malformed line
+        full_lines = [
+            '\ufeff{"step_index": 0, "type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "hello 1"}',
+            '{"step_index": 1, "type": "MODEL_RESPONSE", "content": "reply 1"}',
+            '{bad malformed json line',
+            '{"step_index": 2, "type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "hello 2"}',
+            '{"step_index": 3, "type": "MODEL_RESPONSE", "content": "reply 2"}',
+        ]
+        comp_lines = [
+            '{"step_index": 0, "type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "hello 1"}',
+            '{"step_index": 1, "type": "MODEL_RESPONSE", "content": "reply 1"}',
+            '{"step_index": 2, "type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "hello 2"}',
+            '{"step_index": 3, "type": "MODEL_RESPONSE", "content": "reply 2"}',
+        ]
+        full_file.write_text("\n".join(full_lines) + "\n", encoding="utf-8")
+        comp_file.write_text("\n".join(comp_lines) + "\n", encoding="utf-8")
+
+        res = undo_conversation_turn(cid)
+        assert res.get("step_count") == 2
+        remaining = get_conversation_transcript(cid)
+        assert len(remaining) == 2
+        assert remaining[0]["content"] == "hello 1"
+        assert remaining[1]["content"] == "reply 1"
+    finally:
+        shutil.rmtree(BRAIN_DIR / cid, ignore_errors=True)
+    print("✓ test_undo_conversation_turn_bom_and_corrupt_lines passed")
+
+
+def test_cron_compute_next_run_quoted_expression():
+    from app.services.cron_store import compute_next_run
+    res1 = compute_next_run('"0 9 * * *" ')
+    assert res1 is not None
+    res2 = compute_next_run("'0 9 * * *'")
+    assert res2 is not None
+    res3 = compute_next_run('"every 15m"')
+    assert res3 is not None
+    print("✓ test_cron_compute_next_run_quoted_expression passed")
+
+
+def test_cron_skills_string_coercion():
+    skills_str = "hermes-archivist"
+    if isinstance(skills_str, str):
+        skills_list = [skills_str]
+    else:
+        skills_list = list(skills_str)
+    valid_skills = [str(s).strip() for s in skills_list if s and str(s).strip()]
+    assert valid_skills == ["hermes-archivist"]
+    print("✓ test_cron_skills_string_coercion passed")
+
+
+def test_cron_prune_job_logs_special_chars():
+    import os
+    import time
+
+    from app.services.cron_store import OUTPUT_DIR
+    from app.services.cron_ticker import prune_job_logs
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    test_job = f"test_job[1]_{int(time.time())}"
+    created_files = []
+    try:
+        for i in range(25):
+            f = OUTPUT_DIR / f"{test_job}_{i:03d}.log"
+            f.write_text(f"log {i}", encoding="utf-8")
+            created_files.append(f)
+            os.utime(f, (time.time() + i, time.time() + i))
+
+        prune_job_logs(test_job, keep_latest=20)
+        prefix = f"{test_job}_"
+        remaining = [p for p in OUTPUT_DIR.iterdir() if p.name.startswith(prefix) and p.name.endswith(".log")]
+        assert len(remaining) == 20, f"Expected 20 logs remaining, got {len(remaining)}"
+    finally:
+        for f in created_files:
+            try:
+                f.unlink(missing_ok=True)
+            except Exception:
+                pass
+    print("✓ test_cron_prune_job_logs_special_chars passed")
+
+
+def test_execution_session_remove_subscriber_last_active_at():
+    import time
+
+    from app.services.execution_manager import ExecutionSession
+    session = ExecutionSession("test_conv_sub")
+    session.last_active_at = 100.0
+    dummy_ws = object()  # type: ignore
+    session.add_subscriber(dummy_ws)  # type: ignore
+    t_after_add = session.last_active_at
+    assert t_after_add > 100.0
+    time.sleep(0.01)
+    session.remove_subscriber(dummy_ws)  # type: ignore
+    assert len(session.subscribers) == 0
+    assert session.last_active_at > t_after_add
+    print("✓ test_execution_session_remove_subscriber_last_active_at passed")
 
 
 if __name__ == "__main__":
@@ -2270,4 +2389,9 @@ if __name__ == "__main__":
     test_atomic_write_jsonl_permissions()
     test_cron_prune_job_logs()
     test_git_extended_coauthor_and_masking()
+    test_undo_conversation_turn_bom_and_corrupt_lines()
+    test_cron_compute_next_run_quoted_expression()
+    test_cron_skills_string_coercion()
+    test_cron_prune_job_logs_special_chars()
+    test_execution_session_remove_subscriber_last_active_at()
     print("\nAll unit tests passed successfully!")

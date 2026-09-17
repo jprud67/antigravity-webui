@@ -92,7 +92,13 @@ async def run_agy_task(
     """
     effective_prompt = prompt
     if skills:
-        valid_skills = [str(s).strip() for s in skills if s and str(s).strip()]
+        if isinstance(skills, str):
+            skills_list = [skills]
+        elif isinstance(skills, (list, tuple, set)):
+            skills_list = list(skills)
+        else:
+            skills_list = []
+        valid_skills = [str(s).strip() for s in skills_list if s and str(s).strip()]
         if valid_skills:
             skills_prefix = f"[Active skills: {', '.join(valid_skills)}]\n"
             effective_prompt = f"{skills_prefix}{prompt}"
@@ -336,8 +342,9 @@ def prune_job_logs(job_id: str, keep_latest: int = 20) -> None:
             except OSError:
                 return 0.0
 
+        prefix = f"{job_id}_"
         logs = sorted(
-            [p for p in OUTPUT_DIR.glob(f"{job_id}_*.log") if p.is_file()],
+            [p for p in OUTPUT_DIR.iterdir() if p.is_file() and p.name.startswith(prefix) and p.name.endswith(".log")],
             key=_safe_mtime,
             reverse=True
         )

@@ -575,12 +575,17 @@ def fork_conversation(
     source_full_steps = []
     if source_full_file.exists():
         try:
-            with open(source_full_file, "r", encoding="utf-8") as sf:
+            with open(source_full_file, "r", encoding="utf-8-sig", errors="replace") as sf:
                 for line in sf:
-                    line = line.strip()
-                    if line:
-                        source_full_steps.append(json.loads(line))
-        except Exception:
+                    line_str = line.strip().lstrip("\ufeff")
+                    if not line_str:
+                        continue
+                    try:
+                        source_full_steps.append(json.loads(line_str))
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as e:
+            logger.debug(f"Failed reading source_full_file: {e}")
             source_full_steps = []
 
     forked_full_steps = [s for s in source_full_steps if s.get("step_index", 0) <= up_to_step_index] if source_full_steps else forked_steps
@@ -1027,11 +1032,15 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
     if transcript_full_file.exists():
         full_steps = []
         try:
-            with open(transcript_full_file, "r", encoding="utf-8") as f:
+            with open(transcript_full_file, "r", encoding="utf-8-sig", errors="replace") as f:
                 for line in f:
-                    line_str = line.strip()
-                    if line_str:
+                    line_str = line.strip().lstrip("\ufeff")
+                    if not line_str:
+                        continue
+                    try:
                         full_steps.append(json.loads(line_str))
+                    except json.JSONDecodeError:
+                        continue
         except Exception as e:
             logger.warning(f"Failed to read transcript_full_file: {e}")
             full_steps = []
@@ -1218,16 +1227,17 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                     if len(lines) > 500:
                         lines = lines[-500:]
                 else:
-                    with open(t_file, "r", encoding="utf-8", errors="replace") as f:
+                    with open(t_file, "r", encoding="utf-8-sig", errors="replace") as f:
                         lines = f.readlines()[-500:]
 
                 for line in lines:
-                    if not line.strip():
+                    line_str = line.strip().lstrip("\ufeff")
+                    if not line_str:
                         continue
-                    if q_lower not in line.lower():
+                    if q_lower not in line_str.lower():
                         continue
                     try:
-                        s = json.loads(line)
+                        s = json.loads(line_str)
                         val_content = s.get("content")
                         if isinstance(val_content, str):
                             raw_content = val_content

@@ -185,6 +185,9 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
 
     if not expr:
         return None
+    expr = expr.strip().strip("'\"")
+    if not expr:
+        return None
 
     # Syntaxes rapides : "every 10m", "hourly", "daily", "monthly", "chaque mois"...
     lower = expr.lower().strip()

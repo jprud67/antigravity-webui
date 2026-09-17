@@ -23,15 +23,17 @@ _COAUTHOR_RE = re.compile(
 _URL_CRED_RE = re.compile(r"https?://([^/@:]+):([^/@:]+)@", re.IGNORECASE)
 _TOKEN_CRED_RE = re.compile(r"https?://([^/@:]+)@", re.IGNORECASE)
 _GIT_CRED_RE = re.compile(r"(?:git(?:\+https?|\+ssh)?|ssh)://(?:[^/@:]+:[^/@:]+@|[^/@:]+@)", re.IGNORECASE)
+_RAW_TOKEN_RE = re.compile(r"\b(?:ghp_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{30,}|glpat-[a-zA-Z0-9\-_]{20,})\b")
 
 
 def _mask_git_output(text: str) -> str:
-    """Masque les identifiants ou jetons secrets présents dans les URLs Git."""
+    """Masque les identifiants ou jetons secrets présents dans les URLs Git ou sorties de commande."""
     if not text:
         return ""
     masked = _URL_CRED_RE.sub(r"https://***:***@", text)
     masked = _TOKEN_CRED_RE.sub(r"https://***@", masked)
     masked = _GIT_CRED_RE.sub(r"git://***@", masked)
+    masked = _RAW_TOKEN_RE.sub(r"***", masked)
     return masked
 
 

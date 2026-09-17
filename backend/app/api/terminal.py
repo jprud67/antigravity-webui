@@ -279,7 +279,7 @@ class PersistentTerminalSession:
         if self.master_fd > 0:
             fd = self.master_fd
             self.master_fd = -1
-            if self.loop:
+            if self.loop and not self.loop.is_closed():
                 try:
                     self.loop.remove_reader(fd)
                 except Exception as e:
