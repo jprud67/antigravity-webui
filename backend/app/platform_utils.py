@@ -89,19 +89,23 @@ async def terminate_process_group_async(proc, grace: float = 0.8) -> None:
 
     try:
         await asyncio.wait_for(proc.wait(), timeout=grace)
-        return
     except (asyncio.TimeoutError, asyncio.CancelledError):
-        pass
+        if IS_WINDOWS:
+            _taskkill(proc.pid, force=True)
+        else:
+            _killpg(proc.pid, signal.SIGKILL)
 
-    if IS_WINDOWS:
-        _taskkill(proc.pid, force=True)
-    else:
-        _killpg(proc.pid, signal.SIGKILL)
-
-    try:
-        await asyncio.wait_for(proc.wait(), timeout=2.0)
-    except (asyncio.TimeoutError, asyncio.CancelledError):
-        logger.warning(f"Le processus {proc.pid} ne répond toujours pas après terminaison forcée.")
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=2.0)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            logger.warning(f"Le processus {proc.pid} ne répond toujours pas après terminaison forcée.")
+    finally:
+        for stream in (getattr(proc, "stdin", None), getattr(proc, "stdout", None), getattr(proc, "stderr", None)):
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception:
+                    pass
 
 
 def terminate_process_group_sync(proc, force: bool = True) -> None:
@@ -128,6 +132,13 @@ def terminate_process_group_sync(proc, force: bool = True) -> None:
         proc.kill()
     except Exception:
         pass
+
+    for stream in (getattr(proc, "stdin", None), getattr(proc, "stdout", None), getattr(proc, "stderr", None)):
+        if stream is not None:
+            try:
+                stream.close()
+            except Exception:
+                pass
 
 
 def restrict_file_permissions(path) -> None:

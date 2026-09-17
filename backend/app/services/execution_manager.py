@@ -110,7 +110,7 @@ class ExecutionSession:
                 dead.add(ws)
         for ws in dead:
             self.subscribers.discard(ws)
-            execution_manager.connected_sockets.discard(ws)
+            execution_manager.unregister_socket(ws)
 
     def _update_live_state(self, event: dict[str, Any]):
         evt_type = event.get("event")

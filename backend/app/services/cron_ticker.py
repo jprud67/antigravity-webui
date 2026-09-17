@@ -21,6 +21,7 @@ from typing import Any
 
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
 from app.platform_utils import (
+    restrict_file_permissions,
     spawn_group_kwargs,
     terminate_process_group_async,
     terminate_process_group_sync,
@@ -324,6 +325,31 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
     return {"status": status, "attempts": attempts, "failovers": failovers, "output": output}
 
 
+def prune_job_logs(job_id: str, keep_latest: int = 20) -> None:
+    """Prunes old execution logs for a specific cron job to prevent disk bloat."""
+    if not job_id or not OUTPUT_DIR.exists():
+        return
+    try:
+        def _safe_mtime(p):
+            try:
+                return p.stat().st_mtime
+            except OSError:
+                return 0.0
+
+        logs = sorted(
+            [p for p in OUTPUT_DIR.glob(f"{job_id}_*.log") if p.is_file()],
+            key=_safe_mtime,
+            reverse=True
+        )
+        for old_log in logs[keep_latest:]:
+            try:
+                old_log.unlink(missing_ok=True)
+            except Exception:
+                pass
+    except Exception as e:
+        logger.debug(f"[Cron] Error pruning logs for job {job_id}: {e}")
+
+
 async def _execute_job(job: dict[str, Any]) -> None:
     job_id = job.get("id")
     name = job.get("name") or job_id
@@ -346,7 +372,13 @@ async def _execute_job(job: dict[str, Any]) -> None:
         f"{'-' * 60}\n"
     )
     try:
-        await asyncio.to_thread(log_file.write_text, header + str(result.get("output") or ""), encoding="utf-8")
+        def _write_and_restrict(p, content):
+            p.write_text(content, encoding="utf-8")
+            restrict_file_permissions(p)
+
+        await asyncio.to_thread(_write_and_restrict, log_file, header + str(result.get("output") or ""))
+        if job_id:
+            await asyncio.to_thread(prune_job_logs, job_id, 20)
         logger.info(f"[Cron] Journal écrit: {log_file}")
     except Exception as log_err:
         logger.warning(f"[Cron] Impossible d'écrire le journal {log_file}: {log_err}")

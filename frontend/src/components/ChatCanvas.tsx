@@ -755,9 +755,11 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   };
 
   useEffect(() => {
-    if (!bottomRef.current) return;
-    if (!userScrolledUpRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: isStreaming ? 'auto' : 'smooth' });
+    if (userScrolledUpRef.current) return;
+    if (isStreaming && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    } else if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isStreaming]);
 

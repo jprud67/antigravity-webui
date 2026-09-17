@@ -886,7 +886,10 @@ export async function fetchUsageQuota(): Promise<any> {
   const res = await fetch(`${API_BASE}/settings/usage`, {
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error("Impossible de récupérer les quotas Antigravity");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Impossible de récupérer les quotas Antigravity");
+  }
   return res.json();
 }
 
@@ -894,7 +897,10 @@ export async function fetchCredits(): Promise<any> {
   const res = await fetch(`${API_BASE}/settings/credits`, {
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error("Impossible de récupérer les crédits Antigravity");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Impossible de récupérer les crédits Antigravity");
+  }
   return res.json();
 }
 
@@ -902,7 +908,10 @@ export async function fetchChangelog(): Promise<any> {
   const res = await fetch(`${API_BASE}/settings/changelog`, {
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error("Impossible de récupérer le changelog Antigravity");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Impossible de récupérer le changelog Antigravity");
+  }
   return res.json();
 }
 
@@ -942,7 +951,10 @@ export async function fetchSystemVersion(): Promise<SystemVersionInfo> {
   const res = await fetch(`${API_BASE}/system/version?t=${Date.now()}`, {
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error("Impossible de récupérer les informations de version");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Impossible de récupérer les informations de version");
+  }
   return res.json();
 }
 
@@ -951,7 +963,10 @@ export async function checkSystemUpdate(force: boolean = false): Promise<UpdateC
   const res = await fetch(url, {
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error("Impossible de vérifier les mises à jour");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Impossible de vérifier les mises à jour");
+  }
   return res.json();
 }
 

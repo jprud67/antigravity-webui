@@ -276,9 +276,9 @@ def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
 
     steps = []
     try:
-        with open(target_file, "r", encoding="utf-8", errors="replace") as f:
+        with open(target_file, "r", encoding="utf-8-sig", errors="replace") as f:
             for line in f:
-                line_str = line.strip()
+                line_str = line.strip().lstrip("\ufeff")
                 if not line_str:
                     continue
                 try:
@@ -409,7 +409,9 @@ def atomic_write_jsonl(target_path: Path, items: list[dict[str, Any]]) -> None:
     try:
         with open(tmp_file, "w", encoding="utf-8") as f:
             f.writelines(json.dumps(item, ensure_ascii=False, default=str) + "\n" for item in items)
+        restrict_file_permissions(tmp_file)
         tmp_file.replace(target_path)
+        restrict_file_permissions(target_path)
     except Exception:
         if tmp_file.exists():
             try:
@@ -536,6 +538,11 @@ def _safe_copy_artifacts(source_dir: Path, target_dir: Path) -> None:
                 shutil.copytree(item, target, dirs_exist_ok=True, symlinks=False)
         except Exception as e:
             logger.warning(f"Failed to copy artifact {item.name}: {e}")
+            if target.exists() and item.is_file():
+                try:
+                    target.unlink(missing_ok=True)
+                except Exception:
+                    pass
 
 
 def fork_conversation(

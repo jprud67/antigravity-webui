@@ -17,11 +17,12 @@ router = APIRouter(prefix="/api/git", tags=["git"])
 
 GIT_TIMEOUT = 12
 _COAUTHOR_RE = re.compile(
-    r"(?:co[-_ ]?author(?:ed)?[-_ ]?by|co[-_ ]?author:?|co[-_ ]?committ(?:er|ed):?|signed[-_ ]?off[-_ ]?by|assisted[-_ ]?by|help[-_ ]?from|claude|anthropic|chatgpt|openai)",
+    r"(?:co[-_ \t]*author(?:ed)?[-_ \t]*by|co[-_ \t]*author:?|co[-_ \t]*committ(?:er|ed):?|signed[-_ \t]*off[-_ \t]*by|assisted[-_ \t]*by|help[-_ \t]*from|generated[-_ \t]*by|ai[-_ \t]*assisted|claude|anthropic|chatgpt|openai|copilot|github-actions)",
     re.IGNORECASE
 )
 _URL_CRED_RE = re.compile(r"https?://([^/@:]+):([^/@:]+)@", re.IGNORECASE)
 _TOKEN_CRED_RE = re.compile(r"https?://([^/@:]+)@", re.IGNORECASE)
+_GIT_CRED_RE = re.compile(r"(?:git(?:\+https?|\+ssh)?|ssh)://(?:[^/@:]+:[^/@:]+@|[^/@:]+@)", re.IGNORECASE)
 
 
 def _mask_git_output(text: str) -> str:
@@ -30,6 +31,7 @@ def _mask_git_output(text: str) -> str:
         return ""
     masked = _URL_CRED_RE.sub(r"https://***:***@", text)
     masked = _TOKEN_CRED_RE.sub(r"https://***@", masked)
+    masked = _GIT_CRED_RE.sub(r"git://***@", masked)
     return masked
 
 
