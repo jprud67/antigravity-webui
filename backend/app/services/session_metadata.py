@@ -14,8 +14,8 @@ logger = logging.getLogger("antigravity-webui.session_metadata")
 _meta_lock = threading.RLock()
 
 
-_cached_meta: dict[str, dict[str, Any]] = {}
-_cached_mtime: float = 0.0
+_cached_meta: dict[str, dict[str, Any]] | None = None
+_cached_mtime: float = -1.0
 
 def get_all_session_metadata() -> dict[str, dict[str, Any]]:
     global _cached_meta, _cached_mtime
@@ -24,7 +24,7 @@ def get_all_session_metadata() -> dict[str, dict[str, Any]]:
             return {}
         try:
             mtime = SESSION_METADATA_FILE.stat().st_mtime
-            if mtime <= _cached_mtime and _cached_meta:
+            if _cached_meta is not None and mtime <= _cached_mtime:
                 return copy.deepcopy(_cached_meta)
             
             content = SESSION_METADATA_FILE.read_text(encoding="utf-8")

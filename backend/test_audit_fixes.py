@@ -1014,6 +1014,7 @@ def test_kanban_schema_double_checked_lock():
 
 def test_cron_delete_cancels_running_job():
     from unittest.mock import MagicMock, patch
+
     from app.api.crons import delete_cron_job
 
     mock_cancel = MagicMock()
@@ -1028,8 +1029,10 @@ def test_cron_delete_cancels_running_job():
 
 def test_bulk_conversations_empty_and_limit():
     import asyncio
+
     from fastapi import HTTPException
-    from app.api.conversations import bulk_conversations, BulkActionRequest
+
+    from app.api.conversations import BulkActionRequest, bulk_conversations
 
     # Empty IDs should return count 0 immediately
     req_empty = BulkActionRequest(action="pin", conversation_ids=[])
@@ -1050,7 +1053,8 @@ def test_bulk_conversations_empty_and_limit():
 
 def test_bulk_export_limit():
     from fastapi import HTTPException
-    from app.api.conversations import _do_bulk_export, BulkActionRequest
+
+    from app.api.conversations import BulkActionRequest, _do_bulk_export
 
     req_overflow = BulkActionRequest(action="export", conversation_ids=[f"cid_{i}" for i in range(501)])
     try:
@@ -1060,6 +1064,78 @@ def test_bulk_export_limit():
         assert exc.status_code == 400
         assert "max 500" in exc.detail
     print("✓ test_bulk_export_limit passed")
+
+
+def test_compute_next_run_compound_intervals():
+    from datetime import datetime, timezone
+
+    from app.services.cron_store import compute_next_run
+
+    now = datetime.now(timezone.utc)
+    # Compound: 1 hour + 30 minutes = 90 minutes
+    res_iso = compute_next_run({"kind": "interval", "hours": 1, "minutes": 30})
+    assert res_iso is not None
+    res_dt = datetime.fromisoformat(res_iso)
+    diff_secs = (res_dt - now).total_seconds()
+    assert 5300 <= diff_secs <= 5500, f"Expected ~5400s (90m), got {diff_secs}s"
+
+    # Floor at 10s
+    res_small = compute_next_run({"kind": "interval", "seconds": 3})
+    assert res_small is not None
+    small_dt = datetime.fromisoformat(res_small)
+    diff_small = (small_dt - now).total_seconds()
+    assert 9 <= diff_small <= 15, f"Expected >= 10s, got {diff_small}s"
+    print("✓ test_compute_next_run_compound_intervals passed")
+
+
+def test_cron_model_and_effort_whitespace_cleaning():
+    from app.api.crons import CreateCronJobRequest
+
+    req = CreateCronJobRequest(
+        name="Test whitespace",
+        prompt="Echo hello",
+        schedule="every 10m",
+        model="   ",
+        effort="  \t  "
+    )
+    cleaned_model = req.model.strip() if req.model and req.model.strip() else None
+    cleaned_effort = req.effort.strip() if req.effort and req.effort.strip() else None
+    assert cleaned_model is None, f"Expected None, got {cleaned_model}"
+    assert cleaned_effort is None, f"Expected None, got {cleaned_effort}"
+    print("✓ test_cron_model_and_effort_whitespace_cleaning passed")
+
+
+def test_clean_cid_sanitization():
+    from app.services.execution_manager import _clean_cid
+
+    assert _clean_cid("null") is None
+    assert _clean_cid("undefined") is None
+    assert _clean_cid("None") is None
+    assert _clean_cid("") is None
+    assert _clean_cid("   ") is None
+    assert _clean_cid(None) is None
+    assert _clean_cid(123) is None
+    assert _clean_cid("valid-cid-456") == "valid-cid-456"
+    assert _clean_cid("  trimmed-cid  ") == "trimmed-cid"
+    print("✓ test_clean_cid_sanitization passed")
+
+
+def test_git_anti_trailer_args():
+    from unittest.mock import patch
+
+    from app.api.git import run_git
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = b""
+        mock_run.return_value.stderr = b""
+        run_git(["status"], cwd=Path("/tmp"))
+        assert mock_run.called
+        args_passed = mock_run.call_args[0][0]
+        assert "-c" in args_passed
+        assert "format.signoff=false" in args_passed
+        assert "trailer.co-authored-by.key=" in args_passed
+    print("✓ test_git_anti_trailer_args passed")
 
 
 if __name__ == "__main__":
@@ -1104,5 +1180,9 @@ if __name__ == "__main__":
     test_cron_delete_cancels_running_job()
     test_bulk_conversations_empty_and_limit()
     test_bulk_export_limit()
+    test_compute_next_run_compound_intervals()
+    test_cron_model_and_effort_whitespace_cleaning()
+    test_clean_cid_sanitization()
+    test_git_anti_trailer_args()
     print("\nAll unit tests passed successfully!")
 

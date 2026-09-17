@@ -111,8 +111,8 @@ def create_cron_job(req: CreateCronJobRequest, _ = Depends(require_auth)):
         "schedule": schedule_dict,
         "schedule_display": sched_raw,
         "skills": req.skills or [],
-        "model": req.model.strip() if req.model else None,
-        "effort": req.effort.strip() if req.effort else None,
+        "model": req.model.strip() if req.model and req.model.strip() else None,
+        "effort": req.effort.strip() if req.effort and req.effort.strip() else None,
         "enabled": True,
         "state": "scheduled",
         "created_at": now_iso(),
@@ -155,9 +155,9 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
                 if req.skills is not None:
                     j["skills"] = req.skills
                 if req.model is not None:
-                    j["model"] = req.model.strip() if req.model else None
+                    j["model"] = req.model.strip() if req.model and req.model.strip() else None
                 if req.effort is not None:
-                    j["effort"] = req.effort.strip() if req.effort else None
+                    j["effort"] = req.effort.strip() if req.effort and req.effort.strip() else None
                 if req.schedule is not None:
                     sched_raw = req.schedule.strip()
                     j["schedule"] = {

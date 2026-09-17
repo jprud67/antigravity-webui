@@ -25,6 +25,13 @@ from app.services.storage import get_settings, save_settings
 logger = logging.getLogger("antigravity.execution")
 
 
+def _clean_cid(cid: Any) -> str | None:
+    if not cid or not isinstance(cid, str):
+        return None
+    c = cid.strip()
+    return None if c in ("", "null", "undefined", "None") else c
+
+
 class ExecutionSession:
     """
     Represents an ongoing execution lifecycle for a conversation.
@@ -600,6 +607,7 @@ class ExecutionManager:
         workspace_path: str | None = None,
         ws: WebSocket | None = None,
     ) -> ExecutionSession:
+        conversation_id = _clean_cid(conversation_id)
         self.prune_inactive_sessions()
         if conversation_id:
             if conversation_id in self.sessions:
@@ -636,6 +644,7 @@ class ExecutionManager:
         return session
 
     def get_session(self, conversation_id: str | None) -> ExecutionSession | None:
+        conversation_id = _clean_cid(conversation_id)
         if conversation_id:
             if conversation_id in self.sessions:
                 return self.sessions[conversation_id]
@@ -655,6 +664,7 @@ class ExecutionManager:
         return None
 
     def is_running(self, conversation_id: str | None) -> bool:
+        conversation_id = _clean_cid(conversation_id)
         session = self.get_session(conversation_id)
         return bool(session and session.is_busy)
 
@@ -665,6 +675,7 @@ class ExecutionManager:
         return list(cids)
 
     async def attach(self, conversation_id: str | None, ws: WebSocket) -> dict[str, Any]:
+        conversation_id = _clean_cid(conversation_id)
         # If conversation_id is None or empty, user is not viewing any conversation.
         # Detach WebSocket from all sessions so that live events don't leak into new chat / home.
         if not conversation_id:
@@ -709,7 +720,7 @@ class ExecutionManager:
             await ws.send_json({"event": "error", "message": "Le prompt ne peut pas être vide."})
             return
 
-        conv_id = data.get("conversation_id")
+        conv_id = _clean_cid(data.get("conversation_id"))
         ws_path = data.get("workspace_path")
         mode = data.get("mode", "normal")
 

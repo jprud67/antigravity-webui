@@ -152,42 +152,29 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
         expr = schedule.strip()
     elif isinstance(schedule, dict):
         if schedule.get("kind") == "interval":
-            if "months" in schedule and schedule["months"] is not None:
-                try:
-                    mos = max(1, int(schedule["months"]))
-                    return (now + timedelta(days=30 * mos)).isoformat()
-                except (ValueError, TypeError):
-                    logger.debug("Ignored error")
-            if "weeks" in schedule and schedule["weeks"] is not None:
-                try:
-                    wks = max(1, int(schedule["weeks"]))
-                    return (now + timedelta(weeks=wks)).isoformat()
-                except (ValueError, TypeError):
-                    logger.debug("Ignored error")
-            if "days" in schedule and schedule["days"] is not None:
-                try:
-                    dys = max(1, int(schedule["days"]))
-                    return (now + timedelta(days=dys)).isoformat()
-                except (ValueError, TypeError):
-                    logger.debug("Ignored error")
-            if "hours" in schedule and schedule["hours"] is not None:
-                try:
-                    hrs = max(1, int(schedule["hours"]))
-                    return (now + timedelta(hours=hrs)).isoformat()
-                except (ValueError, TypeError):
-                    logger.debug("Ignored error")
-            if "minutes" in schedule and schedule["minutes"] is not None:
-                try:
-                    mins = max(1, int(schedule["minutes"]))  # minimum 1 min pour éviter une boucle infinie
-                    return (now + timedelta(minutes=mins)).isoformat()
-                except (ValueError, TypeError):
-                    logger.debug("Ignored error")
-            if "seconds" in schedule and schedule["seconds"] is not None:
-                try:
-                    secs = max(10, int(schedule["seconds"]))  # minimum 10s pour éviter surcharge
-                    return (now + timedelta(seconds=secs)).isoformat()
-                except (ValueError, TypeError):
-                    logger.debug("Ignored error")
+            total_delta = timedelta()
+            has_units = False
+            unit_defs = [
+                ("months", lambda v: timedelta(days=30 * max(0, int(v)))),
+                ("weeks", lambda v: timedelta(weeks=max(0, int(v)))),
+                ("days", lambda v: timedelta(days=max(0, int(v)))),
+                ("hours", lambda v: timedelta(hours=max(0, int(v)))),
+                ("minutes", lambda v: timedelta(minutes=max(0, int(v)))),
+                ("seconds", lambda v: timedelta(seconds=max(0, int(v)))),
+            ]
+            for unit_key, delta_fn in unit_defs:
+                if unit_key in schedule and schedule[unit_key] is not None:
+                    try:
+                        unit_delta = delta_fn(schedule[unit_key])
+                        if unit_delta.total_seconds() > 0:
+                            total_delta += unit_delta
+                            has_units = True
+                    except (ValueError, TypeError):
+                        logger.debug("Ignored error")
+            if has_units:
+                if total_delta.total_seconds() < 10:
+                    total_delta = timedelta(seconds=10)
+                return (now + total_delta).isoformat()
             expr = schedule.get("expr") or schedule.get("display") or schedule.get("schedule_display") or ""
 
         elif schedule.get("kind") == "cron":

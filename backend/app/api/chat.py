@@ -68,6 +68,11 @@ async def chat_websocket(websocket: WebSocket, token: str | None = None):
             data = await websocket.receive_json()
             action = data.get("action", "prompt")
             conv_id = data.get("conversation_id")
+            if isinstance(conv_id, str):
+                conv_id = conv_id.strip()
+                if conv_id in ("", "null", "undefined", "None"):
+                    conv_id = None
+            data["conversation_id"] = conv_id
 
             if action == "prompt":
                 await execution_manager.submit_prompt(websocket, data)

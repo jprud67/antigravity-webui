@@ -378,7 +378,7 @@ async def _execute_job(job: dict[str, Any]) -> None:
                             except (ValueError, TypeError):
                                 logger.debug("Ignored error")
                         if not is_future:
-                            computed_next = compute_next_run(j.get("schedule"))
+                            computed_next = compute_next_run(j.get("schedule") or j.get("schedule_display"))
                             if not computed_next:
                                 logger.info(f"[Cron] Job {j.get('id')} sans planification récurrente marqué comme 'completed'.")
                                 j["next_run_at"] = None
@@ -470,7 +470,7 @@ async def tick_once() -> int:
                 logger.warning(
                     f"[Cron] Date next_run_at invalide pour le job {job_id} ('{nxt}': {parse_err}). Recalcul automatique."
                 )
-                computed_next = compute_next_run(job.get("schedule"))
+                computed_next = compute_next_run(job.get("schedule") or job.get("schedule_display"))
                 if not computed_next:
                     job["next_run_at"] = None
                     job["state"] = "completed"
@@ -481,7 +481,7 @@ async def tick_once() -> int:
             if due <= now:
                 job["last_status"] = "running"
                 job["last_started_at"] = now_iso()
-                computed_next = compute_next_run(job.get("schedule"))
+                computed_next = compute_next_run(job.get("schedule") or job.get("schedule_display"))
                 if not computed_next:
                     job["next_run_at"] = None
                     job["state"] = "completed"

@@ -160,9 +160,15 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
     tmp_path: Path | None = None
     try:
         resolved_path.parent.mkdir(parents=True, exist_ok=True)
+        existing_mode = resolved_path.stat().st_mode if resolved_path.exists() else None
         tmp_path = resolved_path.parent / f".{resolved_path.name}.tmp.{uuid.uuid4().hex[:8]}"
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(req.content)
+        if existing_mode is not None:
+            try:
+                tmp_path.chmod(existing_mode)
+            except Exception as e:
+                logger.debug(f"Ignored chmod error: {e}")
         tmp_path.replace(resolved_path)
         stat = resolved_path.stat()
         return {
