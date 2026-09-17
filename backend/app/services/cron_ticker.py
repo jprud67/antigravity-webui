@@ -399,10 +399,12 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
         current_task = asyncio.current_task()
         if current_task is not None:
             _running_job_tasks[job_id] = current_task
+    started = time.time()
     try:
         await _execute_job(job)
     except asyncio.CancelledError:
         logger.warning(f"[Cron] Job {job_id} annulé.")
+        duration = round(time.time() - started, 1)
         try:
             async with _jobs_write_lock:
                 def _mark_interrupted(data: dict[str, Any]) -> None:
@@ -410,6 +412,7 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
                         if j.get("id") == job_id:
                             j["last_status"] = "interrupted"
                             j["last_run_at"] = now_iso()
+                            j["last_duration_seconds"] = duration
                             if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
                                 j["next_run_at"] = None
                             break
@@ -419,6 +422,7 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
         raise
     except Exception as e:
         logger.error(f"[Cron] Erreur pendant l'exécution du job {job_id}: {e}", exc_info=True)
+        duration = round(time.time() - started, 1)
         try:
             async with _jobs_write_lock:
                 def _mark_failed(data: dict[str, Any]) -> None:
@@ -426,6 +430,7 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
                         if j.get("id") == job_id:
                             j["last_status"] = "failed"
                             j["last_run_at"] = now_iso()
+                            j["last_duration_seconds"] = duration
                             if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
                                 j["next_run_at"] = None
                             break

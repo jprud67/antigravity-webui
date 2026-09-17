@@ -144,31 +144,62 @@ class ExecutionSession:
                 }
 
             if update.get("step_type") == "tool":
+                tool_id = update.get("tool_id") or update.get("tool_info", {}).get("id") or update.get("id")
                 tool_name = update.get("tool_name") or update.get("tool_info", {}).get("name") or "tool"
                 tool_args = update.get("tool_info", {}).get("parameters") or update.get("parameters")
                 tool_output = update.get("tool_info", {}).get("output")
                 is_done = update.get("state") == "DONE"
 
                 found = False
-                for t in reversed(self.live_tool_calls):
-                    if t.get("name") == tool_name and t.get("status") == "running":
-                        if tool_args and not t.get("args"):
-                            t["args"] = tool_args
-                        if tool_output is not None and not t.get("result"):
-                            t["result"] = tool_output
-                        if is_done:
-                            t["status"] = "done"
+                if tool_id:
+                    for t in reversed(self.live_tool_calls):
+                        if t.get("id") == tool_id:
+                            if tool_args and not t.get("args"):
+                                t["args"] = tool_args
                             if tool_output is not None:
                                 t["result"] = tool_output
-                        found = True
-                        break
+                            if is_done:
+                                t["status"] = "done"
+                            found = True
+                            break
+                    if not found:
+                        for t in reversed(self.live_tool_calls):
+                            if t.get("name") == tool_name and t.get("status") == "running" and not t.get("id"):
+                                t["id"] = tool_id
+                                if tool_args and not t.get("args"):
+                                    t["args"] = tool_args
+                                if tool_output is not None and not t.get("result"):
+                                    t["result"] = tool_output
+                                if is_done:
+                                    t["status"] = "done"
+                                    if tool_output is not None:
+                                        t["result"] = tool_output
+                                found = True
+                                break
+                else:
+                    for t in reversed(self.live_tool_calls):
+                        if t.get("name") == tool_name and t.get("status") == "running":
+                            if tool_args and not t.get("args"):
+                                t["args"] = tool_args
+                            if tool_output is not None and not t.get("result"):
+                                t["result"] = tool_output
+                            if is_done:
+                                t["status"] = "done"
+                                if tool_output is not None:
+                                    t["result"] = tool_output
+                            found = True
+                            break
+
                 if not found:
-                    self.live_tool_calls.append({
+                    new_tool_call = {
                         "name": tool_name,
                         "args": tool_args,
                         "result": tool_output,
                         "status": "done" if is_done else "running"
-                    })
+                    }
+                    if tool_id:
+                        new_tool_call["id"] = tool_id
+                    self.live_tool_calls.append(new_tool_call)
 
         elif evt_type == "command_result":
             cmd = event.get("command", {})

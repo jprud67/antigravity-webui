@@ -1984,6 +1984,111 @@ def test_cron_store_deepcopy_isolation():
     print("✓ test_cron_store_deepcopy_isolation passed")
 
 
+def test_git_sanitize_extended_ai_tags():
+    from app.api.git import _sanitize_git_message
+    msg = (
+        "feat: add awesome feature\n\n"
+        "- Co-Authored-By: Claude <claude@anthropic.com>\n"
+        "co-authored-by: user <user@example.com>\n"
+        "Assisted-by: chatgpt\n"
+        "Help-from: OpenAI\n"
+        "signed-off-by: random\n"
+    )
+    res = _sanitize_git_message(msg)
+    assert "Claude" not in res
+    assert "claude" not in res
+    assert "chatgpt" not in res
+    assert "OpenAI" not in res
+    assert "Co-Authored-By" not in res
+    assert "co-authored-by" not in res
+    assert "signed-off-by" not in res
+    assert res == "feat: add awesome feature"
+    print("✓ test_git_sanitize_extended_ai_tags passed")
+
+
+def test_live_tool_calls_tool_id_disambiguation():
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession("test-cid-ids")
+    session._update_live_state({
+        "event": "step_update",
+        "step_update": {
+            "step_type": "tool",
+            "tool_id": "call_1",
+            "tool_name": "view_file",
+            "parameters": {"file": "a.txt"},
+            "state": "RUNNING"
+        }
+    })
+    session._update_live_state({
+        "event": "step_update",
+        "step_update": {
+            "step_type": "tool",
+            "tool_id": "call_2",
+            "tool_name": "view_file",
+            "parameters": {"file": "b.txt"},
+            "state": "RUNNING"
+        }
+    })
+    assert len(session.live_tool_calls) == 2
+    assert session.live_tool_calls[0]["id"] == "call_1"
+    assert session.live_tool_calls[1]["id"] == "call_2"
+
+    session._update_live_state({
+        "event": "step_update",
+        "step_update": {
+            "step_type": "tool",
+            "tool_id": "call_1",
+            "tool_name": "view_file",
+            "state": "DONE",
+            "tool_info": {"output": "content of a"}
+        }
+    })
+    assert session.live_tool_calls[0]["status"] == "done"
+    assert session.live_tool_calls[0]["result"] == "content of a"
+    assert session.live_tool_calls[1]["status"] == "running"
+    print("✓ test_live_tool_calls_tool_id_disambiguation passed")
+
+
+def test_cron_guarded_execute_duration_tracking():
+    import asyncio
+
+    from app.services.cron_store import load_jobs, update_jobs
+    from app.services.cron_ticker import _guarded_execute
+
+    test_job = {
+        "id": "test_duration_job",
+        "name": "Duration Test",
+        "prompt": "test prompt",
+        "schedule": "*/5 * * * *",
+        "enabled": True
+    }
+    update_jobs(lambda data: data.setdefault("jobs", []).append(test_job))
+
+    import app.services.cron_ticker as ticker
+    orig_exec = ticker._execute_job
+
+    async def mock_fail(job):
+        await asyncio.sleep(0.05)
+        raise asyncio.CancelledError()
+
+    ticker._execute_job = mock_fail
+    try:
+        try:
+            asyncio.run(_guarded_execute(test_job))
+        except asyncio.CancelledError:
+            pass
+
+        saved = next(j for j in load_jobs()["jobs"] if j["id"] == "test_duration_job")
+        assert saved["last_status"] == "interrupted"
+        assert "last_duration_seconds" in saved
+        assert isinstance(saved["last_duration_seconds"], (int, float))
+    finally:
+        ticker._execute_job = orig_exec
+        update_jobs(lambda data: data["jobs"].remove(next(j for j in data["jobs"] if j["id"] == "test_duration_job")))
+    print("✓ test_cron_guarded_execute_duration_tracking passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -2066,4 +2171,7 @@ if __name__ == "__main__":
     test_git_mask_credentials()
     test_live_tool_calls_reversed_matching()
     test_cron_store_deepcopy_isolation()
+    test_git_sanitize_extended_ai_tags()
+    test_live_tool_calls_tool_id_disambiguation()
+    test_cron_guarded_execute_duration_tracking()
     print("\nAll unit tests passed successfully!")

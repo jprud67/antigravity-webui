@@ -7,12 +7,15 @@ BACKEND_DIR = Path(__file__).resolve().parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
+import pytest
+
 from app.services.cron_ticker import run_job_with_failover
 
 logging.basicConfig(level=logging.WARNING)
 
 
-async def test():
+@pytest.mark.asyncio
+async def test_cron_failover():
     print("Testing Cron Failover Logic...")
     job = {
         "id": "test_job_123",
@@ -23,7 +26,6 @@ async def test():
     }
 
     # We mock run_agy_task to always return a quota error.
-    # To do this cleanly, we can temporarily patch is_quota_error
     import app.services.cron_ticker as ticker
     
     original_run = ticker.run_agy_task
@@ -34,7 +36,7 @@ async def test():
         
     ticker.run_agy_task = mock_run
 
-    # Patch switch_to_next_healthy_account to print something
+    # Patch switch_to_next_healthy_account to return a mock account
     import app.services.google_auth as auth
     orig_switch = auth.switch_to_next_healthy_account
     def mock_switch(exclude_email=None, model=None):
@@ -45,10 +47,13 @@ async def test():
 
     try:
         res = await run_job_with_failover(job)
-        print("\nFinal Result:", res)
+        assert res is not None
+        assert res.get("status") == "quota_exhausted"
+        assert res.get("attempts") == 5
+        assert len(res.get("failovers", [])) > 0
     finally:
         ticker.run_agy_task = original_run
         auth.switch_to_next_healthy_account = orig_switch
 
 if __name__ == "__main__":
-    asyncio.run(test())
+    asyncio.run(test_cron_failover())

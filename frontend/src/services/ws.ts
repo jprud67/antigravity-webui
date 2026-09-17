@@ -295,6 +295,11 @@ export class ChatWebSocketClient {
 
   private queueOrSend(payload: any) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      if (['interrupt', 'clear_queue'].includes(payload.action)) {
+        this.pendingPayloads = this.pendingPayloads.filter(
+          (p) => p.action !== payload.action || p.conversation_id !== payload.conversation_id
+        );
+      }
       this.pendingPayloads.push(payload);
       if (this.pendingPayloads.length > 20) {
         this.pendingPayloads.shift();
@@ -310,6 +315,9 @@ export class ChatWebSocketClient {
     } catch (err) {
       console.error('[WS] Error sending payload, queueing for reconnect:', err);
       this.pendingPayloads.push(payload);
+      if (this.pendingPayloads.length > 20) {
+        this.pendingPayloads.shift();
+      }
     }
   }
 

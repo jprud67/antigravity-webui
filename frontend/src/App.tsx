@@ -1572,15 +1572,14 @@ export function App() {
           onForkMessage={() => handleForkMessage(messages.length > 0 ? messages.length - 1 : 0)}
           onRenameTitle={(newTitle) => {
             if (activeConversationId) {
-              Promise.all([
-                updateConversationMetadata(activeConversationId, { customTitle: newTitle }),
-                updateConversationTitle(activeConversationId, newTitle)
-              ]).then(() => {
-                fetchConversations(100).then(setConversations);
-              }).catch((err) => {
-                console.error('Failed to sync title:', err);
-                fetchConversations(100).then(setConversations);
-              });
+              updateConversationTitle(activeConversationId, newTitle)
+                .then(() => {
+                  fetchConversations(100).then(setConversations);
+                })
+                .catch((err) => {
+                  console.error('Failed to sync title:', err);
+                  fetchConversations(100).then(setConversations);
+                });
             }
           }}
           onRetry={handleRetry}

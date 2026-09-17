@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/git", tags=["git"])
 
 GIT_TIMEOUT = 12
 _COAUTHOR_RE = re.compile(
-    r"(?:co[-_ ]?authored[-_ ]?by|co[-_ ]?author:?|co[-_ ]?committer:?|signed[-_ ]?off[-_ ]?by|assisted[-_ ]?by|claude|anthropic)",
+    r"(?:co[-_ ]?author(?:ed)?[-_ ]?by|co[-_ ]?author:?|co[-_ ]?committ(?:er|ed):?|signed[-_ ]?off[-_ ]?by|assisted[-_ ]?by|help[-_ ]?from|claude|anthropic|chatgpt|openai)",
     re.IGNORECASE
 )
 _URL_CRED_RE = re.compile(r"https?://([^/@:]+):([^/@:]+)@", re.IGNORECASE)
