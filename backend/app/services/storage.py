@@ -159,7 +159,7 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
         "workspace_uris": r["workspace_uris"],
         "status": r["status"],
         "agent_name": r["agent_name"],
-        "parent_conversation_id": dict(r).get("parent_conversation_id") or None,
+        "parent_conversation_id": (r.get("parent_conversation_id") if isinstance(r, dict) else (r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None)) or None,
         "pinned": bool(meta.get("pinned", False)),
         "archived": bool(meta.get("archived", False)),
         "tags": safe_tags,
@@ -199,7 +199,7 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
         all_meta = get_all_session_metadata()
 
         # Guarantee all pinned conversations are fetched even if older than limit * 2
-        pinned_ids = [cid for cid, m in all_meta.items() if m.get("pinned")]
+        pinned_ids = [cid for cid, m in all_meta.items() if m.get("pinned") and is_safe_conversation_id(cid)]
         fetched_ids = {r["conversation_id"] for r in rows}
         missing_pinned = [cid for cid in pinned_ids if cid not in fetched_ids]
         if missing_pinned:
@@ -305,13 +305,20 @@ def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
     return steps
 
 
+_TAGS_PATTERN = (
+    r"ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|"
+    r"USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|"
+    r"MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|"
+    r"COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|"
+    r"TOOL_CALL|AGENT_MODE"
+)
 _USER_REQUEST_RE = re.compile(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', re.IGNORECASE)
 _XML_BLOCKS_RE = re.compile(
-    r'<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)>',
+    rf'<({_TAGS_PATTERN})(?:\s+[^>]*)?>[\s\S]*?</\1>',
     re.IGNORECASE,
 )
 _XML_TAGS_RE = re.compile(
-    r'</?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>',
+    rf'</?(?:USER_REQUEST|{_TAGS_PATTERN})(?:\s+[^>]*)?>',
     re.IGNORECASE,
 )
 _STEERING_PREFIX_RE = re.compile(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+')
@@ -470,6 +477,8 @@ def atomic_write_jsonl(target_path: Path, items: list[dict[str, Any]]) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_file = target_path.parent / f".{target_path.name}.tmp.{uuid.uuid4().hex[:8]}"
     try:
+        tmp_file.touch(mode=0o600, exist_ok=True)
+        restrict_file_permissions(tmp_file)
         with open(tmp_file, "w", encoding="utf-8") as f:
             f.writelines(json.dumps(item, ensure_ascii=False, default=str) + "\n" for item in items)
         restrict_file_permissions(tmp_file)
@@ -1202,7 +1211,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
         if len(matched) < limit:
             metadata_cids = []
             for cid, meta in all_meta.items():
-                if cid in seen_ids:
+                if cid in seen_ids or not is_safe_conversation_id(cid):
                     continue
                 custom_title = (meta.get("customTitle") or "").lower()
                 project = (meta.get("project") or "").lower()

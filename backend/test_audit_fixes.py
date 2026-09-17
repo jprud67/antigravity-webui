@@ -3305,6 +3305,83 @@ def test_google_accounts_delete_route():
     print("✓ test_google_accounts_delete_route passed")
 
 
+def test_auth_verify_password_non_string():
+    from app.services.auth import verify_password
+    assert verify_password(None) is False
+    assert verify_password("") is False
+    assert verify_password(123) is False
+    assert verify_password(["password"]) is False
+    print("✓ test_auth_verify_password_non_string passed")
+
+
+def test_clean_user_prompt_xml_tag_backreference():
+    from app.services.storage import clean_user_prompt
+    # Exact tag match should be removed
+    prompt1 = "Hello <SKILLS>my skill info</SKILLS> world"
+    cleaned1 = clean_user_prompt(prompt1)
+    assert cleaned1 == "Hello  world", f"Got '{cleaned1}'"
+
+    # Mismatched tags should not strip across tags
+    prompt2 = "Hello <SKILLS>valid skill</SKILLS> middle <ARTIFACTS>valid artifact</ARTIFACTS> end"
+    cleaned2 = clean_user_prompt(prompt2)
+    assert "middle" in cleaned2, f"Expected 'middle' preserved, got '{cleaned2}'"
+    print("✓ test_clean_user_prompt_xml_tag_backreference passed")
+
+
+def test_build_conversation_dict_row_or_dict():
+    import sqlite3
+    from app.services.storage import _build_conversation_dict
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE test_conv (
+            conversation_id TEXT,
+            title TEXT,
+            preview TEXT,
+            step_count INT,
+            last_modified_time TEXT,
+            workspace_uris TEXT,
+            status TEXT,
+            agent_name TEXT,
+            parent_conversation_id TEXT
+        )
+    """)
+    cursor.execute("""
+        INSERT INTO test_conv VALUES ('c1', 'T1', 'P1', 1, '2026-09-17T00:00:00', '[]', 'DONE', 'agy', 'p1')
+    """)
+    cursor.execute("SELECT * FROM test_conv WHERE conversation_id = 'c1'")
+    row = cursor.fetchone()
+    d1 = _build_conversation_dict(row, {})
+    assert d1["parent_conversation_id"] == "p1"
+    assert d1["conversation_id"] == "c1"
+
+    cursor.execute("""
+        INSERT INTO test_conv VALUES ('c2', 'T2', 'P2', 2, '2026-09-17T00:00:00', '[]', 'DONE', 'agy', '')
+    """)
+    cursor.execute("SELECT * FROM test_conv WHERE conversation_id = 'c2'")
+    row2 = cursor.fetchone()
+    d2 = _build_conversation_dict(row2, {})
+    assert d2["parent_conversation_id"] is None
+    conn.close()
+    print("✓ test_build_conversation_dict_row_or_dict passed")
+
+
+def test_atomic_write_jsonl_initial_permissions():
+    import tempfile
+    from app.services.storage import atomic_write_jsonl
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "test_out.jsonl"
+        items = [{"index": 0, "content": "secret data"}]
+        atomic_write_jsonl(target, items)
+        assert target.exists()
+        with open(target, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        assert len(lines) == 1
+        assert "secret data" in lines[0]
+    print("✓ test_atomic_write_jsonl_permissions passed")
+
+
 if __name__ == "__main__":
     test_file_download_unicode_and_special_chars()
     test_token_calculation()
@@ -3439,4 +3516,9 @@ if __name__ == "__main__":
     test_execution_manager_cid_sanitization()
     test_storage_artifacts_resilience_and_url_decoding()
     test_google_accounts_delete_route()
+    test_auth_verify_password_non_string()
+    test_clean_user_prompt_xml_tag_backreference()
+    test_build_conversation_dict_row_or_dict()
+    test_atomic_write_jsonl_initial_permissions()
     print("\nAll unit tests passed successfully!")
+

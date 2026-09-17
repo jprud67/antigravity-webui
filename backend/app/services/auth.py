@@ -86,6 +86,8 @@ def save_auth_config(config: dict[str, Any]):
 
 
 def verify_password(input_password: str) -> bool:
+    if not input_password or not isinstance(input_password, str):
+        return False
     config = get_auth_config()
     if not config.get("enabled", True):
         return True
@@ -267,11 +269,16 @@ def verify_api_key(key: str | None) -> bool:
             last_used = k.get("last_used_at") or 0
             # Mettre à jour last_used_at et persister si plus de 60 secondes se sont écoulées
             if now - last_used > 60:
-                k["last_used_at"] = now
-                try:
-                    save_auth_config(config)
-                except Exception as e:
-                    logger.debug(f"Impossible de sauvegarder last_used_at: {e}")
+                with _auth_lock:
+                    current = get_auth_config()
+                    for item in current.get("api_keys", []):
+                        if item.get("id") == k.get("id"):
+                            item["last_used_at"] = now
+                            break
+                    try:
+                        save_auth_config(current)
+                    except Exception as e:
+                        logger.debug(f"Impossible de sauvegarder last_used_at: {e}")
             else:
                 k["last_used_at"] = now
             return True

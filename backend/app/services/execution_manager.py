@@ -454,6 +454,8 @@ class ExecutionSession:
                     new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=current_model)
                     if new_account and attempt < max_failover_attempts:
                         model_switched_on_current_account = False
+                        current_model = model
+                        current_effort = effort
                         logger.info(
                             f"[Session {self.conversation_id}] Auto-failover: Switched from {current_email} to {new_account}. Relaunching task immediately..."
                         )

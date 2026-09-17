@@ -336,10 +336,11 @@ def _read_auth_url(proc, master_fd, win_pty, timeout: float = 12.0):
 
     if IS_WINDOWS:
         chunks: queue.Queue = queue.Queue()
+        stop_event = threading.Event()
 
         def reader():
             try:
-                while True:
+                while not stop_event.is_set():
                     data = win_pty.read(4096)
                     if not data:
                         break
@@ -352,19 +353,22 @@ def _read_auth_url(proc, master_fd, win_pty, timeout: float = 12.0):
         threading.Thread(target=reader, daemon=True, name="gauth-reader").start()
 
         start_time = time.time()
-        while time.time() - start_time < timeout:
-            try:
-                chunk = chunks.get(timeout=0.2)
-            except queue.Empty:
-                if not win_pty.isalive():
+        try:
+            while time.time() - start_time < timeout:
+                try:
+                    chunk = chunks.get(timeout=0.2)
+                except queue.Empty:
+                    if not win_pty.isalive():
+                        break
+                    continue
+                if chunk is None:
                     break
-                continue
-            if chunk is None:
-                break
-            output += chunk
-            match = _AUTH_URL_PATTERN.search(output)
-            if match:
-                return _clean_auth_url(match.group(0)), output
+                output += chunk
+                match = _AUTH_URL_PATTERN.search(output)
+                if match:
+                    return _clean_auth_url(match.group(0)), output
+        finally:
+            stop_event.set()
         return None, output
 
     # POSIX : lecture non bloquante via select
@@ -382,6 +386,8 @@ def _read_auth_url(proc, master_fd, win_pty, timeout: float = 12.0):
             match = _AUTH_URL_PATTERN.search(output)
             if match:
                 return _clean_auth_url(match.group(0)), output
+        elif proc is not None and getattr(proc, "poll", None) and proc.poll() is not None:
+            break
     return None, output
 
 

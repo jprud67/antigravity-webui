@@ -282,7 +282,7 @@ def get_git_diff(
         if not diff_text:
             file_on_disk = (target / norm_path).resolve()
             if is_safe_path(file_on_disk, [target]) and file_on_disk.is_file():
-                devnull_cands = [os.devnull] if os.devnull == "/dev/null" else [os.devnull, "/dev/null"]
+                devnull_cands = list(dict.fromkeys([os.devnull, "NUL", "/dev/null"]))
                 for null_target in devnull_cands:
                     try:
                         untracked_res = run_git(["diff", "--no-index", "--", null_target, norm_path], target)
