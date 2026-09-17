@@ -19,7 +19,8 @@ GIT_TIMEOUT = 12
 _COAUTHOR_RE = re.compile(r"(?:co[-_ ]?authored[-_ ]?by|co[-_ ]?author:?|signed[-_ ]?off[-_ ]?by|claude|anthropic)", re.IGNORECASE)
 
 def _sanitize_git_message(msg: str) -> str:
-    lines = [line for line in msg.strip().split("\n") if not _COAUTHOR_RE.search(line)]
+    normalized = msg.replace("\r\n", "\n").replace("\r", "\n")
+    lines = [line.rstrip() for line in normalized.strip().split("\n") if not _COAUTHOR_RE.search(line)]
     clean = "\n".join(lines).strip()
     clean = re.sub(r'\n{3,}', '\n\n', clean)
     return clean or "chore: update repository"

@@ -212,6 +212,7 @@ class PersistentTerminalSession:
     async def write(self, data: bytes):
         if not self.is_alive():
             return
+        self.last_active = time.time()
         if IS_WINDOWS:
             if self.win_pty is not None:
                 try:
@@ -295,21 +296,56 @@ class PersistentTerminalSession:
 
 _sessions: dict[str, PersistentTerminalSession] = {}
 _sessions_lock = asyncio.Lock()
+TERMINAL_IDLE_TIMEOUT_SECONDS = 7200  # 2 hours idle timeout for disconnected sessions
+
+
+async def prune_dead_sessions() -> None:
+    """Removes dead or long-idle sessions (process exited OR idle >2h with no client) from _sessions dictionary."""
+    now = time.time()
+    to_close: list[PersistentTerminalSession] = []
+    async with _sessions_lock:
+        dead_sids = [
+            sid for sid, s in _sessions.items()
+            if (not s.is_alive() and s.active_websocket is None)
+            or (s.active_websocket is None and (now - s.last_active) > TERMINAL_IDLE_TIMEOUT_SECONDS)
+        ]
+        for sid in dead_sids:
+            s = _sessions.pop(sid, None)
+            if s:
+                to_close.append(s)
+    for s in to_close:
+        try:
+            await s.close()
+            logger.info(f"Pruned inactive/dead terminal session: {s.session_id}")
+        except Exception as e:
+            logger.debug(f"Ignored error closing pruned terminal session: {e}")
+
 
 async def get_or_create_session(session_id: str, cwd: str) -> tuple[PersistentTerminalSession, bool]:
     """Returns (session, is_new)"""
+    await prune_dead_sessions()
+    old_session: PersistentTerminalSession | None = None
     async with _sessions_lock:
         session = _sessions.get(session_id)
         if session and session.is_alive():
+            session.last_active = time.time()
             return session, False
 
         if session:
-            await session.close()
+            old_session = _sessions.pop(session_id, None)
 
         new_session = PersistentTerminalSession(session_id, cwd)
         await new_session.start()
         _sessions[session_id] = new_session
-        return new_session, True
+        created_session = new_session
+
+    if old_session:
+        try:
+            await old_session.close()
+        except Exception as e:
+            logger.debug(f"Error closing old session: {e}")
+
+    return created_session, True
 
 async def kill_session(session_id: str):
     async with _sessions_lock:
@@ -442,22 +478,8 @@ async def terminal_websocket(
         # DETACH CLIENT BUT KEEP PTY PROCESS ALIVE!
         if session and session.active_websocket == websocket:
             session.active_websocket = None
+            session.last_active = time.time()
         logger.info(f"Terminal WebSocket detached from session {sid} (process kept running)")
-
-async def prune_dead_sessions() -> None:
-    """Removes dead sessions (process exited and no client attached) from _sessions dictionary."""
-    async with _sessions_lock:
-        dead_sids = [
-            sid for sid, s in _sessions.items()
-            if not s.is_alive() and s.active_websocket is None
-        ]
-        for sid in dead_sids:
-            s = _sessions.pop(sid, None)
-            if s:
-                try:
-                    await s.close()
-                except Exception as e:
-                    logger.debug(f"Ignored error: {e}")
 
 @router.get("/api/terminal/sessions")
 async def list_terminal_sessions(_ = Depends(require_auth)):

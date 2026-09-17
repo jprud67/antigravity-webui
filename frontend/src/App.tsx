@@ -92,6 +92,25 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
   };
 };
 
+const normalizeUsage = (raw: any): TokenUsageData | undefined => {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const inputTokens = Number(raw.inputTokens ?? raw.input_tokens ?? raw.prompt_tokens ?? raw.promptTokenCount ?? 0) || 0;
+  const outputTokens = Number(raw.outputTokens ?? raw.output_tokens ?? raw.completion_tokens ?? raw.candidatesTokenCount ?? 0) || 0;
+  const thinkingTokens = Number(raw.thinkingTokens ?? raw.thinking_tokens ?? raw.reasoning_tokens ?? raw.thinkingTokenCount ?? 0) || 0;
+  let totalTokens = Number(raw.totalTokens ?? raw.total_tokens ?? raw.totalTokenCount ?? 0) || 0;
+  if (totalTokens === 0 && (inputTokens > 0 || outputTokens > 0 || thinkingTokens > 0)) {
+    totalTokens = inputTokens + outputTokens + thinkingTokens;
+  }
+  const isEstimated = typeof raw.isEstimated === 'boolean' ? raw.isEstimated : (typeof raw.is_estimated === 'boolean' ? raw.is_estimated : false);
+  return {
+    inputTokens,
+    outputTokens,
+    thinkingTokens,
+    totalTokens,
+    isEstimated
+  };
+};
+
 export function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -230,14 +249,9 @@ export function App() {
       setMessages(chatMsgs);
 
       // Instantly set accurate token usage for selected conversation
-      if (data.usage && data.usage.total_tokens > 0) {
-        setTokenUsage({
-          inputTokens: data.usage.input_tokens || 0,
-          outputTokens: data.usage.output_tokens || 0,
-          thinkingTokens: data.usage.thinking_tokens || 0,
-          totalTokens: data.usage.total_tokens || 0,
-          isEstimated: data.usage.is_estimated ?? true
-        });
+      const normUsage = normalizeUsage(data.usage);
+      if (normUsage && normUsage.totalTokens > 0) {
+        setTokenUsage(normUsage);
       } else {
         setTokenUsage(estimateUsageFromMessages(chatMsgs));
       }
@@ -382,14 +396,9 @@ export function App() {
           fetchConversationTranscript(convId).then((data) => {
             const chatMsgs = parseStepsToMessages(data.steps || []);
             setMessages(chatMsgs);
-            if (data.usage && data.usage.total_tokens > 0) {
-              setTokenUsage({
-                inputTokens: data.usage.input_tokens || 0,
-                outputTokens: data.usage.output_tokens || 0,
-                thinkingTokens: data.usage.thinking_tokens || 0,
-                totalTokens: data.usage.total_tokens || 0,
-                isEstimated: data.usage.is_estimated ?? true
-              });
+            const normUsage = normalizeUsage(data.usage);
+            if (normUsage && normUsage.totalTokens > 0) {
+              setTokenUsage(normUsage);
             } else {
               setTokenUsage(estimateUsageFromMessages(chatMsgs));
             }
@@ -473,7 +482,10 @@ export function App() {
             const live = event.active_turn.live_state;
             if (live) {
               if (live.pending_approval) setPendingApproval(live.pending_approval);
-              if (live.usage) setTokenUsage(live.usage);
+              if (live.usage) {
+                const norm = normalizeUsage(live.usage);
+                if (norm) setTokenUsage(norm);
+              }
               const hasContent = live.content || live.thought || (live.tool_calls && live.tool_calls.length > 0);
               if (hasContent) {
                 setMessages((prev) => {
@@ -522,7 +534,10 @@ export function App() {
             const live = event.live_state;
             if (live) {
               if (live.pending_approval) setPendingApproval(live.pending_approval);
-              if (live.usage) setTokenUsage(live.usage);
+              if (live.usage) {
+                const norm = normalizeUsage(live.usage);
+                if (norm) setTokenUsage(norm);
+              }
               const hasContent = live.content || live.thought || (live.tool_calls && live.tool_calls.length > 0);
               if (hasContent) {
                 setMessages((prev) => {
@@ -577,15 +592,8 @@ export function App() {
 
         // Live Context & Token Telemetry
         if (update.usage) {
-          const inTokens = update.usage.input_tokens || 0;
-          const outTokens = update.usage.output_tokens || 0;
-          setTokenUsage({
-            inputTokens: inTokens,
-            outputTokens: outTokens,
-            thinkingTokens: update.usage.thinking_tokens || 0,
-            totalTokens: update.usage.total_tokens || (inTokens + outTokens),
-            isEstimated: false
-          });
+          const norm = normalizeUsage(update.usage);
+          if (norm) setTokenUsage(norm);
         }
 
         // Approval requested via tool step
@@ -712,15 +720,8 @@ export function App() {
       } else if (event.event === 'result') {
         const res = event.result;
         if (res?.usage) {
-          const inTokens = res.usage.input_tokens || 0;
-          const outTokens = res.usage.output_tokens || 0;
-          setTokenUsage({
-            inputTokens: inTokens,
-            outputTokens: outTokens,
-            thinkingTokens: res.usage.thinking_tokens || 0,
-            totalTokens: res.usage.total_tokens || (inTokens + outTokens),
-            isEstimated: false
-          });
+          const norm = normalizeUsage(res.usage);
+          if (norm) setTokenUsage(norm);
         }
         setMessages((prev) => {
           const last = prev[prev.length - 1];
@@ -1377,14 +1378,9 @@ export function App() {
       const data = await undoConversationTurn(activeConversationId);
       const chatMsgs = parseStepsToMessages(data.steps || []);
       setMessages(chatMsgs);
-      if (data.usage && data.usage.total_tokens > 0) {
-        setTokenUsage({
-          inputTokens: data.usage.input_tokens || 0,
-          outputTokens: data.usage.output_tokens || 0,
-          thinkingTokens: data.usage.thinking_tokens || 0,
-          totalTokens: data.usage.total_tokens || 0,
-          isEstimated: data.usage.is_estimated ?? true
-        });
+      const normUsage = normalizeUsage(data.usage);
+      if (normUsage && normUsage.totalTokens > 0) {
+        setTokenUsage(normUsage);
       } else {
         setTokenUsage(estimateUsageFromMessages(chatMsgs));
       }

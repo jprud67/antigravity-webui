@@ -492,6 +492,7 @@ class ExecutionSession:
                     logger.error(f"[Session {self.conversation_id}] Worker task error: {e}")
             finally:
                 self.active_task = None
+                self.is_steering = False
                 self.last_active_at = time.time()
                 self.message_queue.task_done()
 
@@ -513,11 +514,11 @@ class ExecutionManager:
         if not conversation_id:
             return
         target_session = self.sessions.pop(conversation_id, None)
-        if not target_session and self.active_session and self.active_session.conversation_id == conversation_id:
-            target_session = self.active_session
+        if self.active_session and (self.active_session.conversation_id == conversation_id or self.active_session is target_session):
+            if not target_session:
+                target_session = self.active_session
+            self.active_session = None
         if target_session:
-            if target_session is self.active_session:
-                self.active_session = None
             if target_session.active_task and not target_session.active_task.done():
                 target_session.active_task.cancel()
             if target_session.active_proc and target_session.active_proc.returncode is None:

@@ -1687,7 +1687,12 @@ def test_git_sanitize_message_triple_newlines():
     from app.api.git import _sanitize_git_message
     msg = "line 1\n\n\n\n\nline 2"
     sanitized = _sanitize_git_message(msg)
-    assert sanitized == "line 1\n\nline 2", f"Expected collapsed newlines, got {repr(sanitized)}"
+    assert sanitized == "line 1\n\nline 2", f"Expected collapsed newlines, got {sanitized!r}"
+
+    crlf_msg = "feat: add feature\r\n\r\nCo-Authored-By: Claude <claude@anthropic.com>\r\n"
+    sanitized_crlf = _sanitize_git_message(crlf_msg)
+    assert sanitized_crlf == "feat: add feature", f"Expected 'feat: add feature', got {sanitized_crlf!r}"
+    assert "claude" not in sanitized_crlf.lower()
     print("✓ test_git_sanitize_message_triple_newlines passed")
 
 
@@ -1824,8 +1829,9 @@ def test_handoff_conversation_initial_index_and_title_sanitization():
 
 
 def test_serve_frontend_api_and_docs_exclusion():
-    from fastapi import HTTPException
     import asyncio
+
+    from fastapi import HTTPException
     serve_handler = None
     for route in app.routes:
         if getattr(route, "name", None) == "serve_frontend" or (hasattr(route, "path") and route.path == "/{full_path:path}"):
