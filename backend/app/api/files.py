@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
-from app.config import DEFAULT_WORKSPACE
+from app.config import DEFAULT_WORKSPACE, GEMINI_DIR
 from app.platform_utils import is_blocked_sensitive_path, is_safe_path
 from app.services.storage import get_settings
 
@@ -82,7 +82,21 @@ def _is_blocked_sensitive_path(resolved: Path) -> bool:
 
 def _validate_path_access(file_path: Path) -> Path:
     try:
-        if not file_path.is_absolute():
+        from urllib.parse import unquote
+        p_str = unquote(str(file_path).strip())
+        if p_str.startswith("workspace://"):
+            p_str = p_str[12:].lstrip("/")
+            file_path = Path(DEFAULT_WORKSPACE) / p_str
+        elif p_str.startswith("file:///"):
+            p_str = "/" + p_str[8:].lstrip("/")
+            file_path = Path(p_str)
+        elif p_str.startswith("file://"):
+            p_str = "/" + p_str[7:].lstrip("/")
+            file_path = Path(p_str)
+        elif p_str.startswith("file:/"):
+            p_str = "/" + p_str[6:].lstrip("/")
+            file_path = Path(p_str)
+        elif not file_path.is_absolute():
             file_path = Path(DEFAULT_WORKSPACE) / file_path
         resolved = file_path.resolve()
     except Exception as e:
@@ -93,7 +107,7 @@ def _validate_path_access(file_path: Path) -> Path:
 
     settings = get_settings()
     workspaces = settings.get("trustedWorkspaces", [])
-    allowed_roots = [Path(DEFAULT_WORKSPACE).resolve()]
+    allowed_roots = [Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve()]
     for ws in workspaces:
         try:
             allowed_roots.append(Path(ws).resolve())
@@ -204,7 +218,9 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
 @router.get("/download")
 def download_file(path: str = Query(...), _ = Depends(require_auth)):
     import mimetypes
-    file_path = Path(path)
+    from urllib.parse import unquote
+    clean_p = unquote(path.strip())
+    file_path = Path(clean_p)
     resolved_path = _validate_path_access(file_path)
     if not resolved_path.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
@@ -212,9 +228,22 @@ def download_file(path: str = Query(...), _ = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="La cible n'est pas un fichier.")
 
     media_type, _ = mimetypes.guess_type(resolved_path.name)
+    ext = resolved_path.suffix.lower()
+    if ext == ".docx":
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    elif ext == ".doc":
+        media_type = "application/msword"
+    elif ext == ".xlsx":
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif ext == ".pptx":
+        media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    elif ext == ".pdf":
+        media_type = "application/pdf"
+
     return FileResponse(
         path=str(resolved_path),
         filename=resolved_path.name,
-        media_type=media_type or "application/octet-stream"
+        media_type=media_type or "application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{resolved_path.name}"'}
     )
 

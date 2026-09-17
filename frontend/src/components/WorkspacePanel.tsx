@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   X, 
   FolderTree, 
@@ -16,7 +16,8 @@ import {
   Save,
   Check,
   Eye,
-  Code
+  Code,
+  Download
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -25,7 +26,7 @@ import { GitTab } from './GitTab';
 import { KanbanTab } from './KanbanTab';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
-import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent, fetchGitStatus, type GitStatusResult, getAuthToken } from '../services/api';
+import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent, fetchGitStatus, type GitStatusResult, getAuthToken, triggerFileDownload } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
 import type { ArtifactItem } from '../types';
@@ -126,11 +127,30 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     }
   }, [checkUnsavedChanges, onTabChange]);
 
+  const BINARY_EXTENSIONS = useMemo(() => new Set([
+    'docx', 'doc', 'pdf', 'zip', 'tar', 'gz', 'tgz', '7z', 'rar',
+    'xlsx', 'xls', 'pptx', 'ppt', 'bin', 'exe', 'iso', 'odt', 'ods', 'odp'
+  ]), []);
+
+  const isBinaryFile = useCallback((p?: string | null) => {
+    if (!p) return false;
+    const ext = p.split('.').pop()?.toLowerCase() || '';
+    return BINARY_EXTENSIONS.has(ext);
+  }, [BINARY_EXTENSIONS]);
+
   const handleSelectFile = useCallback(async (path: string) => {
     if (!(await checkUnsavedChanges())) return;
     setSelectedFilePath(path);
     setIsEditingFile(false);
     setSaveSuccess(false);
+
+    if (isBinaryFile(path)) {
+      setFileContent('');
+      setEditedFileContent('');
+      setLoadingContent(false);
+      return;
+    }
+
     setLoadingContent(true);
     try {
       const res = await fetchFileContent(path);
@@ -142,7 +162,25 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } finally {
       setLoadingContent(false);
     }
-  }, [checkUnsavedChanges]);
+  }, [checkUnsavedChanges, isBinaryFile]);
+
+  const handleDownloadCurrentFile = useCallback(async () => {
+    if (!selectedFilePath) return;
+    try {
+      const token = getAuthToken();
+      const downloadUrl = `/api/files/download?path=${encodeURIComponent(selectedFilePath)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+      const res = await fetch(downloadUrl, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const blob = await res.blob();
+      const filename = selectedFilePath.split(/[/\\]/).pop() || 'fichier';
+      triggerFileDownload(blob, filename);
+      showToast(`Téléchargement de « ${filename} » terminé`, 'success');
+    } catch {
+      showToast('Erreur lors du téléchargement du fichier.', 'error');
+    }
+  }, [selectedFilePath]);
 
   const handleSaveFile = useCallback(async () => {
     if (!selectedFilePath) return;
@@ -566,6 +604,20 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             + Insérer
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={handleDownloadCurrentFile}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:opacity-90"
+                          style={{
+                            backgroundColor: 'var(--surface)',
+                            borderColor: 'var(--border)',
+                            color: 'var(--text)',
+                          }}
+                          title="Télécharger le fichier sur votre appareil"
+                        >
+                          <Download className="w-2.5 h-2.5" />
+                          <span>Télécharger</span>
+                        </button>
                         {selectedFilePath.endsWith('.md') && !isEditingFile && (
                           <button
                             type="button"
@@ -582,23 +634,25 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             <span>{showMarkdownPreview ? 'Source' : 'Aperçu'}</span>
                           </button>
                         )}
-                        <button
-                          onClick={() => {
-                            if (!isEditingFile) {
-                              setEditedFileContent(fileContent || '');
-                            }
-                            setIsEditingFile(!isEditingFile);
-                          }}
-                          className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border"
-                          style={{
-                            backgroundColor: isEditingFile ? 'var(--accent-bg)' : 'var(--surface)',
-                            borderColor: isEditingFile ? 'var(--accent)' : 'var(--border)',
-                            color: isEditingFile ? 'var(--accent)' : 'var(--text)',
-                          }}
-                        >
-                          <Edit3 className="w-2.5 h-2.5" />
-                          <span>{isEditingFile ? 'Lecture' : 'Éditer'}</span>
-                        </button>
+                        {!isBinaryFile(selectedFilePath) && (
+                          <button
+                            onClick={() => {
+                              if (!isEditingFile) {
+                                setEditedFileContent(fileContent || '');
+                              }
+                              setIsEditingFile(!isEditingFile);
+                            }}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border"
+                            style={{
+                              backgroundColor: isEditingFile ? 'var(--accent-bg)' : 'var(--surface)',
+                              borderColor: isEditingFile ? 'var(--accent)' : 'var(--border)',
+                              color: isEditingFile ? 'var(--accent)' : 'var(--text)',
+                            }}
+                          >
+                            <Edit3 className="w-2.5 h-2.5" />
+                            <span>{isEditingFile ? 'Lecture' : 'Éditer'}</span>
+                          </button>
+                        )}
                         {isEditingFile && (
                           <button
                             onClick={handleSaveFile}
@@ -636,6 +690,32 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             className="max-w-full max-h-full object-contain rounded-lg shadow-sm border"
                             style={{ borderColor: 'var(--border)' }}
                           />
+                        </div>
+                      ) : isBinaryFile(selectedFilePath) ? (
+                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-3">
+                          <div className="w-14 h-14 rounded-2xl flex items-center justify-center border shadow-sm" style={{ backgroundColor: 'var(--accent-bg)', borderColor: 'var(--accent)' }}>
+                            <FileText className="w-7 h-7" style={{ color: 'var(--accent)' }} />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-semibold mb-1" style={{ color: 'var(--strong)' }}>
+                              {selectedFilePath.split(/[/\\]/).pop()}
+                            </h4>
+                            <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                              Fichier binaire (document bureautique ou archive).
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleDownloadCurrentFile}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all hover:scale-105 cursor-pointer mt-2"
+                            style={{
+                              backgroundColor: 'var(--accent)',
+                              color: '#fff',
+                            }}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Télécharger le fichier</span>
+                          </button>
                         </div>
                       ) : selectedFilePath.endsWith('.md') && showMarkdownPreview ? (
                         <div className="p-3 prose dark:prose-invert max-w-none text-xs leading-relaxed overflow-y-auto">

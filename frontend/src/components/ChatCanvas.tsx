@@ -33,7 +33,6 @@ import {
   AlertCircle,
   AlertTriangle,
   ShieldAlert,
-  FileCode,
   ExternalLink,
   User,
   Menu,
@@ -45,7 +44,7 @@ import type { ChatMessage, ToolCallItem } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
 import { DiffViewer } from './DiffViewer';
 import { ApprovalCard } from './ApprovalCard';
-import { getExportHtmlUrl, getExportMarkdownUrl, getExportJsonUrl } from '../services/api';
+import { getExportHtmlUrl, getExportMarkdownUrl, getExportJsonUrl, getAuthToken } from '../services/api';
 import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 import { showToast } from '../services/toast';
@@ -195,6 +194,14 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
     const normalizedSlashPath = cleanPath.replace(/\\/g, '/');
     const isArtifact = normalizedSlashPath.includes('/brain/') && cleanPath.endsWith('.md');
 
+    const token = getAuthToken();
+    const downloadUrl = `/api/files/download?path=${encodeURIComponent(cleanPath)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+
+    const handleDownload = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      showToast(`Téléchargement de « ${filename} » démarré`, 'info');
+    };
+
     if (isArtifact) {
       return (
         <span
@@ -245,34 +252,44 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
               </span>
             </span>
           </span>
-          <span
-            className="flex items-center gap-1.5 text-[11px] font-semibold shrink-0 px-2.5 py-1 rounded-lg border transition-colors"
-            style={{
-              backgroundColor: 'var(--accent-bg)',
-              borderColor: 'var(--accent-bg-strong)',
-              color: 'var(--accent-text)',
-            }}
-          >
-            <span>Ouvrir</span>
-            <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+          <span className="flex items-center gap-2 shrink-0">
+            <a
+              href={downloadUrl}
+              download={filename}
+              onClick={handleDownload}
+              title={`Télécharger « ${filename} »`}
+              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:scale-105 no-underline"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border)',
+                color: 'var(--accent-text)',
+              }}
+            >
+              <Download className="w-3 h-3" />
+              <span>Télécharger</span>
+            </a>
+            <span
+              className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-colors"
+              style={{
+                backgroundColor: 'var(--accent-bg)',
+                borderColor: 'var(--accent-bg-strong)',
+                color: 'var(--accent-text)',
+              }}
+            >
+              <span>Ouvrir</span>
+              <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+            </span>
           </span>
         </span>
       );
     }
 
     return (
-      <span
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          window.dispatchEvent(new CustomEvent('open-workspace-file', { detail: { path: cleanPath } }));
-          if (onOpenFile) {
-            onOpenFile();
-          } else {
-            copyTextToClipboard(cleanPath);
-          }
-        }}
-        className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg font-mono text-[12.5px] cursor-pointer border transition-all my-1 shadow-sm hover:shadow-md group/file"
+      <a
+        href={downloadUrl}
+        download={filename}
+        onClick={handleDownload}
+        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl font-mono text-[12.5px] cursor-pointer border transition-all my-1.5 shadow-sm hover:shadow-md group/file no-underline select-none"
         style={{
           backgroundColor: 'var(--surface-subtle)',
           borderColor: 'var(--border)',
@@ -286,7 +303,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
           e.currentTarget.style.borderColor = 'var(--border)';
           e.currentTarget.style.backgroundColor = 'var(--surface-subtle)';
         }}
-        title={`Fichier local : ${cleanPath}${anchor ? ' (' + anchor + ')' : ''} — Cliquer pour inspecter`}
+        title={`Cliquer pour télécharger directement « ${filename} »`}
       >
         <span
           className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 border"
@@ -295,7 +312,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
             borderColor: 'var(--accent-bg-strong)',
           }}
         >
-          <FileCode className="w-3 h-3" style={{ color: 'var(--accent)' }} />
+          <Download className="w-3 h-3" style={{ color: 'var(--accent)' }} />
         </span>
         <span className="font-semibold underline decoration-dotted underline-offset-2 truncate max-w-[280px]">
           {displayLabel}
@@ -312,8 +329,30 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
             {anchor}
           </span>
         )}
-        <ExternalLink className="w-3 h-3 opacity-50 group-hover/file:opacity-100 shrink-0 transition-opacity" />
-      </span>
+        <span
+          className="text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 uppercase tracking-wide flex items-center gap-1 shadow-xs"
+          style={{
+            backgroundColor: 'var(--accent)',
+            borderColor: 'var(--accent)',
+            color: '#ffffff',
+          }}
+        >
+          <span>Télécharger</span>
+          <Download className="w-2.5 h-2.5" />
+        </span>
+        <span
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.dispatchEvent(new CustomEvent('open-workspace-file', { detail: { path: cleanPath } }));
+            if (onOpenFile) onOpenFile();
+          }}
+          title="Ouvrir dans le panneau latéral"
+          className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors ml-0.5 opacity-50 hover:opacity-100 shrink-0"
+        >
+          <ExternalLink className="w-3 h-3" />
+        </span>
+      </a>
     );
   }
 
