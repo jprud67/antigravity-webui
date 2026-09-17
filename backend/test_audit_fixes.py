@@ -2398,6 +2398,95 @@ def test_git_diff_untracked_fallback_resilience():
     print("✓ test_git_diff_untracked_fallback_resilience passed")
 
 
+def test_git_pull_sanitization_and_execution():
+    from fastapi import HTTPException
+
+    from app.api.git import PullRequest, git_pull
+    from app.config import DEFAULT_WORKSPACE
+
+    # Test invalid remote rejected
+    try:
+        git_pull(PullRequest(workspace=DEFAULT_WORKSPACE, remote="--upload-pack=exploit", branch="main"), _=None)
+        assert False, "Should have rejected invalid remote"
+    except HTTPException as e:
+        assert e.status_code == 400
+        assert "Nom de remote Git invalide" in e.detail
+
+    # Test invalid branch rejected
+    try:
+        git_pull(PullRequest(workspace=DEFAULT_WORKSPACE, remote="origin", branch="--delete"), _=None)
+        assert False, "Should have rejected invalid branch"
+    except HTTPException as e:
+        assert e.status_code == 400
+        assert "Nom de branche Git invalide" in e.detail
+
+    print("✓ test_git_pull_sanitization_and_execution passed")
+
+
+def test_git_diff_deleted_file_fallback():
+    import shutil
+
+    from app.api.git import get_git_diff, run_git
+    from app.config import DEFAULT_WORKSPACE
+
+    tmp_repo = Path(DEFAULT_WORKSPACE) / ".tmp_test_diff_repo"
+    if tmp_repo.exists():
+        shutil.rmtree(tmp_repo, ignore_errors=True)
+    tmp_repo.mkdir(parents=True, exist_ok=True)
+
+    try:
+        run_git(["init"], tmp_repo)
+        f_path = tmp_repo / "deleted_file.txt"
+        f_path.write_text("deleted content test\n", encoding="utf-8")
+        run_git(["add", "deleted_file.txt"], tmp_repo)
+        run_git(["commit", "-m", "chore: add file"], tmp_repo)
+
+        # Delete file on disk
+        f_path.unlink()
+
+        # Should not throw 400, but find the diff in HEAD
+        res = get_git_diff(workspace=str(tmp_repo), path="deleted_file.txt", staged=False, _=None)
+        assert res["path"] == "deleted_file.txt"
+        assert "deleted content test" in res["diff"]
+
+        # Also test with leading slash path
+        res_slash = get_git_diff(workspace=str(tmp_repo), path="/deleted_file.txt", staged=False, _=None)
+        assert "deleted content test" in res_slash["diff"]
+    finally:
+        shutil.rmtree(tmp_repo, ignore_errors=True)
+    print("✓ test_git_diff_deleted_file_fallback passed")
+
+
+def test_git_status_count_fields():
+    from app.api.git import get_git_status
+
+    st = get_git_status(workspace=str(BACKEND_DIR.parent), _=None)
+    assert st["is_repo"] is True
+    assert "is_clean" in st
+    assert "modified_count" in st
+    assert "staged_count" in st
+    assert "untracked_count" in st
+    assert "deleted_count" in st
+    assert st["clean"] == st["is_clean"]
+    assert st["modified_count"] == len(st["modified"])
+    assert st["staged_count"] == len(st["staged"])
+    assert st["untracked_count"] == len(st["untracked"])
+    assert st["deleted_count"] == len(st["deleted"])
+    print("✓ test_git_status_count_fields passed")
+
+
+def test_kill_task_name_matching():
+    from app.api.tasks import KillTaskRequest, kill_task
+
+    res = kill_task(KillTaskRequest(task_id="python"), _=None)
+    assert res["success"] is False
+    assert "Aucun PID spécifié ou processus actif trouvé" in res["message"]
+
+    res_short = kill_task(KillTaskRequest(task_id="ab"), _=None)
+    assert res_short["success"] is False
+    print("✓ test_kill_task_name_matching passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -2497,4 +2586,8 @@ if __name__ == "__main__":
     test_read_artifact_content_utf8_bom()
     test_get_file_content_utf8_bom()
     test_git_diff_untracked_fallback_resilience()
+    test_git_pull_sanitization_and_execution()
+    test_git_diff_deleted_file_fallback()
+    test_git_status_count_fields()
+    test_kill_task_name_matching()
     print("\nAll unit tests passed successfully!")

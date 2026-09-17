@@ -203,11 +203,16 @@ def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth
         "ahead": ahead,
         "behind": behind,
         "clean": len(modified) == 0 and len(staged) == 0 and len(untracked) == 0 and len(deleted) == 0 and len(conflicts) == 0,
+        "is_clean": len(modified) == 0 and len(staged) == 0 and len(untracked) == 0 and len(deleted) == 0 and len(conflicts) == 0,
         "conflicts": conflicts,
         "modified": modified,
         "staged": staged,
         "untracked": untracked,
         "deleted": deleted,
+        "modified_count": len(modified),
+        "staged_count": len(staged),
+        "untracked_count": len(untracked),
+        "deleted_count": len(deleted),
         "last_commit": last_commit
     }
 
@@ -236,7 +241,7 @@ def get_git_diff(
                 if not clean_str or ".." in Path(clean_str).parts:
                     raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
                 candidate = (target / clean_str).resolve()
-                if is_safe_path(candidate, [target]) and candidate.exists():
+                if is_safe_path(candidate, [target]):
                     clean_rel = clean_str
                 else:
                     raise HTTPException(status_code=400, detail="Chemin de fichier en dehors de l'espace de travail.")
@@ -258,13 +263,18 @@ def get_git_diff(
     res = run_git(args, target)
     diff_text = res.stdout
 
-    # Fallback pour fichiers indexes ou non suivis si aucun diff standard n'est trouve
+    # Fallback pour fichiers indexes, supprimes ou non suivis si aucun diff standard n'est trouve
     if not diff_text and norm_path:
         if not staged:
             # Verifier si un diff indexe (staged) existe pour ce fichier
             cached_res = run_git(["diff", "--cached", "--", norm_path], target)
             if cached_res.stdout:
                 diff_text = cached_res.stdout
+        # Si toujours vide, verifier par rapport a HEAD (utile pour les fichiers supprimes ou indexes)
+        if not diff_text:
+            head_res = run_git(["diff", "HEAD", "--", norm_path], target)
+            if head_res.stdout:
+                diff_text = head_res.stdout
         # Si toujours vide, verifier si c'est un fichier non suivi (untracked) present sur le disque
         if not diff_text:
             file_on_disk = (target / norm_path).resolve()
@@ -392,6 +402,59 @@ def git_push(req: PushRequest, _ = Depends(require_auth)):
     return {
         "success": True,
         "output": push_res.stdout.strip() or push_res.stderr.strip()
+    }
+
+
+class PullRequest(BaseModel):
+    workspace: str | None = None
+    remote: str = "origin"
+    branch: str | None = None
+    rebase: bool = False
+
+
+@router.post("/pull")
+def git_pull(req: PullRequest, _ = Depends(require_auth)):
+    import os as _os
+    target = _validate_workspace(req.workspace)
+    remote = req.remote.strip() if req.remote else "origin"
+    if remote.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote):
+        raise HTTPException(status_code=400, detail="Nom de remote Git invalide.")
+
+    branch = req.branch.strip() if req.branch else None
+    if not branch:
+        res_br = run_git(["branch", "--show-current"], target)
+        branch = res_br.stdout.strip() or "main"
+
+    if branch.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
+        raise HTTPException(status_code=400, detail="Nom de branche Git invalide.")
+
+    git_env = _os.environ.copy()
+    git_env["GIT_TERMINAL_PROMPT"] = "0"
+
+    pull_args = ["pull"]
+    if req.rebase:
+        pull_args.append("--rebase")
+    else:
+        pull_args.append("--ff-only")
+    pull_args.extend([remote, branch])
+
+    pull_res = run_git(pull_args, target, timeout=35, env=git_env)
+    if pull_res.returncode != 0:
+        err_out = pull_res.stderr or pull_res.stdout or ""
+        # If fast-forward only failed and user did not request rebase, fallback to standard merge pull
+        if "--ff-only" in pull_args and ("not possible to fast-forward" in err_out.lower() or "fatal: not possible to fast-forward" in err_out.lower()):
+            pull_res = run_git(["pull", remote, branch], target, timeout=35, env=git_env)
+
+        if pull_res.returncode != 0:
+            err_msg = pull_res.stderr or pull_res.stdout or "Erreur inconnue lors du pull"
+            raise HTTPException(
+                status_code=500,
+                detail=f"Échec du pull : {_mask_git_output(err_msg.strip())}"
+            )
+
+    return {
+        "success": True,
+        "output": _mask_git_output(pull_res.stdout.strip() or pull_res.stderr.strip() or "Already up to date.")
     }
 
 

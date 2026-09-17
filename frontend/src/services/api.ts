@@ -410,11 +410,16 @@ export interface GitStatusResult {
   ahead: number;
   behind: number;
   clean: boolean;
+  is_clean?: boolean;
   conflicts?: string[];
   modified: string[];
   staged: string[];
   untracked: string[];
   deleted: string[];
+  modified_count?: number;
+  staged_count?: number;
+  untracked_count?: number;
+  deleted_count?: number;
   last_commit?: {
     hash: string;
     author: string;
@@ -470,6 +475,19 @@ export async function gitPush(workspace?: string, remote: string = 'origin', bra
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Échec du push' }));
     throw new Error(err.detail || 'Erreur lors du push');
+  }
+  return res.json();
+}
+
+export async function gitPull(workspace?: string, remote: string = 'origin', branch?: string, rebase: boolean = false): Promise<{ success: boolean; output: string }> {
+  const res = await fetch(`${API_BASE}/git/pull`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ workspace, remote, branch, rebase })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du pull' }));
+    throw new Error(err.detail || 'Erreur lors du pull');
   }
   return res.json();
 }

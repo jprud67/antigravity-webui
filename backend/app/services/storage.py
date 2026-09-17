@@ -1442,7 +1442,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                 })
             continue
 
-        # 4. Assistant actions
+        # 5. Assistant actions
         mapped_tools = []
         if isinstance(tool_calls, list):
             for tc in tool_calls:
@@ -1467,7 +1467,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                 existing_c = current_asst.get("content", "")
                 current_asst["content"] = f"{existing_c}\n\n{content}".strip() if existing_c else content
             if mapped_tools:
-                current_asst["tool_activities"].extend(mapped_tools)
+                current_asst.setdefault("tool_activities", []).extend(mapped_tools)
         else:
             current_asst = {
                 "role": "assistant",

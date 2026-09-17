@@ -25,7 +25,7 @@ import { GitTab } from './GitTab';
 import { KanbanTab } from './KanbanTab';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
-import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent, fetchGitStatus, getAuthToken } from '../services/api';
+import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent, fetchGitStatus, type GitStatusResult, getAuthToken } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
 import type { ArtifactItem } from '../types';
@@ -236,7 +236,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   }, [isOpen, activeTab, conversationId, selectedArtifact, handleSelectArtifact]);
 
   // Git status & preview mode state
-  const [gitStatus, setGitStatus] = useState<any>(null);
+  const [gitStatus, setGitStatus] = useState<GitStatusResult | null>(null);
   const [showMarkdownPreview, setShowMarkdownPreview] = useState(true);
 
   // Load git status
@@ -440,7 +440,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
         {/* Header Right Actions: Git Badge & Close */}
         <div className="flex items-center gap-1.5 shrink-0 ml-1">
-          {gitStatus && (
+          {gitStatus && gitStatus.is_repo && (
             <div
               className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono border select-none"
               style={{
@@ -452,9 +452,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             >
               <GitBranch className="w-3 h-3 text-emerald-500 shrink-0" />
               <span className="font-semibold truncate max-w-[90px]">{gitStatus.branch}</span>
-              {!gitStatus.is_clean && (
+              {!gitStatus.clean && (
                 <span className="text-amber-500 font-bold">
-                  ({(gitStatus.modified_count || 0) + (gitStatus.untracked_count || 0)})
+                  ({(gitStatus.modified?.length || 0) + (gitStatus.untracked?.length || 0) + (gitStatus.staged?.length || 0) + (gitStatus.deleted?.length || 0) + (gitStatus.conflicts?.length || 0)})
                 </span>
               )}
             </div>

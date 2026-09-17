@@ -4,6 +4,7 @@ import {
   RefreshCw, 
   GitCommit, 
   UploadCloud, 
+  DownloadCloud,
   FileCode, 
   CheckCircle2, 
   AlertCircle, 
@@ -11,7 +12,7 @@ import {
   FileDiff,
   ShieldAlert
 } from 'lucide-react';
-import { fetchGitStatus, fetchGitDiff, gitCommit, gitPush, type GitStatusResult } from '../services/api';
+import { fetchGitStatus, fetchGitDiff, gitCommit, gitPush, gitPull, type GitStatusResult } from '../services/api';
 import { DiffViewer } from './DiffViewer';
 
 interface GitTabProps {
@@ -34,6 +35,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
   const [stageAll, setStageAll] = useState(true);
   const [committing, setCommitting] = useState(false);
   const [pushing, setPushing] = useState(false);
+  const [pulling, setPulling] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   const diffRequestIdRef = React.useRef(0);
@@ -159,6 +161,23 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     }
   };
 
+  const handlePull = async () => {
+    setPulling(true);
+    setActionSuccess(null);
+    setError(null);
+    try {
+      const res = await gitPull(currentWorkspace);
+      setActionSuccess(`Modifications récupérées avec succès depuis origin/${status?.branch || 'main'}: ${res.output || 'À jour'}`);
+      await loadStatus();
+      setActiveDiff(null);
+      setSelectedFile(null);
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du pull');
+    } finally {
+      setPulling(false);
+    }
+  };
+
   const allChangedFiles = React.useMemo(() => {
     if (!status) return [];
     const map = new Map<string, { path: string; type: string }>();
@@ -237,6 +256,16 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
           ) : (
             <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
               <AlertCircle className="w-3 h-3" /> {allChangedFiles.length} fichier(s)
+            </span>
+          )}
+          {status && status.ahead > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded-full border border-sky-500/20" title={`${status.ahead} commit(s) en avance sur le distant`}>
+              ↑ {status.ahead}
+            </span>
+          )}
+          {status && status.behind > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded-full border border-rose-500/20" title={`${status.behind} commit(s) en retard sur le distant`}>
+              ↓ {status.behind}
             </span>
           )}
         </div>
@@ -504,19 +533,37 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
             Auteur : <code style={{ color: 'var(--strong)' }}>jprud67 &lt;jprud67@gmail.com&gt;</code>
           </span>
 
-          <button
-            onClick={handlePush}
-            disabled={pushing}
-            className="py-1.5 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
-            style={{
-              backgroundColor: 'var(--surface)',
-              borderColor: 'var(--border)',
-              color: 'var(--text)'
-            }}
-          >
-            <UploadCloud className={`w-3.5 h-3.5 ${pushing ? 'animate-bounce text-sky-500' : ''}`} />
-            <span>{pushing ? 'Push en cours...' : 'Pousser vers Origin'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePull}
+              disabled={pulling || committing}
+              className="py-1.5 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)'
+              }}
+              title="Tirer les commits depuis le dépôt distant (git pull)"
+            >
+              <DownloadCloud className={`w-3.5 h-3.5 ${pulling ? 'animate-bounce text-sky-500' : ''}`} />
+              <span>{pulling ? 'Pull en cours...' : 'Tirer'}</span>
+            </button>
+
+            <button
+              onClick={handlePush}
+              disabled={pushing || committing}
+              className="py-1.5 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)'
+              }}
+              title="Pousser les commits vers le dépôt distant (git push)"
+            >
+              <UploadCloud className={`w-3.5 h-3.5 ${pushing ? 'animate-bounce text-sky-500' : ''}`} />
+              <span>{pushing ? 'Push en cours...' : 'Pousser'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

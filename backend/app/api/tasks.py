@@ -174,7 +174,7 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
                 ]
 
                 if candidate_tids:
-                    for p in psutil.process_iter(['pid', 'cmdline']):
+                    for p in psutil.process_iter(['pid', 'cmdline', 'name']):
                         try:
                             p_info = p.info
                             if not p_info:
@@ -188,6 +188,7 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
                             cmdline_list = p_info.get('cmdline') or []
                             cmd_str = " ".join(cmdline_list)
                             cmd_lower = cmd_str.lower()
+                            p_name = (p_info.get('name') or '').lower()
 
                             # Disallow matching server or uvicorn
                             if ("uvicorn" in cmd_lower and "backend" in cmd_lower) or ("antigravity-webui" in cmd_lower and "run.py" in cmd_lower):
@@ -201,6 +202,7 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
                                     tid_cand in cmdline_list
                                     or any(tid_cand in arg.split("=") for arg in cmdline_list)
                                     or bool(tid_regex.search(cmd_str))
+                                    or (len(tid_cand) >= 4 and tid_cand.lower() == p_name)
                                 ):
                                     matches_task = True
                                     break
