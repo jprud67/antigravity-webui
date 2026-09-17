@@ -136,8 +136,11 @@ if FRONTEND_DIST.exists():
         if full_path in ("api", "ws") or full_path.startswith(("api/", "ws/")):
             raise HTTPException(status_code=404, detail="API route not found")
         
+        index_file = FRONTEND_DIST / "index.html"
         if not full_path or full_path == "/":
-            return FileResponse(FRONTEND_DIST / "index.html")
+            if index_file.is_file():
+                return FileResponse(index_file)
+            raise HTTPException(status_code=404, detail="Index file not found")
 
         try:
             dist_resolved = FRONTEND_DIST.resolve()
@@ -146,4 +149,6 @@ if FRONTEND_DIST.exists():
                 return FileResponse(file_candidate)
         except Exception:
             pass
-        return FileResponse(FRONTEND_DIST / "index.html")
+        if index_file.is_file():
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="Resource not found")

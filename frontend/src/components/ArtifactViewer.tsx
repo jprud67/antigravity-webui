@@ -40,6 +40,8 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
     try {
       const text = await fetchArtifactContent(art.conversation_id, art.relative_path || art.filename);
       setContent(text);
+    } catch (err: any) {
+      setContent(`[Impossible de charger l'artefact : ${err?.message || 'Erreur de lecture'}]`);
     } finally {
       setLoading(false);
     }

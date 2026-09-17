@@ -21,6 +21,7 @@ _COAUTHOR_RE = re.compile(r"(?:co[-_ ]?authored[-_ ]?by|co[-_ ]?author:?|signed[
 def _sanitize_git_message(msg: str) -> str:
     lines = [line for line in msg.strip().split("\n") if not _COAUTHOR_RE.search(line)]
     clean = "\n".join(lines).strip()
+    clean = re.sub(r'\n{3,}', '\n\n', clean)
     return clean or "chore: update repository"
 
 def _validate_workspace(workspace: str | None) -> Path:

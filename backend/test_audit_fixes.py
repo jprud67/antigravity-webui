@@ -1662,6 +1662,167 @@ def test_broadcast_cleans_up_dead_sockets_from_connected_sockets():
     print("✓ test_broadcast_cleans_up_dead_sockets_from_connected_sockets passed")
 
 
+def test_build_conversation_dict_null_tags_and_bool_coercion():
+    row = {
+        "conversation_id": "test-c-meta",
+        "title": "Meta Test",
+        "preview": "Preview",
+        "step_count": 3,
+        "last_modified_time": "2026-09-16 10:00:00",
+        "workspace_uris": "[]",
+        "status": "DONE",
+        "agent_name": "Antigravity",
+        "parent_conversation_id": None
+    }
+    meta = {"tags": None, "pinned": 1, "archived": 0, "project": None}
+    c_dict = _build_conversation_dict(row, meta)
+    assert c_dict["tags"] == [], f"Expected empty list for tags, got {c_dict['tags']}"
+    assert c_dict["pinned"] is True
+    assert c_dict["archived"] is False
+    assert c_dict["project"] == ""
+    print("✓ test_build_conversation_dict_null_tags_and_bool_coercion passed")
+
+
+def test_git_sanitize_message_triple_newlines():
+    from app.api.git import _sanitize_git_message
+    msg = "line 1\n\n\n\n\nline 2"
+    sanitized = _sanitize_git_message(msg)
+    assert sanitized == "line 1\n\nline 2", f"Expected collapsed newlines, got {repr(sanitized)}"
+    print("✓ test_git_sanitize_message_triple_newlines passed")
+
+
+def test_fork_conversation_user_index_and_title_sanitization():
+    import sqlite3
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.services import storage
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_brain = Path(tmp_dir) / "brain"
+        tmp_brain.mkdir(parents=True, exist_ok=True)
+        conv_id = "test-source-conv"
+        conv_dir = tmp_brain / conv_id
+        logs_dir = conv_dir / ".system_generated" / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+
+        storage.atomic_write_jsonl(logs_dir / "transcript.jsonl", [
+            {"step_index": 0, "source": "USER_EXPLICIT", "type": "USER_INPUT", "content": "Help me", "created_at": "2026-09-16T10:00:00Z"},
+            {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Running tool...", "created_at": "2026-09-16T10:00:01Z"},
+            {"step_index": 2, "source": "SYSTEM", "type": "RUN_COMMAND", "content": "tool result", "created_at": "2026-09-16T10:00:02Z"}
+        ])
+
+        db_file = tmp_brain / "conversations.db"
+        conn = sqlite3.connect(str(db_file))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE conversation_summaries (
+                conversation_id TEXT PRIMARY KEY,
+                title TEXT,
+                preview TEXT,
+                step_count INTEGER,
+                last_modified_time TEXT,
+                workspace_uris TEXT,
+                status TEXT,
+                agent_name TEXT,
+                parent_conversation_id TEXT,
+                last_user_input_time TEXT,
+                last_user_input_step_index INTEGER
+            )
+        """)
+        cursor.execute("""
+            INSERT INTO conversation_summaries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (conv_id, "Source Session", "Help me", 3, "2026-09-16 10:00:02", "[]", "DONE", "Antigravity", "", "2026-09-16T10:00:00Z", 0))
+        conn.commit()
+        conn.close()
+
+        def _get_test_conn():
+            c = sqlite3.connect(str(db_file))
+            c.row_factory = sqlite3.Row
+            return c
+
+        with patch("app.services.storage.BRAIN_DIR", tmp_brain), \
+             patch("app.services.storage.get_db_connection", side_effect=_get_test_conn):
+            res = storage.fork_conversation(conv_id, up_to_step_index=2, new_title="   ")
+            new_id = res["conversation_id"]
+
+            verify_conn = _get_test_conn()
+            row = verify_conn.cursor().execute("SELECT title, last_user_input_step_index, last_user_input_time FROM conversation_summaries WHERE conversation_id = ?", (new_id,)).fetchone()
+            verify_conn.close()
+
+            assert "Branche #2" in row["title"]
+            assert row["last_user_input_step_index"] == 0, f"Expected 0, got {row['last_user_input_step_index']}"
+            assert row["last_user_input_time"] == "2026-09-16T10:00:00Z"
+    print("✓ test_fork_conversation_user_index_and_title_sanitization passed")
+
+
+def test_handoff_conversation_initial_index_and_title_sanitization():
+    import sqlite3
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.services import storage
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_brain = Path(tmp_dir) / "brain"
+        tmp_brain.mkdir(parents=True, exist_ok=True)
+        conv_id = "test-handoff-source"
+        conv_dir = tmp_brain / conv_id
+        logs_dir = conv_dir / ".system_generated" / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+
+        storage.atomic_write_jsonl(logs_dir / "transcript.jsonl", [
+            {"step_index": 0, "source": "USER_EXPLICIT", "type": "USER_INPUT", "content": "Help me", "created_at": "2026-09-16T10:00:00Z"},
+            {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Done", "created_at": "2026-09-16T10:00:01Z"}
+        ])
+
+        db_file = tmp_brain / "conversations.db"
+        conn = sqlite3.connect(str(db_file))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE conversation_summaries (
+                conversation_id TEXT PRIMARY KEY,
+                title TEXT,
+                preview TEXT,
+                step_count INTEGER,
+                last_modified_time TEXT,
+                workspace_uris TEXT,
+                status TEXT,
+                agent_name TEXT,
+                parent_conversation_id TEXT,
+                last_user_input_time TEXT,
+                last_user_input_step_index INTEGER
+            )
+        """)
+        cursor.execute("""
+            INSERT INTO conversation_summaries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (conv_id, "Handoff Source", "Help me", 2, "2026-09-16 10:00:01", "[]", "DONE", "Antigravity", "", "2026-09-16T10:00:00Z", 0))
+        conn.commit()
+        conn.close()
+
+        def _get_test_conn():
+            c = sqlite3.connect(str(db_file))
+            c.row_factory = sqlite3.Row
+            return c
+
+        with patch("app.services.storage.BRAIN_DIR", tmp_brain), \
+             patch("app.services.storage.get_db_connection", side_effect=_get_test_conn):
+            res = storage.create_conversation_handoff(conv_id, new_title="   ")
+            new_id = res["conversation_id"]
+
+            verify_conn = _get_test_conn()
+            row = verify_conn.cursor().execute("SELECT title, last_user_input_step_index FROM conversation_summaries WHERE conversation_id = ?", (new_id,)).fetchone()
+            verify_conn.close()
+
+            assert "[Suite] Handoff Source" in row["title"]
+            assert row["last_user_input_step_index"] == -1, f"Expected -1, got {row['last_user_input_step_index']}"
+    print("✓ test_handoff_conversation_initial_index_and_title_sanitization passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -1730,4 +1891,8 @@ if __name__ == "__main__":
     test_queue_worker_active_task_cleanup()
     test_prune_inactive_sessions_resets_is_running_and_active_proc()
     test_broadcast_cleans_up_dead_sockets_from_connected_sockets()
+    test_build_conversation_dict_null_tags_and_bool_coercion()
+    test_git_sanitize_message_triple_newlines()
+    test_fork_conversation_user_index_and_title_sanitization()
+    test_handoff_conversation_initial_index_and_title_sanitization()
     print("\nAll unit tests passed successfully!")

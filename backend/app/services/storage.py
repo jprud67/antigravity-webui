@@ -132,6 +132,8 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     cid = r["conversation_id"]
     custom_title = (meta.get("customTitle") or "").strip()
     display_title = custom_title or r["title"] or "Nouvelle session"
+    raw_tags = meta.get("tags")
+    safe_tags = list(raw_tags) if isinstance(raw_tags, list) else []
     return {
         "conversation_id": cid,
         "title": display_title,
@@ -143,11 +145,11 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
         "status": r["status"],
         "agent_name": r["agent_name"],
         "parent_conversation_id": dict(r).get("parent_conversation_id") or None,
-        "pinned": meta.get("pinned", False),
-        "archived": meta.get("archived", False),
-        "tags": meta.get("tags", []),
-        "project": meta.get("project", ""),
-        "projectColor": meta.get("projectColor", ""),
+        "pinned": bool(meta.get("pinned", False)),
+        "archived": bool(meta.get("archived", False)),
+        "tags": safe_tags,
+        "project": str(meta.get("project") or ""),
+        "projectColor": str(meta.get("projectColor") or ""),
         "customTitle": custom_title,
     }
 
@@ -612,7 +614,8 @@ def fork_conversation(
         source_workspace = row_dict.get("workspace_uris") or default_workspace_uri
         agent_name = row_dict.get("agent_name") or ""
 
-        title = new_title or f"{source_title} (Branche #{up_to_step_index})"
+        sanitized_title = (new_title or "").strip()
+        title = sanitized_title if sanitized_title else f"{source_title} (Branche #{up_to_step_index})"
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
         
         last_step = forked_steps[-1]
@@ -623,6 +626,18 @@ def fork_conversation(
             preview = clean_user_prompt(raw_preview)[:150]
         else:
             preview = raw_preview[:150]
+
+        forked_last_user_idx = -1
+        forked_last_user_time = None
+        for i in range(len(forked_transcripts) - 1, -1, -1):
+            s = forked_transcripts[i]
+            if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
+                try:
+                    forked_last_user_idx = int(s.get("step_index", i))
+                except (ValueError, TypeError):
+                    forked_last_user_idx = i
+                forked_last_user_time = s.get("created_at") or s.get("timestamp")
+                break
 
         cursor.execute(
             """
@@ -650,8 +665,8 @@ def fork_conversation(
                 "DONE",
                 agent_name,
                 source_conversation_id,
-                now_str,
-                up_to_step_index
+                forked_last_user_time or now_str,
+                forked_last_user_idx
             )
         )
         conn.commit()
@@ -812,7 +827,8 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
     atomic_write_jsonl(transcript_full_path, [step_summary, step_assistant])
 
 
-    title = new_title or f"[Suite] {source_title}"
+    sanitized_title = (new_title or "").strip()
+    title = sanitized_title if sanitized_title else f"[Suite] {source_title}"
     preview = f"Nouvelle section avec mémoire transférée de « {source_title} »"
 
     conn = get_db_connection()
@@ -845,7 +861,7 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
                 agent_name,
                 source_conversation_id,
                 now_db,
-                0
+                -1
             )
         )
         conn.commit()
@@ -1924,7 +1940,15 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
             return []
         dirs_to_scan = [(BRAIN_DIR / conversation_id).resolve()]
     else:
-        dirs_to_scan = [p for p in BRAIN_DIR.iterdir() if p.is_dir()] if BRAIN_DIR.exists() else []
+        if BRAIN_DIR.exists():
+            dirs_to_scan = [p for p in BRAIN_DIR.iterdir() if p.is_dir() and is_safe_conversation_id(p.name)]
+            try:
+                dirs_to_scan.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+            except OSError:
+                pass
+            dirs_to_scan = dirs_to_scan[:50]
+        else:
+            dirs_to_scan = []
 
     for cdir in dirs_to_scan:
         if not cdir.is_dir():
@@ -2127,6 +2151,18 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
 
         parent_conv_id = payload.get("parent_conversation_id") or meta_payload.get("parent_conversation_id") or ""
 
+        imported_last_user_idx = -1
+        imported_last_user_time = None
+        for i in range(len(steps) - 1, -1, -1):
+            s = steps[i]
+            if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
+                try:
+                    imported_last_user_idx = int(s.get("step_index", i))
+                except (ValueError, TypeError):
+                    imported_last_user_idx = i
+                imported_last_user_time = s.get("created_at") or s.get("timestamp")
+                break
+
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -2154,8 +2190,8 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
                 "DONE",
                 "import",
                 parent_conv_id,
-                now_db,
-                0
+                imported_last_user_time or now_db,
+                imported_last_user_idx
             )
         )
         if should_close:
