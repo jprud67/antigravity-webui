@@ -397,7 +397,7 @@ async def apply_update() -> dict[str, Any]:
                 cwd=str(frontend_dir),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=dict(os.environ)
+                env=os.environ.copy()
             )
             _b_out, b_err = await asyncio.wait_for(build_proc.communicate(), timeout=300.0)
             if build_proc.returncode != 0:
@@ -436,7 +436,7 @@ async def apply_update() -> dict[str, Any]:
                 rb = await asyncio.to_thread(
                     subprocess.run,
                     npm_argv("run", "build"), cwd=str(frontend_dir), capture_output=True, timeout=120, check=False,
-                    env=dict(os.environ)
+                    env=os.environ.copy()
                 )
                 hint = "frontend restauré" if rb.returncode == 0 else "relancez un build manuellement"
             except Exception:
