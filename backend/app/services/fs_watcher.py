@@ -187,6 +187,9 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                         "ts": time.time()
                     })
 
+            removed_transcripts = set(transcript_mtimes) - set(cur_transcripts)
+            if removed_transcripts:
+                logger.debug(f"{len(removed_transcripts)} transcript(s) removed from brain_dir")
             transcript_mtimes = cur_transcripts
 
             # --- 3. Check artifact files (new/updated artifacts) ---

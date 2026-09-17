@@ -23,6 +23,19 @@ function getHeaders(customHeaders: Record<string, string> = {}): Record<string, 
   return headers;
 }
 
+if (typeof window !== 'undefined' && !(window as any).__antigravity_fetch_intercepted) {
+  (window as any).__antigravity_fetch_intercepted = true;
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const res = await originalFetch(input, init);
+    const url = typeof input === 'string' ? input : (input instanceof Request ? input.url : input.toString());
+    if (res.status === 401 && !url.includes('/api/auth/login')) {
+      window.dispatchEvent(new CustomEvent('antigravity:unauthorized'));
+    }
+    return res;
+  };
+}
+
 // Auth API
 export async function checkAuthStatus(): Promise<{ enabled: boolean; authenticated: boolean }> {
   const res = await fetch(`${API_BASE}/auth/status`, {

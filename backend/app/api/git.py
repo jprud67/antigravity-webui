@@ -84,6 +84,8 @@ def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | 
     merged_env = {
         **os.environ,
         "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ASKPASS": "",
+        "SSH_ASKPASS": "",
     }
     if env:
         merged_env.update(env)

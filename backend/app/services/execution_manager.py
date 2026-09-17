@@ -506,33 +506,37 @@ class ExecutionSession:
             self.last_active_at = time.time()
 
     async def queue_worker(self):
-        while True:
-            try:
-                item = await self.message_queue.get()
-            except asyncio.CancelledError:
-                break
-            self.is_steering = False
-            self.is_running = True
-            try:
-                self.active_task = asyncio.create_task(self.run_turn(item))
+        try:
+            while True:
                 try:
-                    await self.active_task
+                    item = await self.message_queue.get()
                 except asyncio.CancelledError:
-                    # Distinguer : le worker lui-même est annulé (pruning → sortir
-                    # proprement) vs la tâche active annulée par steer/interrupt
-                    # (l'erreur remonte de la tâche attendue → continuer la boucle).
-                    current = asyncio.current_task()
-                    # Task.cancelling() est disponible uniquement à partir de Python 3.11.
-                    cancelling = getattr(current, "cancelling", None)
-                    if current is not None and callable(cancelling) and cancelling() > 0:
-                        raise
-                except Exception as e:
-                    logger.error(f"[Session {self.conversation_id}] Worker task error: {e}")
-            finally:
-                self.active_task = None
+                    break
                 self.is_steering = False
-                self.last_active_at = time.time()
-                self.message_queue.task_done()
+                self.is_running = True
+                try:
+                    self.active_task = asyncio.create_task(self.run_turn(item))
+                    try:
+                        await self.active_task
+                    except asyncio.CancelledError:
+                        # Distinguer : le worker lui-même est annulé (pruning → sortir
+                        # proprement) vs la tâche active annulée par steer/interrupt
+                        # (l'erreur remonte de la tâche attendue → continuer la boucle).
+                        current = asyncio.current_task()
+                        cancelling = getattr(current, "cancelling", None)
+                        is_cancelling = callable(cancelling) and cancelling() > 0
+                        if is_cancelling or (current is not None and current.cancelled()):
+                            raise
+                    except Exception as e:
+                        logger.error(f"[Session {self.conversation_id}] Worker task error: {e}")
+                finally:
+                    self.active_task = None
+                    self.is_steering = False
+                    self.last_active_at = time.time()
+                    self.message_queue.task_done()
+        finally:
+            self.is_running = False
+            self.active_task = None
 
 
 class ExecutionManager:
@@ -853,6 +857,9 @@ class ExecutionManager:
             except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
                 logger.debug("Ignored error")
 
+        for tc in session.live_tool_calls:
+            if isinstance(tc, dict) and tc.get("status") == "running":
+                tc["status"] = "cancelled"
         session.is_running = False
         session.active_proc = None
         session.pending_approval = None

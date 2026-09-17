@@ -2767,6 +2767,44 @@ def test_git_push_empty_error_fallback():
     print("✓ test_git_push_empty_error_fallback passed")
 
 
+def test_git_run_askpass_env():
+    from pathlib import Path
+    from unittest.mock import MagicMock, patch
+    from app.api.git import run_git
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        run_git(["status"], cwd=Path("/root/antigravity-webui"))
+        assert mock_run.called
+        call_kwargs = mock_run.call_args[1]
+        env = call_kwargs.get("env", {})
+        assert env.get("GIT_ASKPASS") == ""
+        assert env.get("SSH_ASKPASS") == ""
+        assert env.get("GIT_TERMINAL_PROMPT") == "0"
+    print("✓ test_git_run_askpass_env passed")
+
+
+def test_execution_manager_interrupt_clears_running_tool_calls():
+    import asyncio
+    from app.services.execution_manager import ExecutionManager, ExecutionSession
+
+    manager = ExecutionManager()
+    session = ExecutionSession("test-cid-interrupt")
+    session.is_running = True
+    session.live_tool_calls = [
+        {"id": "call_1", "status": "running", "title": "Executing command"},
+        {"id": "call_2", "status": "done", "title": "File view"}
+    ]
+    manager.sessions["test-cid-interrupt"] = session
+
+    asyncio.run(manager.interrupt("test-cid-interrupt"))
+
+    assert session.is_running is False
+    assert session.live_tool_calls[0]["status"] == "cancelled"
+    assert session.live_tool_calls[1]["status"] == "done"
+    print("✓ test_execution_manager_interrupt_clears_running_tool_calls passed")
+
+
 if __name__ == "__main__":
     test_file_download_unicode_and_special_chars()
     test_token_calculation()
@@ -2879,4 +2917,6 @@ if __name__ == "__main__":
     test_storage_calculate_tokens_string_resilience()
     test_storage_search_conversations_legacy_transcript()
     test_git_push_empty_error_fallback()
+    test_git_run_askpass_env()
+    test_execution_manager_interrupt_clears_running_tool_calls()
     print("\nAll unit tests passed successfully!")

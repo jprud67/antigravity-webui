@@ -372,6 +372,18 @@ export function App() {
     return () => clearInterval(updateInterval);
   }, []);
 
+  // Listen for session expiration or 401 Unauthorized across all API calls
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setIsAuthenticated(false);
+      setIsAuthModalOpen(true);
+    };
+    window.addEventListener('antigravity:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('antigravity:unauthorized', handleUnauthorized);
+    };
+  }, []);
+
   // Track WebSocket connection status for reconnection banner
   useEffect(() => {
     return chatSocket.onStatusChange(setWsStatus);
