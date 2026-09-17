@@ -165,11 +165,12 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
                 excluded_tokens = {
                     "bash", "sh", "zsh", "node", "npm", "python", "python3", "uvicorn",
                     "git", "cat", "grep", "root", "systemd", "task", "tasks", "subagent",
-                    "subagents", "process", "worker", "service", "start", "stop", "test", "run"
+                    "subagents", "process", "worker", "service", "start", "stop", "test", "run",
+                    "bin", "usr", "opt", "etc", "dev", "api", "pid", "app", "web", "kill", "ps"
                 }
                 candidate_tids = [
                     c for c in raw_cands
-                    if len(c) >= 5 and c.lower() not in excluded_tokens
+                    if len(c) >= 3 and c.lower() not in excluded_tokens
                 ]
 
                 if candidate_tids:

@@ -1996,7 +1996,10 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
     if not is_safe_conversation_id(conversation_id):
         raise ValueError("Identifiant de conversation non valide")
     base_dir = (BRAIN_DIR / conversation_id).resolve()
-    target_path = (base_dir / filename).resolve()
+    try:
+        target_path = (base_dir / filename).resolve()
+    except (RuntimeError, OSError):
+        raise FileNotFoundError(f"Artifact introuvable ou lien symbolique invalide : {filename}")
     if not is_safe_path(target_path, [base_dir]):
         raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
     if is_blocked_sensitive_path(target_path):

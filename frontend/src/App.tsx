@@ -1039,8 +1039,14 @@ export function App() {
         }
       }
       fetchSettings().then((currentSettings) => {
-        saveSettings({ ...currentSettings, model: found.name, effort: nextEffort }).catch(console.error);
-      }).catch(console.error);
+        saveSettings({ ...currentSettings, model: found.name, effort: nextEffort }).catch((err) => {
+          console.error("Failed to save model settings:", err);
+          showToast('Erreur lors de la sauvegarde du modèle', 'error');
+        });
+      }).catch((err) => {
+        console.error("Failed to fetch settings for model change:", err);
+        showToast('Erreur lors de la récupération des paramètres', 'error');
+      });
     }
   };
 
@@ -1051,8 +1057,14 @@ export function App() {
       models[0];
     if (currentModelObj) {
       fetchSettings().then((currentSettings) => {
-        saveSettings({ ...currentSettings, model: currentModelObj.name, effort: newEffort }).catch(console.error);
-      }).catch(console.error);
+        saveSettings({ ...currentSettings, model: currentModelObj.name, effort: newEffort }).catch((err) => {
+          console.error("Failed to save effort settings:", err);
+          showToast("Erreur lors de la sauvegarde de l'effort de réflexion", 'error');
+        });
+      }).catch((err) => {
+        console.error("Failed to fetch settings for effort change:", err);
+        showToast('Erreur lors de la récupération des paramètres', 'error');
+      });
     }
   };
 

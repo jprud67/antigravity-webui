@@ -253,7 +253,7 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
             # 1. Essayer de basculer sur un autre type de modèle (Gemini <-> Externe) avant de changer de compte
             if not model_switched_on_current_account:
                 families = await get_model_families()
-                is_gemini = "gemini" in str(model).lower()
+                is_gemini = ("gemini" in str(model).lower()) if model else True
                 candidate_models = [
                     f for f in families 
                     if ("gemini" not in f.get("id", "").lower() if is_gemini else "gemini" in f.get("id", "").lower())

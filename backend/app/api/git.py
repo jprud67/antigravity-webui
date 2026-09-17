@@ -212,7 +212,7 @@ def get_git_diff(
                 clean_rel = str(resolved_p.relative_to(resolved_target)).replace("\\", "/")
             except ValueError:
                 # Check if it was passed as a slash-prefixed workspace-relative path (e.g. "/backend/app/main.py")
-                clean_str = path.strip().replace("\\", "/").lstrip("/")
+                clean_str = path.strip().replace("\\", "/").removeprefix("/")
                 if not clean_str or ".." in Path(clean_str).parts:
                     raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
                 candidate = (target / clean_str).resolve()
@@ -227,7 +227,7 @@ def get_git_diff(
             norm_str = os.path.normpath(clean_str).replace("\\", "/")
             if norm_str == "." or norm_str.startswith(".."):
                 raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
-            clean_rel = norm_str.lstrip("./") if norm_str.startswith("./") else norm_str.lstrip("/")
+            clean_rel = norm_str.removeprefix("./").removeprefix("/")
 
         file_candidate = (target / clean_rel).resolve()
         if not is_safe_path(file_candidate, [target]):

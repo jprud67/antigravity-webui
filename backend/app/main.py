@@ -133,7 +133,10 @@ if FRONTEND_DIST.exists():
 
     @app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
     async def serve_frontend(full_path: str):
-        if full_path in ("api", "ws") or full_path.startswith(("api/", "ws/")):
+        if (
+            full_path in ("api", "ws", "docs", "redoc", "openapi.json")
+            or full_path.startswith(("api/", "ws/", "docs/", "redoc/"))
+        ):
             raise HTTPException(status_code=404, detail="API route not found")
         
         index_file = FRONTEND_DIST / "index.html"

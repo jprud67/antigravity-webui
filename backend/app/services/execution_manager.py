@@ -360,7 +360,7 @@ class ExecutionSession:
                     # 1. Essayer de basculer sur un autre type de modèle (Gemini <-> Externe) avant de changer de compte
                     if not model_switched_on_current_account:
                         families = await get_model_families()
-                        is_gemini = "gemini" in str(current_model).lower()
+                        is_gemini = ("gemini" in str(current_model).lower()) if current_model else True
                         candidate_models = [
                             f for f in families
                             if ("gemini" not in f.get("id", "").lower() if is_gemini else "gemini" in f.get("id", "").lower())
@@ -566,6 +566,10 @@ class ExecutionManager:
             s.remove_subscriber(ws)
         if self.active_session:
             self.active_session.remove_subscriber(ws)
+        try:
+            self.prune_inactive_sessions()
+        except Exception as e:
+            logger.debug(f"Error during socket disconnect prune: {e}")
         logger.info(
             f"WebSocket client disconnected; {len(self.get_running_conversations())} background task(s) continue running uninterrupted."
         )

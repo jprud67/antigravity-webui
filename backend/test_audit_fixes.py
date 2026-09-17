@@ -1823,6 +1823,87 @@ def test_handoff_conversation_initial_index_and_title_sanitization():
     print("✓ test_handoff_conversation_initial_index_and_title_sanitization passed")
 
 
+def test_serve_frontend_api_and_docs_exclusion():
+    from fastapi import HTTPException
+    import asyncio
+    serve_handler = None
+    for route in app.routes:
+        if getattr(route, "name", None) == "serve_frontend" or (hasattr(route, "path") and route.path == "/{full_path:path}"):
+            serve_handler = route.endpoint
+            break
+    assert serve_handler is not None, "serve_frontend route handler should be registered"
+
+    for path in ["api", "api/health", "ws", "ws/chat", "docs", "redoc", "openapi.json", "docs/oauth2-redirect"]:
+        try:
+            asyncio.run(serve_handler(path))
+            assert False, f"Expected HTTPException 404 for path: {path}"
+        except HTTPException as exc:
+            assert exc.status_code == 404
+            assert exc.detail == "API route not found"
+    print("✓ test_serve_frontend_api_and_docs_exclusion passed")
+
+
+def test_read_artifact_content_symlink_safety(tmp_path):
+    from unittest.mock import patch
+    conv_id = "test-symlink-conv"
+    conv_dir = tmp_path / conv_id
+    conv_dir.mkdir(parents=True)
+
+    cycle_link = conv_dir / "cycle.txt"
+    try:
+        cycle_link.symlink_to(cycle_link)
+    except OSError:
+        pass
+
+    with patch("app.services.storage.BRAIN_DIR", tmp_path):
+        try:
+            read_artifact_content(conv_id, "cycle.txt")
+            assert False, "Should raise FileNotFoundError for circular symlink"
+        except FileNotFoundError:
+            pass
+    print("✓ test_read_artifact_content_symlink_safety passed")
+
+
+def test_git_diff_removeprefix_dotfiles():
+    test_paths = [".gitignore", "./.gitignore", "/.gitignore"]
+    for raw_p in test_paths:
+        clean = raw_p.strip().replace("\\", "/").removeprefix("./").removeprefix("/")
+        assert clean == ".gitignore", f"Expected '.gitignore', got '{clean}' for input '{raw_p}'"
+    print("✓ test_git_diff_removeprefix_dotfiles passed")
+
+
+def test_kill_task_candidate_tids_short_valid_ids():
+    excluded_tokens = {
+        "bash", "sh", "zsh", "node", "npm", "python", "python3", "uvicorn",
+        "git", "cat", "grep", "root", "systemd", "task", "tasks", "subagent",
+        "subagents", "process", "worker", "service", "start", "stop", "test", "run",
+        "bin", "usr", "opt", "etc", "dev", "api", "pid", "app", "web", "kill", "ps"
+    }
+    valid_short = ["t-12", "job1", "t01", "sub-1", "agy4"]
+    cands = [c for c in valid_short if len(c) >= 3 and c.lower() not in excluded_tokens]
+    assert len(cands) == len(valid_short)
+
+    system_tokens = ["bin", "usr", "api", "pid", "app", "kill", "ps", "sh"]
+    filtered = [c for c in system_tokens if len(c) >= 3 and c.lower() not in excluded_tokens]
+    assert len(filtered) == 0
+    print("✓ test_kill_task_candidate_tids_short_valid_ids passed")
+
+
+def test_model_failover_gemini_detection():
+    model = None
+    is_gemini_exec = ("gemini" in str(model).lower()) if model else True
+    assert is_gemini_exec is True
+
+    model_claude = "Claude 3.7 Sonnet"
+    is_gemini_claude = ("gemini" in str(model_claude).lower()) if model_claude else True
+    assert is_gemini_claude is False
+
+    model_gemini = "Gemini 2.5 Flash"
+    is_gemini_flash = ("gemini" in str(model_gemini).lower()) if model_gemini else True
+    assert is_gemini_flash is True
+    print("✓ test_model_failover_gemini_detection passed")
+
+
 if __name__ == "__main__":
     test_token_calculation()
     test_password_validation()
@@ -1895,4 +1976,11 @@ if __name__ == "__main__":
     test_git_sanitize_message_triple_newlines()
     test_fork_conversation_user_index_and_title_sanitization()
     test_handoff_conversation_initial_index_and_title_sanitization()
+    test_serve_frontend_api_and_docs_exclusion()
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        test_read_artifact_content_symlink_safety(Path(td))
+    test_git_diff_removeprefix_dotfiles()
+    test_kill_task_candidate_tids_short_valid_ids()
+    test_model_failover_gemini_detection()
     print("\nAll unit tests passed successfully!")

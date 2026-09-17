@@ -104,7 +104,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
       if (currentAssistantMsg.toolCalls) {
         for (const tc of currentAssistantMsg.toolCalls) {
           if (tc.status === 'running') {
-            tc.status = 'done';
+            tc.status = currentAssistantMsg.error ? 'error' : 'done';
           }
         }
       }
@@ -286,7 +286,12 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
     );
 
     if (isToolOutput) {
-      const isErr = s.status === 'ERROR' || Boolean(s.error);
+      const isCommandFailure = typeof content === 'string' && (
+        /The command exited with code (?!0\b)\d+/i.test(content) ||
+        /Command exited with code (?!0\b)\d+/i.test(content) ||
+        content.startsWith('Encountered error in tool execution:')
+      );
+      const isErr = s.status === 'ERROR' || Boolean(s.error) || isCommandFailure;
       const outputText = content || (s.error ? String(s.error) : '');
       const tools = currentAssistantMsg.toolCalls || [];
       // Appairer avec le premier outil en attente de résultat (FIFO)
