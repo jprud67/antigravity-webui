@@ -297,10 +297,16 @@ export class ChatWebSocketClient {
   }
 
   private queueOrSend(payload: any) {
-    const isDeduplicable = ['interrupt', 'clear_queue'].includes(payload.action);
+    if (!payload || payload.action === 'ping' || payload.action === 'pong') {
+      return;
+    }
+
+    const isDeduplicable = ['interrupt', 'clear_queue', 'attach'].includes(payload.action);
 
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      if (isDeduplicable) {
+      if (payload.action === 'attach') {
+        this.pendingPayloads = this.pendingPayloads.filter((p) => p.action !== 'attach');
+      } else if (isDeduplicable) {
         this.pendingPayloads = this.pendingPayloads.filter(
           (p) => p.action !== payload.action || p.conversation_id !== payload.conversation_id
         );
@@ -319,7 +325,9 @@ export class ChatWebSocketClient {
       this.ws.send(JSON.stringify(payload));
     } catch (err) {
       console.error('[WS] Error sending payload, queueing for reconnect:', err);
-      if (isDeduplicable) {
+      if (payload.action === 'attach') {
+        this.pendingPayloads = this.pendingPayloads.filter((p) => p.action !== 'attach');
+      } else if (isDeduplicable) {
         this.pendingPayloads = this.pendingPayloads.filter(
           (p) => p.action !== payload.action || p.conversation_id !== payload.conversation_id
         );

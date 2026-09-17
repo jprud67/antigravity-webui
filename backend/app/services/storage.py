@@ -1,3 +1,4 @@
+import copy
 import html
 import json
 import logging
@@ -118,6 +119,12 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None) -> None:
                     group_id TEXT NOT NULL DEFAULT ''
                 );
                 """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_conv_last_modified ON conversation_summaries(last_modified_time DESC);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_conv_parent ON conversation_summaries(parent_conversation_id);"
             )
             conn.commit()
             _schema_initialized = True
@@ -2047,6 +2054,8 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
     return artifacts
 
 _settings_lock = threading.RLock()
+_cached_settings: dict[str, Any] | None = None
+_cached_settings_mtime: float = -1.0
 
 MAX_ARTIFACT_READ_BYTES = 5 * 1024 * 1024  # 5 Mo max
 
@@ -2083,9 +2092,12 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
         return content.lstrip("\ufeff")
     except UnicodeDecodeError:
         return f"[Fichier binaire : {file_size} octets]"
+    except OSError as e:
+        return f"[Erreur de lecture du fichier : {e}]"
 
 
 def get_settings() -> dict[str, Any]:
+    global _cached_settings, _cached_settings_mtime
     defaults: dict[str, Any] = {
         "agentMode": "accept-edits",
         "colorScheme": "dark",
@@ -2094,18 +2106,30 @@ def get_settings() -> dict[str, Any]:
     }
     with _settings_lock:
         if not SETTINGS_FILE.exists():
-            return defaults
+            _cached_settings = None
+            _cached_settings_mtime = -1.0
+            return copy.deepcopy(defaults)
         try:
+            mtime = SETTINGS_FILE.stat().st_mtime
+            if _cached_settings is not None and mtime <= _cached_settings_mtime:
+                return copy.deepcopy(_cached_settings)
+
             content = SETTINGS_FILE.read_text(encoding="utf-8")
             if not content.strip():
-                return defaults
+                _cached_settings = copy.deepcopy(defaults)
+                _cached_settings_mtime = mtime
+                return copy.deepcopy(defaults)
             data = json.loads(content)
-            return data if isinstance(data, dict) else defaults
+            res = data if isinstance(data, dict) else defaults
+            _cached_settings = copy.deepcopy(res)
+            _cached_settings_mtime = mtime
+            return copy.deepcopy(res)
         except Exception as exc:
             logger.warning(f"Failed to parse settings.json, returning defaults: {exc}")
-            return defaults
+            return copy.deepcopy(defaults)
 
 def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
+    global _cached_settings, _cached_settings_mtime
     with _settings_lock:
         current = get_settings()
         current.update(new_settings)
@@ -2116,6 +2140,11 @@ def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
             restrict_file_permissions(tmp_file)
             tmp_file.replace(SETTINGS_FILE)
             restrict_file_permissions(SETTINGS_FILE)
+            _cached_settings = copy.deepcopy(current)
+            try:
+                _cached_settings_mtime = SETTINGS_FILE.stat().st_mtime
+            except OSError:
+                _cached_settings_mtime = -1.0
         except Exception:
             if tmp_file.exists():
                 try:
@@ -2123,7 +2152,7 @@ def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
                 except Exception as e:
                     logger.debug(f"Ignored error: {e}")
             raise
-        return current
+        return copy.deepcopy(current)
 
 def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: str, conn: sqlite3.Connection | None = None) -> dict[str, Any]:
     new_id = str(uuid.uuid4())
@@ -2216,6 +2245,16 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
 
         parent_conv_id = payload.get("parent_conversation_id") or meta_payload.get("parent_conversation_id") or ""
 
+        raw_uris = payload.get("workspace_uris") or meta_payload.get("workspace_uris")
+        if isinstance(raw_uris, list):
+            stored_uris = json.dumps(raw_uris)
+        elif isinstance(raw_uris, str) and raw_uris.strip().startswith("["):
+            stored_uris = raw_uris
+        elif isinstance(raw_uris, str) and raw_uris.strip():
+            stored_uris = json.dumps([raw_uris.strip()])
+        else:
+            stored_uris = json.dumps([get_default_workspace_uri()])
+
         imported_last_user_idx = -1
         imported_last_user_time = None
         for i in range(len(steps) - 1, -1, -1):
@@ -2251,7 +2290,7 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
                 preview,
                 len(steps),
                 now_db,
-                json.dumps([get_default_workspace_uri()]),
+                stored_uris,
                 "DONE",
                 "import",
                 parent_conv_id,

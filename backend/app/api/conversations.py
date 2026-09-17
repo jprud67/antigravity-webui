@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any
 
@@ -97,7 +98,6 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             except Exception as e:
                 logger.debug(f"Ignored error: {e}")
         try:
-            import asyncio
             await asyncio.to_thread(bulk_delete_conversations, ids)
             for cid in ids:
                 results[cid] = True
@@ -169,7 +169,6 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
             logger.error(f"Erreur lors de l'assignation groupée de projet: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Échec lors de l'assignation groupée de projet: {e}")
     elif action == "export":
-        import asyncio
         return await asyncio.to_thread(_do_bulk_export, req)
     else:
         raise HTTPException(status_code=400, detail=f"Action non supportée: {action}")
@@ -284,7 +283,7 @@ async def remove_conversation(conversation_id: str, _ = Depends(require_auth)):
         execution_manager.remove_session(conversation_id)
     except Exception as e:
         logger.debug(f"Ignored error: {e}")
-    success = delete_conversation(conversation_id)
+    success = await asyncio.to_thread(delete_conversation, conversation_id)
     return {"success": success, "conversation_id": conversation_id}
 
 @router.post("/{conversation_id}/undo")
