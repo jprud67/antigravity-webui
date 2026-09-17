@@ -32,7 +32,7 @@ async def test():
     
     original_run = ticker.run_agy_task
     
-    async def mock_run(prompt, skills, model, effort):
+    async def mock_run(prompt, skills=None, model=None, effort=None, *args, **kwargs):
         print(f"--> [Mock] Running task with model: {model}")
         return "", "[quota] RESOURCE_EXHAUSTED", -1
         

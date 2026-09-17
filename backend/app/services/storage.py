@@ -12,7 +12,11 @@ from pathlib import Path
 from typing import Any
 
 from app.config import BRAIN_DIR, CONVERSATION_DB, DEFAULT_WORKSPACE, SETTINGS_FILE
-from app.platform_utils import is_safe_path, restrict_file_permissions
+from app.platform_utils import (
+    is_blocked_sensitive_path,
+    is_safe_path,
+    restrict_file_permissions,
+)
 from app.services.session_metadata import (
     bulk_delete_session_meta,
     delete_session_meta,
@@ -1922,16 +1926,21 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
                     continue
                 p = Path(root) / fname
                 try:
-                    stat = p.stat()
+                    resolved_p = p.resolve()
+                    if not is_safe_path(resolved_p, [cdir]):
+                        continue
+                    if is_blocked_sensitive_path(resolved_p):
+                        continue
+                    stat = resolved_p.stat()
                     artifacts.append({
                         "conversation_id": c_id,
                         "filename": p.name,
-                        "relative_path": p.relative_to(cdir).as_posix(),
-                        "full_path": str(p),
+                        "relative_path": resolved_p.relative_to(cdir).as_posix(),
+                        "full_path": str(resolved_p),
                         "size": stat.st_size,
                         "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
                     })
-                except OSError:
+                except (OSError, ValueError):
                     continue
     artifacts.sort(key=lambda x: str(x["last_modified"]), reverse=True)
     return artifacts
@@ -2136,7 +2145,7 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
             try:
                 conn.rollback()
             except Exception as roll_err:
-                logger.debug(f"Fork rollback error: {roll_err}")
+                logger.debug(f"Import rollback error: {roll_err}")
             delete_session_meta(new_id)
             if new_conv_dir.exists():
                 shutil.rmtree(new_conv_dir, ignore_errors=True)

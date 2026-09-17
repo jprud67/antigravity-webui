@@ -544,6 +544,12 @@ class ExecutionManager:
                         terminate_process_group_sync(target_session.active_proc, force=True)
             if target_session.worker_task and not target_session.worker_task.done():
                 target_session.worker_task.cancel()
+            while not target_session.message_queue.empty():
+                try:
+                    target_session.message_queue.get_nowait()
+                    target_session.message_queue.task_done()
+                except (asyncio.QueueEmpty, ValueError):
+                    break
             target_session.is_running = False
             logger.info(f"Removed execution session for conversation {conversation_id} from memory.")
 
@@ -599,6 +605,12 @@ class ExecutionManager:
                             logger.debug(f"Ignored error: {e}")
                 if target_session.worker_task and not target_session.worker_task.done():
                     target_session.worker_task.cancel()
+                while not target_session.message_queue.empty():
+                    try:
+                        target_session.message_queue.get_nowait()
+                        target_session.message_queue.task_done()
+                    except (asyncio.QueueEmpty, ValueError):
+                        break
             logger.info(f"Pruned inactive execution session for conversation {cid} from memory.")
 
     def get_or_create_session(

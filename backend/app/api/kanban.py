@@ -236,6 +236,8 @@ def create_task(req: CreateTaskRequest, _ = Depends(require_auth)):
 
 @router.patch("/tasks/{task_id}")
 def update_task(task_id: str, req: UpdateTaskRequest, _ = Depends(require_auth)):
+    if req.title is not None and not req.title.strip():
+        raise HTTPException(status_code=400, detail="Le titre de la tâche ne peut pas être vide")
     try:
         with get_db() as conn:
             cur = conn.cursor()

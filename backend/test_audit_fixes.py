@@ -1264,7 +1264,6 @@ def test_git_sanitize_extended_trailers():
 
 def test_kill_task_candidate_tids_hardening():
     clean_tid = "task"
-    pure_tid = "task"
     raw_cands = [clean_tid]
     excluded_tokens = {
         "bash", "sh", "zsh", "node", "npm", "python", "python3", "uvicorn",
@@ -1293,6 +1292,84 @@ def test_compute_next_run_microsecond_stripping():
     assert ".000" not in next_iso
     assert "+" in next_iso or "Z" in next_iso
     print("✓ test_compute_next_run_microsecond_stripping passed")
+
+
+def test_list_artifacts_sensitive_and_traversal_filtering():
+    import tempfile
+
+    import app.services.storage as storage_mod
+    with tempfile.TemporaryDirectory() as tmpdir:
+        orig_brain = storage_mod.BRAIN_DIR
+        try:
+            temp_brain = Path(tmpdir)
+            storage_mod.BRAIN_DIR = temp_brain
+            conv_id = "test-conv-art-1"
+            conv_dir = temp_brain / conv_id
+            conv_dir.mkdir(parents=True)
+
+            # Legitimate artifact
+            art_file = conv_dir / "report.md"
+            art_file.write_text("# Report", encoding="utf-8")
+
+            # Blocked sensitive path (e.g., .env)
+            env_file = conv_dir / ".env"
+            env_file.write_text("SECRET=123", encoding="utf-8")
+
+            # Outside target and symlink
+            outside_file = temp_brain / "outside_secret.txt"
+            outside_file.write_text("outside", encoding="utf-8")
+            symlink_file = conv_dir / "leak_symlink.txt"
+            try:
+                symlink_file.symlink_to(outside_file)
+            except OSError:
+                pass
+
+            artifacts = storage_mod.list_artifacts(conversation_id=conv_id)
+            filenames = [a["filename"] for a in artifacts]
+            assert "report.md" in filenames
+            assert ".env" not in filenames
+            assert "leak_symlink.txt" not in filenames
+        finally:
+            storage_mod.BRAIN_DIR = orig_brain
+    print("✓ test_list_artifacts_sensitive_and_traversal_filtering passed")
+
+
+def test_remove_session_drains_message_queue():
+    from app.services.execution_manager import ExecutionManager, ExecutionSession
+    em = ExecutionManager()
+    cid = "test-drain-queue-session"
+    session = ExecutionSession(conversation_id=cid)
+    session.message_queue.put_nowait({"type": "prompt", "content": "hello 1"})
+    session.message_queue.put_nowait({"type": "prompt", "content": "hello 2"})
+    assert not session.message_queue.empty()
+    assert session.message_queue.qsize() == 2
+
+    em.sessions[cid] = session
+    em.remove_session(cid)
+    assert session.message_queue.empty()
+    assert cid not in em.sessions
+    print("✓ test_remove_session_drains_message_queue passed")
+
+
+def test_kanban_update_task_rejects_empty_title():
+    from fastapi import HTTPException
+
+    from app.api.kanban import UpdateTaskRequest, update_task
+
+    try:
+        update_task(task_id="task-any", req=UpdateTaskRequest(title="   "))
+        assert False, "Should raise HTTPException 400 on empty title"
+    except HTTPException as e:
+        assert e.status_code == 400
+        assert "vide" in e.detail
+
+    try:
+        update_task(task_id="task-any", req=UpdateTaskRequest(title=""))
+        assert False, "Should raise HTTPException 400 on empty title"
+    except HTTPException as e:
+        assert e.status_code == 400
+        assert "vide" in e.detail
+    print("✓ test_kanban_update_task_rejects_empty_title passed")
 
 
 if __name__ == "__main__":
@@ -1349,4 +1426,7 @@ if __name__ == "__main__":
     test_git_sanitize_extended_trailers()
     test_kill_task_candidate_tids_hardening()
     test_compute_next_run_microsecond_stripping()
+    test_list_artifacts_sensitive_and_traversal_filtering()
+    test_remove_session_drains_message_queue()
+    test_kanban_update_task_rejects_empty_title()
     print("\nAll unit tests passed successfully!")
