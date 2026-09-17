@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { GitCommit, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { copyText } from '../utils/codeBlockUtils';
 
@@ -23,58 +23,66 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   const [collapsed, setCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Parse unified diff or snippet
-  const lines = (diffText || '').replace(/\r/g, '').split('\n');
-  const parsedLines: DiffLine[] = [];
-  let oldLine = 1;
-  let newLine = 1;
-  let inHunk = false;
+  // Parse unified diff or snippet memoized
+  const { parsedLines, additionsCount, deletionsCount } = useMemo(() => {
+    const lines = (diffText || '').replace(/\r/g, '').split('\n');
+    const parsed: DiffLine[] = [];
+    let oldLine = 1;
+    let newLine = 1;
+    let inHunk = false;
 
-  for (const line of lines) {
-    if (line.startsWith('@@')) {
-      inHunk = true;
-      parsedLines.push({ type: 'meta', text: line });
-      // Match @@ -oldStart,oldCount +newStart,newCount @@
-      const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-      if (match) {
-        oldLine = parseInt(match[1], 10);
-        newLine = parseInt(match[2], 10);
+    for (const line of lines) {
+      if (line.startsWith('@@')) {
+        inHunk = true;
+        parsed.push({ type: 'meta', text: line });
+        // Match @@ -oldStart,oldCount +newStart,newCount @@
+        const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        if (match) {
+          oldLine = parseInt(match[1], 10);
+          newLine = parseInt(match[2], 10);
+        }
+      } else if (
+        line.startsWith('---') ||
+        line.startsWith('+++') ||
+        line.startsWith('diff ') ||
+        line.startsWith('index ') ||
+        line.startsWith('new file mode') ||
+        line.startsWith('deleted file mode') ||
+        line.startsWith('similarity index')
+      ) {
+        parsed.push({ type: 'meta', text: line });
+      } else if (line.startsWith('+')) {
+        parsed.push({
+          type: 'add',
+          text: line.substring(1),
+          newLineNum: newLine++,
+        });
+      } else if (line.startsWith('-')) {
+        parsed.push({
+          type: 'del',
+          text: line.substring(1),
+          oldLineNum: oldLine++,
+        });
+      } else {
+        const cleanLine = line.startsWith(' ') ? line.substring(1) : line;
+        parsed.push({
+          type: 'context',
+          text: cleanLine,
+          oldLineNum: inHunk ? oldLine++ : undefined,
+          newLineNum: inHunk ? newLine++ : undefined,
+        });
       }
-    } else if (
-      line.startsWith('---') ||
-      line.startsWith('+++') ||
-      line.startsWith('diff ') ||
-      line.startsWith('index ') ||
-      line.startsWith('new file mode') ||
-      line.startsWith('deleted file mode') ||
-      line.startsWith('similarity index')
-    ) {
-      parsedLines.push({ type: 'meta', text: line });
-    } else if (line.startsWith('+')) {
-      parsedLines.push({
-        type: 'add',
-        text: line.substring(1),
-        newLineNum: newLine++,
-      });
-    } else if (line.startsWith('-')) {
-      parsedLines.push({
-        type: 'del',
-        text: line.substring(1),
-        oldLineNum: oldLine++,
-      });
-    } else {
-      const cleanLine = line.startsWith(' ') ? line.substring(1) : line;
-      parsedLines.push({
-        type: 'context',
-        text: cleanLine,
-        oldLineNum: inHunk ? oldLine++ : undefined,
-        newLineNum: inHunk ? newLine++ : undefined,
-      });
     }
-  }
 
-  const additionsCount = parsedLines.filter((l) => l.type === 'add').length;
-  const deletionsCount = parsedLines.filter((l) => l.type === 'del').length;
+    const additions = parsed.filter((l) => l.type === 'add').length;
+    const deletions = parsed.filter((l) => l.type === 'del').length;
+
+    return {
+      parsedLines: parsed,
+      additionsCount: additions,
+      deletionsCount: deletions
+    };
+  }, [diffText]);
 
   const copyDiff = async () => {
     await copyText(diffText);

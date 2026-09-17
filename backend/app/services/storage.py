@@ -1238,6 +1238,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 if file_size > 512 * 1024:
                     with open(t_file, "rb") as f:
                         f.seek(file_size - 512 * 1024)
+                        raw_data = f.read().decode("utf-8", errors="replace")
                     split_lines = raw_data.splitlines()
                     lines = split_lines[1:] if len(split_lines) > 1 else split_lines  # skip potential partial line only if multiple lines
                     if len(lines) > 500:

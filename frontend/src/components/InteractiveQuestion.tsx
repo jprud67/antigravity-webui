@@ -29,9 +29,17 @@ export const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({
   const [submitted, setSubmitted] = useState(false);
   const [finalAnswer, setFinalAnswer] = useState<string>('');
 
-  const [prevToolArgs, setPrevToolArgs] = useState(toolArgs);
-  if (toolArgs !== prevToolArgs) {
-    setPrevToolArgs(toolArgs);
+  const argsKey = React.useMemo(() => {
+    try {
+      return JSON.stringify(toolArgs);
+    } catch {
+      return '';
+    }
+  }, [toolArgs]);
+
+  const [prevArgsKey, setPrevArgsKey] = useState(argsKey);
+  if (argsKey !== prevArgsKey) {
+    setPrevArgsKey(argsKey);
     setSelectedAnswers({});
     setCustomInputs({});
     setSubmitted(false);

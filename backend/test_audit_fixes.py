@@ -21,6 +21,7 @@ from app.services.storage import (
     calculate_conversation_tokens,
     import_conversation,
     read_artifact_content,
+    search_conversations,
 )
 from app.services.updater import CURRENT_VERSION
 
@@ -2576,6 +2577,56 @@ def test_import_single_conversation_non_dict_items():
     print("✓ test_import_single_conversation_non_dict_items passed")
 
 
+def test_search_conversations_large_transcript():
+    """Verify that search_conversations handles transcripts > 512KB without NameError on raw_data."""
+    import shutil
+    import tempfile
+    import uuid
+    from unittest.mock import patch
+
+    unique_cid = f"test-large-search-{uuid.uuid4().hex[:8]}"
+    conv_dir = BRAIN_DIR / unique_cid
+    log_dir = conv_dir / ".system_generated" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    t_file = log_dir / "transcript.jsonl"
+
+    unique_term = f"needle_{uuid.uuid4().hex[:8]}"
+
+    try:
+        # Create a file > 512KB (approx 550KB)
+        dummy_step = json.dumps({"source": "USER", "type": "USER_INPUT", "content": "padding line " * 10}) + "\n"
+        step_bytes = dummy_step.encode("utf-8")
+        target_size = 550 * 1024
+        repeat_count = target_size // len(step_bytes)
+
+        with open(t_file, "wb") as f:
+            f.write(step_bytes * repeat_count)
+            target_step = json.dumps({"source": "USER", "type": "USER_INPUT", "content": f"Secret code: {unique_term}"}) + "\n"
+            f.write(target_step.encode("utf-8"))
+
+        assert t_file.stat().st_size > 512 * 1024
+
+        dummy_conv = {
+            "conversation_id": unique_cid,
+            "title": "Large Transcript Test",
+            "last_modified_time": "2026-09-17 12:00:00",
+            "preview": "Test preview",
+            "step_count": 100,
+            "pinned": False,
+        }
+
+        with patch("app.services.storage.list_conversations", return_value=[dummy_conv]):
+            results = search_conversations(unique_term, limit=10)
+
+        assert len(results) >= 1
+        found = any(r.get("conversation_id") == unique_cid and r.get("match_type") == "transcript" for r in results)
+        assert found, f"Expected {unique_cid} to be matched in transcript search, got {results}"
+        print("✓ test_search_conversations_large_transcript passed")
+    finally:
+        if conv_dir.exists():
+            shutil.rmtree(conv_dir, ignore_errors=True)
+
+
 if __name__ == "__main__":
     test_file_download_unicode_and_special_chars()
     test_token_calculation()
@@ -2683,4 +2734,5 @@ if __name__ == "__main__":
     test_files_path_access_drive_letters()
     test_crons_skills_sanitization_trimmed()
     test_import_single_conversation_non_dict_items()
+    test_search_conversations_large_transcript()
     print("\nAll unit tests passed successfully!")

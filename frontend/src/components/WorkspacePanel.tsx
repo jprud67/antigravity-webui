@@ -74,6 +74,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const [selectedArtifact, setSelectedArtifact] = useState<ArtifactItem | null>(null);
   const [artifactMarkdown, setArtifactMarkdown] = useState<string>('');
   const [loadingArtifacts, setLoadingArtifacts] = useState(false);
+  const selectedArtifactRef = useRef<ArtifactItem | null>(null);
+  useEffect(() => {
+    selectedArtifactRef.current = selectedArtifact;
+  }, [selectedArtifact]);
 
   // Drag resizing logic
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -243,7 +247,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     try {
       const items = await fetchArtifacts(conversationId);
       setArtifacts(items);
-      if (items.length > 0 && !selectedArtifact) {
+      if (items.length > 0 && !selectedArtifactRef.current) {
         handleSelectArtifact(items[0]);
       }
     } catch (e) {
@@ -251,7 +255,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } finally {
       setLoadingArtifacts(false);
     }
-  }, [conversationId, selectedArtifact, handleSelectArtifact]);
+  }, [conversationId, handleSelectArtifact]);
 
   useEffect(() => {
     if (!isOpen || activeTab !== 'artifacts') return;
@@ -261,7 +265,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
         if (active) {
           setArtifacts(items);
           setLoadingArtifacts(false);
-          if (items.length > 0 && !selectedArtifact) {
+          if (items.length > 0 && !selectedArtifactRef.current) {
             handleSelectArtifact(items[0]);
           }
         }
@@ -271,7 +275,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
         if (active) setLoadingArtifacts(false);
       });
     return () => { active = false; };
-  }, [isOpen, activeTab, conversationId, selectedArtifact, handleSelectArtifact]);
+  }, [isOpen, activeTab, conversationId, handleSelectArtifact]);
 
   // Git status & preview mode state
   const [gitStatus, setGitStatus] = useState<GitStatusResult | null>(null);

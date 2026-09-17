@@ -40,8 +40,16 @@ import { showConfirm } from '../services/dialog';
 
 function parseSafeDate(dateVal: any): Date {
   if (!dateVal) return new Date();
+  if (typeof dateVal === 'number') {
+    return new Date(dateVal < 10000000000 ? dateVal * 1000 : dateVal);
+  }
   if (typeof dateVal === 'string') {
-    return new Date(dateVal.replace(' ', 'T'));
+    const s = dateVal.trim();
+    if (/^\d+$/.test(s)) {
+      const n = parseInt(s, 10);
+      return new Date(n < 10000000000 ? n * 1000 : n);
+    }
+    return new Date(s.replace(' ', 'T'));
   }
   return new Date(dateVal);
 }
