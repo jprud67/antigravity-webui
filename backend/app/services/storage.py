@@ -1185,19 +1185,35 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                         break
             
             if metadata_cids:
-                placeholders = ",".join(["?"] * len(metadata_cids))
-                cursor.execute(
-                    f"SELECT * FROM conversation_summaries WHERE conversation_id IN ({placeholders})",  # nosec B608
-                    tuple(metadata_cids)
-                )
-                for r in cursor.fetchall():
-                    cid = r["conversation_id"]
-                    meta = all_meta.get(cid, {})
-                    c_item = _build_conversation_dict(r, meta)
-                    c_item["match_type"] = "metadata"
-                    c_item["match_snippet"] = meta.get("customTitle") or meta.get("project") or c_item.get("preview")
-                    matched.append(c_item)
-                    seen_ids.add(cid)
+                chunk_size = 500
+                for i in range(0, len(metadata_cids), chunk_size):
+                    chunk = metadata_cids[i : i + chunk_size]
+                    placeholders = ",".join(["?"] * len(chunk))
+                    cursor.execute(
+                        f"""
+                        SELECT 
+                            conversation_id,
+                            title,
+                            preview,
+                            step_count,
+                            last_modified_time,
+                            workspace_uris,
+                            status,
+                            agent_name,
+                            parent_conversation_id
+                        FROM conversation_summaries
+                        WHERE conversation_id IN ({placeholders})
+                        """,  # nosec B608
+                        tuple(chunk),
+                    )
+                    for r in cursor.fetchall():
+                        cid = r["conversation_id"]
+                        meta = all_meta.get(cid, {})
+                        c_item = _build_conversation_dict(r, meta)
+                        c_item["match_type"] = "metadata"
+                        c_item["match_snippet"] = meta.get("customTitle") or meta.get("project") or c_item.get("preview")
+                        matched.append(c_item)
+                        seen_ids.add(cid)
     finally:
         conn.close()
 

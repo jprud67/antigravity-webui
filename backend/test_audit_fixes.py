@@ -2487,7 +2487,33 @@ def test_kill_task_name_matching():
     print("✓ test_kill_task_name_matching passed")
 
 
+def test_file_download_unicode_and_special_chars():
+    from app.api.files import download_file
+    from app.config import DEFAULT_WORKSPACE
+
+    test_dir = Path(DEFAULT_WORKSPACE) / ".tmp_test_download_unicode"
+    test_dir.mkdir(parents=True, exist_ok=True)
+    unicode_filename = "spécification_résumé_2026.docx"
+    test_file = test_dir / unicode_filename
+    test_file.write_text("Contenu test téléchargement unicode", encoding="utf-8")
+
+    try:
+        response = download_file(path=str(test_file), _=None)
+        assert response.status_code == 200
+        headers_dict = dict(response.headers)
+        cd = headers_dict.get("content-disposition", "")
+        assert "attachment" in cd
+        assert "filename*" in cd or "filename=" in cd
+        print("✓ test_file_download_unicode_and_special_chars passed")
+    finally:
+        if test_file.exists():
+            test_file.unlink()
+        if test_dir.exists():
+            test_dir.rmdir()
+
+
 if __name__ == "__main__":
+    test_file_download_unicode_and_special_chars()
     test_token_calculation()
     test_password_validation()
     test_session_metadata_copy()

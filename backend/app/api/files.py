@@ -243,7 +243,6 @@ def download_file(path: str = Query(...), _ = Depends(require_auth)):
     return FileResponse(
         path=str(resolved_path),
         filename=resolved_path.name,
-        media_type=media_type or "application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{resolved_path.name}"'}
+        media_type=media_type or "application/octet-stream"
     )
 
