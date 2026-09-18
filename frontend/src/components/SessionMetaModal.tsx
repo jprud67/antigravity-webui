@@ -4,6 +4,7 @@ import type { Conversation } from '../types';
 import { updateConversationMetadata, deleteConversation, exportConversationMarkdown, exportConversationJSON, triggerFileDownload } from '../services/api';
 import { showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
+import { useI18n } from '../services/i18n';
 
 interface SessionMetaModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
   onUpdated,
   onDeleted
 }) => {
+  const { t } = useI18n();
   const [prevConvId, setPrevConvId] = useState<string | null>(null);
   const [prevIsOpen, setPrevIsOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -71,9 +73,9 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
         const blob = await exportConversationJSON(conversation.conversation_id);
         triggerFileDownload(blob, `session_${conversation.conversation_id.slice(0, 8)}.json`);
       }
-      showToast(`Export ${format.toUpperCase()} téléchargé`, 'success');
+      showToast(t('export_downloaded', `Export ${format.toUpperCase()} downloaded`, format.toUpperCase()), 'success');
     } catch (e: any) {
-      showToast(`Erreur export : ${e.message}`, 'error');
+      showToast(`${t('export_error', 'Export error')}: ${e.message}`, 'error');
     } finally {
       setExporting(false);
     }
@@ -99,14 +101,14 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
       onUpdated();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Erreur lors de la sauvegarde');
+      setError(err.message || t('error_saving_file', 'Error saving'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!(await showConfirm('Voulez-vous vraiment supprimer définitivement cette conversation et son historique ?', { destructive: true }))) {
+    if (!(await showConfirm(t('delete_session_confirm', 'Are you sure you want to permanently delete this conversation and its history?'), { destructive: true }))) {
       return;
     }
     setLoading(true);
@@ -116,7 +118,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
       onUpdated();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Erreur de suppression');
+      setError(err.message || t('delete_failed', 'Delete error'));
     } finally {
       setLoading(false);
     }
@@ -142,7 +144,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
         >
           <div className="flex items-center gap-2">
             <Tag className="w-4 h-4 text-sky-400" />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--strong)' }}>Gestion de Session & Métadonnées</h3>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--strong)' }}>{t('session_meta_title', 'Session Management & Metadata')}</h3>
           </div>
           <button
             onClick={onClose}
@@ -163,12 +165,12 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
 
           {/* Title */}
           <div className="space-y-1.5">
-            <label className="font-medium" style={{ color: 'var(--muted)' }}>Titre de la session</label>
+            <label className="font-medium" style={{ color: 'var(--muted)' }}>{t('session_title_label', 'Session Title')}</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Refonte du backend API, Bug Auth..."
+              placeholder={t('session_title_placeholder', 'e.g. Backend API refactor, Auth bug...')}
               className="w-full px-3 py-2 rounded-xl font-medium text-xs border focus:outline-none"
               style={{
                 backgroundColor: 'var(--surface-subtle)',
@@ -182,14 +184,14 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
           <div className="space-y-1.5">
             <label className="font-medium flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
               <Folder className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Projet / Catégorie</span>
+              <span>{t('session_project_label', 'Project / Category')}</span>
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={project}
                 onChange={(e) => setProject(e.target.value)}
-                placeholder="Ex: Antigravity, LeadForge, Infra..."
+                placeholder={t('session_project_placeholder', 'e.g. Antigravity, LeadForge, Infra...')}
                 className="flex-1 px-3 py-2 rounded-xl text-xs border focus:outline-none"
                 style={{
                   backgroundColor: 'var(--surface-subtle)',
@@ -204,7 +206,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
           <div className="space-y-1.5">
             <label className="font-medium flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
               <Palette className="w-3.5 h-3.5 text-amber-400" />
-              <span>Pastille de couleur du projet</span>
+              <span>{t('session_color_label', 'Project color badge')}</span>
             </label>
             <div className="flex items-center gap-2 pt-1">
               {PALETTE.map((c) => (
@@ -227,13 +229,13 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
           <div className="space-y-1.5">
             <label className="font-medium flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
               <Tag className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Tags (séparés par des virgules)</span>
+              <span>{t('session_tags_label', 'Tags (comma-separated)')}</span>
             </label>
             <input
               type="text"
               value={tagsStr}
               onChange={(e) => setTagsStr(e.target.value)}
-              placeholder="Ex: backend, security, refactor, bug"
+              placeholder={t('session_tags_placeholder', 'e.g. backend, security, refactor, bug')}
               className="w-full px-3 py-2 rounded-xl font-mono text-xs border focus:outline-none"
               style={{
                 backgroundColor: 'var(--surface-subtle)',
@@ -241,7 +243,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
                 color: 'var(--text)'
               }}
             />
-            <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Ces tags vous permettront de filtrer vos sessions en un clic dans la barre latérale.</p>
+            <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{t('session_tags_hint', 'These tags allow you to filter your sessions with one click in the sidebar.')}</p>
           </div>
 
           {/* Pin toggle */}
@@ -258,9 +260,9 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
             >
               <div className="flex items-center gap-2 font-medium">
                 <Pin className={`w-4 h-4 ${pinned ? 'fill-current text-amber-500' : ''}`} style={{ color: pinned ? undefined : 'var(--muted)' }} />
-                <span>Épingler cette session en haut de la liste</span>
+                <span>{t('pin_session_top', 'Pin this session to top of list')}</span>
               </div>
-              <span className="text-[10px] uppercase font-mono">{pinned ? 'Actif' : 'Inactif'}</span>
+              <span className="text-[10px] uppercase font-mono">{pinned ? t('active', 'Active') : t('inactive', 'Inactive')}</span>
             </button>
 
             {/* Archive toggle */}
@@ -276,9 +278,9 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
             >
               <div className="flex items-center gap-2 font-medium">
                 <Archive className="w-4 h-4 text-slate-400" />
-                <span>Archiver cette session</span>
+                <span>{t('archive_session', 'Archive session')}</span>
               </div>
-              <span className="text-[10px] uppercase font-mono">{archived ? 'Archivé' : 'Non archivé'}</span>
+              <span className="text-[10px] uppercase font-mono">{archived ? t('kanban_status_archived', 'Archived') : t('not_archived', 'Not archived')}</span>
             </button>
           </div>
 
@@ -286,7 +288,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
           <div className="pt-2 border-t mt-2" style={{ borderColor: 'var(--border-subtle)' }}>
             <label className="text-[11px] font-semibold flex items-center gap-1.5 mb-2" style={{ color: 'var(--muted)' }}>
               <Download className="w-3.5 h-3.5 text-sky-400" />
-              <span>Exporter cette discussion</span>
+              <span>{t('export_discussion', 'Export this discussion')}</span>
             </label>
             <div className="flex items-center gap-2">
               <button
@@ -315,7 +317,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
                 }}
               >
                 <Download className="w-3.5 h-3.5 text-sky-400" />
-                <span>JSON complet</span>
+                <span>{t('export_full_json', 'Full JSON')}</span>
               </button>
             </div>
           </div>
@@ -336,7 +338,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
             className="py-1.5 px-3 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Supprimer la session</span>
+            <span>{t('delete_session', 'Delete session')}</span>
           </button>
 
           <div className="flex items-center gap-2">
@@ -347,7 +349,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
               className="py-1.5 px-3 rounded-lg text-xs cursor-pointer"
               style={{ color: 'var(--muted)' }}
             >
-              Annuler
+              {t('cancel', 'Cancel')}
             </button>
             <button
               type="button"
@@ -355,7 +357,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
               disabled={loading}
               className="py-1.5 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold text-xs transition-all shadow-md shadow-sky-500/20 cursor-pointer"
             >
-              {loading ? 'Enregistrement...' : 'Enregistrer'}
+              {loading ? t('saving', 'Saving...') : t('save', 'Save')}
             </button>
           </div>
         </div>
