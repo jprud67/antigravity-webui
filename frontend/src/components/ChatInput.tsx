@@ -993,6 +993,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
           finalText += `\n\n[Fichier attaché : ${att.name} (${Math.round(att.size / 1024)} ko)]\n\`\`\`\n${content}\n\`\`\``;
         }
       }
+      finalText = finalText.trim();
       setAttachments([]);
     }
 

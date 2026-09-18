@@ -266,11 +266,9 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
             return True
         if ".stash_" in name:
             return True
-    except (ValueError, TypeError, OSError):
-        # En cas d'erreur de résolution sur un chemin potentiellement hostile, bloquer par précaution
-        return True
     except Exception:
-        return False
+        # En cas d'erreur de résolution sur un chemin potentiellement hostile ou inattendu, bloquer par précaution
+        return True
     return False
 
 

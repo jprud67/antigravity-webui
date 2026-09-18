@@ -560,27 +560,34 @@ const ToolActivityFeed: React.FC<{
 }> = ({ toolCalls, isExpanded, onToggle, onAnswerQuestion, onQuickPrompt }) => {
   const { t } = useI18n();
   const [showAllTools, setShowAllTools] = useState(false);
-  const interactiveTools = toolCalls.filter(
+  const interactiveTools = useMemo(() => toolCalls.filter(
     (t) => t.name === 'ask_question' || t.name === 'ask_permission' || t.name === 'ask_custom_permission'
-  );
-  const actionTools = toolCalls.filter(
+  ), [toolCalls]);
+
+  const actionTools = useMemo(() => toolCalls.filter(
     (t) => t.name !== 'ask_question' && t.name !== 'ask_permission' && t.name !== 'ask_custom_permission'
-  );
+  ), [toolCalls]);
 
-  const cmdCount = actionTools.filter((t) => t.name === 'run_command').length;
-  const fileReadCount = actionTools.filter((t) => ['view_file', 'read_url_content', 'list_dir', 'grep_search', 'find_by_name'].includes(t.name)).length;
-  const fileWriteCount = actionTools.filter((t) => ['replace_file_content', 'write_to_file'].includes(t.name)).length;
+  const { summary, hasRunning } = useMemo(() => {
+    const cmdCount = actionTools.filter((t) => t.name === 'run_command').length;
+    const fileReadCount = actionTools.filter((t) => ['view_file', 'read_url_content', 'list_dir', 'grep_search', 'find_by_name'].includes(t.name)).length;
+    const fileWriteCount = actionTools.filter((t) => ['replace_file_content', 'write_to_file'].includes(t.name)).length;
 
-  const parts = [];
-  if (cmdCount > 0) parts.push(`${cmdCount} commande${cmdCount > 1 ? 's' : ''}`);
-  if (fileWriteCount > 0) parts.push(`${fileWriteCount} modification${fileWriteCount > 1 ? 's' : ''}`);
-  if (fileReadCount > 0) parts.push(`${fileReadCount} consultation${fileReadCount > 1 ? 's' : ''}`);
+    const parts = [];
+    if (cmdCount > 0) parts.push(`${cmdCount} commande${cmdCount > 1 ? 's' : ''}`);
+    if (fileWriteCount > 0) parts.push(`${fileWriteCount} modification${fileWriteCount > 1 ? 's' : ''}`);
+    if (fileReadCount > 0) parts.push(`${fileReadCount} consultation${fileReadCount > 1 ? 's' : ''}`);
 
-  const summary = parts.length > 0
-    ? parts.join(', ')
-    : `${actionTools.length} action${actionTools.length > 1 ? 's' : ''}`;
+    const s = parts.length > 0
+      ? parts.join(', ')
+      : `${actionTools.length} action${actionTools.length > 1 ? 's' : ''}`;
 
-  const hasRunning = actionTools.some((t) => t.status === 'running');
+    return {
+      summary: s,
+      hasRunning: actionTools.some((t) => t.status === 'running')
+    };
+  }, [actionTools]);
+
   const visibleTools = showAllTools || actionTools.length <= 8
     ? actionTools
     : actionTools.slice(actionTools.length - 8);

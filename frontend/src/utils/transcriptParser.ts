@@ -41,9 +41,10 @@ export function cleanUserPrompt(raw: any): string {
   if (!raw) return '';
   const str = typeof raw === 'string' ? raw : (typeof raw === 'object' ? JSON.stringify(raw) : String(raw));
 
+  const trimmedStart = str.trimStart();
   // Optimisation de performance : court-circuiter si aucun délimiteur XML ou préfixe de guidage
-  if (!str.includes('<') && !str.startsWith('⚡') && !str.startsWith('📥') && !str.startsWith('[')) {
-    return str.trim();
+  if (!trimmedStart.includes('<') && !trimmedStart.startsWith('⚡') && !trimmedStart.startsWith('📥') && !trimmedStart.startsWith('[')) {
+    return trimmedStart.trimEnd();
   }
 
   // 1. Retirer les blocs de métadonnées, contexte et paramètres système
