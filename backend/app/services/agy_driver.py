@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import json
 import logging
 import re
@@ -12,6 +13,11 @@ from app.platform_utils import spawn_group_kwargs, terminate_process_group_async
 from app.services.quota_watch import watch_agy_log_for_quota
 
 logger = logging.getLogger("antigravity.driver")
+
+# Seuil de bascule du prompt vers stdin. MAX_ARG_STRLEN vaut 128 Kio sur Linux :
+# on garde une marge confortable sous la limite pour les prompts passés en
+# argument (mode --json-schema uniquement).
+STDIN_PROMPT_THRESHOLD = 100_000
 
 DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
     {
@@ -346,8 +352,21 @@ async def stream_turn(
         if is_different:
             cmd.extend(["--add-dir", str(Path(workspace_path).resolve())])
 
-    # Prompt parameter
-    cmd.extend(["-p", prompt])
+    # Prompt parameter.
+    # Sous Linux, MAX_ARG_STRLEN (128 Kio) impose une limite stricte par argument
+    # de argv. Au-delà du seuil STDIN_PROMPT_THRESHOLD (100 Kio), le prompt est
+    # transmis sur stdin via --input-format stream-json afin d'éviter l'erreur
+    # système E2BIG ("Argument list too long").
+    # En-deçà, le prompt est passé directement via -p, ce qui préserve stdin
+    # ouvert pour les approbations interactives et questions utilisateur.
+    prompt_bytes = len(prompt.encode("utf-8", "ignore"))
+    schema_bytes = len(json_schema.encode("utf-8", "ignore")) if json_schema else 0
+    if prompt_bytes + schema_bytes >= STDIN_PROMPT_THRESHOLD:
+        cmd.extend(["--input-format", "stream-json"])
+        prompt_via_stdin = True
+    else:
+        cmd.extend(["-p", prompt])
+        prompt_via_stdin = False
 
     safe_cmd = []
     skip_next = False
@@ -367,6 +386,7 @@ async def stream_turn(
     proc: asyncio.subprocess.Process | None = None
     stderr_task: asyncio.Task | None = None
     quota_task: asyncio.Task | None = None
+    feed_task: asyncio.Task | None = None
 
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -380,6 +400,32 @@ async def stream_turn(
 
         if proc_callback:
             proc_callback(proc)
+
+        if prompt_via_stdin and proc.stdin is not None:
+            # Le prompt est écrit sur stdin sous forme NDJSON (stream-json).
+            payload = json.dumps({
+                "event": "user",
+                "message": {
+                    "role": "user",
+                    "content": [{"type": "text", "text": prompt}],
+                },
+            }).encode("utf-8")
+            stdin_stream = proc.stdin
+
+            async def _feed_stdin() -> None:
+                try:
+                    res = stdin_stream.write(payload + b"\n")
+                    if inspect.isawaitable(res):
+                        await res
+                    drain = stdin_stream.drain()
+                    if inspect.isawaitable(drain):
+                        await drain
+                except (BrokenPipeError, ConnectionResetError):
+                    logger.warning("agy a fermé stdin avant réception du prompt.")
+                except Exception as exc:
+                    logger.warning(f"Erreur lors de l'envoi du prompt sur stdin: {exc}")
+
+            feed_task = asyncio.create_task(_feed_stdin())
 
         quota_detected: dict[str, Any] = {"line": None}
 
@@ -474,6 +520,12 @@ async def stream_turn(
                 logger.debug(f"Ignored error during cancellation process cleanup: {e}")
         raise
     finally:
+        if feed_task and not feed_task.done():
+            feed_task.cancel()
+            try:
+                await feed_task
+            except (asyncio.CancelledError, Exception):
+                logger.debug("Ignored error")
         if stderr_task and not stderr_task.done():
             stderr_task.cancel()
             try:

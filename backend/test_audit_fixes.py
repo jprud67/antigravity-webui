@@ -4774,7 +4774,128 @@ def test_tasks_list_active_tasks_expanded_markers():
     print("✓ test_tasks_list_active_tasks_expanded_markers passed")
 
 
+def test_agy_driver_prompt_passing_threshold():
+    """Verify stream_turn uses -p for short prompts and stream-json for prompts >= 100KB."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from app.services.agy_driver import stream_turn, STDIN_PROMPT_THRESHOLD
+
+    async def run_test():
+        # 1. Short prompt -> uses -p, no stream-json
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_proc = AsyncMock()
+            mock_proc.stdout.readline = AsyncMock(side_effect=[b"", b""])
+            mock_proc.stderr.readline = AsyncMock(return_value=b"")
+            mock_proc.stderr.read = AsyncMock(return_value=b"")
+            mock_proc.wait = AsyncMock(return_value=0)
+            mock_proc.returncode = 0
+            mock_exec.return_value = mock_proc
+
+            async for _ in stream_turn(prompt="hello world", json_schema='{"type": "object"}'):
+                pass
+
+            assert mock_exec.called
+            args = list(mock_exec.call_args[0])
+            assert "-p" in args
+            assert "hello world" in args
+            assert "--json-schema" in args
+            assert "--input-format" not in args
+
+        # 2. Large prompt (>= 100KB) -> uses --input-format stream-json, prompt on stdin
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_proc = AsyncMock()
+            mock_proc.stdout.readline = AsyncMock(side_effect=[b"", b""])
+            mock_proc.stderr.readline = AsyncMock(return_value=b"")
+            mock_proc.stderr.read = AsyncMock(return_value=b"")
+            mock_proc.wait = AsyncMock(return_value=0)
+            mock_proc.returncode = 0
+            mock_proc.stdin = AsyncMock()
+            mock_proc.stdin.write = AsyncMock()
+            mock_proc.stdin.drain = AsyncMock()
+            mock_exec.return_value = mock_proc
+
+            big_prompt = "x" * (STDIN_PROMPT_THRESHOLD + 10)
+            async for _ in stream_turn(prompt=big_prompt, json_schema='{"type": "object"}'):
+                pass
+
+            assert mock_exec.called
+            args = list(mock_exec.call_args[0])
+            assert "--input-format" in args
+            assert "stream-json" in args
+            assert "-p" not in args
+            assert "--json-schema" in args
+
+    asyncio.run(run_test())
+    print("✓ test_agy_driver_prompt_passing_threshold passed")
+
+
+def test_cron_ticker_run_agy_task_large_prompt():
+    """Verify run_agy_task uses -p for normal prompts and stream-json stdin for large prompts."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from app.services.cron_ticker import run_agy_task
+
+    async def run_test():
+        # Short prompt -> -p
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_proc = AsyncMock()
+            mock_proc.stdout.readline = AsyncMock(side_effect=[b"", b""])
+            mock_proc.stderr.readline = AsyncMock(side_effect=[b"", b""])
+            mock_proc.wait = AsyncMock(return_value=0)
+            mock_proc.returncode = 0
+            mock_exec.return_value = mock_proc
+
+            await run_agy_task("short task")
+            assert mock_exec.called
+            args = list(mock_exec.call_args[0])
+            assert "-p" in args
+            assert "short task" in args
+            assert "--input-format" not in args
+
+        # Large prompt (>= 100KB) -> stream-json
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_proc = AsyncMock()
+            mock_proc.stdout.readline = AsyncMock(side_effect=[b"", b""])
+            mock_proc.stderr.readline = AsyncMock(side_effect=[b"", b""])
+            mock_proc.wait = AsyncMock(return_value=0)
+            mock_proc.returncode = 0
+            mock_proc.stdin = AsyncMock()
+            mock_proc.stdin.write = AsyncMock()
+            mock_proc.stdin.drain = AsyncMock()
+            mock_exec.return_value = mock_proc
+
+            big_prompt = "y" * 105_000
+            await run_agy_task(big_prompt)
+            assert mock_exec.called
+            args = list(mock_exec.call_args[0])
+            assert "--input-format" in args
+            assert "stream-json" in args
+            assert "-p" not in args
+
+    asyncio.run(run_test())
+    print("✓ test_cron_ticker_run_agy_task_large_prompt passed")
+
+
+def test_tool_bridge_schema_injection_on_large_prompt():
+    """Verify build_prompt injects ENFORCED OUTPUT SCHEMA when prompt exceeds ARG_PROMPT_LIMIT."""
+    from app.services.tool_bridge import build_prompt, ARG_PROMPT_LIMIT
+
+    sample_tool = {"type": "function", "function": {"name": "test_fn", "description": "test"}}
+    # Under limit
+    short_prompt = build_prompt([{"role": "user", "content": "hi"}], [sample_tool])
+    assert "ENFORCED OUTPUT SCHEMA" not in short_prompt
+
+    # Over limit
+    big_content = "Z" * (ARG_PROMPT_LIMIT + 500)
+    long_prompt = build_prompt([{"role": "user", "content": big_content}], [sample_tool])
+    assert "ENFORCED OUTPUT SCHEMA" in long_prompt
+    print("✓ test_tool_bridge_schema_injection_on_large_prompt passed")
+
+
 if __name__ == "__main__":
+    test_agy_driver_prompt_passing_threshold()
+    test_cron_ticker_run_agy_task_large_prompt()
+    test_tool_bridge_schema_injection_on_large_prompt()
     test_is_blocked_sensitive_path_extended()
     test_files_validate_path_access_url_fragments()
     test_execution_manager_unregister_socket_prune_flag()

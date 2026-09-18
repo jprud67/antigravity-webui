@@ -50,9 +50,16 @@ MAX_FAILOVERS = 2
 # Pause après bascule de compte avant relance (laisse le token actif s'écrire proprement).
 FAILOVER_PAUSE_S = 1.0
 
-# Garde-fou de taille : au-delà, la partie médiane de la conversation est tronquée
-# (la ligne de commande a une limite système — ARG_MAX — côté agy).
+# Garde-fou de taille : au-delà, la partie médiane de la conversation est tronquée.
+# Le prompt tool-bridge transite désormais par stdin (voir agy_driver), donc cette
+# limite n'est plus dictée par ARG_MAX ; on la conserve pour borner le coût en
+# tokens envoyés au CLI.
 MAX_PROMPT_CHARS = 600_000
+
+# Limite réelle d'un argument de ligne de commande sous Linux (MAX_ARG_STRLEN,
+# 128 Kio) : au-delà, create_subprocess_exec échoue en E2BIG quoi qu'il arrive.
+# Sert à décider si le prompt peut encore être passé en argument (--json-schema).
+ARG_PROMPT_LIMIT = 100_000
 
 # Enveloppe JSON imposée à agy (--json-schema : sortie finale contrainte).
 ENVELOPE_SCHEMA = json.dumps({
@@ -195,6 +202,18 @@ def build_prompt(messages: list[dict[str, Any]], tools: list[dict[str, Any]], to
     )
     parts.append("NEXT STEP — output the single JSON object now:")
     prompt = "\n\n".join(parts)
+
+    # Quand le prompt dépasse ARG_PROMPT_LIMIT, la contrainte de sortie est
+    # rappelée explicitement au début du prompt pour renforcer le respect du
+    # format par le modèle sur les contextes volumineux.
+    if len(prompt.encode("utf-8", "ignore")) >= ARG_PROMPT_LIMIT:
+        parts_schema = (
+            "ENFORCED OUTPUT SCHEMA (you MUST obey this JSON envelope shape exactly):\n"
+            + ENVELOPE_SCHEMA
+        )
+        parts.insert(1, parts_schema)
+        prompt = "\n\n".join(parts)
+
     return _truncate_prompt(prompt)
 
 

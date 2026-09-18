@@ -14,6 +14,8 @@ Fonctionnement :
   sortie de chaque run est journalisée dans CRON_DIR/output/.
 """
 import asyncio
+import inspect
+import json
 import logging
 import time
 from datetime import datetime, timezone
@@ -108,18 +110,49 @@ async def run_agy_task(
         cmd.extend(["--model", resolved_model.strip()])
     if resolved_effort and resolved_effort.strip():
         cmd.extend(["--effort", resolved_effort.strip()])
-    cmd.extend(["-p", effective_prompt])
+    prompt_bytes = len(effective_prompt.encode("utf-8", "ignore"))
+    via_stdin = prompt_bytes >= 100_000
+    if via_stdin:
+        cmd.extend(["--input-format", "stream-json", "--output-format", "stream-json"])
+    else:
+        cmd.extend(["-p", effective_prompt])
+
     spawned_at = time.time()
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         cwd=DEFAULT_WORKSPACE,
-        stdin=asyncio.subprocess.DEVNULL,
+        stdin=asyncio.subprocess.PIPE if via_stdin else asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         **spawn_group_kwargs()
     )
     if job_id:
         _running_job_procs[job_id] = proc
+
+    if via_stdin and proc.stdin is not None:
+        payload = json.dumps({
+            "event": "user",
+            "message": {
+                "role": "user",
+                "content": [{"type": "text", "text": effective_prompt}],
+            },
+        }).encode("utf-8")
+        try:
+            res = proc.stdin.write(payload + b"\n")
+            if inspect.isawaitable(res):
+                await res
+            drain = proc.stdin.drain()
+            if inspect.isawaitable(drain):
+                await drain
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        finally:
+            try:
+                res_close = proc.stdin.close()
+                if inspect.isawaitable(res_close):
+                    await res_close
+            except Exception:
+                pass
 
     stdout_chunks: list = []
     stderr_chunks: list = []
