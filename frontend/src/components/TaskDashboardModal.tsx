@@ -13,6 +13,7 @@ import {
 import { fetchTasksList, killTask } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
+import { useI18n } from '../services/i18n';
 
 interface TaskDashboardModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
   onClose,
   conversationId,
 }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'tasks' | 'subagents' | 'processes'>('tasks');
   const [data, setData] = useState<{ tasks: any[]; subagents: any[]; processes: any[] }>({
     tasks: [],
@@ -66,13 +68,13 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
   }, [isOpen, conversationId]);
 
   const handleKillProcess = async (pid: number) => {
-    if (!(await showConfirm(`Confirmer l'arrêt forcé du processus PID ${pid} ?`, { destructive: true }))) return;
+    if (!(await showConfirm(t('task_kill_confirm', `Confirm forced stop of process PID ${pid}?`, pid), { destructive: true }))) return;
     setKillingPid(pid);
     try {
       await killTask(pid);
       await refreshData();
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de l\'arrêt du processus', 'error');
+      showToast(err.message || t('task_kill_error', 'Error stopping process'), 'error');
     } finally {
       setKillingPid(null);
     }
@@ -110,8 +112,8 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
               <Activity className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-xs font-semibold truncate" style={{ color: 'var(--strong)' }}>Supervision & Tâches d'Arrière-Plan</h2>
-              <p className="text-[10px] truncate hidden sm:block" style={{ color: 'var(--muted)' }}>Monitoring en temps réel des sous-agents, commandes longues et processus</p>
+              <h2 className="text-xs font-semibold truncate" style={{ color: 'var(--strong)' }}>{t('task_dashboard_title', 'Supervision & Background Tasks')}</h2>
+              <p className="text-[10px] truncate hidden sm:block" style={{ color: 'var(--muted)' }}>{t('task_dashboard_subtitle', 'Real-time monitoring of subagents, long commands, and processes')}</p>
             </div>
           </div>
 
@@ -120,7 +122,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
               onClick={refreshData}
               className="p-1.5 rounded-lg transition-colors cursor-pointer hover:opacity-100 opacity-70"
               style={{ color: 'var(--muted)' }}
-              title="Rafraîchir"
+              title={t('refresh', 'Refresh')}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} style={{ color: loading ? 'var(--accent)' : undefined }} />
             </button>
@@ -151,7 +153,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
             }`}
           >
             <Terminal className="w-3.5 h-3.5" />
-            <span>Tâches ({data.tasks.length})</span>
+            <span>{t('tasks', 'Tasks')} ({data.tasks.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('subagents')}
@@ -162,7 +164,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
             }`}
           >
             <Bot className="w-3.5 h-3.5" />
-            <span>Sous-Agents ({data.subagents.length})</span>
+            <span>{t('subagents', 'Subagents')} ({data.subagents.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('processes')}
@@ -173,7 +175,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />
-            <span>Processus CLI ({data.processes.length})</span>
+            <span>{t('cli_processes', 'CLI Processes')} ({data.processes.length})</span>
           </button>
         </div>
 
@@ -186,7 +188,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
             <div className="space-y-3">
               {data.tasks.length === 0 ? (
                 <div className="p-8 text-center text-xs" style={{ color: 'var(--muted)' }}>
-                  Aucune tâche d'arrière-plan enregistrée.
+                  {t('no_background_tasks', 'No background tasks registered.')}
                 </div>
               ) : (
                 data.tasks.map((task) => (
@@ -202,18 +204,20 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
                       <div className="flex items-center gap-2 font-mono">
                         <Terminal className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
                         <span className="font-semibold" style={{ color: 'var(--strong)' }}>{task.task_id}</span>
-                        <span className="text-[10px]" style={{ color: 'var(--muted)' }}>dans conv {task.conversation_id.substring(0, 8)}...</span>
+                        <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                          conv {task.conversation_id.substring(0, 8)}...
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         {task.status === 'completed' ? (
                           <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                             <CheckCircle2 className="w-3 h-3" />
-                            Terminé
+                            {t('done', 'Done')}
                           </span>
                         ) : (
                           <span className="flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full animate-pulse">
                             <Clock className="w-3 h-3" />
-                            En cours
+                            {t('in_progress', 'In progress')}
                           </span>
                         )}
                         <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
@@ -244,7 +248,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
             <div className="space-y-3">
               {data.subagents.length === 0 ? (
                 <div className="p-8 text-center text-xs" style={{ color: 'var(--muted)' }}>
-                  Aucun sous-agent délégué actif pour l'instant.
+                  {t('no_active_subagents', 'No active delegated subagents at this time.')}
                 </div>
               ) : (
                 data.subagents.map((sub) => (
@@ -285,7 +289,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
             <div className="space-y-3">
               {data.processes.length === 0 ? (
                 <div className="p-8 text-center text-xs" style={{ color: 'var(--muted)' }}>
-                  Aucun sous-processus Antigravity en cours d'exécution.
+                  {t('no_cli_processes', 'No Antigravity CLI subprocesses currently running.')}
                 </div>
               ) : (
                 data.processes.map((proc) => (
@@ -330,7 +334,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
                       className="py-1.5 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-500 text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                     >
                       <Square className="w-3 h-3 fill-rose-500" />
-                      <span>{killingPid === proc.pid ? 'Arrêt...' : 'Terminer'}</span>
+                      <span>{killingPid === proc.pid ? t('stopping', 'Stopping...') : t('terminate', 'Terminate')}</span>
                     </button>
                   </div>
                 ))
