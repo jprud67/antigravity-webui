@@ -368,9 +368,17 @@ async def close_all_terminal_sessions():
 async def terminal_websocket(
     websocket: WebSocket,
     token: str | None = None,
+    api_key: str | None = None,
     workspace: str | None = None,
     session_id: str | None = None
 ):
+    # Support token / API key extraction from query params or headers
+    effective_token = token or api_key or websocket.query_params.get("token") or websocket.query_params.get("api_key")
+    if not effective_token:
+        x_api_key = websocket.headers.get("x-api-key", "").strip()
+        if x_api_key:
+            effective_token = x_api_key
+
     # Support token extraction via Sec-WebSocket-Protocol header (e.g. token.<token>)
     selected_subprotocol: str | None = None
     raw_subprotocols = websocket.headers.get("sec-websocket-protocol", "")
@@ -379,19 +387,28 @@ async def terminal_websocket(
             sp_clean = sp.strip()
             if sp_clean.startswith("token."):
                 raw_token = sp_clean[6:]
-                if not token:
+                if not effective_token:
                     import base64
+                    from urllib.parse import unquote
                     try:
-                        rem = len(raw_token) % 4
-                        padded = raw_token + ("=" * ((4 - rem) % 4))
-                        decoded = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
-                        if verify_token_or_api_key(decoded):
-                            token = decoded
+                        clean_unquoted = unquote(raw_token).strip()
+                        rem = len(clean_unquoted) % 4
+                        padded = clean_unquoted + ("=" * ((4 - rem) % 4))
+                        decoded = None
+                        try:
+                            decoded = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
+                        except Exception:
+                            try:
+                                decoded = base64.b64decode(padded.encode("ascii")).decode("utf-8")
+                            except Exception:
+                                decoded = None
+                        if decoded and verify_token_or_api_key(decoded):
+                            effective_token = decoded
                         elif verify_token_or_api_key(raw_token):
-                            token = raw_token
+                            effective_token = raw_token
                     except Exception:
                         if verify_token_or_api_key(raw_token):
-                            token = raw_token
+                            effective_token = raw_token
                 selected_subprotocol = sp_clean
                 break
             elif sp_clean == "terminal":
@@ -399,7 +416,7 @@ async def terminal_websocket(
 
     # Verify authentication
     config = get_auth_config()
-    if config.get("enabled", True) and not verify_token_or_api_key(token):
+    if config.get("enabled", True) and not verify_token_or_api_key(effective_token):
         await websocket.close(code=1008, reason="Unauthorized")
         logger.warning("Unauthorized terminal websocket connection attempt")
         return

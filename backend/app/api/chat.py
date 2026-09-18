@@ -32,11 +32,20 @@ async def chat_websocket(
             if sp_clean.startswith("token."):
                 raw_token = sp_clean[6:]
                 if not effective_token:
+                    from urllib.parse import unquote
                     try:
-                        rem = len(raw_token) % 4
-                        padded = raw_token + ("=" * ((4 - rem) % 4))
-                        decoded = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
-                        if verify_token_or_api_key(decoded):
+                        clean_unquoted = unquote(raw_token).strip()
+                        rem = len(clean_unquoted) % 4
+                        padded = clean_unquoted + ("=" * ((4 - rem) % 4))
+                        decoded = None
+                        try:
+                            decoded = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
+                        except Exception:
+                            try:
+                                decoded = base64.b64decode(padded.encode("ascii")).decode("utf-8")
+                            except Exception:
+                                decoded = None
+                        if decoded and verify_token_or_api_key(decoded):
                             effective_token = decoded
                         elif verify_token_or_api_key(raw_token):
                             effective_token = raw_token

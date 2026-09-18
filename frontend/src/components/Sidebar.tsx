@@ -234,12 +234,12 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
 
     return [
       { label: `📌 ${t('pinned_section', 'Pinned')}`, items: pinned },
-      { label: '📅 Aujourd\'hui', items: today },
-      { label: '📅 Hier', items: yesterday },
-      { label: '📅 7 derniers jours', items: last7Days },
-      { label: '📅 Ce mois-ci', items: last30Days },
-      { label: '🗄️ Plus ancien', items: older },
-      { label: '📦 Archives', items: archived },
+      { label: `📅 ${t('today', 'Today')}`, items: today },
+      { label: `📅 ${t('yesterday', 'Yesterday')}`, items: yesterday },
+      { label: `📅 ${t('last_7_days', 'Last 7 days')}`, items: last7Days },
+      { label: `📅 ${t('this_month', 'This month')}`, items: last30Days },
+      { label: `🗄️ ${t('older', 'Older')}`, items: older },
+      { label: `📦 ${t('archives', 'Archives')}`, items: archived },
     ].filter((g) => g.items.length > 0);
   }, [filtered]);
 

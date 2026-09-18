@@ -88,9 +88,27 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const token = getAuthToken() || '';
-    const wsUrl = `${protocol}//${host}/ws/terminal?token=${encodeURIComponent(token)}&workspace=${encodeURIComponent(currentWorkspace)}`;
+    let protocols: string[] | undefined;
+    if (token) {
+      try {
+        const utf8Bytes = encodeURIComponent(token).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+          String.fromCharCode(parseInt(p1, 16))
+        );
+        const safeToken = btoa(utf8Bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        protocols = ['terminal', `token.${safeToken}`];
+      } catch {
+        protocols = undefined;
+      }
+    }
+    const baseUrl = `${protocol}//${host}/ws/terminal?workspace=${encodeURIComponent(currentWorkspace)}`;
+    const fallbackUrl = `${baseUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
 
-    const ws = new WebSocket(wsUrl);
+    let ws: WebSocket;
+    try {
+      ws = protocols ? new WebSocket(baseUrl, protocols) : new WebSocket(fallbackUrl);
+    } catch {
+      ws = new WebSocket(fallbackUrl);
+    }
     ws.binaryType = 'arraybuffer';
     wsRef.current = ws;
 
