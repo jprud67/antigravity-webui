@@ -5,12 +5,14 @@ import '@xterm/xterm/css/xterm.css';
 import { RefreshCw, Trash2, Terminal as TerminalIcon, ShieldAlert } from 'lucide-react';
 import { getAuthToken } from '../services/api';
 import { showConfirm } from '../services/dialog';
+import { useI18n } from '../services/i18n';
 
 interface TerminalTabProps {
   currentWorkspace: string;
 }
 
 export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) => {
+  const { t } = useI18n();
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -117,16 +119,16 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
       setConnected(false);
       if (!xtermRef.current) return;
       if (e.code === 1008) {
-        setError('Session non autorisée. Veuillez vous connecter.');
-        xtermRef.current.writeln('\r\n\x1b[31m✖ Erreur : Session non autorisée (403/1008).\x1b[0m\r\n');
+        setError(t('terminal_session_unauthorized', 'Unauthorized session. Please log in.'));
+        xtermRef.current.writeln(`\r\n\x1b[31m✖ ${t('error', 'Error')}: ${t('terminal_session_unauthorized', 'Unauthorized session (403/1008).')}\x1b[0m\r\n`);
       } else {
-        xtermRef.current.writeln('\r\n\x1b[33m⚡ Session terminal terminée.\x1b[0m\r\n');
+        xtermRef.current.writeln(`\r\n\x1b[33m⚡ ${t('terminal_session_ended', 'Terminal session ended.')}\x1b[0m\r\n`);
       }
     };
 
     ws.onerror = () => {
       setConnected(false);
-      setError('Erreur de connexion au WebSocket terminal.');
+      setError(t('terminal_ws_error', 'Terminal WebSocket connection error.'));
     };
 
     // Forward terminal input to WebSocket
@@ -135,7 +137,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
         ws.send(data);
       }
     });
-  }, [currentWorkspace]);
+  }, [currentWorkspace, t]);
 
   useEffect(() => {
     connectTerminal();
@@ -214,7 +216,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
   };
 
   const handleRestartSession = async () => {
-    const ok = await showConfirm('Voulez-vous réinitialiser le shell bash (tous les processus en cours seront arrêtés) ?', { destructive: true });
+    const ok = await showConfirm(t('terminal_reset_confirm', 'Do you want to reset the bash shell (all running processes will be terminated)?'), { destructive: true });
     if (ok) {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ action: 'restart' }));
@@ -239,7 +241,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
       >
         <div className="flex items-center gap-2">
           <TerminalIcon className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="font-semibold" style={{ color: 'var(--strong)' }}>Terminal PTY</span>
+          <span className="font-semibold" style={{ color: 'var(--strong)' }}>{t('terminal_pty_title', 'Terminal PTY')}</span>
           <span
             className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono border"
             style={{
@@ -247,21 +249,21 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
               borderColor: 'var(--border-subtle)',
               color: 'var(--muted)'
             }}
-            title="Le terminal et les processus en arrière-plan restent actifs même en fermant le volet"
+            title={t('terminal_persistent_hint', 'The terminal and background processes remain active even when closing panel')}
           >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
                 connected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'
               }`}
             />
-            {connected ? 'Persistant (En ligne)' : 'Déconnecté'}
+            {connected ? t('terminal_persistent_online', 'Persistent (Online)') : t('terminal_disconnected', 'Disconnected')}
           </span>
         </div>
 
         <div className="flex items-center gap-1">
           <button
             onClick={handleClear}
-            title="Effacer l'affichage de l'écran"
+            title={t('terminal_clear_title', 'Clear terminal display')}
             className="p-1.5 rounded-md transition-colors cursor-pointer hover:opacity-100 opacity-70"
             style={{ color: 'var(--muted)' }}
           >
@@ -269,7 +271,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
           </button>
           <button
             onClick={handleRestartSession}
-            title="Réinitialiser l'interpréteur bash"
+            title={t('terminal_restart_title', 'Reset bash interpreter')}
             className="p-1.5 rounded-md transition-colors cursor-pointer hover:opacity-100 opacity-70 hover:text-amber-400"
             style={{ color: 'var(--muted)' }}
           >
