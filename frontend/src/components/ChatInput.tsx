@@ -1072,15 +1072,15 @@ export const ChatInput = React.memo<ChatInputProps>(({
             >
               <div className="flex items-center gap-2">
                 <Slash className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
-                <span className="uppercase tracking-wider">Commandes Antigravity & Hermes</span>
+                <span className="uppercase tracking-wider">{t('antigravity_hermes_commands', 'Commandes Antigravity & Hermes')}</span>
               </div>
-              <span className="text-[10px] font-mono opacity-70">↑↓ naviguer · ↵ insérer · esc fermer</span>
+              <span className="text-[10px] font-mono opacity-70">{t('nav_insert_close_hint', '↑↓ naviguer · ↵ insérer · esc fermer')}</span>
             </div>
 
             <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5">
               {filteredCommands.length === 0 ? (
                 <div className="p-4 text-xs text-center" style={{ color: 'var(--muted)' }}>
-                  Aucune commande correspondante
+                  {t('no_matching_command', 'Aucune commande correspondante')}
                 </div>
               ) : (
                 filteredCommands.map((c, idx) => {
@@ -1181,7 +1181,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                     type="text"
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    placeholder="Filtrer les commandes passées..."
+                    placeholder={t('filter_past_commands', 'Filtrer les commandes passées...')}
                     className="w-full bg-transparent outline-none text-xs"
                     style={{ color: 'var(--text)' }}
                   />
@@ -1237,11 +1237,11 @@ export const ChatInput = React.memo<ChatInputProps>(({
                     <div className="shrink-0 ml-2.5 flex items-center gap-1.5">
                       {item.isCurrentDiscussion ? (
                         <span className="text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          discussion
+                          {t('discussion_tag', 'discussion')}
                         </span>
                       ) : (
                         <span className="text-[9px] px-1.5 py-0.5 rounded font-mono bg-slate-500/10 text-slate-400 border border-slate-500/20">
-                          récent
+                          {t('recent', 'récent')}
                         </span>
                       )}
                     </div>
@@ -1254,7 +1254,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
               className="px-4 py-2 border-t text-[10px] flex items-center justify-between"
               style={{ borderColor: 'var(--border-subtle)', color: 'var(--muted)' }}
             >
-              <span>💡 Utilisez les flèches <kbd className="px-1 py-0.5 rounded bg-black/20 font-mono text-[9px]">↑</kbd> et <kbd className="px-1 py-0.5 rounded bg-black/20 font-mono text-[9px]">↓</kbd> dans le champ de saisie pour naviguer comme dans un terminal.</span>
+              <span>{t('terminal_arrow_keys_tip', '💡 Utilisez les flèches ↑ et ↓ dans le champ de saisie pour naviguer comme dans un terminal.')}</span>
             </div>
           </div>
         )}
@@ -1356,7 +1356,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                 borderColor: attachments.length > 0 ? 'var(--accent)' : 'var(--border)',
                 color: attachments.length > 0 ? 'var(--accent)' : 'var(--text)'
               }}
-              title="Attacher des fichiers (images, code, texte) ou glisser-déposer"
+              title={t('attach_files_tooltip', 'Attacher des fichiers (images, code, texte) ou glisser-déposer')}
             >
               <Paperclip className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
               {attachments.length > 0 && (
@@ -1389,7 +1389,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
               onClick={() => {
                 const next = !autoApprove;
                 setAutoApprove(next);
-                showToast(next ? '⚡ Mode YOLO activé (Exécution autonome)' : 'Mode YOLO désactivé (Confirmation requise)', next ? 'success' : 'info');
+                showToast(next ? t('yolo_mode_enabled_toast', '⚡ Mode YOLO activé (Exécution autonome)') : t('yolo_mode_disabled_toast', 'Mode YOLO désactivé (Confirmation requise)'), next ? 'success' : 'info');
               }}
               className="flex items-center gap-1.5 px-2.5 py-1.5 sm:py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer shadow-sm shrink-0"
               style={{
@@ -1397,7 +1397,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                 borderColor: autoApprove ? 'var(--accent)' : 'var(--border)',
                 color: autoApprove ? 'var(--accent-text)' : 'var(--muted)'
               }}
-              title={autoApprove ? 'YOLO actif: exécution autonome sans confirmation. Cliquer pour désactiver.' : 'YOLO inactif: demande de confirmation avant chaque outil.'}
+              title={autoApprove ? t('yolo_active_tooltip', 'YOLO actif: exécution autonome sans confirmation. Cliquer pour désactiver.') : t('yolo_inactive_tooltip', 'YOLO inactif: demande de confirmation avant chaque outil.')}
             >
               <Zap className="w-3 h-3 fill-current" />
               <span>YOLO</span>
@@ -1480,7 +1480,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                   onChange={(e) => onSelectEffort(e.target.value as any)}
                   className="bg-transparent text-[11px] font-mono outline-none cursor-pointer"
                   style={{ color: 'var(--text)' }}
-                  title="Niveau de réflexion / Effort"
+                  title={t('thinking_effort_level_tooltip', 'Niveau de réflexion / Effort')}
                 >
                   {supportedEfforts.includes('high') && (
                     <option value="high" style={{ backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
@@ -1534,7 +1534,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
 
             {!isStreaming && (
               <span className="hidden sm:inline text-[10px] font-mono opacity-50">
-                {(typeof window !== 'undefined' && localStorage.getItem('antigravity_send_key') === 'ctrlEnter') ? 'Ctrl+↵' : 'Entrée ↵'}
+                {(typeof window !== 'undefined' && localStorage.getItem('antigravity_send_key') === 'ctrlEnter') ? t('ctrl_enter_label', 'Ctrl+↵') : t('enter_key_label', 'Entrée ↵')}
               </span>
             )}
 

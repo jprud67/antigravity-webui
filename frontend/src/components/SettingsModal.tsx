@@ -250,12 +250,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const text = await file.text();
       const payload = JSON.parse(text);
       const res = await importConversation(payload);
-      showToast(`Session "${res.title}" importée avec succès !`, 'success');
+      showToast(t('toast_session_imported_success', 'Session "{0}" importée avec succès !').replace('{0}', res.title), 'success');
       if (onConversationUpdated) {
         onConversationUpdated();
       }
     } catch (err: any) {
-      showToast(`Erreur lors de l'import : ${err.message}`, 'error');
+      showToast(t('toast_import_error', "Erreur lors de l'import : {0}").replace('{0}', err.message), 'error');
     } finally {
       if (convFileInputRef.current) {
         convFileInputRef.current.value = '';
@@ -389,7 +389,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const res = await fetchApiKeys();
       setApiKeys(res.api_keys || []);
     } catch (e: any) {
-      showToast(`Erreur chargement clés API: ${e.message}`, 'error');
+      showToast(t('err_load_api_keys', 'Erreur chargement clés API: {0}').replace('{0}', e.message), 'error');
     } finally {
       setLoadingApiKeys(false);
     }
@@ -430,9 +430,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleCopyText = (text: string, label: string = 'Texte') => {
+  const handleCopyText = (text: string, label?: string) => {
+    const lbl = label || t('text_label', 'Texte');
     navigator.clipboard.writeText(text);
-    showToast(t('toast_copied_to_clipboard', '{0} copied to clipboard!').replace('{0}', label), 'success');
+    showToast(t('toast_copied_to_clipboard', '{0} copied to clipboard!').replace('{0}', lbl), 'success');
   };
 
   useEffect(() => {
@@ -507,26 +508,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setGoogleError(null);
     try {
       const res = await switchGoogleAccount(email);
-      setGoogleSuccess(`Compte Google basculé sur ${email}`);
+      setGoogleSuccess(t('toast_google_account_switched', 'Compte Google basculé sur {0}').replace('{0}', email));
       await loadGoogleAccounts();
       if (onGoogleAccountChanged) {
         onGoogleAccountChanged(res.active_account);
       }
       setTimeout(() => setGoogleSuccess(null), 3000);
     } catch (e: any) {
-      setGoogleError(e.message || 'Erreur lors du changement de compte');
+      setGoogleError(e.message || t('err_switch_account', 'Erreur lors du changement de compte'));
     } finally {
       setGoogleSwitching(null);
     }
   };
 
   const handleDeleteGoogleAccount = async (email: string) => {
-    if (!(await showConfirm(`Supprimer le compte ${email} des comptes enregistrés ?`, { destructive: true }))) return;
+    if (!(await showConfirm({ title: t('confirm_delete_google_account_title', 'Supprimer le compte Google'), message: t('confirm_delete_google_account_msg', 'Supprimer le compte {0} des comptes enregistrés ?').replace('{0}', email), confirmText: t('confirm_delete_btn', 'Supprimer'), destructive: true }))) return;
     try {
       await deleteGoogleAccount(email);
       await loadGoogleAccounts();
     } catch (e: any) {
-      setGoogleError(e.message || 'Erreur suppression compte');
+      setGoogleError(e.message || t('err_delete_account', 'Erreur suppression compte'));
     }
   };
 
@@ -537,7 +538,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const res = await startGoogleLogin();
       setGoogleLoginSession({ sessionId: res.session_id, authUrl: res.auth_url });
     } catch (e: any) {
-      setGoogleError(e.message || 'Impossible de démarrer la session de connexion');
+      setGoogleError(e.message || t('err_start_login_session', 'Impossible de démarrer la session de connexion'));
     } finally {
       setGoogleLoading(false);
     }
@@ -550,7 +551,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setGoogleError(null);
     try {
       const res = await submitGoogleAuthCode(googleLoginSession.sessionId, googleAuthCode.trim());
-      setGoogleSuccess(res.message || 'Nouveau compte Google connecté avec succès !');
+      setGoogleSuccess(res.message || t('toast_new_google_connected', 'Nouveau compte Google connecté avec succès !'));
       setGoogleLoginSession(null);
       setGoogleAuthCode('');
       await loadGoogleAccounts();
@@ -559,7 +560,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
       setTimeout(() => setGoogleSuccess(null), 4000);
     } catch (e: any) {
-      setGoogleError(e.message || 'Code invalide ou expiré');
+      setGoogleError(e.message || t('err_invalid_expired_code', 'Code invalide ou expiré'));
     } finally {
       setGoogleSubmitting(false);
     }
@@ -699,11 +700,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      setPwdError('Les mots de passe ne correspondent pas');
+      setPwdError(t('err_passwords_mismatch', 'Les mots de passe ne correspondent pas'));
       return;
     }
     if (newPassword.length < 8) {
-      setPwdError('Le mot de passe doit comporter au moins 8 caractères');
+      setPwdError(t('err_password_min_length', 'Le mot de passe doit comporter au moins 8 caractères'));
       return;
     }
 
@@ -717,7 +718,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setConfirmPassword('');
       setTimeout(() => setPwdSuccess(false), 3000);
     } catch (err: any) {
-      setPwdError(err.message || 'Erreur lors du changement de mot de passe');
+      setPwdError(err.message || t('err_change_password', 'Erreur lors du changement de mot de passe'));
     } finally {
       setPwdLoading(false);
     }
@@ -758,7 +759,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <SettingsIcon className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-bold tracking-tight truncate" style={{ color: 'var(--strong)' }}>Configuration Antigravity</h2>
+              <h2 className="text-sm font-bold tracking-tight truncate" style={{ color: 'var(--strong)' }}>{t('antigravity_configuration', 'Configuration Antigravity')}</h2>
               <p className="text-[11px] truncate" style={{ color: 'var(--muted)' }}>{t("models_reasoning_sub", "AI models, permissions, skills and security")}</p>
             </div>
           </div>
@@ -789,7 +790,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 background: 'linear-gradient(to right, var(--surface-subtle) 75%, transparent)',
                 color: 'var(--text)'
               }}
-              title="Défiler vers la gauche"
+              title={t('scroll_left', 'Défiler vers la gauche')}
             >
               <span
                 className="p-1 rounded-lg border flex items-center justify-center shadow-xs hover:scale-105 transition-transform"
@@ -818,7 +819,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}
             >
               <MessageSquare className="w-4 h-4" />
-              <span>Session & Export</span>
+              <span>{t('tab_session_export', 'Session & Export')}</span>
               {activeConversation && (
                 <span className="text-[10px] bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30 px-1.5 py-0.2 rounded-full font-mono max-w-[100px] truncate">
                   {activeConversation.customTitle || activeConversation.title || activeConversation.conversation_id.slice(0, 6)}
@@ -850,7 +851,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}
             >
               <GoogleIcon className="w-4 h-4" />
-              <span>Compte Google</span>
+              <span>{t('tab_google_account', 'Compte Google')}</span>
               {googleData?.active_account && (
                 <span className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 px-1.5 py-0.2 rounded-full font-mono max-w-[120px] truncate">
                   {googleData.active_account.email.split('@')[0]}
@@ -882,7 +883,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}
             >
               <Boxes className="w-4 h-4" />
-              <span>Skills ({skills.length})</span>
+              <span>{t('tab_skills', 'Skills')} ({skills.length})</span>
             </button>
 
             <button
@@ -936,7 +937,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}
             >
               <Globe className="w-4 h-4" />
-              <span>Langues ({SUPPORTED_LANGUAGES.find(l => l.code === lang)?.flag || '🌐'})</span>
+              <span>{t('tab_languages', 'Langues')} ({SUPPORTED_LANGUAGES.find(l => l.code === lang)?.flag || '🌐'})</span>
             </button>
 
             <button
@@ -974,7 +975,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 background: 'linear-gradient(to left, var(--surface-subtle) 75%, transparent)',
                 color: 'var(--text)'
               }}
-              title="Défiler vers la droite"
+              title={t('scroll_right', 'Défiler vers la droite')}
             >
               <span
                 className="p-1 rounded-lg border flex items-center justify-center shadow-xs hover:scale-105 transition-transform"
@@ -1040,7 +1041,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>
-                          {convTitle || activeConversation.title || 'Discussion sans titre'}
+                          {convTitle || activeConversation.title || t('untitled_conversation', 'Discussion sans titre')}
                         </span>
                         {convPinned && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 flex items-center gap-1 font-mono">
@@ -1067,7 +1068,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         )}
                       </div>
                       <p className="text-[10px] font-mono" style={{ color: 'var(--muted)' }}>
-                        ID : {activeConversation.conversation_id} · {activeConversation.step_count || 0} messages
+                        ID : {activeConversation.conversation_id} · {activeConversation.step_count || 0} {t('messages_count', 'messages')}
                       </p>
                     </div>
 
@@ -1080,7 +1081,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         style={{ backgroundColor: 'var(--accent)' }}
                       >
                         {convSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                        <span>Enregistrer</span>
+                        <span>{t('save', 'Enregistrer')}</span>
                       </button>
                     </div>
                   </div>
@@ -1127,7 +1128,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           type="text"
                           value={convProject}
                           onChange={(e) => setConvProject(e.target.value)}
-                          placeholder="ex: LeadForge, Client, Refactoring"
+                          placeholder={t('project_example_placeholder', 'ex: LeadForge, Client, Refactoring')}
                           className="w-full px-3 py-2 rounded-xl text-xs focus:outline-none transition-colors"
                           style={{
                             backgroundColor: 'var(--input-bg)',
@@ -1140,7 +1141,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div>
                         <label className="text-[11px] font-medium block mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
                           <Palette className="w-3 h-3 text-amber-500" />
-                          <span>Couleur du projet</span>
+                          <span>{t('project_color', 'Couleur du projet')}</span>
                         </label>
                         <div className="flex items-center gap-2 pt-0.5">
                           {CONV_PALETTE.map((color) => (
@@ -1170,7 +1171,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         type="text"
                         value={convTagsStr}
                         onChange={(e) => setConvTagsStr(e.target.value)}
-                        placeholder="backend, api, bugfix, urgent"
+                        placeholder={t('tags_example_placeholder', 'backend, api, bugfix, urgent')}
                         className="w-full px-3 py-2 rounded-xl text-xs focus:outline-none transition-colors font-mono"
                         style={{
                           backgroundColor: 'var(--input-bg)',
@@ -1202,7 +1203,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           className="rounded border text-purple-500 focus:ring-purple-500"
                         />
                         <span className="font-medium" style={{ color: 'var(--text)' }}>
-                          📦 Archiver la session
+                          {t('archive_session', '📦 Archiver la session')}
                         </span>
                       </label>
                     </div>
@@ -1248,7 +1249,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <FileText className="w-4 h-4 text-sky-500 shrink-0" />
                         <div>
                           <span className="font-bold text-xs block" style={{ color: 'var(--strong)' }}>
-                            Export Markdown (.md)
+                            {t('export_markdown', 'Export Markdown (.md)')}
                           </span>
                           <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
                             {t("formatted_readable_transcript", "Readable & formatted transcript")}
@@ -1269,10 +1270,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <Globe className="w-4 h-4 text-amber-500 shrink-0" />
                         <div>
                           <span className="font-bold text-xs block" style={{ color: 'var(--strong)' }}>
-                            Export Web (.html)
+                            {t('export_web_html', 'Export Web (.html)')}
                           </span>
                           <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
-                            Rendu visuel autonome
+                            {t('export_html_desc', 'Rendu visuel autonome')}
                           </span>
                         </div>
                       </button>
@@ -1290,7 +1291,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <Download className="w-4 h-4 text-emerald-500 shrink-0" />
                         <div>
                           <span className="font-bold text-xs block" style={{ color: 'var(--strong)' }}>
-                            Export JSON (.json)
+                            {t('export_json', 'Export JSON (.json)')}
                           </span>
                           <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
                             {t("complete_data_metas", "Complete data & metadata")}
@@ -1310,10 +1311,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <Upload className="w-4 h-4 text-purple-500 shrink-0" />
                         <div>
                           <span className="font-bold text-xs block" style={{ color: 'var(--strong)' }}>
-                            Importer JSON (.json)
+                            {t('import_json', 'Importer JSON (.json)')}
                           </span>
                           <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
-                            Format Antigravity ou Hermes
+                            {t('import_json_desc', 'Format Antigravity ou Hermes')}
                           </span>
                         </div>
                       </button>
@@ -1330,7 +1331,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     <div>
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-rose-500">
-                        Zone de Danger
+                        {t('danger_zone', 'Zone de Danger')}
                       </h4>
                       <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
                         {t("irreversible_actions", "Irreversible actions on selected conversation.")}
@@ -1344,7 +1345,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         className="px-3.5 py-2 rounded-xl text-xs font-medium border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Effacer l'historique des messages</span>
+                        <span>{t('clear_message_history', "Effacer l'historique des messages")}</span>
                       </button>
 
                       <button
@@ -1434,7 +1435,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-semibold" style={{ color: 'var(--strong)' }}>Niveau d'Effort de Raisonnement</span>
+                      <span className="font-semibold" style={{ color: 'var(--strong)' }}>{t('reasoning_effort_level', "Niveau d'Effort de Raisonnement")}</span>
                       <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{t("thinking_depth_allocated", "Thinking depth allocated to selected model")}</p>
                     </div>
                     <div
@@ -1470,7 +1471,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* 1-Click Profiles */}
               <div className="space-y-2.5">
                 <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
-                  Profils Rapides en 1 Clic
+                  {t('quick_profiles_1click', 'Profils Rapides en 1 Clic')}
                 </label>
                 <div className="grid grid-cols-3 gap-2.5">
                   <button
@@ -1518,7 +1519,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <Lock className="w-3.5 h-3.5 text-amber-500" />
                       <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>{t("strict_read_only", "Strict (Read Only)")}</span>
                     </div>
-                    <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Aucune commande terminal, analyse & lecture seule</p>
+                    <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{t('strict_read_only_desc', 'Aucune commande terminal, analyse & lecture seule')}</p>
                   </button>
                 </div>
               </div>
@@ -1530,10 +1531,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </label>
                 <div className="grid grid-cols-2 gap-2.5">
                   {[
-                    { label: 'Commandes Shell (command(*))', rule: 'command(*)', desc: 'Autoriser l\'agent à exécuter des scripts et commandes' },
-                    { label: 'Écriture Fichiers (write_file(/))', rule: 'write_file(/)', desc: t("write_files_desc", "Allow modification and creation of files") },
-                    { label: 'Lecture Fichiers (read_file(/))', rule: 'read_file(/)', desc: t("read_files_desc", "Allow reading code and logs") },
-                    { label: 'Requêtes Réseau (read_url(*))', rule: 'read_url(*)', desc: 'Autoriser l\'inspection web et URLs' },
+                    { label: t('perm_shell_commands', 'Commandes Shell (command(*))'), rule: 'command(*)', desc: t('perm_shell_commands_desc', 'Autoriser l\'agent à exécuter des scripts et commandes') },
+                    { label: t('perm_write_files', 'Écriture Fichiers (write_file(/))'), rule: 'write_file(/)', desc: t("write_files_desc", "Allow modification and creation of files") },
+                    { label: t('perm_read_files', 'Lecture Fichiers (read_file(/))'), rule: 'read_file(/)', desc: t("read_files_desc", "Allow reading code and logs") },
+                    { label: t('perm_network_requests', 'Requêtes Réseau (read_url(*))'), rule: 'read_url(*)', desc: t('perm_network_requests_desc', 'Autoriser l\'inspection web et URLs') },
                   ].map((item) => {
                     const active = allowRules.includes(item.rule);
                     return (
@@ -1625,7 +1626,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="text"
                     value={newRuleValue}
                     onChange={(e) => setNewRuleValue(e.target.value)}
-                    placeholder="* ou chemin"
+                    placeholder={t('rule_path_placeholder', '* ou chemin')}
                     className="flex-1 border rounded-lg px-3 py-1.5 text-xs font-mono outline-none"
                     style={{
                       backgroundColor: 'var(--input-bg)',
@@ -1645,7 +1646,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }}
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Ajouter</span>
+                    <span>{t('add', 'Ajouter')}</span>
                   </button>
                 </div>
               </div>
@@ -1662,7 +1663,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{t("modular_capabilities_desc", "Modular capabilities discovered automatically by Antigravity")}</p>
                 </div>
                 <span className="text-[10px] font-mono bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 px-2 py-0.5 rounded-full">
-                  {skills.length} skills disponibles
+                  {t('skills_available_count', '{0} skills disponibles').replace('{0}', String(skills.length))}
                 </span>
               </div>
 
@@ -1753,7 +1754,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] group-hover:text-indigo-500 transition-colors flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-                          <span>Voir doc</span>
+                          <span>{t('view_doc', 'Voir doc')}</span>
                           <ChevronRight className="w-3 h-3" />
                         </span>
                       </div>
@@ -1785,7 +1786,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex items-center gap-3 text-xs text-emerald-500 bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-xl">
                   <ShieldCheck className="w-5 h-5 shrink-0" />
                   <div>
-                    <span className="font-semibold block" style={{ color: 'var(--strong)' }}>Protection Active</span>
+                    <span className="font-semibold block" style={{ color: 'var(--strong)' }}>{t('active_protection', 'Protection Active')}</span>
                     <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{t("auth_enabled_info", "Password and HMAC signature authentication is enabled.")}</span>
                   </div>
                 </div>
@@ -1793,7 +1794,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <form onSubmit={handlePasswordChange} className="space-y-3">
                   <div>
                     <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--muted)' }}>
-                      Mot de passe actuel
+                      {t('current_password', 'Mot de passe actuel')}
                     </label>
                     <input
                       type="password"
@@ -1811,13 +1812,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   <div>
                     <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--muted)' }}>
-                      Nouveau mot de passe
+                      {t('new_password', 'Nouveau mot de passe')}
                     </label>
                     <input
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Saisissez un nouveau mot de passe fort"
+                      placeholder={t('new_password_placeholder', 'Saisissez un nouveau mot de passe fort')}
                       className="w-full px-3 py-2 border rounded-xl text-xs font-mono focus:outline-none"
                       style={{
                         backgroundColor: 'var(--input-bg)',
@@ -1835,7 +1836,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirmez le nouveau mot de passe"
+                      placeholder={t('confirm_new_password_placeholder', 'Confirmez le nouveau mot de passe')}
                       className="w-full px-3 py-2 border rounded-xl text-xs font-mono focus:outline-none"
                       style={{
                         backgroundColor: 'var(--input-bg)',
@@ -1864,7 +1865,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="py-2 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-medium text-xs flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all shadow-xs"
                   >
                     <KeyRound className="w-3.5 h-3.5" />
-                    <span>{pwdLoading ? 'Mise à jour...' : 'Mettre à jour le mot de passe'}</span>
+                    <span>{pwdLoading ? t('updating_ellipsis', 'Mise à jour...') : t('update_password', 'Mettre à jour le mot de passe')}</span>
                   </button>
                 </form>
 
@@ -1885,17 +1886,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
                     <div className="p-2.5 rounded-xl border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
-                      <span className="block text-[10px] uppercase font-bold" style={{ color: 'var(--muted)' }}>Application</span>
+                      <span className="block text-[10px] uppercase font-bold" style={{ color: 'var(--muted)' }}>{t('application', 'Application')}</span>
                       <span className="font-semibold" style={{ color: 'var(--strong)' }}>Antigravity WebUI v2.0</span>
                     </div>
 
                     <div className="p-2.5 rounded-xl border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
-                      <span className="block text-[10px] uppercase font-bold" style={{ color: 'var(--muted)' }}>Serveur & API</span>
+                      <span className="block text-[10px] uppercase font-bold" style={{ color: 'var(--muted)' }}>{t('server_and_api', 'Serveur & API')}</span>
                       <span className="font-semibold" style={{ color: 'var(--strong)' }}>FastAPI + Uvicorn (Port 8000)</span>
                     </div>
 
                     <div className="p-2.5 rounded-xl border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
-                      <span className="block text-[10px] uppercase font-bold" style={{ color: 'var(--muted)' }}>Moteur d'Agent</span>
+                      <span className="block text-[10px] uppercase font-bold" style={{ color: 'var(--muted)' }}>{t('agent_engine', "Moteur d'Agent")}</span>
                       <span className="font-semibold" style={{ color: 'var(--strong)' }}>Google Antigravity CLI (agy)</span>
                     </div>
 
@@ -2051,7 +2052,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                   <Keyboard className="w-4 h-4 text-sky-500" />
-                  <span>Raccourci Clavier d'Envoi (Composer)</span>
+                  <span>{t('keyboard_send_shortcut', "Raccourci Clavier d'Envoi (Composer)")}</span>
                 </h3>
                 <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>
                   {t("shortcut_send_desc", "Configure the key combination to send messages to the agent.")}
@@ -2069,7 +2070,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>Entrée ↵</span>
+                      <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>{t('send_key_enter', 'Entrée ↵')}</span>
                       {sendKeyMode === 'enter' && <Check className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />}
                     </div>
                     <p className="text-[10px]" style={{ color: 'var(--muted)' }}>
@@ -2088,7 +2089,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>Ctrl / Cmd + Entrée ↵</span>
+                      <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>{t('send_key_ctrl_enter', 'Ctrl / Cmd + Entrée ↵')}</span>
                       {sendKeyMode === 'ctrlEnter' && <Check className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />}
                     </div>
                     <p className="text-[10px]" style={{ color: 'var(--muted)' }}>
@@ -2105,7 +2106,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                   <Globe className="w-4 h-4 text-cyan-500" />
-                  <span>Langues de l'interface (15 langues Hermes WebUI)</span>
+                  <span>{t('interface_languages_title', "Langues de l'interface (15 langues Hermes WebUI)")}</span>
                 </h3>
                 <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>
                   {t("language_select_desc", "Select display and text-to-speech language. Entire console is updated instantly.")}
@@ -2161,7 +2162,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                   <GoogleIcon className="w-4 h-4" />
-                  <span>Gestion des Comptes Google (Antigravity & Gemini)</span>
+                  <span>{t('manage_google_accounts_title', 'Gestion des Comptes Google (Antigravity & Gemini)')}</span>
                 </h3>
                 <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
                   {t("view_google_accounts_desc", "View active account, switch instantly between saved accounts, or connect a new Google account.")}
@@ -2191,7 +2192,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 }}
               >
                 <div className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>
-                  Compte Google Principal Actif
+                  {t('primary_google_account_active', 'Compte Google Principal Actif')}
                 </div>
 
                 <div className="flex items-center justify-between flex-wrap gap-3">
@@ -2202,16 +2203,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-sm" style={{ color: 'var(--strong)' }}>
-                          {googleData?.active_account?.email || 'Aucun compte connecté'}
+                          {googleData?.active_account?.email || t('no_account_connected', 'Aucun compte connecté')}
                         </span>
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
                           <Check className="w-3 h-3" /> {t("connected", "Connected")}
                         </span>
                       </div>
                       <div className="text-[11px] flex items-center gap-3 mt-1" style={{ color: 'var(--muted)' }}>
-                        <span>Auth : OAuth 2.0 PKCE</span>
+                        <span>{t('auth_oauth_pkce', 'Auth : OAuth 2.0 PKCE')}</span>
                         <span>&bull;</span>
-                        <span>Renouvellement automatique : Actif</span>
+                        <span>{t('auto_renewal_active', 'Renouvellement automatique : Actif')}</span>
                       </div>
                     </div>
                   </div>
@@ -2226,10 +2227,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       borderColor: 'var(--border)',
                       color: 'var(--text)'
                     }}
-                    title="Actualiser les informations du compte"
+                    title={t('refresh_account_info', 'Actualiser les informations du compte')}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${googleLoading ? 'animate-spin' : ''}`} />
-                    <span>Actualiser</span>
+                    <span>{t('refresh', 'Actualiser')}</span>
                   </button>
                 </div>
               </div>
@@ -2275,7 +2276,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 </span>
                                 {isActive && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                    ACTIF
+                                    {t('active_caps', 'ACTIF')}
                                   </span>
                                 )}
                               </div>
@@ -2297,12 +2298,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                   {isSwitching ? (
                                     <>
                                       <RefreshCw className="w-3 h-3 animate-spin" />
-                                      <span>Basculement...</span>
+                                      <span>{t('switching_ellipsis', 'Basculement...')}</span>
                                     </>
                                   ) : (
                                     <>
                                       <UserCheck className="w-3.5 h-3.5" />
-                                      <span>Basculer sur ce compte</span>
+                                      <span>{t('switch_to_this_account', 'Basculer sur ce compte')}</span>
                                     </>
                                   )}
                                 </button>
@@ -2310,14 +2311,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                   type="button"
                                   onClick={() => handleDeleteGoogleAccount(acc.email)}
                                   className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                                  title="Supprimer ce compte de la liste"
+                                  title={t('remove_account_from_list', 'Supprimer ce compte de la liste')}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </>
                             ) : (
                               <span className="text-[11px] font-medium text-emerald-400 flex items-center gap-1">
-                                <Check className="w-3.5 h-3.5" /> Compte actif
+                                <Check className="w-3.5 h-3.5" /> {t('active_account_label', 'Compte actif')}
                               </span>
                             )}
                           </div>
@@ -2339,7 +2340,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>
-                      Connecter un nouveau compte Google
+                      {t('connect_new_google_account', 'Connecter un nouveau compte Google')}
                     </h4>
                     <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
                       {t("connect_another_gmail_desc", "Link another Gmail or Google Workspace address to access anytime.")}
@@ -2370,7 +2371,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     <div className="flex items-center justify-between pb-2 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
                       <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>
-                        Connexion Google OAuth 2.0 en cours
+                        {t('google_oauth_in_progress', 'Connexion Google OAuth 2.0 en cours')}
                       </span>
                       <button
                         type="button"
@@ -2385,7 +2386,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="space-y-1.5">
                       <div className="font-semibold text-xs flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                         <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-[10px] font-bold">1</span>
-                        <span>Ouvrez la page d'authentification Google :</span>
+                        <span>{t('open_google_auth_page', "Ouvrez la page d'authentification Google :")}</span>
                       </div>
                       <a
                         href={googleLoginSession.authUrl}
@@ -2421,7 +2422,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           type="text"
                           value={googleAuthCode}
                           onChange={(e) => setGoogleAuthCode(e.target.value)}
-                          placeholder="ex: 4/0AbCdEf... ou https://antigravity.google/oauth-callback?code=..."
+                          placeholder={t('google_code_url_placeholder', 'ex: 4/0AbCdEf... ou https://antigravity.google/oauth-callback?code=...')}
                           className="flex-1 px-3 py-2 rounded-xl border text-xs outline-none font-mono transition-colors"
                           style={{
                             backgroundColor: 'var(--surface-subtle)',
@@ -2442,7 +2443,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           ) : (
                             <>
                               <Check className="w-3.5 h-3.5" />
-                              <span>Valider & Activer</span>
+                              <span>{t('validate_activate', 'Valider & Activer')}</span>
                             </>
                           )}
                         </button>
@@ -2463,12 +2464,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 <Terminal className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-semibold text-amber-300">Astuce ligne de commande : </span>
+                  <span className="font-semibold text-amber-300">{t('cli_tip_title', 'Astuce ligne de commande :')} </span>
                   {t("google_terminal_cmd_desc", "You can also manage Google accounts directly from terminal with command")}{' '}
                   <code className="px-1.5 py-0.5 rounded font-mono bg-black/20 text-amber-200 border border-amber-500/20">
                     antigravity-account
                   </code>
-                  {' '}(ex: <code className="font-mono text-amber-200">antigravity-account switch email@gmail.com</code> ou <code className="font-mono text-amber-200">antigravity-account login</code>).
+                  {' '}(ex: <code className="font-mono text-amber-200">antigravity-account switch email@gmail.com</code> {t('or', 'ou')} <code className="font-mono text-amber-200">antigravity-account login</code>).
                 </div>
               </div>
             </div>
@@ -2508,7 +2509,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   className="p-3.5 rounded-xl border flex flex-col justify-between"
                   style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}
                 >
-                  <span className="text-[10px] uppercase font-mono tracking-wider font-semibold opacity-60">Version Actuelle</span>
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-semibold opacity-60">{t('current_version', 'Version Actuelle')}</span>
                   <div className="mt-2 flex items-baseline gap-1.5">
                     <span className="text-base font-bold font-mono text-sky-500">v{systemVersion?.version || '0.1.61'}</span>
                     <span className="text-[10px] font-mono opacity-50">{systemVersion?.tag || 'v0.1.61'}</span>
@@ -2519,7 +2520,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   className="p-3.5 rounded-xl border flex flex-col justify-between"
                   style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}
                 >
-                  <span className="text-[10px] uppercase font-mono tracking-wider font-semibold opacity-60">Dernier Commit (HEAD)</span>
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-semibold opacity-60">{t('latest_commit', 'Dernier Commit (HEAD)')}</span>
                   <div className="mt-2">
                     <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-black/10 dark:bg-white/10 border" style={{ borderColor: 'var(--border)' }}>
                       {systemVersion?.commit || 'local'}
@@ -2531,7 +2532,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   className="p-3.5 rounded-xl border flex flex-col justify-between"
                   style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}
                 >
-                  <span className="text-[10px] uppercase font-mono tracking-wider font-semibold opacity-60">Branche Active</span>
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-semibold opacity-60">{t('active_branch', 'Branche Active')}</span>
                   <div className="mt-2">
                     <span className="text-xs font-bold font-mono text-emerald-500">
                       {systemVersion?.branch || 'main'}
@@ -2549,7 +2550,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <span className="text-xs font-mono text-sky-400 animate-pulse">{t("verifying", "Verifying...")}</span>
                     ) : updateCheck?.update_available ? (
                       <span className="text-xs font-bold text-amber-500">
-                        {updateCheck.behind} commit(s) dispo
+                        {t('commits_available', '{0} commit(s) dispo').replace('{0}', String(updateCheck.behind))}
                       </span>
                     ) : (
                       <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">
@@ -2586,10 +2587,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-amber-500">
-                        Une nouvelle version est disponible sur GitHub !
+                        {t('new_version_available_github', 'Une nouvelle version est disponible sur GitHub !')}
                       </h4>
                       <p className="text-[11px] text-amber-600 dark:text-amber-400/90 mt-0.5">
-                        Votre environnement a {updateCheck.behind} commit(s) de retard. Vous pouvez mettre à jour et redémarrer la plateforme en 1 clic.
+                        {t('commits_behind_desc', 'Votre environnement a {0} commit(s) de retard. Vous pouvez mettre à jour et redémarrer la plateforme en 1 clic.').replace('{0}', String(updateCheck.behind))}
                       </p>
                     </div>
                   </div>
@@ -2599,7 +2600,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-amber-500/20 cursor-pointer shrink-0"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Installer la mise à jour</span>
+                    <span>{t('install_update', 'Installer la mise à jour')}</span>
                   </button>
                 </div>
               )}
@@ -2613,7 +2614,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--strong)' }}>
                       <FileText className="w-3.5 h-3.5 text-sky-500" />
-                      <span>Nouveautés et correctifs en attente ({updateCheck.commits.length})</span>
+                      <span>{t('pending_features_fixes', 'Nouveautés et correctifs en attente ({0})').replace('{0}', String(updateCheck.commits.length))}</span>
                     </span>
                     <span className="text-[10px] font-mono opacity-50">origin/main</span>
                   </div>
@@ -2634,7 +2635,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </span>
                           </div>
                           <div className="text-[10px] mt-1 opacity-50 flex items-center gap-2">
-                            <span>Auteur : {c.author}</span>
+                            <span>{t('author', 'Auteur')} : {c.author}</span>
                             {(() => {
                               if (!c.timestamp) return null;
                               const tsNum = Number(c.timestamp);
@@ -2666,10 +2667,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
                   <div>
                     <div className="font-bold text-emerald-600 dark:text-emerald-400">
-                      Antigravity WebUI est parfaitement à jour.
+                      {t('up_to_date_title', 'Antigravity WebUI est parfaitement à jour.')}
                     </div>
                     <div className="text-[11px] opacity-70 mt-0.5">
-                      Tous les derniers correctifs, optimisations et fonctionnalités d'orchestration sont installés.
+                      {t('all_latest_features_installed', "Tous les derniers correctifs, optimisations et fonctionnalités d'orchestration sont installés.")}
                     </div>
                   </div>
                 </div>
@@ -2686,8 +2687,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 <Terminal className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-semibold text-sky-400">Architecture de mise à jour synchronisée : </span>
-                  Ce module reprend le protocole d'Hermes Agent : les vérifications s'exécutent de façon asynchrone en arrière-plan sans bloquer l'UI, avec un cache local de 1 heure pour préserver le réseau. La mise à jour effectue un pull sécurisé, recompile le frontend Vite et relance le service systemd.
+                  <span className="font-semibold text-sky-400">{t('sync_update_arch_title', 'Architecture de mise à jour synchronisée :')} </span>
+                  {t('sync_update_arch_desc', "Ce module reprend le protocole d'Hermes Agent : les vérifications s'exécutent de façon asynchrone en arrière-plan sans bloquer l'UI, avec un cache local de 1 heure pour préserver le réseau. La mise à jour effectue un pull sécurisé, recompile le frontend Vite et relance le service systemd.")}
                 </div>
               </div>
             </div>
@@ -2712,10 +2713,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                      Passerelle API Universelle pour Applications Externes
+                      {t('universal_api_gateway_title', 'Passerelle API Universelle pour Applications Externes')}
                     </h3>
                     <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--muted)' }}>
-                      Connectez n'importe quelle application (Cursor, Continue.dev, LangChain, OpenWebUI, LibreChat, scripts Python/Node.js) à Antigravity en utilisant le protocole standard <strong>OpenAI (<code className="text-emerald-400">/v1/chat/completions</code>)</strong> ou l'API Agent native <strong>(<code className="text-emerald-400">/api/v1/agent/run</code>)</strong>.
+                      {t('connect_any_app_desc', 'Connectez n\'importe quelle application (Cursor, Continue.dev, LangChain, OpenWebUI, LibreChat, scripts Python/Node.js) à Antigravity en utilisant le protocole standard OpenAI (/v1/chat/completions) ou l\'API Agent native (/api/v1/agent/run).')} (<code className="text-emerald-400">/v1/chat/completions</code> / <code className="text-emerald-400">/api/v1/agent/run</code>)
                     </p>
                   </div>
                 </div>
@@ -2730,14 +2731,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 }}
               >
                 <div className="text-xs font-bold flex items-center justify-between" style={{ color: 'var(--strong)' }}>
-                  <span>Points de Terminaison (Endpoints)</span>
+                  <span>{t('endpoints_title', 'Points de Terminaison (Endpoints)')}</span>
                   <a
                     href="/docs"
                     target="_blank"
                     rel="noreferrer"
                     className="text-[11px] text-sky-400 hover:underline flex items-center gap-1 font-mono font-medium"
                   >
-                    <span>Documentation Swagger interactive (/docs)</span>
+                    <span>{t('swagger_docs_interactive', 'Documentation Swagger interactive (/docs)')}</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
@@ -2748,15 +2749,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-subtle)' }}
                   >
                     <div className="min-w-0">
-                      <div className="text-[10px] font-semibold text-emerald-500">BASE URL COMPATIBLE OPENAI</div>
+                      <div className="text-[10px] font-semibold text-emerald-500">{t('base_url_openai_compatible', 'BASE URL COMPATIBLE OPENAI')}</div>
                       <div className="font-mono text-xs truncate mt-0.5" style={{ color: 'var(--text)' }}>
                         {typeof window !== 'undefined' ? `${window.location.origin}/v1` : 'http://localhost:8000/v1'}
                       </div>
                     </div>
                     <button
-                      onClick={() => handleCopyText(typeof window !== 'undefined' ? `${window.location.origin}/v1` : 'http://localhost:8000/v1', 'Base URL OpenAI')}
+                      onClick={() => handleCopyText(typeof window !== 'undefined' ? `${window.location.origin}/v1` : 'http://localhost:8000/v1', t('base_url_openai_copy', 'Base URL OpenAI'))}
                       className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-100 transition-colors shrink-0"
-                      title="Copier l'URL"
+                      title={t('copy_url', "Copier l'URL")} 
                     >
                       <Copy className="w-3.5 h-3.5" />
                     </button>
@@ -2767,15 +2768,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border-subtle)' }}
                   >
                     <div className="min-w-0">
-                      <div className="text-[10px] font-semibold text-sky-500">API AGENT NATIF ANTIGRAVITY</div>
+                      <div className="text-[10px] font-semibold text-sky-500">{t('antigravity_native_agent_api', 'API AGENT NATIF ANTIGRAVITY')}</div>
                       <div className="font-mono text-xs truncate mt-0.5" style={{ color: 'var(--text)' }}>
                         {typeof window !== 'undefined' ? `${window.location.origin}/api/v1/agent/run` : 'http://localhost:8000/api/v1/agent/run'}
                       </div>
                     </div>
                     <button
-                      onClick={() => handleCopyText(typeof window !== 'undefined' ? `${window.location.origin}/api/v1/agent/run` : 'http://localhost:8000/api/v1/agent/run', 'URL Agent')}
+                      onClick={() => handleCopyText(typeof window !== 'undefined' ? `${window.location.origin}/api/v1/agent/run` : 'http://localhost:8000/api/v1/agent/run', t('agent_url_copy', 'URL Agent'))}
                       className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-100 transition-colors shrink-0"
-                      title="Copier l'URL"
+                      title={t('copy_url', "Copier l'URL")} 
                     >
                       <Copy className="w-3.5 h-3.5" />
                     </button>
@@ -2792,12 +2793,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 }}
               >
                 <div className="text-xs font-bold mb-2.5" style={{ color: 'var(--strong)' }}>
-                  Générer une Nouvelle Clé d'API
+                  {t('generate_new_api_key', "Générer une Nouvelle Clé d'API")}
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2.5">
                   <input
                     type="text"
-                    placeholder="Nom de l'application (ex: Cursor, LangChain, Script Python...)"
+                    placeholder={t('app_name_placeholder', "Nom de l'application (ex: Cursor, LangChain, Script Python...)")}
                     value={newKeyName}
                     onChange={(e) => setNewKeyName(e.target.value)}
                     onKeyDown={(e) => {
@@ -2816,7 +2817,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-600/20 shrink-0 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>{creatingApiKey ? 'Génération...' : 'Générer la clé'}</span>
+                    <span>{creatingApiKey ? t('generating_ellipsis', 'Génération...') : t('generate_key', 'Générer la clé')}</span>
                   </button>
                 </div>
               </div>
@@ -2831,7 +2832,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 <div className="flex items-center justify-between">
                   <div className="text-xs font-bold" style={{ color: 'var(--strong)' }}>
-                    Clés d'API Actives ({apiKeys.length})
+                    {t('active_api_keys_count', "Clés d'API Actives ({0})").replace('{0}', String(apiKeys.length))}
                   </div>
                   <button
                     onClick={loadApiKeys}
@@ -2839,14 +2840,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="text-[11px] text-slate-400 hover:text-slate-200 flex items-center gap-1 transition-colors"
                   >
                     <RefreshCw className={`w-3 h-3 ${loadingApiKeys ? 'animate-spin' : ''}`} />
-                    <span>Actualiser</span>
+                    <span>{t('refresh', 'Actualiser')}</span>
                   </button>
                 </div>
 
                 {loadingApiKeys && apiKeys.length === 0 ? (
-                  <div className="py-8 text-center text-xs opacity-50">Chargement des clés d'API...</div>
+                  <div className="py-8 text-center text-xs opacity-50">{t('loading_api_keys', "Chargement des clés d'API...")}</div>
                 ) : apiKeys.length === 0 ? (
-                  <div className="py-8 text-center text-xs opacity-50">Aucune clé d'API configurée.</div>
+                  <div className="py-8 text-center text-xs opacity-50">{t('no_api_keys_configured', "Aucune clé d'API configurée.")}</div>
                 ) : (
                   <div className="space-y-2.5">
                     {apiKeys.map((k) => {
@@ -2866,7 +2867,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 {k.name}
                               </span>
                               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold">
-                                ACTIVE
+                                {t('active_caps', 'ACTIVE')}
                               </span>
                             </div>
                             <div className="flex items-center gap-2 mt-1.5">
@@ -2876,28 +2877,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               <button
                                 onClick={() => setRevealedKeys(prev => ({ ...prev, [k.id]: !prev[k.id] }))}
                                 className="p-1 text-slate-400 hover:text-slate-200 transition-colors"
-                                title={isRevealed ? "Masquer la clé" : "Afficher la clé"}
+                                title={isRevealed ? t('hide_key', 'Masquer la clé') : t('show_key', 'Afficher la clé')}
                               >
                                 {isRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                               </button>
                               <button
-                                onClick={() => handleCopyText(k.key, `Clé d'API "${k.name}"`)}
+                                onClick={() => handleCopyText(k.key, t('api_key_named', 'Clé d\'API "{0}"').replace('{0}', k.name))}
                                 className="p-1 text-slate-400 hover:text-slate-200 transition-colors"
-                                title="Copier la clé"
+                                title={t('copy_key', 'Copier la clé')}
                               >
                                 <Copy className="w-3.5 h-3.5" />
                               </button>
                             </div>
                             <div className="text-[10px] opacity-40 mt-1">
-                              Créée le {new Date(k.created_at * 1000).toLocaleDateString()}
-                              {k.last_used_at ? ` • Dernière utilisation : ${new Date(k.last_used_at * 1000).toLocaleString()}` : ' • Jamais utilisée'}
+                              {t('created_on', 'Créée le')} {new Date(k.created_at * 1000).toLocaleDateString()}
+                              {k.last_used_at ? ` • ${t('last_used', 'Dernière utilisation')} : ${new Date(k.last_used_at * 1000).toLocaleString()}` : ` • ${t('never_used', 'Jamais utilisée')}`}
                             </div>
                           </div>
 
                           <button
                             onClick={() => handleDeleteApiKey(k.id, k.name)}
                             className="p-2 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-transparent hover:border-rose-500/20 transition-colors self-end sm:self-center shrink-0 cursor-pointer"
-                            title="Révoquer cette clé"
+                            title={t('revoke_this_key', 'Révoquer cette clé')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -2917,20 +2918,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 }}
               >
                 <div className="text-xs font-bold" style={{ color: 'var(--strong)' }}>
-                  Exemples d'Intégration Rapide
+                  {t('quick_integration_examples', "Exemples d'Intégration Rapide")}
                 </div>
 
                 <div className="space-y-3 text-xs">
                   {/* Python OpenAI SDK */}
                   <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
                     <div className="px-3 py-2 bg-black/10 dark:bg-white/5 flex items-center justify-between border-b" style={{ borderColor: 'var(--border-subtle)' }}>
-                      <span className="font-bold text-[11px] text-sky-400">🐍 Python (Bibliothèque standard `openai`)</span>
+                      <span className="font-bold text-[11px] text-sky-400">{t('python_openai_sdk', '🐍 Python (Bibliothèque standard `openai`)')}</span>
                       <button
-                        onClick={() => handleCopyText(`from openai import OpenAI\n\nclient = OpenAI(\n    base_url="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'}/v1",\n    api_key="${apiKeys[0]?.key || 'agy_sk_votre_cle'}"\n)\n\nresponse = client.chat.completions.create(\n    model="gemini-3.8-flash",\n    messages=[{"role": "user", "content": "Bonjour !"}],\n    stream=True\n)\n\nfor chunk in response:\n    if chunk.choices[0].delta.content:\n        print(chunk.choices[0].delta.content, end="", flush=True)\n`, 'Code Python')}
+                        onClick={() => handleCopyText(`from openai import OpenAI\n\nclient = OpenAI(\n    base_url="${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'}/v1",\n    api_key="${apiKeys[0]?.key || 'agy_sk_votre_cle'}"\n)\n\nresponse = client.chat.completions.create(\n    model="gemini-3.8-flash",\n    messages=[{"role": "user", "content": "Bonjour !"}],\n    stream=True\n)\n\nfor chunk in response:\n    if chunk.choices[0].delta.content:\n        print(chunk.choices[0].delta.content, end="", flush=True)\n`, t('python_code_label', 'Code Python'))}
                         className="text-[10px] text-slate-400 hover:text-slate-100 flex items-center gap-1"
                       >
                         <Copy className="w-3 h-3" />
-                        <span>Copier</span>
+                        {t('copy', 'Copier')}
                       </button>
                     </div>
                     <pre className="p-3 bg-black/20 text-[11px] font-mono overflow-x-auto text-slate-300 leading-relaxed">
@@ -2956,13 +2957,13 @@ for chunk in response:
                   {/* cURL Example */}
                   <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
                     <div className="px-3 py-2 bg-black/10 dark:bg-white/5 flex items-center justify-between border-b" style={{ borderColor: 'var(--border-subtle)' }}>
-                      <span className="font-bold text-[11px] text-emerald-400">⚡ cURL / Bash (Streaming SSE)</span>
+                      <span className="font-bold text-[11px] text-emerald-400">{t('curl_bash_streaming', '⚡ cURL / Bash (Streaming SSE)')}</span>
                       <button
-                        onClick={() => handleCopyText(`curl -N -X POST ${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'}/v1/chat/completions \\\n  -H "Authorization: Bearer ${apiKeys[0]?.key || 'agy_sk_votre_cle'}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "model": "gemini-3.8-flash",\n    "messages": [{"role": "user", "content": "Explique le concept d'Antigravity"}],\n    "stream": true\n  }'`, 'Commande cURL')}
+                        onClick={() => handleCopyText(`curl -N -X POST ${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'}/v1/chat/completions \\\n  -H "Authorization: Bearer ${apiKeys[0]?.key || 'agy_sk_votre_cle'}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "model": "gemini-3.8-flash",\n    "messages": [{"role": "user", "content": "Explique le concept d'Antigravity"}],\n    "stream": true\n  }'`, t('curl_cmd_label', 'Commande cURL'))}
                         className="text-[10px] text-slate-400 hover:text-slate-100 flex items-center gap-1"
                       >
                         <Copy className="w-3 h-3" />
-                        <span>Copier</span>
+                        {t('copy', 'Copier')}
                       </button>
                     </div>
                     <pre className="p-3 bg-black/20 text-[11px] font-mono overflow-x-auto text-slate-300 leading-relaxed">
@@ -2993,7 +2994,7 @@ for chunk in response:
           <div className="text-xs">
             {savedSuccess && (
               <span className="text-emerald-500 flex items-center gap-1.5 font-medium">
-                <Check className="w-4 h-4" /> Paramètres enregistrés avec succès !
+                <Check className="w-4 h-4" /> {t('settings_saved_success', 'Paramètres enregistrés avec succès !')}
               </span>
             )}
           </div>
@@ -3007,7 +3008,7 @@ for chunk in response:
                 color: 'var(--text)',
               }}
             >
-              Fermer
+              {t('close', 'Fermer')}
             </button>
             {activeTab !== 'skills' && activeTab !== 'security' && activeTab !== 'updates' && (
               <button
@@ -3016,7 +3017,7 @@ for chunk in response:
                 className="py-2 px-5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold text-xs flex items-center gap-2 transition-all shadow-md shadow-sky-500/20 disabled:opacity-50 cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>{saving ? 'Enregistrement...' : 'Enregistrer les modifications'}</span>
+                <span>{saving ? t('saving_ellipsis', 'Enregistrement...') : t('save_changes', 'Enregistrer les modifications')}</span>
               </button>
             )}
           </div>
