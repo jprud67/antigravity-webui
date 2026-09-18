@@ -155,7 +155,7 @@ if FRONTEND_DIST.is_dir():
             file_candidate = (dist_resolved / full_path).resolve()
             if file_candidate.is_relative_to(dist_resolved) and file_candidate.is_file():
                 return FileResponse(file_candidate)
-        except Exception:
+        except (ValueError, TypeError, OSError):
             pass
         if index_file.is_file():
             return FileResponse(index_file)

@@ -1395,9 +1395,12 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                                 end = min(len(raw_thinking), idx + 80)
                                 snippet = "[Raisonnement] " + ("..." if start > 0 else "") + raw_thinking[start:end] + ("..." if end < len(raw_thinking) else "")
 
+                            cleaned_snippet = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", snippet)
+                            cleaned_snippet = re.sub(r"\s+", " ", cleaned_snippet).strip()
+
                             c_copy = dict(c)
                             c_copy["match_type"] = "transcript"
-                            c_copy["match_snippet"] = snippet
+                            c_copy["match_snippet"] = cleaned_snippet
                             matched.append(c_copy)
                             seen_ids.add(cid)
                             break
@@ -1538,11 +1541,18 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                     "tool_activities": [],
                 }
             activities = current_asst.setdefault("tool_activities", [])
+            tool_call_id = s.get("tool_call_id") or s.get("call_id")
             pending = None
-            for act in activities:
-                if act.get("result") is None:
-                    pending = act
-                    break
+            if tool_call_id:
+                for act in activities:
+                    if act.get("id") == tool_call_id and act.get("result") is None:
+                        pending = act
+                        break
+            if not pending:
+                for act in activities:
+                    if act.get("result") is None:
+                        pending = act
+                        break
             is_err = s.get("status") == "ERROR" or bool(s.get("error"))
             status_val = "error" if is_err else "done"
             out_content = content or (str(s.get("error")) if s.get("error") else "")
@@ -1556,6 +1566,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                     else "action"
                 )
                 activities.append({
+                    "id": tool_call_id or None,
                     "name": act_name,
                     "args": {},
                     "result": out_content,
@@ -1574,6 +1585,7 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                 if raw_args is None:
                     raw_args = tc.get("parameters") or {}
                 mapped_tools.append({
+                    "id": tc.get("id") or tc.get("tool_call_id") or tc.get("call_id"),
                     "name": name,
                     "args": raw_args if isinstance(raw_args, dict) else {},
                     "result": None,
@@ -1710,6 +1722,7 @@ def export_conversation_html(conversation_id: str) -> str:
         if val is None:
             return ""
         s = str(val).replace("\x00", "")
+        s = re.sub(r"[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]", "", s)
         return html.escape(s, quote=True)
 
     messages_html = []

@@ -42,7 +42,7 @@ def _extract_password_from_any_source() -> str | None:
                 d = json.load(f)
                 if isinstance(d, dict) and d.get("password"):
                     return str(d["password"])
-        except Exception:
+        except (json.JSONDecodeError, OSError):
             pass
     if AUTH_BACKUP_FILE.exists():
         try:
@@ -50,7 +50,7 @@ def _extract_password_from_any_source() -> str | None:
                 d = json.load(f)
                 if isinstance(d, dict) and d.get("password"):
                     return str(d["password"])
-        except Exception:
+        except (json.JSONDecodeError, OSError):
             pass
     return None
 
@@ -106,8 +106,8 @@ def get_auth_config() -> dict[str, Any]:
                 logger.warning("Utilisation de la configuration d'authentification en mémoire (cache protégé)")
                 try:
                     save_auth_config(_auth_cache)
-                except Exception:
-                    pass
+                except (OSError, TypeError) as save_err:
+                    logger.debug(f"Impossible de réécrire la configuration depuis le cache: {save_err}")
                 return _auth_cache.copy()
 
         # Première installation uniquement (aucun fichier, aucun backup, aucun cache existant)
@@ -161,18 +161,10 @@ def save_auth_config(config: dict[str, Any]):
                 bak_temp.replace(AUTH_BACKUP_FILE)
                 restrict_file_permissions(AUTH_BACKUP_FILE)
             except Exception as bak_err:
-                if bak_temp.exists():
-                    try:
-                        bak_temp.unlink()
-                    except Exception:
-                        pass
+                bak_temp.unlink(missing_ok=True)
                 logger.debug(f"Impossible d'écrire la sauvegarde miroir .bak: {bak_err}")
         except Exception:
-            if temp_file.exists():
-                try:
-                    temp_file.unlink()
-                except Exception as e:
-                    logger.debug(f"Ignored error: {e}")
+            temp_file.unlink(missing_ok=True)
             raise
 
 

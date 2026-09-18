@@ -34,10 +34,10 @@ def _validate_workspace_path(workspace_path: str) -> Path:
         for ws in get_settings().get("trustedWorkspaces", []) or []:
             try:
                 allowed_roots.append(Path(ws).resolve())
-            except Exception:
-                continue
+            except (ValueError, TypeError, OSError) as ws_err:
+                logger.debug(f"Skipping invalid trusted workspace {ws}: {ws_err}")
     except Exception as e:
-        logger.debug(f"Ignored error: {e}")
+        logger.debug(f"Ignored error reading trustedWorkspaces: {e}")
 
     if not is_safe_path(resolved, allowed_roots):
         raise HTTPException(status_code=403, detail="Accès refusé : chemin en dehors des répertoires de travail autorisés.")

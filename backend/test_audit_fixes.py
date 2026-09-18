@@ -3984,6 +3984,185 @@ def test_main_spa_mounting_resilience(tmp_path):
     print("✓ test_main_spa_mounting_resilience passed")
 
 
+def test_export_conversation_html_sanitizes_control_characters():
+    from unittest.mock import patch
+
+    from app.services.storage import export_conversation_html
+
+    mock_steps = [
+        {
+            "step_index": 0,
+            "source": "USER_EXPLICIT",
+            "type": "USER_INPUT",
+            "content": "Bonjour\x00\x07monde\x1b",
+            "created_at": "2026-09-18T12:00:00Z"
+        },
+        {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "content": "Voici\x08un\x0etest\x0cpropre.",
+            "created_at": "2026-09-18T12:00:01Z"
+        }
+    ]
+    with patch("app.services.storage.get_conversation_transcript", return_value=mock_steps), \
+         patch("app.services.storage.get_conversation_by_id", return_value={"title": "Test Sanitize"}):
+        html_out = export_conversation_html("test_san_conv")
+        assert "\x07" not in html_out
+        assert "\x1b" not in html_out
+        assert "\x08" not in html_out
+        assert "\x0e" not in html_out
+        assert "Bonjourmonde" in html_out
+        assert "Voiciuntestpropre." in html_out
+    print("✓ test_export_conversation_html_sanitizes_control_characters passed")
+
+
+def test_search_conversations_snippet_sanitization():
+    import json
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.services.storage import search_conversations
+
+    with tempfile.TemporaryDirectory() as td:
+        conv_dir = Path(td) / "conv_snip_test"
+        log_dir = conv_dir / ".system_generated" / "logs"
+        log_dir.mkdir(parents=True)
+        t_file = log_dir / "transcript.jsonl"
+        raw_entry = {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "content": "Ligne 1\x07avec\x1bcaracteres   bizarres   et\nretours\nde ligne pour audit_kw.",
+            "created_at": "2026-09-18T12:00:00Z"
+        }
+        t_file.write_text(json.dumps(raw_entry) + "\n", encoding="utf-8")
+
+        mock_conv = {
+            "conversation_id": "conv_snip_test",
+            "title": "Snippet Test",
+            "preview": "Test",
+            "step_count": 1,
+            "last_modified_time": "2026-09-18T12:00:00Z",
+            "workspace_uris": "",
+            "status": "DONE"
+        }
+
+        with patch("app.services.storage.BRAIN_DIR", Path(td)), \
+             patch("app.services.storage.list_conversations", return_value=[mock_conv]), \
+             patch("app.services.storage.get_db_connection") as mock_db, \
+             patch("app.services.storage.get_all_session_metadata", return_value={}):
+            mock_cursor = mock_db.return_value.cursor.return_value
+            mock_cursor.fetchall.return_value = []
+
+            results = search_conversations("audit_kw", limit=10)
+            assert len(results) == 1
+            snip = results[0]["match_snippet"]
+            assert "\x07" not in snip
+            assert "\x1b" not in snip
+            assert "\n" not in snip
+            assert "   " not in snip
+            assert "audit_kw" in snip
+    print("✓ test_search_conversations_snippet_sanitization passed")
+
+
+def test_aggregate_steps_preserves_tool_call_id_and_matches():
+    from app.services.storage import aggregate_steps_into_turns
+
+    steps = [
+        {
+            "step_index": 0,
+            "source": "USER_EXPLICIT",
+            "type": "USER_INPUT",
+            "content": "Run tools",
+            "created_at": "2026-09-18T12:00:00Z"
+        },
+        {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "content": "Exécution...",
+            "tool_calls": [
+                {"id": "call_1", "name": "run_command", "args": {"CommandLine": "echo 1"}},
+                {"id": "call_2", "name": "view_file", "args": {"AbsolutePath": "/root/test.txt"}}
+            ],
+            "created_at": "2026-09-18T12:00:01Z"
+        },
+        {
+            "step_index": 2,
+            "source": "SYSTEM",
+            "type": "RUN_COMMAND",
+            "tool_call_id": "call_2",
+            "content": "Contenu du fichier test",
+            "status": "DONE",
+            "created_at": "2026-09-18T12:00:02Z"
+        },
+        {
+            "step_index": 3,
+            "source": "SYSTEM",
+            "type": "RUN_COMMAND",
+            "tool_call_id": "call_1",
+            "content": "1\n",
+            "status": "DONE",
+            "created_at": "2026-09-18T12:00:03Z"
+        }
+    ]
+
+    turns = aggregate_steps_into_turns(steps)
+    assert len(turns) == 2
+    asst_turn = turns[1]
+    assert asst_turn["role"] == "assistant"
+    activities = asst_turn["tool_activities"]
+    assert len(activities) == 2
+    assert activities[0]["id"] == "call_1"
+    assert activities[0]["result"] == "1\n"
+    assert activities[1]["id"] == "call_2"
+    assert activities[1]["result"] == "Contenu du fichier test"
+    print("✓ test_aggregate_steps_preserves_tool_call_id_and_matches passed")
+
+
+def test_cron_ticker_loop_terminates_running_procs_on_cancel():
+    import asyncio
+    from unittest.mock import MagicMock, patch
+
+    from app.services import cron_ticker
+
+    mock_proc = MagicMock()
+    mock_proc.returncode = None
+    mock_proc.pid = 99999
+
+    async def run_test():
+        with patch.dict(cron_ticker._running_job_procs, {"job_123": mock_proc}, clear=True), \
+             patch("app.services.cron_ticker.ensure_dirs"), \
+             patch("app.services.cron_ticker.terminate_process_group_sync") as mock_term:
+            task = asyncio.create_task(cron_ticker.cron_ticker_loop())
+            await asyncio.sleep(0.01)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            mock_term.assert_called_once_with(mock_proc, force=True)
+            assert len(cron_ticker._running_job_procs) == 0
+
+    asyncio.run(run_test())
+    print("✓ test_cron_ticker_loop_terminates_running_procs_on_cancel passed")
+
+
+def test_rules_validate_workspace_path_resilience():
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.api.rules import _validate_workspace_path
+    from app.config import DEFAULT_WORKSPACE
+
+    with patch("app.api.rules.get_settings", return_value={"trustedWorkspaces": [None, "", "/nonexistent/invalid/dir\x00/here"]}):
+        res = _validate_workspace_path(DEFAULT_WORKSPACE)
+        assert res == Path(DEFAULT_WORKSPACE).resolve()
+    print("✓ test_rules_validate_workspace_path_resilience passed")
+
+
 if __name__ == "__main__":
     test_clean_user_prompt_with_context_summary_history()
     test_validate_path_access_null_bytes()
@@ -4138,5 +4317,10 @@ if __name__ == "__main__":
         test_storage_project_and_group_id_in_queries(Path(td))
     with tempfile.TemporaryDirectory() as td:
         test_main_spa_mounting_resilience(Path(td))
+    test_export_conversation_html_sanitizes_control_characters()
+    test_search_conversations_snippet_sanitization()
+    test_aggregate_steps_preserves_tool_call_id_and_matches()
+    test_cron_ticker_loop_terminates_running_procs_on_cancel()
+    test_rules_validate_workspace_path_resilience()
     print("\nAll unit tests passed successfully!")
 

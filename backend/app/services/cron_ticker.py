@@ -589,4 +589,11 @@ async def cron_ticker_loop() -> None:
             for t in list(_background_tasks):
                 t.cancel()
             await asyncio.gather(*list(_background_tasks), return_exceptions=True)
+        for jid, proc in list(_running_job_procs.items()):
+            try:
+                if proc.returncode is None:
+                    terminate_process_group_sync(proc, force=True)
+            except OSError as term_err:
+                logger.debug(f"[Cron] Erreur lors de la terminaison du process {jid}: {term_err}")
+        _running_job_procs.clear()
         raise

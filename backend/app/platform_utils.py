@@ -104,7 +104,7 @@ async def terminate_process_group_async(proc, grace: float = 0.8) -> None:
             if stream is not None:
                 try:
                     stream.close()
-                except Exception:
+                except (OSError, ValueError):
                     pass
 
 
@@ -130,14 +130,14 @@ def terminate_process_group_sync(proc, force: bool = True) -> None:
 
     try:
         proc.kill()
-    except Exception:
+    except OSError:
         pass
 
     for stream in (getattr(proc, "stdin", None), getattr(proc, "stdout", None), getattr(proc, "stderr", None)):
         if stream is not None:
             try:
                 stream.close()
-            except Exception:
+            except (OSError, ValueError):
                 pass
 
 
@@ -191,9 +191,9 @@ def is_safe_path(target: os.PathLike[Any] | str, allowed_roots: Sequence[os.Path
                 except AttributeError:
                     if t == r or r in t.parents:
                         return True
-            except Exception:
+            except (ValueError, TypeError, OSError):
                 continue
-    except Exception:
+    except (ValueError, TypeError, OSError):
         return False
     return False
 
