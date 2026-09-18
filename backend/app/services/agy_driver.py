@@ -288,23 +288,46 @@ async def stream_turn(
     effort: str | None = None,
     auto_approve: bool = True,
     agent_mode: str | None = None,
-    proc_callback: Any | None = None
+    proc_callback: Any | None = None,
+    json_schema: str | None = None,
+    sandbox: bool = False,
+    disable_slash_commands: bool = False,
+    skip_permissions: bool | None = None,
+    print_timeout: str = "30m"
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
     Executes a turn using `agy --output-format stream-json` and yields parsed NDJSON events.
     Supports cancellation, process group termination, agent_mode, and proc_callback.
+
+    Paramètres additionnels (mode « API simulée » / tool bridge) :
+      - json_schema : schéma JSON (chaîne) imposé à la sortie finale via `--json-schema` ;
+      - sandbox : active `--sandbox` (restrictions terminal) ;
+      - disable_slash_commands : active `--disable-slash-commands` ;
+      - skip_permissions : None = suit auto_approve (comportement historique), False = ne jamais
+        ajouter `--dangerously-skip-permissions`, True = l'ajouter ;
+      - print_timeout : valeur de `--print-timeout` (défaut 30m).
     """
     cwd = workspace_path if workspace_path and Path(workspace_path).is_dir() else DEFAULT_WORKSPACE
     
     resolved_model, resolved_effort = resolve_model_and_effort(model, effort)
 
-    cmd = [AGY_BIN, "--output-format", "stream-json", "--print-timeout", "30m"]
+    cmd = [AGY_BIN, "--output-format", "stream-json", "--print-timeout", print_timeout]
 
-    if auto_approve:
+    use_skip_permissions = auto_approve if skip_permissions is None else skip_permissions
+    if use_skip_permissions:
         cmd.append("--dangerously-skip-permissions")
 
     if agent_mode and agent_mode in ["accept-edits", "plan"]:
         cmd.extend(["--mode", agent_mode])
+
+    if disable_slash_commands:
+        cmd.append("--disable-slash-commands")
+
+    if sandbox:
+        cmd.append("--sandbox")
+
+    if json_schema:
+        cmd.extend(["--json-schema", json_schema])
 
     if conversation_id:
         cmd.extend(["--conversation", conversation_id])

@@ -14,6 +14,7 @@ from app.services.agy_driver import (
     get_model_families,
     stream_turn,
 )
+from app.services import tool_bridge
 from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.openai_compat")
@@ -65,6 +66,9 @@ class ChatMessage(BaseModel):
     role: str = "user"
     content: Any = ""
     name: str | None = None
+    # Tool calling OpenAI : assistant avec appels d'outils, messages role="tool" avec résultat.
+    tool_calls: Any = None
+    tool_call_id: str | None = None
 
 
 def _extract_message_content(content: Any) -> str:
@@ -96,6 +100,11 @@ class ChatCompletionRequest(BaseModel):
     top_p: float | None = None
     max_tokens: int | None = None
     stop: list[str] | str | None = None
+
+    # Tool calling OpenAI (function calling) — traité par le pont tool_bridge (agy en « API simulée »).
+    tools: Any = None
+    tool_choice: Any = None
+    parallel_tool_calls: Any = None
 
     # Paramètres d'extension Antigravity (acceptés gracieusement par les clients externes)
     conversation_id: str | None = None
@@ -249,7 +258,13 @@ async def create_chat_completion(
     Endpoint standard OpenAI /v1/chat/completions.
     Gère à la fois le mode synchrone (JSON complet) et le mode streaming (SSE).
     Transmet le raisonnement (thinking) dans reasoning_content (standard DeepSeek R1 / o1).
+    Si le client déclare des outils (`tools`), la décision est produite par le pont tool_bridge
+    (agy en mode « API simulée ») puis convertie en tool_calls / texte OpenAI — sync et streaming.
     """
+    tool_list = _normalized_tool_list(req.tools)
+    if tool_list and not _tool_choice_disables_tools(req.tool_choice):
+        return await _tool_mode_response(req, tool_list)
+
     raw_cid = req.conversation_id or x_conversation_id
     conv_id = raw_cid.strip() if raw_cid and is_safe_conversation_id(raw_cid) else None
     prompt = _messages_to_prompt(req.messages, has_conv_id=bool(conv_id))
@@ -498,3 +513,160 @@ async def create_chat_completion(
         ],
         "usage": usage_data
     }
+
+
+# ============================================================================
+# Tool calling OpenAI (pont tool_bridge)
+# ============================================================================
+
+def _normalized_tool_list(raw_tools: Any) -> list[dict[str, Any]]:
+    """Filtre les définitions d'outils valides (format OpenAI `{type, function}` accepté gracieusement)."""
+    if not isinstance(raw_tools, list):
+        return []
+    tools: list[dict[str, Any]] = []
+    for tool in raw_tools:
+        if not isinstance(tool, dict):
+            continue
+        fn = tool.get("function") if isinstance(tool.get("function"), dict) else tool
+        name = fn.get("name") if isinstance(fn, dict) else None
+        if isinstance(name, str) and name.strip():
+            tools.append(tool)
+    return tools
+
+
+def _tool_choice_disables_tools(tool_choice: Any) -> bool:
+    """`tool_choice: "none"` désactive le mode tool calling (chat texte classique)."""
+    return isinstance(tool_choice, str) and tool_choice.strip().lower() == "none"
+
+
+async def _tool_mode_response(req: ChatCompletionRequest, tool_list: list[dict[str, Any]]):
+    """
+    Produit la réponse OpenAI (tool_calls ou texte) via le pont tool_bridge.
+
+    Mode volontairement « sans état » : l'historique complet est rejoué à chaque appel.
+    `conversation_id`, `workspace_path` et `auto_approve` de la requête sont ignorés —
+    l'agent agy reste en mode simulation, sans exécution de ses propres outils.
+    """
+    completion_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
+    created_ts = int(time.time())
+
+    outcome = await tool_bridge.run_turn(
+        messages=[message.model_dump() for message in req.messages],
+        tools=tool_list,
+        tool_choice=req.tool_choice,
+        model=req.model,
+        effort=req.effort,
+    )
+
+    if outcome.get("kind") == "error":
+        _raise_http_for_error(
+            str(outcome.get("message") or "Erreur inconnue du pont tool calling"),
+            context="/v1/chat/completions (tool bridge)",
+        )
+
+    usage = _extract_usage_info(outcome.get("usage"))
+    reasoning = outcome.get("thinking") or None
+
+    tool_call_payload: dict[str, Any] | None = None
+    if outcome.get("kind") == "tool_call":
+        tool_call_payload = {
+            "id": outcome.get("id") or f"call_{uuid.uuid4().hex[:24]}",
+            "type": "function",
+            "function": {
+                "name": outcome.get("name") or "",
+                "arguments": json.dumps(outcome.get("arguments") or {}, ensure_ascii=False),
+            },
+        }
+        message: dict[str, Any] = {
+            "role": "assistant",
+            "content": None,
+            "reasoning_content": reasoning,
+            "tool_calls": [tool_call_payload],
+        }
+        finish_reason = "tool_calls"
+    else:
+        message = {
+            "role": "assistant",
+            "content": outcome.get("content") or "",
+            "reasoning_content": reasoning,
+        }
+        finish_reason = "stop"
+
+    if not req.stream:
+        return {
+            "id": completion_id,
+            "object": "chat.completion",
+            "created": created_ts,
+            "model": req.model,
+            "system_fingerprint": "fp_antigravity",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": message,
+                    "finish_reason": finish_reason
+                }
+            ],
+            "usage": usage,
+        }
+
+    def build_chunk(delta: dict[str, Any], finish: str | None = None, with_usage: bool = False) -> str:
+        chunk: dict[str, Any] = {
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "created": created_ts,
+            "model": req.model,
+            "system_fingerprint": "fp_antigravity",
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": delta,
+                    "finish_reason": finish
+                }
+            ],
+        }
+        if with_usage:
+            chunk["usage"] = usage
+        return f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+
+    async def sse_generator() -> AsyncGenerator[str, None]:
+        # Décision bufferisée : l'enveloppe JSON doit être analysée avant de savoir si la
+        # réponse est un tool_call ou du texte ; les fragments SSE sont ensuite émis d'un bloc.
+        if reasoning:
+            yield build_chunk({"role": "assistant", "reasoning_content": reasoning})
+        if tool_call_payload:
+            yield build_chunk({
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "index": 0,
+                        "id": tool_call_payload["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tool_call_payload["function"]["name"],
+                            "arguments": ""
+                        }
+                    }
+                ]
+            })
+            yield build_chunk({
+                "tool_calls": [
+                    {
+                        "index": 0,
+                        "function": {"arguments": tool_call_payload["function"]["arguments"]}
+                    }
+                ]
+            })
+        else:
+            yield build_chunk({"role": "assistant", "content": message["content"]})
+        yield build_chunk({}, finish=finish_reason, with_usage=True)
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        sse_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
