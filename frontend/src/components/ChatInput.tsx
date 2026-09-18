@@ -397,7 +397,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
     e.stopPropagation();
     try {
       localStorage.removeItem('antigravity_prompt_history');
-      showToast('Historique des prompts effacé', 'info');
+      showToast(t('clear_prompt_history', 'Prompt history cleared'), 'info');
       setShowHistoryMenu(false);
     } catch (err) {
       console.error(err);
@@ -1120,7 +1120,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                         </div>
                       </div>
                       <span className="text-[11px] truncate max-w-[50%] text-right ml-2" style={{ color: 'var(--muted)' }}>
-                        {c.desc}
+                        {t(c.descKey || '', c.desc)}
                       </span>
                     </button>
                   );
@@ -1159,11 +1159,10 @@ export const ChatInput = React.memo<ChatInputProps>(({
                   <button
                     type="button"
                     onClick={clearStoredHistory}
-                    className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 transition-colors cursor-pointer px-1.5 py-0.5 rounded hover:bg-red-500/10"
-                    title="Vider l'historique persistant"
+                    className="p-1 rounded opacity-50 hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    title={t('clear_persistent_history', 'Clear persistent history')}
                   >
-                    <Trash2 className="w-3 h-3" />
-                    <span>Effacer</span>
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
                 <span className="text-[10px] font-mono opacity-70">↑↓ naviguer · esc fermer</span>
@@ -1211,7 +1210,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                 if (filtered.length === 0) {
                   return (
                     <div className="p-4 text-xs text-center" style={{ color: 'var(--muted)' }}>
-                      {historySearch ? 'Aucun résultat correspondant' : 'Aucun prompt dans l\'historique'}
+                      {historySearch ? t('no_results_match', 'No matching results') : t('no_prompts_history', 'No prompts in history')}
                     </div>
                   );
                 }
@@ -1320,7 +1319,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                     type="button"
                     onClick={() => handleRemoveAttachment(att.id)}
                     className="p-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-slate-400 hover:text-red-400 transition-colors cursor-pointer ml-0.5"
-                    title="Supprimer la pièce jointe"
+                    title={t("remove_attachment", "Remove attachment")}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -1456,7 +1455,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                 onChange={(e) => handleModelChange(e.target.value)}
                 className="bg-transparent text-[11px] font-semibold font-sans outline-none cursor-pointer truncate"
                 style={{ color: 'var(--text)' }}
-                title="Modèle de base"
+                title={t("base_model", "Base model")}
               >
                 {models.map((m) => (
                   <option key={m.id} value={m.id} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
@@ -1525,7 +1524,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                     type="button"
                     onClick={onClearQueue}
                     className="hover:opacity-100 opacity-70 transition-opacity cursor-pointer ml-0.5 p-0.5"
-                    title="Vider la file d'attente"
+                    title={t("clear_queue", "Clear queue")}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -1549,7 +1548,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                       onClick={() => handleSubmit('steer')}
                       className="py-1.5 px-3 rounded-xl text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
                       style={{ backgroundColor: '#EA580C' }}
-                      title="Interrompre l'étape en cours et réorienter immédiatement"
+                      title={t("steer_tooltip", "Interrupt current step and steer immediately")}
                     >
                       <Zap className="w-3.5 h-3.5 fill-current" />
                       <span>{t('steer', 'Orienter')}</span>
@@ -1565,7 +1564,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                         borderColor: 'var(--border)',
                         color: 'var(--text)'
                       }}
-                      title="Placer dans la file d'attente pour le prochain tour"
+                      title={t("queue_tooltip", "Place in queue for next turn")}
                     >
                       <Layers className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
                       <span>{t('queue', 'En attente')}</span>
@@ -1578,7 +1577,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                   type="button"
                   onClick={onStopStreaming}
                   className="py-1.5 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-md shadow-rose-600/20 cursor-pointer"
-                  title="Interrompre l'exécution"
+                  title={t("stop_execution", "Stop execution")}
                 >
                   <Square className="w-3.5 h-3.5 fill-current" />
                   <span>{t('stop', 'Arrêter')}</span>

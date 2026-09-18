@@ -54,6 +54,7 @@ import {
 import { DiffViewer } from './DiffViewer';
 import { PreContext, copyText, extractRawText } from '../utils/codeBlockUtils';
 import { triggerFileDownload } from '../services/api';
+import { useI18n } from '../services/i18n';
 
 const MermaidRenderer = React.lazy(() =>
   import('./MermaidRenderer').then((m) => ({ default: m.MermaidRenderer }))
@@ -308,6 +309,7 @@ function getLanguageDisplay(lang: string) {
  * Clean inline code component. Never breaks line or paragraph layout.
  */
 export const InlineCode: React.FC<any> = ({ children, ...props }) => {
+  const { t } = useI18n();
   return (
     <code
       className="inline font-mono text-[13px] px-1.5 py-0.5 mx-0.5 rounded-md border font-medium transition-colors break-words max-w-full select-text align-baseline"
@@ -316,7 +318,7 @@ export const InlineCode: React.FC<any> = ({ children, ...props }) => {
         borderColor: 'var(--border-subtle)',
         color: 'var(--accent-text)',
       }}
-      title="Code inline"
+      title={t('code_inline', 'Inline code')}
       {...props}
     >
       {children}
@@ -348,6 +350,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
   onOpenFile,
   onOpenTerminal,
 }) => {
+  const { t } = useI18n();
   const rawCode = extractRawText(children).replace(/\n$/, '');
   const { language, filename, cleanedCode } = useMemo(
     () => parseCodeFenceMeta(className, rawCode),
@@ -388,7 +391,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
       <React.Suspense
         fallback={
           <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-xs text-slate-500 font-mono animate-pulse flex items-center justify-center">
-            Chargement du diagramme Mermaid...
+            {t('loading_mermaid', 'Loading Mermaid diagram...')}
           </div>
         }
       >
@@ -458,7 +461,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
             <button
               type="button"
               onClick={() => onOpenFile?.(filename)}
-              title={`Ouvrir ${filename}`}
+              title={t('open_file_name', 'Open {0}').replace('{0}', filename)}
               className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono border transition-colors truncate max-w-[240px] cursor-pointer"
               style={{
                 backgroundColor: 'var(--surface)',
@@ -474,7 +477,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
 
           {/* Line count & size */}
           <span className="text-[10.5px] opacity-60 font-mono shrink-0 hidden sm:inline">
-            ({linesCount} ligne{linesCount > 1 ? 's' : ''} • {formatBytes(cleanedCode.length)})
+            ({t('lines_count', '{0} lines').replace('{0}', String(linesCount))} • {formatBytes(cleanedCode.length)})
           </span>
         </div>
 
@@ -485,7 +488,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
             <button
               type="button"
               onClick={onOpenTerminal}
-              title="Ouvrir le terminal interactif"
+              title={t('open_terminal', 'Open interactive terminal')}
               className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer border hover:text-emerald-400"
               style={{
                 backgroundColor: 'var(--surface)',
@@ -494,7 +497,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
               }}
             >
               <Terminal className="w-3 h-3 text-emerald-400" />
-              <span className="hidden md:inline">Terminal</span>
+              <span className="hidden md:inline">{t('terminal', 'Terminal')}</span>
             </button>
           )}
 
@@ -502,7 +505,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
           <button
             type="button"
             onClick={() => setShowLineNumbers(!showLineNumbers)}
-            title={showLineNumbers ? 'Masquer les numéros de ligne' : 'Afficher les numéros de ligne'}
+            title={showLineNumbers ? t('hide_line_numbers', 'Hide line numbers') : t('show_line_numbers', 'Show line numbers')}
             className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
             style={{
               backgroundColor: showLineNumbers ? 'var(--surface-subtle-hover)' : 'var(--surface)',
@@ -517,7 +520,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
           <button
             type="button"
             onClick={() => setWrapLines(!wrapLines)}
-            title={wrapLines ? 'Désactiver le retour à la ligne automatique' : 'Activer le retour à la ligne (Wrap)'}
+            title={wrapLines ? t('disable_line_wrap', 'Disable line wrap') : t('enable_line_wrap', 'Enable line wrap')}
             className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
             style={{
               backgroundColor: wrapLines ? 'var(--surface-subtle-hover)' : 'var(--surface)',
@@ -533,7 +536,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
             <button
               type="button"
               onClick={() => setIsExpanded(!isExpanded)}
-              title={isExpanded ? "Réduire l'affichage du code" : 'Agrandir le code complet'}
+              title={isExpanded ? t('collapse_code_view', 'Collapse code view') : t('expand_code_view', 'Expand full code')}
               className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
               style={{
                 backgroundColor: 'var(--surface)',
@@ -549,7 +552,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
           <button
             type="button"
             onClick={handleDownload}
-            title="Télécharger l'extrait de code"
+            title={t('download_snippet', 'Download code snippet')}
             className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
             style={{
               backgroundColor: 'var(--surface)',
@@ -564,7 +567,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
           <button
             type="button"
             onClick={handleCopy}
-            title="Copier le code complet"
+            title={t('copy_full_code', 'Copy full code')}
             className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer border ml-1 shadow-2xs"
             style={{
               backgroundColor: copied ? 'rgba(16, 185, 129, 0.1)' : 'var(--surface)',
@@ -573,7 +576,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
             }}
           >
             {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-            <span className="font-sans font-medium">{copied ? 'Copié !' : 'Copier'}</span>
+            <span className="font-sans font-medium">{copied ? t('copied', 'Copied!') : t('copy', 'Copy')}</span>
           </button>
         </div>
       </div>
@@ -635,7 +638,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
               }}
             >
               <ChevronDown className="w-3.5 h-3.5" />
-              <span>Afficher les {linesCount - 28} lignes restantes</span>
+              <span>{t('show_remaining_lines', 'Show {0} remaining lines').replace('{0}', String(linesCount - 28))}</span>
             </button>
           </div>
         )}
@@ -656,7 +659,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
             className="flex items-center gap-1.5 text-muted hover:text-accent cursor-pointer transition-colors"
           >
             <ChevronUp className="w-3.5 h-3.5" />
-            <span>Réduire l'affichage</span>
+            <span>{t('collapse_code_view', 'Collapse code view')}</span>
           </button>
         </div>
       )}

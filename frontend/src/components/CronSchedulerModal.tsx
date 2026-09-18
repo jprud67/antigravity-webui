@@ -157,32 +157,32 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
 
     try {
       await updateCronJob(job.id, { state: nextState });
-      showToast(nextState === 'paused' ? 'Tâche mise en pause' : 'Tâche réactivée', 'info');
+      showToast(nextState === 'paused' ? t('cron_paused_toast', 'Task paused') : t('cron_resumed_toast', 'Task resumed'), 'info');
       await loadCrons();
     } catch (e: any) {
-      showToast(e.message || 'Erreur modification statut', 'error');
+      showToast(e.message || t('cron_error_toggle', 'Error changing task status'), 'error');
       await loadCrons();
     }
   };
 
   const handleDelete = async (jobId: string) => {
-    if (!(await showConfirm('Supprimer cette tâche planifiée ?', { destructive: true }))) return;
+    if (!(await showConfirm(t('cron_delete_confirm', 'Delete this scheduled task?'), { destructive: true }))) return;
     try {
       await deleteCronJob(jobId);
       await loadCrons();
     } catch (e: any) {
-      showToast(e.message || 'Erreur suppression', 'error');
+      showToast(e.message || t('cron_error_delete', 'Error deleting task'), 'error');
     }
   };
 
   const handleTriggerNow = async (job: CronJobItem) => {
     try {
       await triggerCronJob(job.id);
-      setActionNotice(`⚡ Exécution en tâche de fond lancée pour "${job.name}"`);
+      setActionNotice(`⚡ ${t('cron_triggered_toast', 'Background task launched for "{0}"').replace('{0}', job.name)}`);
       setTimeout(() => setActionNotice(null), 3500);
       await loadCrons();
     } catch (e: any) {
-      showToast(e.message || 'Erreur déclenchement', 'error');
+      showToast(e.message || t('cron_error_trigger', 'Error triggering task'), 'error');
     }
   };
 
@@ -204,9 +204,9 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
     setSelectedLogContent(null);
     try {
       const res = await fetchCronJobLog(job.id);
-      setSelectedLogContent(res.content || 'Aucun contenu de journal disponible.');
+      setSelectedLogContent(res.content || t('no_log_content', 'No log content available.'));
     } catch (err: any) {
-      setSelectedLogContent(`Erreur lors de la récupération du journal: ${err.message || err}`);
+      setSelectedLogContent(`${t('cron_error_load', 'Error loading scheduled tasks')}: ${err.message || err}`);
     } finally {
       setLoadingLog(false);
     }
@@ -242,21 +242,21 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
         schedule: finalExpr,
       });
       setEditingJobId(null);
-      setActionNotice('Tâche mise à jour avec succès ✓');
+      setActionNotice(t('cron_updated', 'Task updated successfully ✓'));
       setTimeout(() => setActionNotice(null), 3000);
       await loadCrons();
     } catch (e: any) {
-      showToast(e.message || 'Erreur mise à jour', 'error');
+      showToast(e.message || t('cron_error_update', 'Error updating task'), 'error');
     } finally {
       setEditSaving(false);
     }
   };
 
   const formatDateTime = (iso?: string | null) => {
-    if (!iso) return 'Non planifié';
+    if (!iso) return t('cron_not_scheduled', 'Paused');
     try {
       const d = new Date(iso);
-      return d.toLocaleString('fr-FR', {
+      return d.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', {
         day: '2-digit',
         month: '2-digit',
         hour: '2-digit',
@@ -298,20 +298,20 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--strong)' }}>
-                <span>Planificateur de Tâches & Crons Autonomes</span>
+                <span>{t('cron_title', 'Task Scheduler & Autonomous Crons')}</span>
                 {cronData?.ticker_status === 'active' ? (
                   <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Ticker Actif
+                    {t('cron_ticker_active', 'Ticker Active')}
                   </span>
                 ) : (
                   <span className="text-[10px] font-medium text-amber-500 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                    En veille
+                    {t('cron_ticker_idle', 'Idle')}
                   </span>
                 )}
               </h2>
               <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                Orchestrez l'exécution périodique de tâches en arrière-plan, directement via Antigravity
+                {t('cron_subtitle', 'Orchestrate periodic background task execution via Antigravity')}
               </p>
             </div>
           </div>
@@ -326,7 +326,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                 borderColor: 'var(--border)',
                 color: 'var(--muted)'
               }}
-              title="Rafraîchir"
+              title={t('refresh', 'Refresh')}
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} style={{ color: loading ? 'var(--accent)' : undefined }} />
             </button>
@@ -373,21 +373,21 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
           >
             <h3 className="text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
               <Plus className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
-              <span>Programmer une nouvelle tâche</span>
+              <span>{t('cron_new_task_title', 'Schedule a new task')}</span>
             </h3>
 
             <form onSubmit={handleCreate} className="space-y-3.5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text)' }}>
-                    Nom de la tâche *
+                    {t('cron_task_name', 'Task name *')}
                   </label>
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="ex: Vérification des logs et santé système"
+                    placeholder={t('cron_task_name_placeholder', 'e.g. Log check and system health')}
                     className="w-full border rounded-lg px-3 py-2 text-xs placeholder-slate-400 focus:outline-none focus:ring-1"
                     style={{
                       backgroundColor: 'var(--surface)',
@@ -399,7 +399,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
 
                 <div>
                   <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text)' }}>
-                    Fréquence d'exécution
+                    {t('cron_frequency', 'Execution frequency')}
                   </label>
                   <select
                     value={preset}
@@ -418,7 +418,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                   >
                     {SCHEDULE_PRESETS.map((p, idx) => (
                       <option key={idx} value={p.expr} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
-                        {p.label} {p.expr !== 'custom' ? `(${p.expr})` : ''}
+                        {t(p.key, p.label)} {p.expr !== 'custom' ? `(${p.expr})` : ''}
                       </option>
                     ))}
                   </select>
@@ -428,7 +428,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
               {preset === 'custom' && (
                 <div>
                   <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text)' }}>
-                    Expression Cron (Minute Heure Jour Mois JourSemaine)
+                    {t('cron_custom_expr', 'Cron Expression (Minute Hour Day Month Weekday)')}
                   </label>
                   <input
                     type="text"
@@ -448,14 +448,14 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
 
               <div>
                 <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text)' }}>
-                  Prompt d'instructions à exécuter de manière autonome *
+                  {t('cron_prompt_label', 'Instruction or prompt to execute *')}
                 </label>
                 <textarea
                   rows={3}
                   required
                   value={prompt}
                   onChange={e => setPrompt(e.target.value)}
-                  placeholder="ex: Examine les métriques système, vérifie l'absence d'erreurs dans les logs d'aujourd'hui et résume la situation..."
+                  placeholder={t('cron_prompt_placeholder', 'e.g. Check git status and report pending commits...')}
                   className="w-full border rounded-lg p-3 text-xs placeholder-slate-400 focus:outline-none focus:ring-1 font-mono"
                   style={{
                     backgroundColor: 'var(--surface)',
@@ -473,7 +473,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                   style={{ backgroundColor: 'var(--accent)' }}
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>{submitting ? 'Création en cours...' : 'Ajouter la tâche au planificateur'}</span>
+                  <span>{submitting ? t('cron_adding', 'Adding...') : t('cron_add_task', 'Add task to scheduler')}</span>
                 </button>
               </div>
             </form>
@@ -484,7 +484,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                 <Timer className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
-                <span>Tâches planifiées actives ({cronData?.jobs.length || 0})</span>
+                <span>{t('cron_active_tasks', 'Active Scheduled Tasks')} ({cronData?.jobs.length || 0})</span>
               </h3>
             </div>
 
@@ -498,7 +498,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
               >
                 <RefreshCw className="w-5 h-5 animate-spin" style={{ color: 'var(--accent)' }} />
                 <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
-                  Chargement des tâches planifiées...
+                  {t('cron_loading', 'Loading scheduled tasks...')}
                 </p>
               </div>
             ) : cronData.jobs.length === 0 ? (
@@ -510,9 +510,9 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                 }}
               >
                 <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" style={{ color: 'var(--muted)' }} />
-                <p className="text-xs font-medium" style={{ color: 'var(--strong)' }}>Aucune tâche planifiée configurée</p>
+                <p className="text-xs font-medium" style={{ color: 'var(--strong)' }}>{t('cron_no_tasks', 'No scheduled tasks yet.')}</p>
                 <p className="text-[11px] mt-1" style={{ color: 'var(--muted)' }}>
-                  Remplissez le formulaire ci-dessus pour automatiser des tâches régulières.
+                  {t('cron_no_tasks_hint', 'Fill the form above to automate regular tasks.')}
                 </p>
               </div>
             ) : (
@@ -545,10 +545,10 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                             {isScheduled ? (
                               <span className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                Actif
+                                {t('cron_status_active', 'active')}
                               </span>
                             ) : (
-                              <span className="text-[10px] text-amber-500 font-semibold">En pause</span>
+                              <span className="text-[10px] text-amber-500 font-semibold">{t('cron_not_scheduled', 'Paused')}</span>
                             )}
                           </div>
                           <p className="text-[11px] mt-1 line-clamp-2 font-mono" style={{ color: 'var(--muted)' }}>
@@ -565,10 +565,10 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                               borderColor: 'var(--accent)',
                               color: 'var(--accent-text)'
                             }}
-                            title="Lancer en tâche de fond immédiatement"
+                            title={t('cron_run_now_title', 'Run as background task immediately')}
                           >
                             <Play className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-semibold hidden sm:inline">Exécuter</span>
+                            <span className="text-[10px] font-semibold hidden sm:inline">{t('cron_run_now', 'Run now')}</span>
                           </button>
 
                           {onExecutePrompt && (
@@ -580,10 +580,10 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                                 borderColor: 'var(--border)',
                                 color: 'var(--text)'
                               }}
-                              title="Tester le prompt dans le chat actif"
+                              title={t('cron_test_chat_title', 'Test prompt in active chat')}
                             >
                               <MessageSquare className="w-3.5 h-3.5" />
-                              <span className="text-[10px] font-medium hidden md:inline">Tester</span>
+                              <span className="text-[10px] font-medium hidden md:inline">{t('cron_test_chat', 'Test')}</span>
                             </button>
                           )}
 
@@ -595,10 +595,10 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                               borderColor: selectedLogJobId === job.id ? 'var(--accent)' : 'var(--border)',
                               color: selectedLogJobId === job.id ? 'var(--accent)' : 'var(--text)'
                             }}
-                            title="Consulter le journal d'exécution"
+                            title={t('cron_logs_title', 'View execution log')}
                           >
                             <FileText className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-medium hidden md:inline">Logs</span>
+                            <span className="text-[10px] font-medium hidden md:inline">{t('cron_logs', 'Logs')}</span>
                           </button>
 
                           <button
@@ -609,7 +609,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                               borderColor: 'var(--border)',
                               color: 'var(--text)'
                             }}
-                            title={isScheduled ? 'Mettre en pause' : 'Réactiver la tâche'}
+                            title={isScheduled ? t('cron_pause', 'Pause') : t('cron_resume', 'Resume')}
                           >
                             {isScheduled ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                           </button>
@@ -622,7 +622,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                               borderColor: editingJobId === job.id ? 'var(--accent)' : 'var(--border)',
                               color: editingJobId === job.id ? 'var(--accent)' : 'var(--text)'
                             }}
-                            title={editingJobId === job.id ? 'Annuler l\'édition' : 'Modifier la tâche'}
+                            title={editingJobId === job.id ? t('cron_edit_cancel', 'Cancel edit') : t('cron_edit_task', 'Edit task')}
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
@@ -630,7 +630,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                           <button
                             onClick={() => handleDelete(job.id)}
                             className="p-1.5 rounded-lg hover:bg-rose-500/20 text-rose-500 transition-colors cursor-pointer"
-                            title="Supprimer"
+                            title={t('cron_delete', 'Delete')}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -644,15 +644,15 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                           color: 'var(--muted)'
                         }}
                       >
-                        <span>Prochaine exécution : <strong style={{ color: 'var(--strong)' }}>{!isScheduled ? 'En pause' : formatDateTime(job.next_run_at)}</strong></span>
+                        <span>{t('cron_next_run', 'Next run:')} <strong style={{ color: 'var(--strong)' }}>{!isScheduled ? t('cron_not_scheduled', 'Paused') : formatDateTime(job.next_run_at)}</strong></span>
                         {job.last_run_at && (
-                          <span>Dernier passage : <strong style={{ color: 'var(--strong)' }}>{formatDateTime(job.last_run_at)}</strong></span>
+                          <span>{t('cron_last_run', 'Last run:')} <strong style={{ color: 'var(--strong)' }}>{formatDateTime(job.last_run_at)}</strong></span>
                         )}
                         {job.last_status && (
-                          <span className="capitalize">Statut : <strong style={{ color: 'var(--accent)' }}>{job.last_status}</strong></span>
+                          <span className="capitalize">{t('cron_status_label', 'Status:')} <strong style={{ color: 'var(--accent)' }}>{job.last_status}</strong></span>
                         )}
                         {job.last_duration_seconds != null && (
-                          <span>Durée : <strong style={{ color: 'var(--strong)' }}>{job.last_duration_seconds}s</strong></span>
+                          <span>{t('cron_duration', 'Duration:')} <strong style={{ color: 'var(--strong)' }}>{job.last_duration_seconds}s</strong></span>
                         )}
                       </div>
 
@@ -668,17 +668,17 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                         >
                           <div className="flex items-center justify-between pb-2 mb-2 border-b text-[10px] font-sans" style={{ borderColor: 'var(--border-subtle)', color: 'var(--muted)' }}>
                             <span className="font-semibold flex items-center gap-1.5" style={{ color: 'var(--strong)' }}>
-                              <FileText className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} /> Journal de la tâche ({job.name})
+                              <FileText className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} /> {t('cron_log_title', 'Task log ({0})').replace('{0}', job.name)}
                             </span>
                             <button
                               onClick={() => setSelectedLogJobId(null)}
                               className="text-[10px] hover:underline cursor-pointer opacity-70 hover:opacity-100"
                             >
-                              Fermer
+                              {t('close', 'Close')}
                             </button>
                           </div>
                           {loadingLog ? (
-                            <p className="text-muted text-[11px] animate-pulse">Chargement du journal d'exécution...</p>
+                            <p className="text-muted text-[11px] animate-pulse">{t('cron_log_loading', 'Loading execution log...')}</p>
                           ) : (
                             <pre className="whitespace-pre-wrap overflow-x-auto max-h-52 text-[11px] leading-relaxed select-text p-2 rounded-lg bg-black/20" style={{ color: 'var(--text)' }}>
                               {selectedLogContent}
@@ -694,12 +694,12 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                           style={{ borderColor: 'var(--border)' }}
                         >
                           <p className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--accent)' }}>
-                            <Pencil className="w-3 h-3" /> Modifier la tâche
+                            <Pencil className="w-3 h-3" /> {t('cron_edit_label', 'Edit task')}
                           </p>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                             <div>
-                              <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>Nom</label>
+                              <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>{t('cron_name_label', 'Name')}</label>
                               <input
                                 type="text"
                                 value={editName}
@@ -713,7 +713,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                               />
                             </div>
                             <div>
-                              <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>Fréquence</label>
+                              <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>{t('cron_frequency_label', 'Frequency')}</label>
                               <select
                                 value={editPreset}
                                 onChange={e => {
@@ -729,7 +729,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                               >
                                 {SCHEDULE_PRESETS.map((p, idx) => (
                                   <option key={idx} value={p.expr} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
-                                    {p.label} {p.expr !== 'custom' ? `(${p.expr})` : ''}
+                                    {t(p.key, p.label)} {p.expr !== 'custom' ? `(${p.expr})` : ''}
                                   </option>
                                 ))}
                               </select>
@@ -738,7 +738,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
 
                           {editPreset === 'custom' && (
                             <div>
-                              <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>Expression Cron personnalisée</label>
+                              <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>{t('cron_custom_cron_label', 'Custom Cron Expression')}</label>
                               <input
                                 type="text"
                                 value={editCustomExpr}
@@ -755,7 +755,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                           )}
 
                           <div>
-                            <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>Prompt</label>
+                            <label className="block text-[10px] font-medium mb-1" style={{ color: 'var(--text)' }}>{t('cron_prompt_field', 'Prompt')}</label>
                             <textarea
                               rows={3}
                               value={editPrompt}
@@ -779,7 +779,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                                 color: 'var(--text)'
                               }}
                             >
-                              Annuler
+                              {t('cancel', 'Cancel')}
                             </button>
                             <button
                               onClick={() => handleSaveEdit(job.id)}
@@ -788,7 +788,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                               style={{ backgroundColor: 'var(--accent)' }}
                             >
                               <Check className="w-3.5 h-3.5" />
-                              {editSaving ? 'Sauvegarde...' : 'Enregistrer'}
+                              {editSaving ? t('saving', 'Saving...') : t('save', 'Save')}
                             </button>
                           </div>
                         </div>

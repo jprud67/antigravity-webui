@@ -3,16 +3,18 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { 
   X, 
-  FileText, 
+   
   Copy, 
   Check, 
   Download,
   FileCode,
   Sparkles,
-  ChevronLeft
+  ChevronLeft,
+  Layers
 } from 'lucide-react';
 import type { ArtifactItem } from '../types';
 import { fetchArtifacts, fetchArtifactContent, triggerFileDownload } from '../services/api';
+import { useI18n } from '../services/i18n';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
 
@@ -25,28 +27,15 @@ interface ArtifactViewerProps {
 export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
   isOpen,
   onClose,
-  conversationId,
+  conversationId
 }) => {
+  const { t } = useI18n();
   const [artifacts, setArtifacts] = useState<ArtifactItem[]>([]);
   const [selectedArtifact, setSelectedArtifact] = useState<ArtifactItem | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [content, setContent] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [showMobileList, setShowMobileList] = useState(false);
-
-  const selectArtifact = useCallback(async (art: ArtifactItem) => {
-    setSelectedArtifact(art);
-    setLoading(true);
-    try {
-      const text = await fetchArtifactContent(art.conversation_id, art.relative_path || art.filename);
-      setContent(text);
-    } catch (err: any) {
-      setContent(`[Impossible de charger l'artefact : ${err?.message || 'Erreur de lecture'}]`);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  const [copied, setCopied] = useState<boolean>(false);
+  const [showMobileList, setShowMobileList] = useState<boolean>(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -54,23 +43,53 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
     fetchArtifacts(conversationId || undefined).then((items) => {
       if (active) {
         setArtifacts(items);
-        setLoading(false);
         if (items.length > 0) {
-          selectArtifact(items[0]);
+          setSelectedArtifact(items[0]);
         } else {
           setSelectedArtifact(null);
-          setContent('');
         }
       }
     });
     return () => {
       active = false;
     };
-  }, [isOpen, conversationId, selectArtifact]);
+  }, [isOpen, conversationId]);
 
-  const copyContent = async () => {
+
+
+  useEffect(() => {
+    let active = true;
+    if (selectedArtifact) {
+      setLoading(true);
+      fetchArtifactContent(selectedArtifact.conversation_id, selectedArtifact.relative_path || selectedArtifact.filename)
+        .then(res => {
+          if (active) {
+            setContent(typeof res === 'string' ? res : (res as any).content || '');
+            setLoading(false);
+          }
+        })
+        .catch(err => {
+          if (active) {
+            setContent(`[${t('artifact_load_error', 'Unable to load artifact: {0}').replace('{0}', err?.message || t('read_error', 'Read error'))}]`);
+            setLoading(false);
+          }
+        });
+    } else {
+      setContent('');
+    }
+    return () => {
+      active = false;
+    };
+  }, [selectedArtifact, t]);
+
+  const selectArtifact = useCallback((art: ArtifactItem) => {
+    setSelectedArtifact(art);
+    setCopied(false);
+  }, []);
+
+  const copyContent = useCallback(async () => {
     try {
-      if (navigator?.clipboard?.writeText) {
+      if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(content);
       } else {
         const ta = document.createElement('textarea');
@@ -84,23 +103,23 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Ignore copy error
+    } catch (e) {
+      console.error('Failed to copy', e);
     }
-  };
+  }, [content]);
 
-  const downloadContent = () => {
+  const downloadContent = useCallback(() => {
     if (!selectedArtifact) return;
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     triggerFileDownload(blob, selectedArtifact.filename);
-  };
+  }, [content, selectedArtifact]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/75 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-0 sm:p-6 safe-pt safe-pb">
       <div
-        className="w-[900px] max-w-full h-full border-l flex flex-col shadow-2xl"
+        className="w-full sm:w-[90vw] sm:max-w-6xl h-full sm:h-[90vh] sm:rounded-2xl flex flex-col shadow-2xl border"
         style={{
           backgroundColor: 'var(--surface)',
           borderColor: 'var(--border2)',
@@ -109,19 +128,19 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
       >
         {/* Header */}
         <div
-          className="h-14 px-6 border-b flex items-center justify-between shrink-0"
+          className="flex items-center justify-between px-4 sm:px-6 py-3 border-b shrink-0"
           style={{
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)'
           }}
         >
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-emerald-400" />
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl" style={{ backgroundColor: 'var(--accent-bg)', color: 'var(--accent)' }}>
+              <Layers className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xs font-semibold" style={{ color: 'var(--strong)' }}>Documents & Artifacts Générés</h2>
-              <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Plans d'architecture, rapports et code produits par Antigravity</p>
+              <h2 className="text-xs font-semibold" style={{ color: 'var(--strong)' }}>{t('generated_artifacts', 'Generated Documents & Artifacts')}</h2>
+              <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{t('generated_artifacts_desc', 'Architecture plans, reports, and code produced by Antigravity')}</p>
             </div>
           </div>
           <button
@@ -144,14 +163,14 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
             }}
           >
             <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider px-2.5 mb-2" style={{ color: 'var(--muted)' }}>
-              <span>Documents ({artifacts.length})</span>
+              <span>{t('documents', 'Documents')} ({artifacts.length})</span>
               <span className="font-mono px-1.5 py-0.2 rounded border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>{artifacts.length}</span>
             </div>
 
             {artifacts.length === 0 ? (
               <div className="p-6 text-center text-xs space-y-2" style={{ color: 'var(--muted)' }}>
                 <Sparkles className="w-5 h-5 mx-auto" style={{ color: 'var(--muted)' }} />
-                <p>Aucun artifact trouvé dans cette session.</p>
+                <p>{t('no_artifacts', 'No artifacts found.')}</p>
               </div>
             ) : (
               artifacts.map((art) => {
@@ -213,7 +232,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
                       }}
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
-                      <span>Liste</span>
+                      <span>{t('list', 'List')}</span>
                     </button>
 
                     <span className="font-semibold text-emerald-500 truncate max-w-[120px] sm:max-w-none">{selectedArtifact.filename}</span>
@@ -231,7 +250,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
                       }}
                     >
                       {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span className="hidden sm:inline">{copied ? 'Copié !' : 'Copier'}</span>
+                      <span className="hidden sm:inline">{copied ? t('copied', 'Copied!') : t('copy', 'Copy')}</span>
                     </button>
                     <button
                       onClick={downloadContent}
@@ -243,7 +262,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
                       }}
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Télécharger</span>
+                      <span className="hidden sm:inline">{t('download', 'Download')}</span>
                     </button>
                   </div>
                 </div>
@@ -255,7 +274,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
                 >
                   {loading ? (
                     <div className="flex items-center justify-center h-full" style={{ color: 'var(--muted)' }}>
-                      Chargement de l'artifact...
+                      {t('loading_artifact', 'Loading artifact...')}
                     </div>
                   ) : selectedArtifact.filename.endsWith('.md') ? (
                     <div className="markdown-content max-w-none">
@@ -299,7 +318,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center text-xs" style={{ color: 'var(--muted)' }}>
-                Sélectionnez un document pour le visualiser.
+                {t('select_doc_view', 'Select a document to view.')}
               </div>
             )}
           </div>

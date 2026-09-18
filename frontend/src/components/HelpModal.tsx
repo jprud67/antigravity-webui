@@ -54,7 +54,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
                 Antigravity Cockpit &bull; {t('help', 'Aide & Commandes')}
               </h2>
               <p className="text-[11px]" style={{ color: 'var(--muted, #A0A0A0)' }}>
-                Guide des raccourcis, commandes slash et sélecteur de langue
+                {t('help_desc', 'Shortcut guide, slash commands, and language selector')}
               </p>
             </div>
           </div>
@@ -71,7 +71,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
 
         {/* Tab Navigation */}
         <div
-          className="flex items-center gap-2 px-6 py-2.5 border-b text-xs shrink-0"
+          className="flex items-center gap-2 px-6 py-2.5 border-b text-xs shrink-0 flex-wrap"
           style={{
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)'
@@ -90,7 +90,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
             }}
           >
             <Terminal className="w-3.5 h-3.5" />
-            <span>Commandes Slash ({ALL_SLASH_COMMANDS.length})</span>
+            <span>{t('slash_commands', 'Slash Commands')} ({ALL_SLASH_COMMANDS.length})</span>
           </button>
 
           <button
@@ -106,7 +106,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
             }}
           >
             <Command className="w-3.5 h-3.5" />
-            <span>Raccourcis Clavier</span>
+            <span>{t('keyboard_shortcuts', 'Keyboard Shortcuts')}</span>
           </button>
 
           <button
@@ -134,7 +134,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
                 type="text"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                placeholder="Filtrer une commande..."
+                placeholder={t('filter_commands', 'Filter a command...')}
                 className="w-full px-3.5 py-2 text-xs rounded-xl border outline-none transition-colors"
                 style={{
                   backgroundColor: 'var(--surface-subtle)',
@@ -182,7 +182,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
                       </span>
                     </div>
                     <p className="text-[11px] leading-snug" style={{ color: 'var(--muted)' }}>
-                      {item.desc}
+                      {t(item.descKey || '', item.desc)}
                     </p>
                   </button>
                 ))}
@@ -193,12 +193,12 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
           {activeCategory === 'shortcuts' && (
             <div className="space-y-3">
               {[
-                { key: 'Entrée (Enter)', desc: 'Envoyer le message ou valider la commande' },
-                { key: 'Maj + Entrée (Shift+Enter)', desc: 'Insérer un saut de ligne dans le composer' },
-                { key: '/', desc: 'Ouvrir le menu contextuel des 36 commandes slash' },
-                { key: 'Flèches Haut / Bas', desc: 'Naviguer dans les commandes ou rappeler les invites' },
-                { key: 'Tab ou Entrée', desc: 'Compléter automatiquement la commande sélectionnée' },
-                { key: 'Échap (Escape)', desc: 'Fermer les menus, fenêtres modales ou annuler la recherche' }
+                { key: 'Entrée (Enter)', desc: t('shortcut_enter_desc', 'Send message or submit command') },
+                { key: 'Maj + Entrée (Shift+Enter)', desc: t('shortcut_shift_enter_desc', 'Insert line break in composer') },
+                { key: '/', desc: t('shortcut_slash_desc', 'Open context menu of slash commands') },
+                { key: 'Flèches Haut / Bas', desc: t('shortcut_arrows_desc', 'Navigate commands or recall prompts') },
+                { key: 'Tab ou Entrée', desc: t('shortcut_tab_desc', 'Auto-complete selected command') },
+                { key: 'Échap (Escape)', desc: t('shortcut_esc_desc', 'Close menus, modals or cancel search') }
               ].map((s, idx) => (
                 <div
                   key={idx}
@@ -227,7 +227,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
           {activeCategory === 'languages' && (
             <div className="space-y-4">
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                Choisissez votre langue parmi les 15 langues intégrées d'Hermes WebUI :
+                {t('choose_language_desc', 'Choose your language from the built-in languages:')}
               </p>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -272,7 +272,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
           }}
         >
           <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--muted)' }}>
-            <span>Langue active :</span>
+            <span>{t('active_language', 'Active language:')}</span>
             <span className="font-semibold" style={{ color: 'var(--strong)' }}>
               {SUPPORTED_LANGUAGES.find((l) => l.code === lang)?.label || 'Français'}
             </span>
@@ -285,7 +285,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
             className="flex items-center gap-1.5 text-[11px] font-medium transition-colors hover:underline"
             style={{ color: 'var(--accent)' }}
           >
-            <span>Documentation officielle</span>
+            <span>{t('official_docs', 'Official documentation')}</span>
             <ExternalLink className="w-3 h-3" />
           </a>
         </div>

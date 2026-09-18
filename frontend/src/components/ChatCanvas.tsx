@@ -687,6 +687,7 @@ const ToolActivityFeed: React.FC<{
  * Checkpoint Divider in timeline
  */
 const CheckpointDivider: React.FC<{ content: string; stepIndex?: number }> = ({ content, stepIndex }) => {
+
   const [isOpen, setIsOpen] = useState(false);
   return (
     <div className="my-6 max-w-4xl mx-auto w-full flex flex-col items-center">
