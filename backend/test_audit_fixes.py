@@ -4778,7 +4778,8 @@ def test_agy_driver_prompt_passing_threshold():
     """Verify stream_turn uses -p for short prompts and stream-json for prompts >= 100KB."""
     import asyncio
     from unittest.mock import AsyncMock, patch
-    from app.services.agy_driver import stream_turn, STDIN_PROMPT_THRESHOLD
+
+    from app.services.agy_driver import STDIN_PROMPT_THRESHOLD, stream_turn
 
     async def run_test():
         # 1. Short prompt -> uses -p, no stream-json
@@ -4833,6 +4834,7 @@ def test_cron_ticker_run_agy_task_large_prompt():
     """Verify run_agy_task uses -p for normal prompts and stream-json stdin for large prompts."""
     import asyncio
     from unittest.mock import AsyncMock, patch
+
     from app.services.cron_ticker import run_agy_task
 
     async def run_test():
@@ -4878,7 +4880,7 @@ def test_cron_ticker_run_agy_task_large_prompt():
 
 def test_tool_bridge_schema_injection_on_large_prompt():
     """Verify build_prompt injects ENFORCED OUTPUT SCHEMA when prompt exceeds ARG_PROMPT_LIMIT."""
-    from app.services.tool_bridge import build_prompt, ARG_PROMPT_LIMIT
+    from app.services.tool_bridge import ARG_PROMPT_LIMIT, build_prompt
 
     sample_tool = {"type": "function", "function": {"name": "test_fn", "description": "test"}}
     # Under limit

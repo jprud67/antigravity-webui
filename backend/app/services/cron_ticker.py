@@ -137,18 +137,19 @@ async def run_agy_task(
                 "content": [{"type": "text", "text": effective_prompt}],
             },
         }).encode("utf-8")
+        stdin_obj: Any = proc.stdin
         try:
-            res = proc.stdin.write(payload + b"\n")
+            res = stdin_obj.write(payload + b"\n")
             if inspect.isawaitable(res):
                 await res
-            drain = proc.stdin.drain()
+            drain = stdin_obj.drain()
             if inspect.isawaitable(drain):
                 await drain
         except (BrokenPipeError, ConnectionResetError):
             pass
         finally:
             try:
-                res_close = proc.stdin.close()
+                res_close = stdin_obj.close()
                 if inspect.isawaitable(res_close):
                     await res_close
             except Exception:

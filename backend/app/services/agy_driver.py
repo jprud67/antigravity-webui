@@ -410,14 +410,14 @@ async def stream_turn(
                     "content": [{"type": "text", "text": prompt}],
                 },
             }).encode("utf-8")
-            stdin_stream = proc.stdin
+            stdin_obj: Any = proc.stdin
 
             async def _feed_stdin() -> None:
                 try:
-                    res = stdin_stream.write(payload + b"\n")
+                    res = stdin_obj.write(payload + b"\n")
                     if inspect.isawaitable(res):
                         await res
-                    drain = stdin_stream.drain()
+                    drain = stdin_obj.drain()
                     if inspect.isawaitable(drain):
                         await drain
                 except (BrokenPipeError, ConnectionResetError):
