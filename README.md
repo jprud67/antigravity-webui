@@ -6,6 +6,11 @@
 
 ## ✨ Nouveautés
 
+- **🧩 Tool Calling OpenAI sur la passerelle `/v1` :**
+  - Les clients agentiques (**Hermes**, SDK OpenAI avec `tools=[...]`, agents autonomes) reçoivent désormais de vrais **`tool_calls`** : l'agent Antigravity est converti en « modèle sans état » (sortie contrainte par schéma JSON) qui demande les appels d'outils — **sans jamais exécuter ses propres outils** côté serveur.
+  - Boucle complète vérifiée de bout en bout (appel d'outil → exécution côté client → résultat → réponse finale), **streaming SSE** et **bascule automatique de compte Google** incluses.
+  - Guide complet : [`docs/API_EXTERNAL.md`](docs/API_EXTERNAL.md#tool-calling-function-calling).
+
 - **🔄 Bascule automatique de compte Google (quota atteint) :**
   - Détection en **~1 seconde** directement dans les journaux d'`agy` (au lieu d'attendre ses retries internes, qui peuvent durer des dizaines de minutes).
   - Bascule immédiate vers un **compte non épuisé** puis **relance automatique de la tâche** — pour le chat **et** les tâches planifiées.

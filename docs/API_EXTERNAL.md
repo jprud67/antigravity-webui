@@ -11,6 +11,7 @@ Bienvenue dans la documentation de l'API externe d'**Antigravity WebUI**. Cette 
    - [Découverte des Modèles (`GET /v1/models`)](#découverte-des-modèles-get-v1models)
    - [Chat Completions (`POST /v1/chat/completions`)](#chat-completions-post-v1chatcompletions)
    - [Streaming & Raisonnement Thinking](#streaming--raisonnement-thinking)
+   - [Tool Calling (Function Calling)](#tool-calling-function-calling)
 3. [API Native Agent Antigravity (`/api/v1/agent`)](#3-api-native-agent-antigravity-apiv1agent)
    - [Exécution d'un Tour Agent (`POST /api/v1/agent/run`)](#exécution-dun-tour-agent-post-apiv1agentrun)
    - [Interruption & Guidage en Direct (`steer` / `interrupt`)](#interruption--guidage-en-direct)
@@ -100,7 +101,9 @@ Gère à la fois les requêtes synchrones standard et le streaming temps réel (
 | `stream` | boolean | Non | `true` pour activer le Server-Sent Events (défaut : `false`) |
 | `temperature` | float | Non | Température de génération |
 | `max_tokens` | integer | Non | Nombre maximal de tokens de sortie |
-| `workspace_path` | string | Non | *Extension Antigravity* : répertoire de travail racine pour l'agent |
+| `tools` | array | Non | Définitions d'outils OpenAI — active le **tool calling** (voir section dédiée ci-dessous) |
+| `tool_choice` | string / object | Non | `auto` (défaut) · `required` · `none` · `{"type":"function","function":{"name":"..."}}` — nécessite `tools` |
+| `workspace_path` | string | Non | *Extension Antigravity* : répertoire de travail racine pour l'agent (ignoré en mode tool calling) |
 | `effort` | string | Non | *Extension Antigravity* : niveau de réflexion (`low`, `medium`, `high`) |
 | `auto_approve` | boolean | Non | *Extension Antigravity* : exécution autonome sans confirmation d'outil (défaut : `true`) |
 | `conversation_id` | string | Non | *Extension Antigravity* : ID pour continuer une session existante |
@@ -122,6 +125,76 @@ data: {"id":"chatcmpl-a1b2c3","object":"chat.completion.chunk","choices":[{"inde
 
 data: [DONE]
 ```
+
+---
+
+### Tool Calling (Function Calling)
+
+La passerelle `/v1` prend en charge le **protocole function calling d'OpenAI** : les clients agentiques (**Hermes Agent**, SDK OpenAI avec `tools=[...]`, agents autonomes) déclarent leurs propres outils, reçoivent des **`tool_calls`**, les exécutent de leur côté, puis renvoient les résultats pour poursuivre la boucle — jusqu'à la réponse finale en texte.
+
+> [!IMPORTANT]
+> **En mode tool calling, l'agent Antigravity n'exécute jamais ses propres outils.** Il « joue le rôle » d'un modèle sans état : il décide du prochain appel d'outil (ou de la réponse finale) et c'est **votre application** qui exécute réellement les outils. Côté serveur : sortie contrainte par schéma JSON, bac à sable (`--sandbox`), aucune permission d'exécution accordée. La **bascule automatique de compte Google** s'applique aussi en cas de quota.
+
+#### Premier pas — obtenir un `tool_call`
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="agy_sk_votre_cle")
+
+tools = [{
+    "type": "function",
+    "function": {
+        "name": "get_weather",
+        "description": "Get current weather for a city",
+        "parameters": {
+            "type": "object",
+            "properties": {"city": {"type": "string"}},
+            "required": ["city"]
+        }
+    }
+}]
+
+response = client.chat.completions.create(
+    model="gemini-3.8-flash",
+    messages=[{"role": "user", "content": "Quel temps fait-il à Paris ?"}],
+    tools=tools,
+)
+
+choice = response.choices[0]
+# → finish_reason == "tool_calls"
+# → choice.message.tool_calls[0].function.name == "get_weather"
+# → choice.message.tool_calls[0].function.arguments == '{"city": "Paris"}'
+```
+
+#### Deuxième pas — renvoyer le résultat de l'outil
+
+```python
+tool_call = choice.message.tool_calls[0]
+messages = [
+    {"role": "user", "content": "Quel temps fait-il à Paris ?"},
+    choice.message,   # message assistant contenant tool_calls
+    {"role": "tool", "tool_call_id": tool_call.id, "content": '{"temperature_c": 18, "conditions": "sunny"}'},
+]
+
+final = client.chat.completions.create(model="gemini-3.8-flash", messages=messages, tools=tools)
+print(final.choices[0].message.content)  # → « Il fait ensoleillé à Paris avec 18°C. »
+```
+
+#### Comportement & bonnes pratiques
+
+| Aspect | Détail |
+|---|---|
+| Décision | **1 appel d'outil par tour** (séquentiel) ; bouclez jusqu'à `finish_reason: "stop"` |
+| Sans état | Rejouez **tout l'historique** à chaque appel : messages `assistant` avec `tool_calls`, puis messages `role: "tool"` avec `tool_call_id` |
+| `tool_choice` | `auto` (défaut) · `required` (force un appel d'outil) · `none` (désactive le tool calling → chat texte) · `{"type":"function","function":{"name":"..."}}` |
+| Streaming | Supporté : `tool_calls` émis en chunks SSE (`delta.tool_calls`), `finish_reason: "tool_calls"` |
+| Quota | Bascule automatique de compte Google intégrée (comme le chat classique) ; erreur 429 seulement si tous les comptes sont épuisés |
+| Coût / latence | Chaque appel = un tour complet d'`agy` (~15–60 k tokens, quelques dizaines de secondes). `effort: "low"` accélère la décision — ajustable par client (ex. `extra_body` chez Hermes) |
+| Garde-fou | Pour les très longs historiques, la partie médiane peut être tronquée côté serveur pour rester sous la limite système de ligne de commande |
+
+> [!TIP]
+> **Hermes Agent** — configuration en *custom provider* : `base_url: http://<hôte>:8000/v1`, `api_key: agy_sk_...`, `model: gemini-3.8-flash`. La boucle d'outils complète (terminal, fichiers, etc.) fonctionne de bout en bout — vérifié en conditions réelles.
 
 ---
 
