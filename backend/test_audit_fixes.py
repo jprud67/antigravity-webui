@@ -4165,6 +4165,7 @@ def test_rules_validate_workspace_path_resilience():
 
 def test_fs_watcher_safe_conversation_ids():
     from pathlib import Path
+
     from app.services.fs_watcher import extract_conv_id, extract_conv_id_from_artifact
 
     p_uuid = Path("/root/.gemini/antigravity-cli/brain/12345678-1234-1234-1234-123456789abc/.system_generated/logs/transcript.jsonl")
@@ -4181,8 +4182,10 @@ def test_fs_watcher_safe_conversation_ids():
 
 def test_agent_api_input_endpoint():
     import asyncio
+
     import pytest
     from fastapi import HTTPException
+
     from app.api.agent_api import AgentInputRequest, send_agent_input
 
     req_invalid = AgentInputRequest(conversation_id="../traversal", text="hello")
@@ -4199,6 +4202,7 @@ def test_agent_api_input_endpoint():
 
 def test_auth_secret_key_empty_fallback():
     from unittest.mock import patch
+
     from app.services.auth import create_access_token, verify_access_token
 
     with patch("app.services.auth.get_auth_config", return_value={"enabled": True, "secret_key": ""}):
@@ -4270,7 +4274,8 @@ def test_storage_read_artifact_and_import_preview():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
-    from app.services.storage import read_artifact_content, _import_single_conversation
+
+    from app.services.storage import _import_single_conversation, read_artifact_content
 
     with tempfile.TemporaryDirectory() as td:
         brain = Path(td)
@@ -4323,6 +4328,25 @@ def test_agy_driver_unversioned_gemini_models():
     m3, _ = resolve_model_and_effort("gemini-pro", "high")
     assert m3 == "gemini-3.1-pro-high"
     print("✓ test_agy_driver_unversioned_gemini_models passed")
+
+
+def test_tasks_list_active_tasks_safe_mtime():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.api.tasks import list_active_tasks
+
+    with tempfile.TemporaryDirectory() as td:
+        fake_brain = Path(td)
+        (fake_brain / "conv1").mkdir()
+        (fake_brain / "conv2").mkdir()
+        with patch("app.api.tasks.BRAIN_DIR", fake_brain):
+            res = list_active_tasks(conversation_id=None)
+            assert "tasks" in res
+            assert "subagents" in res
+            assert "processes" in res
+    print("✓ test_tasks_list_active_tasks_safe_mtime passed")
 
 
 if __name__ == "__main__":
@@ -4493,5 +4517,6 @@ if __name__ == "__main__":
     test_tasks_directory_sorting_resilience()
     test_storage_read_artifact_and_import_preview()
     test_agy_driver_unversioned_gemini_models()
+    test_tasks_list_active_tasks_safe_mtime()
     print("\nAll unit tests passed successfully!")
 
