@@ -134,6 +134,32 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None) -> None:
             if close_after:
                 conn.close()
 
+_ALLOWED_CONVERSATION_SUMMARY_COLUMNS: frozenset[str] = frozenset({
+    "conversation_id",
+    "title",
+    "preview",
+    "step_count",
+    "last_modified_time",
+    "workspace_uris",
+    "workspace_path",
+    "status",
+    "source",
+    "project_id",
+    "agent_name",
+    "parent_conversation_id",
+    "nesting_depth",
+    "battle_id",
+    "winning_conversation_id",
+    "not_fully_idle",
+    "killed",
+    "last_user_input_time",
+    "last_user_input_step_index",
+    "app_data_dir",
+    "raw_summary",
+    "group_id",
+})
+
+
 def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     """Construit le dict conversation à partir d'une ligne SQLite et des métadonnées session."""
     cid = r["conversation_id"]
@@ -592,8 +618,8 @@ def _safe_copy_artifacts(source_dir: Path, target_dir: Path) -> None:
             if target is not None and target.exists() and item.is_file():
                 try:
                     target.unlink(missing_ok=True)
-                except Exception:
-                    pass
+                except OSError as unl_err:
+                    logger.debug(f"Failed to remove incomplete artifact copy {target}: {unl_err}")
 
 
 def fork_conversation(
@@ -727,9 +753,13 @@ def fork_conversation(
             fields.append("group_id")
             values.append(source_group_id)
 
+        for col in fields:
+            if col not in _ALLOWED_CONVERSATION_SUMMARY_COLUMNS:
+                raise ValueError(f"Invalid column name: {col}")
+
         placeholders = ", ".join(["?"] * len(fields))
         field_str = ", ".join(fields)
-        cursor.execute(f"INSERT INTO conversation_summaries ({field_str}) VALUES ({placeholders})", tuple(values))
+        cursor.execute(f"INSERT INTO conversation_summaries ({field_str}) VALUES ({placeholders})", tuple(values))  # nosec B608
         conn.commit()
     except Exception:
         conn.rollback()
@@ -919,9 +949,13 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
             fields.append("group_id")
             values.append(source_group_id)
 
+        for col in fields:
+            if col not in _ALLOWED_CONVERSATION_SUMMARY_COLUMNS:
+                raise ValueError(f"Invalid column name: {col}")
+
         placeholders = ", ".join(["?"] * len(fields))
         field_str = ", ".join(fields)
-        cursor.execute(f"INSERT INTO conversation_summaries ({field_str}) VALUES ({placeholders})", tuple(values))
+        cursor.execute(f"INSERT INTO conversation_summaries ({field_str}) VALUES ({placeholders})", tuple(values))  # nosec B608
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1011,6 +1045,9 @@ def delete_conversation(conversation_id: str) -> bool:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM conversation_summaries WHERE conversation_id = ?", (conversation_id,))
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -1033,6 +1070,9 @@ def update_conversation_title(conversation_id: str, new_title: str) -> bool:
         cursor = conn.cursor()
         cursor.execute("UPDATE conversation_summaries SET title = ? WHERE conversation_id = ?", (clean_title, conversation_id))
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
     return True
@@ -1148,6 +1188,9 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
             (len(remaining_steps), new_preview, now_str, new_last_user_idx, effective_user_time, conversation_id)
         )
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 

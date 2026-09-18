@@ -313,7 +313,7 @@ def _spawn_login_process(env):
         close_fds=True,
         env=env,
         cwd=str(HOME)
-    )
+    )  # nosec B603
     os.close(slave_fd)
     return proc, master_fd, None
 

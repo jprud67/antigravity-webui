@@ -70,8 +70,8 @@ def cancel_running_job(job_id: str) -> bool:
         try:
             terminate_process_group_sync(proc, force=True)
             canceled = True
-        except Exception:
-            pass
+        except OSError as term_err:
+            logger.debug(f"[Cron] Error terminating process group for job {job_id}: {term_err}")
     return canceled
 
 
@@ -356,8 +356,8 @@ def prune_job_logs(job_id: str, keep_latest: int = 20) -> None:
         for old_log in logs[keep_latest:]:
             try:
                 old_log.unlink(missing_ok=True)
-            except Exception:
-                pass
+            except OSError as unl_err:
+                logger.debug(f"[Cron] Error pruning old log {old_log}: {unl_err}")
     except Exception as e:
         logger.debug(f"[Cron] Error pruning logs for job {job_id}: {e}")
 

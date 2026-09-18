@@ -40,6 +40,7 @@ REPO_DIR = Path(__file__).resolve().parent.parent.parent.parent
 CACHE_FILE = GEMINI_DIR / ".update_check"
 MARKER_FILE = GEMINI_DIR / ".update_incomplete"
 CURRENT_VERSION = "0.2.1"
+GIT_BIN: str = shutil.which("git") or "git"
 
 # Principe Hermes : cache de 6 h + rafraîchissement périodique de 6 h
 CACHE_DURATION_SECONDS = 6 * 3600
@@ -67,14 +68,14 @@ def _git_cmd(args: list[str], timeout: int = 10, cwd: Path | None = None) -> str
     }
     try:
         res = subprocess.run(
-            ["git", *args],
+            [GIT_BIN, *args],
             cwd=str(target_cwd),
             capture_output=True,
             text=True,
             timeout=timeout,
             check=False,
             env=env
-        )
+        )  # nosec B603, B607
         if res.returncode == 0:
             return (res.stdout or "").strip()
         logger.debug(f"git {' '.join(args)} returned {res.returncode}: {res.stderr}")
@@ -261,14 +262,14 @@ def check_for_updates(force: bool = False) -> dict[str, Any]:
             **_DEFAULT_GIT_ENV,
         }
         fetch_res = subprocess.run(
-            ["git", "fetch", "origin", "main", "--quiet"],
+            [GIT_BIN, "fetch", "origin", "main", "--quiet"],
             cwd=str(REPO_DIR),
             capture_output=True,
             text=True,
             timeout=15,
             check=False,
             env=fetch_env
-        )
+        )  # nosec B603, B607
 
         if fetch_res.returncode != 0:
             logger.warning(f"git fetch origin main failed: {fetch_res.stderr}")
@@ -362,19 +363,19 @@ async def apply_update() -> dict[str, Any]:
         **_DEFAULT_GIT_ENV,
     }
     pull_proc = await asyncio.create_subprocess_exec(
-        "git", "pull", "--ff-only", "origin", "main",
+        GIT_BIN, "pull", "--ff-only", "origin", "main",
         cwd=str(REPO_DIR),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=git_env
-    )
+    )  # nosec B603, B607
     try:
         stdout, stderr = await asyncio.wait_for(pull_proc.communicate(), timeout=45.0)
     except asyncio.TimeoutError:
         try:
             pull_proc.kill()
-        except Exception:
-            pass
+        except OSError as e:
+            logger.debug(f"Failed to kill timed out pull process: {e}")
         _clear_update_marker()
         logger.error("git pull --ff-only timed out after 45s.")
         return {
@@ -388,19 +389,19 @@ async def apply_update() -> dict[str, Any]:
         if "diverging" in err_msg.lower() or "not possible to fast-forward" in err_msg.lower():
             logger.info("Divergence détectée, tentative de git pull --rebase origin main...")
             rebase_proc = await asyncio.create_subprocess_exec(
-                "git", "pull", "--rebase", "origin", "main",
+                GIT_BIN, "pull", "--rebase", "origin", "main",
                 cwd=str(REPO_DIR),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=git_env
-            )
+            )  # nosec B603, B607
             try:
                 r_out, r_err = await asyncio.wait_for(rebase_proc.communicate(), timeout=45.0)
             except asyncio.TimeoutError:
                 try:
                     rebase_proc.kill()
-                except Exception:
-                    pass
+                except OSError as e:
+                    logger.debug(f"Failed to kill timed out rebase process: {e}")
                 _git_cmd(["rebase", "--abort"])
                 _clear_update_marker()
                 logger.error("git pull --rebase timed out after 45s.")
@@ -467,19 +468,19 @@ async def apply_update() -> dict[str, Any]:
         try:
             rollback = await asyncio.to_thread(
                 subprocess.run,
-                ["git", "reset", "--keep", prev_sha],
+                [GIT_BIN, "reset", "--keep", prev_sha],
                 cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20, check=False,
                 env=git_env
-            )
+            )  # nosec B603, B607
             rolled = rollback.returncode == 0
             if not rolled:
                 logger.error(f"Rollback --keep impossible ({rollback.stderr.strip()}), tentative --hard...")
                 hard = await asyncio.to_thread(
                     subprocess.run,
-                    ["git", "reset", "--hard", prev_sha],
+                    [GIT_BIN, "reset", "--hard", prev_sha],
                     cwd=str(REPO_DIR), capture_output=True, text=True, timeout=20, check=False,
                     env=git_env
-                )
+                )  # nosec B603, B607
                 rolled = hard.returncode == 0
         except Exception as rb_err:
             logger.error(f"Exception during rollback: {rb_err}")
@@ -493,7 +494,8 @@ async def apply_update() -> dict[str, Any]:
                     env=os.environ.copy()
                 )
                 hint = "frontend restauré" if rb.returncode == 0 else "relancez un build manuellement"
-            except Exception:
+            except Exception as rb_build_err:
+                logger.debug(f"Rollback frontend build exception: {rb_build_err}")
                 hint = "relancez un build manuellement"
             _clear_update_marker()
             return {

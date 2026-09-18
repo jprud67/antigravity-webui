@@ -1129,7 +1129,7 @@ const LISTENERS = new Set<(lang: string) => void>();
 function detectInitialLocale(): string {
   try {
     const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('hermes-lang');
-    if (saved && (LOCALES[saved] || UI_TRANSLATIONS.new_conversation[saved])) return saved;
+    if (saved && SUPPORTED_LANGUAGES.some((l) => l.code === saved)) return saved;
 
     const nav = navigator.language || '';
     for (const opt of SUPPORTED_LANGUAGES) {
