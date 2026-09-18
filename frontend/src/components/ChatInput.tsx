@@ -764,7 +764,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
       case '/reasoning':
         if (args && ['low', 'medium', 'high'].includes(args.toLowerCase())) {
           onSelectEffort(args.toLowerCase() as any);
-          showToast(`Effort de réflexion réglé sur : ${args}`, 'success');
+          showToast(t('toast_reasoning_effort_set', 'Reasoning effort set to: {0}').replace('{0}', args), 'success');
         } else {
           showToast(`Effort actuel : ${selectedEffort}. Choix: low, medium, high`, 'info');
         }

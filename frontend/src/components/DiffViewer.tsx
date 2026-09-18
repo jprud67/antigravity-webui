@@ -140,7 +140,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             }}
           >
             {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-            <span>{copied ? t('copied', 'Copié') : t('copy', 'Copier')}</span>
+            <span>{copied ? t('copied', 'Copied') : t('copy', 'Copy')}</span>
           </button>
           <button
             onClick={() => setCollapsed(!collapsed)}

@@ -176,7 +176,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (typeof window !== 'undefined') {
       localStorage.setItem('antigravity_send_key', mode);
     }
-    showToast(`Raccourci d'envoi réglé sur : ${mode === 'ctrlEnter' ? 'Ctrl/Cmd+Entrée' : 'Entrée'}`, 'info');
+    showToast(t('toast_send_shortcut_set', 'Send shortcut set to: {0}').replace('{0}', mode === 'ctrlEnter' ? 'Ctrl/Cmd+Enter' : 'Enter'), 'info');
   };
 
   const prevConvIdRef = useRef(activeConversation?.conversation_id);
@@ -213,9 +213,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (onConversationUpdated) {
         onConversationUpdated();
       }
-      showToast('Métadonnées de la session enregistrées.', 'success');
+      showToast(t('toast_session_meta_saved', 'Session metadata saved.'), 'success');
     } catch (e: any) {
-      showToast(`Erreur enregistrement : ${e.message}`, 'error');
+      showToast(t('err_save_session_meta', 'Error saving metadata: {0}').replace('{0}', e.message), 'error');
     } finally {
       setConvSaving(false);
     }
@@ -235,9 +235,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         const blob = await exportConversationJSON(activeConversation.conversation_id);
         triggerFileDownload(blob, `session_${activeConversation.conversation_id.slice(0, 8)}.json`);
       }
-      showToast(`Export ${format.toUpperCase()} téléchargé`, 'success');
+      showToast(t('toast_export_downloaded', 'Export {0} downloaded').replace('{0}', format.toUpperCase()), 'success');
     } catch (e: any) {
-      showToast(`Erreur export : ${e.message}`, 'error');
+      showToast(t('err_export', 'Error exporting: {0}').replace('{0}', e.message), 'error');
     } finally {
       setConvExporting(false);
     }

@@ -2625,7 +2625,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "it": {
     "offline_title": "Connessione persa",
@@ -5240,7 +5247,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "ja": {
     "offline_title": "接続が切断されました",
@@ -7860,7 +7874,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "ru": {
     "offline_title": "Соединение потеряно",
@@ -10480,7 +10501,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "es": {
     "offline_title": "Conexión perdida",
@@ -13056,7 +13084,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "de": {
     "offline_title": "Verbindung verloren",
@@ -15620,7 +15655,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "zh": {
     "offline_title": "连接已断开",
@@ -18184,7 +18226,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "zh-Hant": {
     "offline_title": "連線中斷",
@@ -20804,7 +20853,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "pt": {
     "offline_title": "Conexão perdida",
@@ -23250,7 +23306,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "ko": {
     "offline_title": "연결이 끊겼습니다",
@@ -25870,7 +25933,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "fr": {
     "offline_title": "Connexion perdue",
@@ -28490,7 +28560,14 @@
     "key_shift_enter": "Maj + Entrée (Shift+Enter)",
     "key_arrows": "Flèches Haut / Bas",
     "key_tab_enter": "Tab ou Entrée",
-    "key_escape": "Échap (Escape)"
+    "key_escape": "Échap (Escape)",
+    "assign_project": "Assigner un projet",
+    "toast_send_shortcut_set": "Raccourci d'envoi réglé sur : {0}",
+    "toast_session_meta_saved": "Métadonnées de la session enregistrées.",
+    "err_save_session_meta": "Erreur enregistrement : {0}",
+    "toast_export_downloaded": "Export {0} téléchargé",
+    "err_export": "Erreur export : {0}",
+    "toast_reasoning_effort_set": "Effort de réflexion réglé sur : {0}"
   },
   "cs": {
     "_label": "Čeština",
@@ -31110,7 +31187,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "tr": {
     "offline_title": "Bağlantı kesildi",
@@ -33730,7 +33814,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "pl": {
     "offline_title": "Połączenie utracone",
@@ -36350,7 +36441,14 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   },
   "vi": {
     "offline_title": "Mất kết nối",
@@ -38970,6 +39068,13 @@
     "key_shift_enter": "Shift + Enter",
     "key_arrows": "Up / Down Arrows",
     "key_tab_enter": "Tab or Enter",
-    "key_escape": "Escape (Esc)"
+    "key_escape": "Escape (Esc)",
+    "assign_project": "Assign project",
+    "toast_send_shortcut_set": "Send shortcut set to: {0}",
+    "toast_session_meta_saved": "Session metadata saved.",
+    "err_save_session_meta": "Error saving metadata: {0}",
+    "toast_export_downloaded": "Export {0} downloaded",
+    "err_export": "Error exporting: {0}",
+    "toast_reasoning_effort_set": "Reasoning effort set to: {0}"
   }
 }

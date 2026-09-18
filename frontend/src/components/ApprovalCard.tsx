@@ -44,10 +44,10 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
         <div className="flex items-center gap-2">
           {isAllowed ? <Check className="w-4 h-4 text-emerald-400" /> : <X className="w-4 h-4 text-rose-400" />}
           <span className="font-medium">
-            {decision === 'allow-once' && t('approval_allowed_once', 'Action autorisée une seule fois.')}
-            {decision === 'allow-session' && t('approval_allowed_session', 'Action autorisée pour toute la session.')}
-            {decision === 'always-allow' && t('approval_allowed_always', 'Action autorisée de manière permanente (règle enregistrée).')}
-            {decision === 'deny' && t('approval_denied', 'Action refusée par l’utilisateur.')}
+            {decision === 'allow-once' && t('approval_allowed_once', 'Action authorized once.')}
+            {decision === 'allow-session' && t('approval_allowed_session', 'Action authorized for the whole session.')}
+            {decision === 'always-allow' && t('approval_allowed_always', 'Action permanently authorized (rule saved).')}
+            {decision === 'deny' && t('approval_denied', 'Action denied by user.')}
           </span>
         </div>
         <span className="text-[10px] font-mono opacity-70 uppercase tracking-wider">{decision}</span>
@@ -72,7 +72,7 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-amber-500">
-              <span>{t('approval_security_required', 'Confirmation de Sécurité Requise')}</span>
+              <span>{t('approval_security_required', 'Security Confirmation Required')}</span>
             </h4>
             <span
               className="text-[10px] font-mono px-2 py-0.5 rounded-full border"

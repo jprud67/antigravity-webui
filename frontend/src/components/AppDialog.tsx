@@ -68,7 +68,7 @@ export const ConfirmDialogContainer: React.FC = () => {
             onClick={() => handleResolve(false)}
             className="p-1 rounded-lg hover:bg-white/10 transition-colors"
             style={{ color: 'var(--muted)' }}
-            aria-label="Fermer"
+            aria-label="Close"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -92,7 +92,7 @@ export const ConfirmDialogContainer: React.FC = () => {
               color: 'var(--text)',
             }}
           >
-            {current.cancelLabel || 'Annuler'}
+            {current.cancelLabel || 'Cancel'}
           </button>
           <button
             onClick={() => handleResolve(true)}

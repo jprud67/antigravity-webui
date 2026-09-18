@@ -1303,7 +1303,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 borderColor: isRightPanelOpen ? 'var(--accent)' : 'var(--border)',
                 color: isRightPanelOpen ? 'var(--accent-text)' : 'var(--muted)'
               }}
-              title={isRightPanelOpen ? 'Fermer le volet latéral' : 'Ouvrir le volet latéral'}
+              title={isRightPanelOpen ? t('close_side_panel', 'Close side panel') : t('open_side_panel', 'Open side panel')}
             >
               <PanelRight className="w-4 h-4" />
             </button>

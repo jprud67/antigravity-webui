@@ -555,7 +555,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                   borderColor: 'var(--border)',
                   color: 'var(--muted)',
                 }}
-                title="Fermer le menu"
+                title={t("close_menu", "Close menu")}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -813,7 +813,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 backgroundColor: 'var(--surface)',
                 color: 'var(--text)',
               }}
-              title="Assigner un projet"
+              title={t("assign_project", "Assign project")}
             >
               <Folder className="w-3 h-3 text-indigo-500" />
               <span className="hidden sm:inline">{t("project", "Project")}</span>
