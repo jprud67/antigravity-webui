@@ -207,7 +207,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
       }
       return current;
     });
-  }, [showToast]);
+  }, [showToast, t]);
 
   const handleRemoveAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));

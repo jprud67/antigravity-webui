@@ -69,7 +69,15 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
   }, [t]);
 
   useEffect(() => {
-    void loadTasks();
+    let active = true;
+    queueMicrotask(() => {
+      if (active) {
+        void loadTasks();
+      }
+    });
+    return () => {
+      active = false;
+    };
   }, [loadTasks, currentWorkspace]);
 
   const openCreateModal = () => {

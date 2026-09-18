@@ -3743,6 +3743,7 @@ def test_updater_git_env_strict_author():
 
 def test_execution_manager_live_tool_calls_bounding():
     import asyncio
+
     from app.services.execution_manager import ExecutionSession
 
     session = ExecutionSession("test-bounding-cid")
@@ -3785,6 +3786,7 @@ def test_safe_copy_artifacts_handles_exception_without_unbound_error():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
+
     from app.services.storage import _safe_copy_artifacts
 
     with tempfile.TemporaryDirectory() as td:

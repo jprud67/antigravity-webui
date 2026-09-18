@@ -393,7 +393,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } finally {
       setLoadingApiKeys(false);
     }
-  }, []);
+  }, [t]);
 
   const handleCreateApiKey = async () => {
     if (!newKeyName.trim()) {

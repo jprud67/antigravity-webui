@@ -91,7 +91,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentWorkspace, handleSelectFile]);
+  }, [currentWorkspace, handleSelectFile, t]);
 
   useEffect(() => {
     let active = true;
@@ -125,7 +125,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     return () => {
       active = false;
     };
-  }, [currentWorkspace, handleSelectFile]);
+  }, [currentWorkspace, handleSelectFile, t]);
 
   const handleCommit = async (e: React.FormEvent) => {
     e.preventDefault();

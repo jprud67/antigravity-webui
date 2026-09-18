@@ -60,7 +60,9 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
   useEffect(() => {
     let active = true;
     if (selectedArtifact) {
-      setLoading(true);
+      queueMicrotask(() => {
+        if (active) setLoading(true);
+      });
       fetchArtifactContent(selectedArtifact.conversation_id, selectedArtifact.relative_path || selectedArtifact.filename)
         .then(res => {
           if (active) {
@@ -75,7 +77,9 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
           }
         });
     } else {
-      setContent('');
+      queueMicrotask(() => {
+        if (active) setContent('');
+      });
     }
     return () => {
       active = false;

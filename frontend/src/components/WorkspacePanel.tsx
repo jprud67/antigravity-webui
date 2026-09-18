@@ -119,7 +119,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       });
     }
     return true;
-  }, [isEditingFile, editedFileContent, fileContent]);
+  }, [isEditingFile, editedFileContent, fileContent, t]);
 
   const handleClose = useCallback(async () => {
     if (await checkUnsavedChanges()) {
@@ -173,7 +173,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } finally {
       setLoadingContent(false);
     }
-  }, [checkUnsavedChanges, isBinaryFile]);
+  }, [checkUnsavedChanges, isBinaryFile, t]);
 
   const handleDownloadCurrentFile = useCallback(async () => {
     if (!selectedFilePath) return;
@@ -191,7 +191,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } catch {
       showToast(t('error_downloading_file', 'Error downloading file.'), 'error');
     }
-  }, [selectedFilePath]);
+  }, [selectedFilePath, t]);
 
   const handleSaveFile = useCallback(async () => {
     if (!selectedFilePath) return;
@@ -206,7 +206,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } finally {
       setSavingFile(false);
     }
-  }, [selectedFilePath, editedFileContent]);
+  }, [selectedFilePath, editedFileContent, t]);
 
   const handleSelectArtifact = useCallback(async (art: ArtifactItem) => {
     setSelectedArtifact(art);
@@ -216,7 +216,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } catch {
       setArtifactMarkdown(t('error_loading_file', 'Unable to load artifact content.'));
     }
-  }, []);
+  }, [t]);
 
   // Load file tree when files tab is active
   const loadTree = useCallback(async () => {

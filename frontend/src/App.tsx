@@ -117,8 +117,25 @@ export function App() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [currentWorkspace, setCurrentWorkspace] = useState('/root');
+  const [currentWorkspace, setCurrentWorkspace] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('antigravity_workspace');
+      if (saved && saved.trim()) return saved.trim();
+    } catch {
+      // localStorage may fail in restricted sandboxes
+    }
+    return '/root';
+  });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  const handleSelectWorkspace = useCallback((ws: string) => {
+    setCurrentWorkspace(ws);
+    try {
+      localStorage.setItem('antigravity_workspace', ws);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const activeConv = useMemo(
     () => conversations.find((c) => c.conversation_id === activeConversationId),
@@ -325,7 +342,14 @@ export function App() {
         setSelectedEffort((mods[0].default_effort as any) || 'high');
       }
 
-      if (settings.trustedWorkspaces && settings.trustedWorkspaces.length > 0) {
+      const savedWorkspace = (() => {
+        try {
+          return localStorage.getItem('antigravity_workspace');
+        } catch {
+          return null;
+        }
+      })();
+      if (!savedWorkspace && settings.trustedWorkspaces && settings.trustedWorkspaces.length > 0) {
         setCurrentWorkspace(settings.trustedWorkspaces[0]);
       }
 
@@ -1674,7 +1698,7 @@ export function App() {
         isOpen={isWorkspacesOpen}
         onClose={() => setIsWorkspacesOpen(false)}
         currentWorkspace={currentWorkspace}
-        onSelectWorkspace={(ws) => setCurrentWorkspace(ws)}
+        onSelectWorkspace={handleSelectWorkspace}
       />
 
       <SessionMetaModal
