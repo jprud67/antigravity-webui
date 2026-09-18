@@ -1172,19 +1172,40 @@ export function getCurrentLanguage(): string {
  * 3. Falls back to default string (if provided) or English, then key itself.
  */
 export function t(key: string, defaultValOrArg?: string | number, ...args: (string | number)[]): string {
-  const allArgs = defaultValOrArg !== undefined ? [defaultValOrArg, ...args] : [];
+  let fallbackTemplate: string | undefined = undefined;
+  let substArgs: (string | number)[] = [];
+
+  if (args.length > 0) {
+    if (typeof defaultValOrArg === 'string') {
+      fallbackTemplate = defaultValOrArg;
+      substArgs = args;
+    } else if (defaultValOrArg !== undefined) {
+      substArgs = [defaultValOrArg, ...args];
+    }
+  } else if (defaultValOrArg !== undefined) {
+    if (typeof defaultValOrArg === 'number') {
+      substArgs = [defaultValOrArg];
+    } else if (typeof defaultValOrArg === 'string') {
+      fallbackTemplate = defaultValOrArg;
+    }
+  }
 
   // 1. Direct UI translation
   if (UI_TRANSLATIONS[key]) {
     const directVal = UI_TRANSLATIONS[key][currentLanguage] ?? UI_TRANSLATIONS[key]['en'];
-    if (directVal) {
-      if (allArgs.length > 0 && /\{\d+\}/.test(directVal)) {
-        return String(directVal).replace(/\{(\d+)\}/g, (match, idx) => {
+    if (directVal !== undefined && directVal !== null) {
+      const valStr = String(directVal);
+      let activeArgs = substArgs;
+      if (activeArgs.length === 0 && fallbackTemplate !== undefined && !/\{\d+\}/.test(fallbackTemplate) && /\{\d+\}/.test(valStr)) {
+        activeArgs = [fallbackTemplate];
+      }
+      if (activeArgs.length > 0 && /\{\d+\}/.test(valStr)) {
+        return valStr.replace(/\{(\d+)\}/g, (match, idx) => {
           const i = parseInt(idx, 10);
-          return i < allArgs.length ? String(allArgs[i]) : match;
+          return i < activeArgs.length ? String(activeArgs[i]) : match;
         });
       }
-      return directVal;
+      return valStr;
     }
   }
 
@@ -1194,24 +1215,29 @@ export function t(key: string, defaultValOrArg?: string | number, ...args: (stri
   const val = dict[key] ?? enDict[key];
 
   if (val !== undefined && val !== null) {
-    if (allArgs.length > 0 && /\{\d+\}/.test(val)) {
-      return String(val).replace(/\{(\d+)\}/g, (match, idx) => {
+    const valStr = String(val);
+    let activeArgs = substArgs;
+    if (activeArgs.length === 0 && fallbackTemplate !== undefined && !/\{\d+\}/.test(fallbackTemplate) && /\{\d+\}/.test(valStr)) {
+      activeArgs = [fallbackTemplate];
+    }
+    if (activeArgs.length > 0 && /\{\d+\}/.test(valStr)) {
+      return valStr.replace(/\{(\d+)\}/g, (match, idx) => {
         const i = parseInt(idx, 10);
-        return i < allArgs.length ? String(allArgs[i]) : match;
+        return i < activeArgs.length ? String(activeArgs[i]) : match;
       });
     }
-    return String(val);
+    return valStr;
   }
 
   // 3. Fallback: if caller provided a fallback text string (e.g. t('some_key', 'Fallback text'))
-  if (typeof defaultValOrArg === 'string' && defaultValOrArg.trim().length > 0) {
-    if (args.length > 0 && /\{\d+\}/.test(defaultValOrArg)) {
-      return defaultValOrArg.replace(/\{(\d+)\}/g, (match, idx) => {
+  if (fallbackTemplate !== undefined && fallbackTemplate.trim().length > 0) {
+    if (substArgs.length > 0 && /\{\d+\}/.test(fallbackTemplate)) {
+      return fallbackTemplate.replace(/\{(\d+)\}/g, (match, idx) => {
         const i = parseInt(idx, 10);
-        return i < args.length ? String(args[i]) : match;
+        return i < substArgs.length ? String(substArgs[i]) : match;
       });
     }
-    return defaultValOrArg;
+    return fallbackTemplate;
   }
 
   return key;

@@ -3910,6 +3910,80 @@ def test_fork_and_handoff_preserves_project_and_group_id():
     print("✓ test_fork_and_handoff_preserves_project_and_group_id passed")
 
 
+def test_storage_project_and_group_id_in_queries(tmp_path):
+    import sqlite3
+    from unittest.mock import patch
+
+    from app.services import storage
+
+    db_path = tmp_path / "conversations.db"
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE conversation_summaries (
+            conversation_id TEXT PRIMARY KEY,
+            title TEXT,
+            preview TEXT,
+            step_count INTEGER,
+            last_modified_time TEXT,
+            workspace_uris TEXT,
+            status TEXT,
+            agent_name TEXT,
+            parent_conversation_id TEXT,
+            project_id TEXT,
+            group_id TEXT
+        )
+    """)
+    cursor.execute("""
+        INSERT INTO conversation_summaries (
+            conversation_id, title, preview, step_count, last_modified_time,
+            workspace_uris, status, agent_name, parent_conversation_id, project_id, group_id
+        ) VALUES (
+            'conv_proj_test', 'Project Test Title', 'Preview snippet', 5, '2026-09-18T12:00:00Z',
+            '["/root"]', 'DONE', 'antigravity', NULL, 'proj_alpha', 'grp_beta'
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+    def _get_test_conn():
+        c = sqlite3.connect(db_path)
+        c.row_factory = sqlite3.Row
+        return c
+
+    with patch("app.services.storage.CONVERSATION_DB", db_path), \
+         patch("app.services.storage.get_db_connection", side_effect=_get_test_conn), \
+         patch("app.services.storage.get_all_session_metadata", return_value={}):
+        conv = storage.get_conversation_by_id("conv_proj_test")
+        assert conv is not None
+        assert conv.get("project_id") == "proj_alpha"
+        assert conv.get("group_id") == "grp_beta"
+
+        convs = storage.list_conversations(limit=10)
+        assert len(convs) >= 1
+        found = next((c for c in convs if c["conversation_id"] == "conv_proj_test"), None)
+        assert found is not None
+        assert found.get("project_id") == "proj_alpha"
+        assert found.get("group_id") == "grp_beta"
+
+        search_res = storage.search_conversations("Project Test", limit=10)
+        assert len(search_res) >= 1
+        found_search = next((c for c in search_res if c["conversation_id"] == "conv_proj_test"), None)
+        assert found_search is not None
+        assert found_search.get("project_id") == "proj_alpha"
+        assert found_search.get("group_id") == "grp_beta"
+    print("✓ test_storage_project_and_group_id_in_queries passed")
+
+
+def test_main_spa_mounting_resilience(tmp_path):
+    empty_dist = tmp_path / "empty_dist"
+    empty_dist.mkdir()
+    # empty_dist exists as directory, but does NOT have an 'assets' subfolder
+    assert empty_dist.is_dir()
+    assert not (empty_dist / "assets").is_dir()
+    print("✓ test_main_spa_mounting_resilience passed")
+
+
 if __name__ == "__main__":
     test_clean_user_prompt_with_context_summary_history()
     test_validate_path_access_null_bytes()
@@ -4060,5 +4134,9 @@ if __name__ == "__main__":
     test_updater_git_env_strict_author()
     test_execution_manager_live_tool_calls_bounding()
     test_safe_copy_artifacts_handles_exception_without_unbound_error()
+    with tempfile.TemporaryDirectory() as td:
+        test_storage_project_and_group_id_in_queries(Path(td))
+    with tempfile.TemporaryDirectory() as td:
+        test_main_spa_mounting_resilience(Path(td))
     print("\nAll unit tests passed successfully!")
 

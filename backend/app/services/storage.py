@@ -181,6 +181,18 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     except (IndexError, KeyError):
         parent_id = None
 
+    project_id = ""
+    try:
+        project_id = str(r["project_id"] or "")
+    except (IndexError, KeyError):
+        project_id = ""
+
+    group_id = ""
+    try:
+        group_id = str(r["group_id"] or "")
+    except (IndexError, KeyError):
+        group_id = ""
+
     return {
         "conversation_id": cid,
         "title": display_title,
@@ -192,6 +204,8 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
         "status": r["status"],
         "agent_name": r["agent_name"],
         "parent_conversation_id": parent_id,
+        "project_id": project_id,
+        "group_id": group_id,
         "pinned": bool(meta.get("pinned", False)),
         "archived": bool(meta.get("archived", False)),
         "tags": safe_tags,
@@ -220,7 +234,9 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
                 workspace_uris,
                 status,
                 agent_name,
-                parent_conversation_id
+                parent_conversation_id,
+                project_id,
+                group_id
             FROM conversation_summaries
             ORDER BY last_modified_time DESC
             LIMIT ?
@@ -241,7 +257,7 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
                 chunk = missing_pinned[i : i + chunk_size]
                 placeholders = ",".join("?" * len(chunk))
                 query_sql = (
-                    f"SELECT conversation_id, title, preview, step_count, last_modified_time, workspace_uris, status, agent_name, parent_conversation_id FROM conversation_summaries WHERE conversation_id IN ({placeholders})"  # nosec B608
+                    f"SELECT conversation_id, title, preview, step_count, last_modified_time, workspace_uris, status, agent_name, parent_conversation_id, project_id, group_id FROM conversation_summaries WHERE conversation_id IN ({placeholders})"  # nosec B608
                 )
                 cursor.execute(query_sql, tuple(chunk))
                 rows.extend(cursor.fetchall())
@@ -279,7 +295,9 @@ def get_conversation_by_id(conversation_id: str, conn: Any = None) -> dict[str, 
                 workspace_uris,
                 status,
                 agent_name,
-                parent_conversation_id
+                parent_conversation_id,
+                project_id,
+                group_id
             FROM conversation_summaries
             WHERE conversation_id = ?
             LIMIT 1
@@ -1228,7 +1246,9 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 workspace_uris,
                 status,
                 agent_name,
-                parent_conversation_id
+                parent_conversation_id,
+                project_id,
+                group_id
             FROM conversation_summaries
             WHERE title LIKE ? ESCAPE '\\' OR preview LIKE ? ESCAPE '\\'
             ORDER BY last_modified_time DESC
@@ -1280,7 +1300,9 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                             workspace_uris,
                             status,
                             agent_name,
-                            parent_conversation_id
+                            parent_conversation_id,
+                            project_id,
+                            group_id
                         FROM conversation_summaries
                         WHERE conversation_id IN ({placeholders})
                         """,  # nosec B608
