@@ -1,6 +1,6 @@
 import type { ChatMessage } from '../types';
 
-const REQUEST_REGEX = /<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i;
+const REQUEST_REGEX = /<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/gi;
 const XML_BLOCKS_REGEX = /<(ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?<\/\1>/gi;
 const XML_TAGS_REGEX = /<\/?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>/gi;
 const STEERING_PREFIX_REGEX = /^(?:⚡\s*\[(?:Guidage|Steering)\]\s*|📥\s*\[(?:En attente|Queued)\]\s*|\[(?:Instruction Prioritaire de Guidage|Priority Steering Instruction)\]\s*:?\s*)+/gi;
@@ -46,12 +46,14 @@ export function cleanUserPrompt(raw: any): string {
     return str.trim();
   }
 
-  // 1. Extraire le contenu spécifique de <USER_REQUEST> s'il est présent
-  const requestMatch = REQUEST_REGEX.exec(str);
-  let cleaned = requestMatch ? requestMatch[1] : str;
+  // 1. Retirer les blocs de métadonnées, contexte et paramètres système
+  let cleaned = str.replace(XML_BLOCKS_REGEX, '');
 
-  // 2. Retirer les blocs de métadonnées, contexte et paramètres système
-  cleaned = cleaned.replace(XML_BLOCKS_REGEX, '');
+  // 2. Extraire le contenu spécifique de <USER_REQUEST> s'il est présent
+  const requestMatches = [...cleaned.matchAll(REQUEST_REGEX)];
+  if (requestMatches.length > 0) {
+    cleaned = requestMatches[requestMatches.length - 1][1];
+  }
   cleaned = cleaned.replace(XML_TAGS_REGEX, '');
 
   // 3. Retirer les préfixes de guidage/file d'attente
@@ -270,6 +272,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
         if (!tc || typeof tc !== 'object') continue;
         currentAssistantMsg.toolCalls = currentAssistantMsg.toolCalls || [];
         currentAssistantMsg.toolCalls.push({
+          id: tc.id || tc.tool_call_id || tc.call_id || undefined,
           name: tc.name || tc.tool_name || tc.toolAction || 'tool',
           args: tc.args || tc.parameters || {},
           result: undefined,
@@ -298,13 +301,18 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
       const isCommandFailure = typeof content === 'string' && (
         /The command exited with code (?!0\b)\d+/i.test(content) ||
         /Command exited with code (?!0\b)\d+/i.test(content) ||
-        content.startsWith('Encountered error in tool execution:')
+        /Exit code: (?!0\b)\d+/i.test(content) ||
+        content.startsWith('Encountered error in tool execution:') ||
+        content.startsWith('Tool execution failed:') ||
+        content.startsWith('process terminated with exit code')
       );
       const isErr = s.status === 'ERROR' || Boolean(s.error) || isCommandFailure;
       const outputText = content || (s.error ? String(s.error) : '');
       const tools = currentAssistantMsg.toolCalls || [];
-      // Appairer avec le premier outil en attente de résultat (FIFO)
-      const targetTool = tools.find((t) => t.result === undefined);
+      const toolCallId = s.tool_call_id || s.call_id;
+      // Appairer prioritairement par ID, puis avec le premier outil en attente (FIFO)
+      const targetTool = (toolCallId ? tools.find((t) => t.id === toolCallId && t.result === undefined) : null)
+        || tools.find((t) => t.result === undefined);
       if (targetTool) {
         targetTool.result = outputText;
         targetTool.status = isErr ? 'error' : 'done';
@@ -312,6 +320,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
         // Sortie d'action implicite sans appel préalable (ex: amorce subagent)
         currentAssistantMsg.toolCalls = currentAssistantMsg.toolCalls || [];
         currentAssistantMsg.toolCalls.push({
+          id: toolCallId || undefined,
           name: !['GENERIC', 'TOOL_OUTPUT', 'TOOL_RESULT', 'SYSTEM'].includes(stype.toUpperCase()) ? stype.toLowerCase() : 'action',
           args: {},
           result: outputText,

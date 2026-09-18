@@ -1,4 +1,6 @@
 import logging
+import os
+import re
 import uuid
 from pathlib import Path
 from typing import Any
@@ -87,6 +89,10 @@ def _validate_path_access(file_path: Path) -> Path:
     try:
         from urllib.parse import unquote
         p_str = unquote(str(file_path).strip())
+        if "\x00" in p_str:
+            raise HTTPException(status_code=400, detail="Chemin invalide : octet nul détecté.")
+        if os.name == "posix" and re.match(r'^[a-zA-Z]:[/\\]', p_str):
+            raise HTTPException(status_code=400, detail="Chemin de style Windows non valide sur ce système d'exploitation.")
         if p_str.startswith("workspace://"):
             p_str = p_str[12:].lstrip("/")
             file_path = Path(DEFAULT_WORKSPACE) / p_str
@@ -108,6 +114,8 @@ def _validate_path_access(file_path: Path) -> Path:
         elif not file_path.is_absolute():
             file_path = Path(DEFAULT_WORKSPACE) / file_path
         resolved = file_path.resolve()
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Chemin invalide : {e}")
 

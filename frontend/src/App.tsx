@@ -65,13 +65,18 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
   let thinkingChars = 0;
 
   for (const m of msgs) {
-    if (m.role === 'user') {
+    if (m.role === 'user' || m.role === 'system') {
       promptChars += (m.content || '').length;
     } else {
       responseChars += (m.content || '').length;
       if (m.thought) thinkingChars += m.thought.length;
       if (m.toolCalls && m.toolCalls.length > 0) {
-        responseChars += JSON.stringify(m.toolCalls).length;
+        for (const tc of m.toolCalls) {
+          responseChars += (tc.name || '').length + JSON.stringify(tc.args || {}).length;
+          if (tc.result) {
+            promptChars += typeof tc.result === 'string' ? tc.result.length : JSON.stringify(tc.result).length;
+          }
+        }
       }
     }
   }

@@ -290,8 +290,9 @@ def get_git_diff(
                             diff_text = untracked_res.stdout
                             break
                     except Exception as e:
-                        logger.debug(f"Git diff untracked fallback error with {null_target}: {e}")
+                        logger.debug(f"Git diff untracked fallback error with {null_target}: {_mask_git_output(str(e))}")
 
+    diff_text = _mask_git_output(diff_text or "")
     MAX_DIFF_BYTES = 2 * 1024 * 1024  # 2 Mo
     truncated = False
     if diff_text and len(diff_text) > MAX_DIFF_BYTES:

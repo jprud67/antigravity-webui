@@ -341,12 +341,11 @@ def clean_user_prompt(raw: Any) -> str:
             raw = str(raw)
         except Exception:
             return ""
-    m = _USER_REQUEST_RE.search(raw)
-    if m:
-        text = m.group(1).strip()
-    else:
-        text = raw
-    text = _XML_BLOCKS_RE.sub('', text)
+    # Strip metadata XML blocks first (e.g. CONTEXT_SUMMARY, SKILLS, SYSTEM_MESSAGE, etc.)
+    text = _XML_BLOCKS_RE.sub('', raw)
+    matches = _USER_REQUEST_RE.findall(text)
+    if matches:
+        text = matches[-1].strip()
     text = _XML_TAGS_RE.sub('', text)
     # Strip steering/queued instruction prefixes so history stays pure and clean
     text = _STEERING_PREFIX_RE.sub('', text)
@@ -677,6 +676,8 @@ def fork_conversation(
         default_workspace_uri = json.dumps([get_default_workspace_uri()])
         source_workspace = row_dict.get("workspace_uris") or default_workspace_uri
         agent_name = row_dict.get("agent_name") or ""
+        source_project_id = str(row_dict.get("project_id") or "")
+        source_group_id = str(row_dict.get("group_id") or "")
 
         sanitized_title = (new_title or "").strip()
         title = sanitized_title if sanitized_title else f"{source_title} (Branche #{up_to_step_index})"
@@ -703,36 +704,32 @@ def fork_conversation(
                 forked_last_user_time = s.get("created_at") or s.get("timestamp")
                 break
 
-        cursor.execute(
-            """
-            INSERT INTO conversation_summaries (
-                conversation_id,
-                title,
-                preview,
-                step_count,
-                last_modified_time,
-                workspace_uris,
-                status,
-                agent_name,
-                parent_conversation_id,
-                last_user_input_time,
-                last_user_input_step_index
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                new_id,
-                title,
-                preview,
-                len(forked_steps),
-                now_str,
-                source_workspace,
-                "DONE",
-                agent_name,
-                source_conversation_id,
-                forked_last_user_time or now_str,
-                forked_last_user_idx
-            )
-        )
+        cursor.execute("PRAGMA table_info(conversation_summaries)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+
+        fields = [
+            "conversation_id", "title", "preview", "step_count",
+            "last_modified_time", "workspace_uris", "status",
+            "agent_name", "parent_conversation_id",
+            "last_user_input_time", "last_user_input_step_index"
+        ]
+        values: list[Any] = [
+            new_id, title, preview, len(forked_steps),
+            now_str, source_workspace, "DONE",
+            agent_name, source_conversation_id,
+            forked_last_user_time or now_str,
+            forked_last_user_idx
+        ]
+        if "project_id" in existing_cols:
+            fields.append("project_id")
+            values.append(source_project_id)
+        if "group_id" in existing_cols:
+            fields.append("group_id")
+            values.append(source_group_id)
+
+        placeholders = ", ".join(["?"] * len(fields))
+        field_str = ", ".join(fields)
+        cursor.execute(f"INSERT INTO conversation_summaries ({field_str}) VALUES ({placeholders})", tuple(values))
         conn.commit()
     except Exception:
         conn.rollback()
@@ -784,6 +781,8 @@ def create_conversation_handoff(
         default_workspace_uri = json.dumps([get_default_workspace_uri()])
         source_workspace = row_dict.get("workspace_uris") or default_workspace_uri
         agent_name = row_dict.get("agent_name") or ""
+        source_project_id = str(row_dict.get("project_id") or "")
+        source_group_id = str(row_dict.get("group_id") or "")
     finally:
         conn.close()
 
@@ -898,36 +897,31 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO conversation_summaries (
-                conversation_id,
-                title,
-                preview,
-                step_count,
-                last_modified_time,
-                workspace_uris,
-                status,
-                agent_name,
-                parent_conversation_id,
-                last_user_input_time,
-                last_user_input_step_index
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                new_id,
-                title,
-                preview,
-                2,
-                now_db,
-                source_workspace,
-                "DONE",
-                agent_name,
-                source_conversation_id,
-                now_db,
-                -1
-            )
-        )
+        cursor.execute("PRAGMA table_info(conversation_summaries)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+
+        fields = [
+            "conversation_id", "title", "preview", "step_count",
+            "last_modified_time", "workspace_uris", "status",
+            "agent_name", "parent_conversation_id",
+            "last_user_input_time", "last_user_input_step_index"
+        ]
+        values: list[Any] = [
+            new_id, title, preview, 2,
+            now_db, source_workspace, "DONE",
+            agent_name, source_conversation_id,
+            now_db, -1
+        ]
+        if "project_id" in existing_cols:
+            fields.append("project_id")
+            values.append(source_project_id)
+        if "group_id" in existing_cols:
+            fields.append("group_id")
+            values.append(source_group_id)
+
+        placeholders = ", ".join(["?"] * len(fields))
+        field_str = ", ".join(fields)
+        cursor.execute(f"INSERT INTO conversation_summaries ({field_str}) VALUES ({placeholders})", tuple(values))
         conn.commit()
     except Exception:
         conn.rollback()

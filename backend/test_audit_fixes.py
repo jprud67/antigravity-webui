@@ -3806,7 +3806,114 @@ def test_safe_copy_artifacts_handles_exception_without_unbound_error():
     print("✓ test_safe_copy_artifacts_handles_exception_without_unbound_error passed")
 
 
+def test_clean_user_prompt_with_context_summary_history():
+    from app.services.storage import clean_user_prompt
+    raw = (
+        "<CONTEXT_SUMMARY>\n"
+        "Previous requests:\n"
+        "1. <USER_REQUEST>old outdated request</USER_REQUEST>\n"
+        "</CONTEXT_SUMMARY>\n"
+        "<USER_REQUEST>\n"
+        "Actual active user request\n"
+        "</USER_REQUEST>"
+    )
+    cleaned = clean_user_prompt(raw)
+    assert cleaned == "Actual active user request", f"Got: '{cleaned}'"
+    print("✓ test_clean_user_prompt_with_context_summary_history passed")
+
+
+def test_validate_path_access_null_bytes():
+    from pathlib import Path
+
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.files import _validate_path_access
+
+    with pytest.raises(HTTPException) as exc_info:
+        _validate_path_access(Path("/root/antigravity-webui/test\x00.txt"))
+    assert exc_info.value.status_code == 400
+    assert "octet nul" in exc_info.value.detail
+    print("✓ test_validate_path_access_null_bytes passed")
+
+
+def test_fork_and_handoff_preserves_project_and_group_id():
+    import sqlite3
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.services import storage
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_brain = Path(tmp_dir) / "brain"
+        tmp_brain.mkdir(parents=True, exist_ok=True)
+        conv_id = "test-proj-group-conv"
+        conv_dir = tmp_brain / conv_id
+        logs_dir = conv_dir / ".system_generated" / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+
+        storage.atomic_write_jsonl(logs_dir / "transcript.jsonl", [
+            {"step_index": 0, "source": "USER_EXPLICIT", "type": "USER_INPUT", "content": "Help with project", "created_at": "2026-09-18T10:00:00Z"},
+            {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Done", "created_at": "2026-09-18T10:00:01Z"}
+        ])
+
+        db_file = tmp_brain / "conversations.db"
+        conn = sqlite3.connect(str(db_file))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE conversation_summaries (
+                conversation_id TEXT PRIMARY KEY,
+                title TEXT,
+                preview TEXT,
+                step_count INTEGER,
+                last_modified_time TEXT,
+                workspace_uris TEXT,
+                status TEXT,
+                agent_name TEXT,
+                parent_conversation_id TEXT,
+                last_user_input_time TEXT,
+                last_user_input_step_index INTEGER,
+                project_id TEXT,
+                group_id TEXT
+            )
+        """)
+        cursor.execute("""
+            INSERT INTO conversation_summaries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (conv_id, "Source Session", "Help", 2, "2026-09-18 10:00:01", "[]", "DONE", "Antigravity", "", "2026-09-18T10:00:00Z", 0, "proj_xyz", "grp_123"))
+        conn.commit()
+        conn.close()
+
+        def _get_test_conn():
+            c = sqlite3.connect(str(db_file))
+            c.row_factory = sqlite3.Row
+            return c
+
+        with patch("app.services.storage.BRAIN_DIR", tmp_brain), \
+             patch("app.services.storage.get_db_connection", side_effect=_get_test_conn):
+            fork_res = storage.fork_conversation(conv_id, up_to_step_index=1, new_title="Forked Project Session")
+            fork_id = fork_res["conversation_id"]
+
+            handoff_res = storage.create_conversation_handoff(conv_id, new_title="Handoff Project Session")
+            handoff_id = handoff_res["conversation_id"]
+
+            verify_conn = _get_test_conn()
+            row_fork = verify_conn.cursor().execute("SELECT project_id, group_id FROM conversation_summaries WHERE conversation_id = ?", (fork_id,)).fetchone()
+            row_handoff = verify_conn.cursor().execute("SELECT project_id, group_id FROM conversation_summaries WHERE conversation_id = ?", (handoff_id,)).fetchone()
+            verify_conn.close()
+
+            assert row_fork["project_id"] == "proj_xyz"
+            assert row_fork["group_id"] == "grp_123"
+            assert row_handoff["project_id"] == "proj_xyz"
+            assert row_handoff["group_id"] == "grp_123"
+    print("✓ test_fork_and_handoff_preserves_project_and_group_id passed")
+
+
 if __name__ == "__main__":
+    test_clean_user_prompt_with_context_summary_history()
+    test_validate_path_access_null_bytes()
+    test_fork_and_handoff_preserves_project_and_group_id()
     test_file_download_unicode_and_special_chars()
     test_token_calculation()
     test_password_validation()

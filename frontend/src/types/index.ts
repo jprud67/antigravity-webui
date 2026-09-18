@@ -21,6 +21,7 @@ export interface Conversation {
 }
 
 export interface ToolCallItem {
+  id?: string;
   name: string;
   args?: any;
   result?: any;
