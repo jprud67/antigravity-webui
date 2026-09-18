@@ -119,7 +119,7 @@ class ExecutionSession:
                 dead.add(ws)
         for ws in dead:
             self.subscribers.discard(ws)
-            execution_manager.unregister_socket(ws)
+            execution_manager.unregister_socket(ws, prune=False)
 
     def _update_live_state(self, event: dict[str, Any]):
         evt_type = event.get("event")
@@ -621,17 +621,18 @@ class ExecutionManager:
     def register_socket(self, ws: WebSocket):
         self.connected_sockets.add(ws)
 
-    def unregister_socket(self, ws: WebSocket):
+    def unregister_socket(self, ws: WebSocket, prune: bool = True):
         self.connected_sockets.discard(ws)
         # Detach from all sessions WITHOUT stopping or cancelling anything!
         for s in list(self.sessions.values()):
             s.remove_subscriber(ws)
         if self.active_session:
             self.active_session.remove_subscriber(ws)
-        try:
-            self.prune_inactive_sessions()
-        except Exception as e:
-            logger.debug(f"Error during socket disconnect prune: {e}")
+        if prune:
+            try:
+                self.prune_inactive_sessions()
+            except Exception as e:
+                logger.debug(f"Error during socket disconnect prune: {e}")
         logger.info(
             f"WebSocket client disconnected; {len(self.get_running_conversations())} background task(s) continue running uninterrupted."
         )

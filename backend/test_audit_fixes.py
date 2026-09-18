@@ -4578,7 +4578,97 @@ def test_storage_update_conversation_summary_fields():
     print("✓ test_storage_update_conversation_summary_fields passed")
 
 
+def test_is_blocked_sensitive_path_extended():
+    """Verify is_blocked_sensitive_path blocks null bytes and system roots properly."""
+    from app.platform_utils import is_blocked_sensitive_path
+
+    assert is_blocked_sensitive_path("/workspace/bad\x00path.py") is True
+    assert is_blocked_sensitive_path("/proc/cpuinfo") is True
+    assert is_blocked_sensitive_path("/sys/class/net") is True
+    assert is_blocked_sensitive_path("/dev/null") is True
+    assert is_blocked_sensitive_path("/etc/passwd") is True
+    assert is_blocked_sensitive_path("/etc/shadow") is True
+    assert is_blocked_sensitive_path("/etc/sudoers") is True
+    assert is_blocked_sensitive_path("/etc/ssh/ssh_host_rsa_key") is True
+    assert is_blocked_sensitive_path("/workspace/normal.ts") is False
+    print("✓ test_is_blocked_sensitive_path_extended passed")
+
+
+def test_files_validate_path_access_url_fragments():
+    """Verify _validate_path_access strips markdown URL fragments and query strings."""
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.api.files import _validate_path_access
+
+    with tempfile.TemporaryDirectory() as td:
+        ws_path = Path(td)
+        test_file = ws_path / "component.tsx"
+        test_file.write_text("export default function() {}", encoding="utf-8")
+
+        with patch("app.api.files.DEFAULT_WORKSPACE", str(ws_path)):
+            resolved = _validate_path_access(Path(f"{test_file}#L10-L25"))
+            assert resolved == test_file.resolve()
+
+            resolved_query = _validate_path_access(Path(f"{test_file}?v=123"))
+            assert resolved_query == test_file.resolve()
+    print("✓ test_files_validate_path_access_url_fragments passed")
+
+
+def test_execution_manager_unregister_socket_prune_flag():
+    """Verify unregister_socket respects prune=False parameter."""
+    from unittest.mock import MagicMock, patch
+    from app.services.execution_manager import ExecutionManager
+
+    em = ExecutionManager()
+    ws_mock = MagicMock()
+    em.register_socket(ws_mock)
+    assert ws_mock in em.connected_sockets
+
+    with patch.object(em, "prune_inactive_sessions") as mock_prune:
+        em.unregister_socket(ws_mock, prune=False)
+        assert ws_mock not in em.connected_sockets
+        mock_prune.assert_not_called()
+
+        em.register_socket(ws_mock)
+        em.unregister_socket(ws_mock, prune=True)
+        assert ws_mock not in em.connected_sockets
+        mock_prune.assert_called_once()
+    print("✓ test_execution_manager_unregister_socket_prune_flag passed")
+
+
+def test_tasks_list_active_tasks_expanded_markers():
+    """Verify list_active_tasks detects expanded completion markers."""
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.api.tasks import list_active_tasks
+
+    with tempfile.TemporaryDirectory() as td:
+        fake_brain = Path(td)
+        cid_dir = fake_brain / "conv-finish-test"
+        tasks_dir = cid_dir / ".system_generated" / "tasks"
+        tasks_dir.mkdir(parents=True, exist_ok=True)
+
+        tfile1 = tasks_dir / "task-done-1.log"
+        tfile1.write_text("Starting command...\nCommand finished\n", encoding="utf-8")
+
+        tfile2 = tasks_dir / "task-done-2.log"
+        tfile2.write_text("Executing...\nstatus: completed\n", encoding="utf-8")
+
+        with patch("app.api.tasks.BRAIN_DIR", fake_brain):
+            res = list_active_tasks(conversation_id="conv-finish-test")
+            task_dict = {t["task_id"]: t["status"] for t in res["tasks"]}
+            assert task_dict.get("task-done-1") == "completed"
+            assert task_dict.get("task-done-2") == "completed"
+    print("✓ test_tasks_list_active_tasks_expanded_markers passed")
+
+
 if __name__ == "__main__":
+    test_is_blocked_sensitive_path_extended()
+    test_files_validate_path_access_url_fragments()
+    test_execution_manager_unregister_socket_prune_flag()
+    test_tasks_list_active_tasks_expanded_markers()
     test_clean_user_prompt_with_context_summary_history()
     test_validate_path_access_null_bytes()
     test_fork_and_handoff_preserves_project_and_group_id()

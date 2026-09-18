@@ -50,19 +50,19 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2, visited
             name = entry.name
             if name.startswith(".") and name != ".gitignore":
                 continue
-            if entry.is_dir() and name in IGNORED_DIRS:
+            if name in IGNORED_DIRS and entry.is_dir():
                 continue
             if is_blocked_sensitive_path(entry):
                 continue
 
             try:
-                stat = entry.stat()
                 is_dir = entry.is_dir()
+                stat = entry.stat()
                 item: dict[str, Any] = {
                     "name": name,
                     "path": str(entry.resolve()),
                     "is_dir": is_dir,
-                    "size": stat.st_size if not is_dir else 0,
+                    "size": 0 if is_dir else stat.st_size,
                     "last_modified": stat.st_mtime,
                 }
 
@@ -91,6 +91,14 @@ def _validate_path_access(file_path: Path) -> Path:
         p_str = unquote(str(file_path).strip())
         if "\x00" in p_str:
             raise HTTPException(status_code=400, detail="Chemin invalide : octet nul détecté.")
+        # Strip URL fragment (#L10-L20) or query string (?...) if present from markdown links
+        if "#" in p_str:
+            p_str = p_str.split("#", 1)[0]
+        if "?" in p_str:
+            p_str = p_str.split("?", 1)[0]
+        p_str = p_str.strip()
+        if not p_str:
+            raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
         if os.name == "posix" and re.match(r'^[a-zA-Z]:[/\\]', p_str):
             raise HTTPException(status_code=400, detail="Chemin de style Windows non valide sur ce système d'exploitation.")
         if p_str.startswith("workspace://"):
@@ -111,8 +119,10 @@ def _validate_path_access(file_path: Path) -> Path:
             if not (len(p_clean) > 1 and p_clean[1] == ":"):
                 p_clean = "/" + p_clean.lstrip("/")
             file_path = Path(p_clean)
-        elif not file_path.is_absolute():
-            file_path = Path(DEFAULT_WORKSPACE) / file_path
+        else:
+            file_path = Path(p_str)
+            if not file_path.is_absolute():
+                file_path = Path(DEFAULT_WORKSPACE) / file_path
         resolved = file_path.resolve()
     except HTTPException:
         raise

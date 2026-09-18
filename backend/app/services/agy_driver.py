@@ -489,7 +489,11 @@ async def stream_turn(
         # Terminaison robuste du groupe de processus si encore actif
         # (couvre GeneratorExit, break et erreurs) — multiplateforme.
         if proc and proc.returncode is None:
-            await terminate_process_group_async(proc, grace=0.8)
+            try:
+                await asyncio.shield(terminate_process_group_async(proc, grace=0.8))
+            except Exception as e:
+                logger.debug(f"Ignored error during final process cleanup: {e}")
+
 
 
 _quota_cache: dict[str, Any] = {"data": None, "timestamp": 0.0}

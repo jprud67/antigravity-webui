@@ -25,8 +25,37 @@ class KillTaskRequest(BaseModel):
 def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_auth)):
     tasks: list[dict[str, Any]] = []
     subagents: list[dict[str, Any]] = []
+    running_processes: list[dict[str, Any]] = []
+    active_cmdlines: list[str] = []
 
-    # 1. Scan background tasks from brain
+    # 1. Scan active process tree for agy and background workers
+    try:
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'create_time', 'cpu_percent', 'memory_info']):
+            try:
+                info = proc.info
+                if not info or not info.get('pid'):
+                    continue
+                cmdline = info.get('cmdline') or []
+                cmd_str = " ".join(cmdline)
+                if cmd_str:
+                    active_cmdlines.append(cmd_str.lower())
+                name = info.get('name') or ''
+                if 'agy' in name or 'agy' in cmd_str or 'antigravity' in cmd_str:
+                    mem = info.get('memory_info')
+                    mem_rss = getattr(mem, 'rss', 0) if mem else 0
+                    running_processes.append({
+                        "pid": info['pid'],
+                        "name": name,
+                        "cmd": cmd_str[:120],
+                        "created_at": info.get('create_time') or 0.0,
+                        "memory_mb": round((mem_rss or 0) / (1024 * 1024), 1)
+                    })
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError, KeyError, TypeError):
+                continue
+    except Exception as e:
+        logger.warning(f"Error scanning psutil processes: {e}")
+
+    # 2. Scan background tasks and subagents from brain
     if BRAIN_DIR.exists():
         if conversation_id:
             if not is_safe_conversation_id(conversation_id):
@@ -74,16 +103,21 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                         stat_mtime = 0.0
 
                     now_ts = time.time()
-                    is_finished = (
-                        "finished with result" in preview
-                        or "exited with code" in preview
-                        or "exit code" in preview
-                        or "Completed At:" in preview
-                        or "The command exited" in preview
-                        or "process terminated" in preview
-                        or "Task cancelled" in preview
-                        or (now_ts - stat_mtime) > 1800
+                    lower_preview = preview.lower()
+                    has_finish_marker = (
+                        "finished with result" in lower_preview
+                        or "exited with code" in lower_preview
+                        or "exit code" in lower_preview
+                        or "completed at:" in lower_preview
+                        or "the command exited" in lower_preview
+                        or "process terminated" in lower_preview
+                        or "task cancelled" in lower_preview
+                        or "status: completed" in lower_preview
+                        or "status: failed" in lower_preview
+                        or "command finished" in lower_preview
                     )
+                    is_active_process = any(tid.lower() in cmd for cmd in active_cmdlines) if active_cmdlines else False
+                    is_finished = has_finish_marker or ((now_ts - stat_mtime) > 1800 and not is_active_process)
                     tasks.append({
                         "id": f"{cid}/{tid}",
                         "task_id": tid,
@@ -112,35 +146,10 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                             "status": "idle"
                         })
 
-    # 2. Scan active process tree for agy and background workers
-    running_processes = []
-    try:
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'create_time', 'cpu_percent', 'memory_info']):
-            try:
-                info = proc.info
-                if not info or not info.get('pid'):
-                    continue
-                cmdline = info.get('cmdline') or []
-                cmd_str = " ".join(cmdline)
-                name = info.get('name') or ''
-                if 'agy' in name or 'agy' in cmd_str or 'antigravity' in cmd_str:
-                    mem = info.get('memory_info')
-                    mem_rss = getattr(mem, 'rss', 0) if mem else 0
-                    running_processes.append({
-                        "pid": info['pid'],
-                        "name": name,
-                        "cmd": cmd_str[:120],
-                        "created_at": info.get('create_time') or 0.0,
-                        "memory_mb": round((mem_rss or 0) / (1024 * 1024), 1)
-                    })
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError, KeyError, TypeError):
-                continue
-    except Exception as e:
-        logger.warning(f"Error scanning psutil processes: {e}")
-
     # Sort recent first
     tasks.sort(key=lambda x: float(x.get("last_modified") or 0.0), reverse=True)
     running_processes.sort(key=lambda p: float(p.get("created_at") or 0.0), reverse=True)
+
 
     return {
         "tasks": tasks[:50],

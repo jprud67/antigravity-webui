@@ -310,6 +310,13 @@ export class ChatWebSocketClient {
         this.pendingPayloads = this.pendingPayloads.filter(
           (p) => p.action !== payload.action || p.conversation_id !== payload.conversation_id
         );
+      } else if (payload.action === 'prompt') {
+        const isDuplicatePrompt = this.pendingPayloads.some(
+          (p) => p.action === 'prompt' && p.conversation_id === payload.conversation_id && p.prompt === payload.prompt
+        );
+        if (isDuplicatePrompt) {
+          return;
+        }
       }
       this.pendingPayloads.push(payload);
       if (this.pendingPayloads.length > 20) {
@@ -331,6 +338,13 @@ export class ChatWebSocketClient {
         this.pendingPayloads = this.pendingPayloads.filter(
           (p) => p.action !== payload.action || p.conversation_id !== payload.conversation_id
         );
+      } else if (payload.action === 'prompt') {
+        const isDuplicatePrompt = this.pendingPayloads.some(
+          (p) => p.action === 'prompt' && p.conversation_id === payload.conversation_id && p.prompt === payload.prompt
+        );
+        if (isDuplicatePrompt) {
+          return;
+        }
       }
       this.pendingPayloads.push(payload);
       if (this.pendingPayloads.length > 20) {

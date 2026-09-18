@@ -178,6 +178,8 @@ def is_safe_path(target: os.PathLike[Any] | str, allowed_roots: Sequence[os.Path
     """
     if not target or not allowed_roots:
         return False
+    if "\x00" in str(target):
+        return False
     try:
         t = Path(target).resolve()
         for root in allowed_roots:
@@ -207,6 +209,9 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
     """
     if not target:
         return False
+    target_str = str(target)
+    if "\x00" in target_str:
+        return True
     try:
         resolved = Path(target).resolve()
         parts = resolved.parts
@@ -215,11 +220,28 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
             return True
         if any(parts[i] == ".config" and parts[i + 1] == "gcloud" for i in range(len(parts) - 1)):
             return True
-        # Points de montage système root
-        if len(parts) > 1 and parts[1] in ("proc", "sys", "dev"):
-            return True
-        if len(parts) > 2 and parts[1] == "etc" and parts[2] in ("passwd", "shadow", "sudoers", "master.passwd"):
-            return True
+
+        # Points de montage système root (/proc, /sys, /dev, /etc secrets)
+        root_offset = 1 if parts and (parts[0] in ("/", "\\") or (len(parts[0]) >= 2 and parts[0][1] == ":")) else 0
+        if len(parts) > root_offset:
+            first_dir = parts[root_offset].lower()
+            if first_dir in ("proc", "sys", "dev"):
+                return True
+            if first_dir == "etc":
+                if len(parts) > root_offset + 1:
+                    second = parts[root_offset + 1].lower()
+                    if second in (
+                        "passwd",
+                        "shadow",
+                        "gshadow",
+                        "sudoers",
+                        "master.passwd",
+                        "sudoers.d",
+                        "ssh",
+                        "ssl",
+                        "security",
+                    ):
+                        return True
 
         # Fichiers de secrets et identifiants
         name = resolved.name.lower()
@@ -244,7 +266,11 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
             return True
         if ".stash_" in name:
             return True
+    except (ValueError, TypeError, OSError):
+        # En cas d'erreur de résolution sur un chemin potentiellement hostile, bloquer par précaution
+        return True
     except Exception:
         return False
     return False
+
 
