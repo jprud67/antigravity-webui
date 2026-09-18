@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -147,6 +148,31 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
         "processes": running_processes
     }
 
+def _mark_task_cancelled(task_id: str) -> bool:
+    """Marks task log file in BRAIN_DIR as cancelled if found."""
+    if not BRAIN_DIR.exists():
+        return False
+    clean_tid = task_id.strip()
+    pure_tid = clean_tid.split("/")[-1].strip() if "/" in clean_tid else clean_tid
+    marked = False
+    try:
+        for cdir in BRAIN_DIR.iterdir():
+            if not cdir.is_dir():
+                continue
+            tfile = cdir / ".system_generated" / "tasks" / pure_tid
+            if tfile.exists() and tfile.is_file():
+                try:
+                    with open(tfile, "a", encoding="utf-8") as f:
+                        f.write(f"\n[Task cancelled by user]\nCompleted At: {datetime.now(timezone.utc).isoformat()}\n")
+                    marked = True
+                    break
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.debug(f"Error marking task log file as cancelled: {e}")
+    return marked
+
+
 @router.post("/kill")
 def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
     target_pid = req.pid
@@ -226,6 +252,8 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
             except Exception as e:
                 logger.warning(f"Error resolving task_id to pid: {e}")
         if not target_pid:
+            if req.task_id and _mark_task_cancelled(req.task_id):
+                return {"success": True, "message": f"Tâche {req.task_id} marquée comme terminée/annulée"}
             return {"success": False, "message": "Aucun PID spécifié ou processus actif trouvé pour la tâche demandée"}
 
     # Block killing system critical PIDs and backend server itself
@@ -272,6 +300,9 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
                 p.kill()
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 logger.debug("Ignored error")
+
+        if req.task_id:
+            _mark_task_cancelled(req.task_id)
 
         logger.info(f"Terminated process PID {target_pid} ({proc_name})")
         return {"success": True, "message": f"Processus {target_pid} ({proc_name}) arrêté avec succès"}

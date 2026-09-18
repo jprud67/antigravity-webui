@@ -4352,8 +4352,13 @@ def test_tasks_list_active_tasks_safe_mtime():
 def test_import_single_conversation_preserves_project_and_group():
     """Verify that _import_single_conversation persists project, project_id, group_id, and projectColor."""
     from datetime import datetime, timezone
-    from app.services.storage import _import_single_conversation, delete_conversation, get_conversation_by_id
+
     from app.services.session_metadata import get_session_meta
+    from app.services.storage import (
+        _import_single_conversation,
+        delete_conversation,
+        get_conversation_by_id,
+    )
 
     now_iso = datetime.now(timezone.utc).isoformat()
     now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -4393,6 +4398,7 @@ def test_run_agy_subcommand_json_resilient_to_banners():
     """Verify that run_agy_subcommand_json parses output correctly even when CLI prints banner or warnings."""
     import asyncio
     from unittest.mock import patch
+
     from app.services.agy_subcommand import run_agy_subcommand_json
 
     banner_stdout = "WARNING: New CLI version available.\n\n{\"status\": \"ok\", \"items\": [1, 2, 3]}\n"
@@ -4406,7 +4412,98 @@ def test_run_agy_subcommand_json_resilient_to_banners():
         assert res.get("status") == "ok"
         assert res.get("items") == [1, 2, 3]
 
-    print("✓ test_run_agy_subcommand_json_resilient_to_banners passed")
+def test_build_conversation_dict_millisecond_timestamps():
+    """Verify that _build_conversation_dict safely converts millisecond and out-of-range timestamps."""
+    from app.services.storage import _build_conversation_dict
+
+    # Millisecond timestamp (~1.74e12)
+    fake_row = {
+        "conversation_id": "conv-ms-test",
+        "title": "MS Test",
+        "preview": "test preview",
+        "step_count": 2,
+        "last_modified_time": 1740000000000,
+        "workspace_uris": "[]",
+        "status": "idle",
+        "agent_name": "Antigravity",
+        "parent_conversation_id": None,
+        "project_id": "",
+        "group_id": "",
+    }
+    res = _build_conversation_dict(fake_row, {})
+    assert "2025" in res["last_modified_time"] or "2026" in res["last_modified_time"]
+
+    # Extreme timestamp that could cause OverflowError
+    fake_row_extreme = dict(fake_row)
+    fake_row_extreme["last_modified_time"] = 999999999999999999
+    res_extreme = _build_conversation_dict(fake_row_extreme, {})
+    assert res_extreme["last_modified_time"] != ""
+
+    print("✓ test_build_conversation_dict_millisecond_timestamps passed")
+
+
+def test_is_blocked_sensitive_path_cloud_credentials():
+    """Verify that is_blocked_sensitive_path blocks cloud secrets and credential files."""
+    from app.platform_utils import is_blocked_sensitive_path
+
+    assert is_blocked_sensitive_path("/home/user/.aws/credentials") is True
+    assert is_blocked_sensitive_path("/root/.azure/token.json") is True
+    assert is_blocked_sensitive_path("/workspace/credentials") is True
+    assert is_blocked_sensitive_path("/workspace/client_secret.json") is True
+    assert is_blocked_sensitive_path("/workspace/client_secret_oauth2.json") is True
+
+    # Legitimate non-sensitive files
+    assert is_blocked_sensitive_path("/workspace/app.py") is False
+    assert is_blocked_sensitive_path("/workspace/client_code.py") is False
+
+    print("✓ test_is_blocked_sensitive_path_cloud_credentials passed")
+
+
+def test_kill_task_marks_task_log_as_cancelled():
+    """Verify that _mark_task_cancelled writes cancellation notice to task log."""
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.api.tasks import _mark_task_cancelled
+
+    with tempfile.TemporaryDirectory() as td:
+        brain_path = Path(td)
+        cid_dir = brain_path / "test-conv-cancel"
+        task_dir = cid_dir / ".system_generated" / "tasks"
+        task_dir.mkdir(parents=True, exist_ok=True)
+        tfile = task_dir / "task-cancel-123"
+        tfile.write_text("Starting task execution...\n", encoding="utf-8")
+
+        with patch("app.api.tasks.BRAIN_DIR", brain_path):
+            marked = _mark_task_cancelled("task-cancel-123")
+            assert marked is True
+            content = tfile.read_text(encoding="utf-8")
+            assert "Task cancelled by user" in content
+            assert "Completed At:" in content
+
+    print("✓ test_kill_task_marks_task_log_as_cancelled passed")
+
+
+def test_undo_turn_invalidates_execution_manager_session():
+    """Verify that undo_turn clears cached execution_manager session."""
+    from unittest.mock import MagicMock, patch
+
+    from app.api.conversations import undo_turn
+
+    mock_exec_mgr = MagicMock()
+    mock_exec_mgr.is_running.return_value = False
+
+    with (
+        patch("app.api.conversations.execution_manager", mock_exec_mgr),
+        patch("app.api.conversations.undo_conversation_turn") as mock_undo,
+    ):
+        mock_undo.return_value = {"success": True, "truncated_steps": 1}
+        res = undo_turn("test-conv-undo", None)
+        assert res["success"] is True
+        mock_exec_mgr.remove_session.assert_called_once_with("test-conv-undo")
+
+    print("✓ test_undo_turn_invalidates_execution_manager_session passed")
 
 
 if __name__ == "__main__":
@@ -4580,5 +4677,9 @@ if __name__ == "__main__":
     test_tasks_list_active_tasks_safe_mtime()
     test_import_single_conversation_preserves_project_and_group()
     test_run_agy_subcommand_json_resilient_to_banners()
+    test_build_conversation_dict_millisecond_timestamps()
+    test_is_blocked_sensitive_path_cloud_credentials()
+    test_kill_task_marks_task_log_as_cancelled()
+    test_undo_turn_invalidates_execution_manager_session()
     print("\nAll unit tests passed successfully!")
 

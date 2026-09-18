@@ -297,6 +297,7 @@ def undo_turn(conversation_id: str, _ = Depends(require_auth)):
         )
     try:
         res = undo_conversation_turn(conversation_id)
+        execution_manager.remove_session(conversation_id)
         return res
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

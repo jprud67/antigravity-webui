@@ -35,6 +35,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
   });
   const [loading, setLoading] = useState(false);
   const [killingPid, setKillingPid] = useState<number | null>(null);
+  const [killingTaskId, setKillingTaskId] = useState<string | null>(null);
 
   const refreshData = useCallback(async () => {
     setLoading(true);
@@ -77,6 +78,19 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
       showToast(err.message || t('task_kill_error', 'Error stopping process'), 'error');
     } finally {
       setKillingPid(null);
+    }
+  };
+
+  const handleKillTask = async (taskId: string) => {
+    if (!(await showConfirm(t('task_kill_confirm', `Confirm forced stop of task ${taskId}?`, taskId), { destructive: true }))) return;
+    setKillingTaskId(taskId);
+    try {
+      await killTask(undefined, taskId);
+      await refreshData();
+    } catch (err: any) {
+      showToast(err.message || t('task_kill_error', 'Error stopping task'), 'error');
+    } finally {
+      setKillingTaskId(null);
     }
   };
 
@@ -215,10 +229,21 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
                             {t('done', 'Done')}
                           </span>
                         ) : (
-                          <span className="flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full animate-pulse">
-                            <Clock className="w-3 h-3" />
-                            {t('in_progress', 'In progress')}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full animate-pulse">
+                              <Clock className="w-3 h-3" />
+                              {t('in_progress', 'In progress')}
+                            </span>
+                            <button
+                              onClick={() => handleKillTask(task.task_id)}
+                              disabled={killingTaskId === task.task_id}
+                              className="py-0.5 px-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-500 text-[10px] font-medium flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                              title={t('terminate', 'Terminate')}
+                            >
+                              <Square className="w-2.5 h-2.5 fill-rose-500" />
+                              <span>{killingTaskId === task.task_id ? t('stopping', 'Stopping...') : t('terminate', 'Terminate')}</span>
+                            </button>
+                          </div>
                         )}
                         <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
                           {new Date(task.last_modified * 1000).toLocaleTimeString()}

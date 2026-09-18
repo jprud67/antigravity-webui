@@ -171,7 +171,13 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     if hasattr(raw_lmt, "isoformat"):
         safe_lmt = raw_lmt.isoformat()
     elif isinstance(raw_lmt, (int, float)):
-        safe_lmt = datetime.fromtimestamp(raw_lmt, tz=timezone.utc).isoformat()
+        ts = float(raw_lmt)
+        if ts > 100_000_000_000:
+            ts /= 1000.0
+        try:
+            safe_lmt = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+        except (OverflowError, ValueError, OSError):
+            safe_lmt = str(raw_lmt)
     else:
         safe_lmt = str(raw_lmt) if raw_lmt is not None else ""
 

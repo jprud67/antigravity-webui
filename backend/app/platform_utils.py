@@ -211,7 +211,7 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
         resolved = Path(target).resolve()
         parts = resolved.parts
         # Répertoires système et dossiers cachés sensibles
-        if any(p in (".ssh", ".gnupg") for p in parts):
+        if any(p in (".ssh", ".gnupg", ".aws", ".azure") for p in parts):
             return True
         # Points de montage système root
         if len(parts) > 1 and parts[1] in ("proc", "sys", "dev"):
@@ -223,7 +223,16 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
         name = resolved.name.lower()
         if any(p == ".git" for p in parts):
             return True
-        if name in ("antigravity-oauth-token", "webui_auth.json", "webui_password.txt", "google_accounts.json"):
+        if name in (
+            "antigravity-oauth-token",
+            "webui_auth.json",
+            "webui_password.txt",
+            "google_accounts.json",
+            "credentials",
+            "client_secret.json",
+        ):
+            return True
+        if name.startswith("client_secret") and name.endswith(".json"):
             return True
         if name in ("id_rsa", "id_ed25519", "id_dsa", "id_ecdsa") or name.startswith(("id_rsa.", "id_ed25519.")):
             return True

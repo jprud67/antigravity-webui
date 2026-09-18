@@ -115,16 +115,27 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
     transcript_mtimes: dict[str, float] = {}
     # artifact path → last mtime
     artifact_mtimes: dict[str, float] = {}
+    # directory path → mtime cache to avoid scanning unchanged session directories
+    dir_mtimes: dict[str, float] = {}
+    dir_artifacts_cache: dict[str, dict[str, float]] = {}
 
     def _scan_brain() -> tuple[dict[str, float], dict[str, float]]:
         transcripts: dict[str, float] = {}
         artifacts: dict[str, float] = {}
         if not brain_dir.exists():
             return transcripts, artifacts
+        seen_dirs: set[str] = set()
         try:
             for child in brain_dir.iterdir():
                 if not child.is_dir() or not (_UUID_PATTERN.match(child.name) or is_safe_conversation_id(child.name)):
                     continue
+                child_str = str(child)
+                seen_dirs.add(child_str)
+                try:
+                    c_mtime = child.stat().st_mtime
+                except OSError:
+                    continue
+
                 # Primary Antigravity path: brain_dir/<conv_id>/.system_generated/logs/transcript.jsonl
                 t1 = child / ".system_generated" / "logs" / "transcript.jsonl"
                 t_full = child / ".system_generated" / "logs" / "transcript_full.jsonl"
@@ -141,15 +152,36 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                     logger.debug(f"transcript scan error on {child.name}: {e}")
 
                 # Artifacts scan (non-system files directly in session folder)
-                try:
-                    for f in child.iterdir():
+                prev_dmtime = dir_mtimes.get(child_str)
+                if prev_dmtime == c_mtime and child_str in dir_artifacts_cache:
+                    cached_files = dir_artifacts_cache[child_str]
+                    for f_path in cached_files:
                         try:
-                            if f.name not in [".system_generated", "scratch"] and f.is_file():
-                                artifacts[str(f)] = f.stat().st_mtime
+                            f_mtime = Path(f_path).stat().st_mtime
+                            artifacts[f_path] = f_mtime
+                            cached_files[f_path] = f_mtime
                         except OSError:
-                            continue
-                except OSError as e:
-                    logger.debug(f"artifacts scan error on {child.name}: {e}")
+                            pass
+                else:
+                    dir_mtimes[child_str] = c_mtime
+                    child_artifacts: dict[str, float] = {}
+                    try:
+                        for f in child.iterdir():
+                            try:
+                                if f.name not in [".system_generated", "scratch"] and f.is_file():
+                                    m = f.stat().st_mtime
+                                    artifacts[str(f)] = m
+                                    child_artifacts[str(f)] = m
+                            except OSError:
+                                continue
+                    except OSError as e:
+                        logger.debug(f"artifacts scan error on {child.name}: {e}")
+                    dir_artifacts_cache[child_str] = child_artifacts
+
+            # Cleanup stale dirs from cache
+            for stale_dir in set(dir_mtimes.keys()) - seen_dirs:
+                dir_mtimes.pop(stale_dir, None)
+                dir_artifacts_cache.pop(stale_dir, None)
         except OSError as e:
             logger.debug(f"scan des transcripts/artefacts impossible : {e}")
         return transcripts, artifacts
