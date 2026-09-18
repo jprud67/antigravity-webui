@@ -138,7 +138,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       if (onRefreshConversations) {
         await onRefreshConversations();
       }
-      onSelectConversation(res.conversation_id);
+      if (res.conversation_id) {
+        onSelectConversation(res.conversation_id);
+      }
     } catch (err: any) {
       showToast(t('err_session_import', 'Error importing session: {0}').replace('{0}', err.message), 'error');
     } finally {

@@ -4349,6 +4349,66 @@ def test_tasks_list_active_tasks_safe_mtime():
     print("✓ test_tasks_list_active_tasks_safe_mtime passed")
 
 
+def test_import_single_conversation_preserves_project_and_group():
+    """Verify that _import_single_conversation persists project, project_id, group_id, and projectColor."""
+    from datetime import datetime, timezone
+    from app.services.storage import _import_single_conversation, delete_conversation, get_conversation_by_id
+    from app.services.session_metadata import get_session_meta
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    payload = {
+        "title": "Project Import Test",
+        "project": "my-cool-project",
+        "project_id": "proj-123",
+        "group_id": "grp-456",
+        "projectColor": "#0ea5e9",
+        "steps": [{"step_index": 0, "type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "hello project"}]
+    }
+
+    res = _import_single_conversation(payload, now_iso, now_db)
+    assert res["success"] is True
+    cid = res["conversation_id"]
+
+    try:
+        conv = get_conversation_by_id(cid)
+        assert conv is not None
+        assert conv.get("project_id") == "proj-123"
+        assert conv.get("group_id") == "grp-456"
+        assert conv.get("project") == "my-cool-project"
+        assert conv.get("projectColor") == "#0ea5e9"
+
+        meta = get_session_meta(cid)
+        assert meta.get("project") == "my-cool-project"
+        assert meta.get("projectColor") == "#0ea5e9"
+        assert meta.get("group_id") == "grp-456"
+    finally:
+        delete_conversation(cid)
+
+    print("✓ test_import_single_conversation_preserves_project_and_group passed")
+
+
+def test_run_agy_subcommand_json_resilient_to_banners():
+    """Verify that run_agy_subcommand_json parses output correctly even when CLI prints banner or warnings."""
+    import asyncio
+    from unittest.mock import patch
+    from app.services.agy_subcommand import run_agy_subcommand_json
+
+    banner_stdout = "WARNING: New CLI version available.\n\n{\"status\": \"ok\", \"items\": [1, 2, 3]}\n"
+
+    async def fake_subcommand(args, timeout=15.0):
+        return 0, banner_stdout, ""
+
+    with patch("app.services.agy_subcommand.run_agy_subcommand", side_effect=fake_subcommand):
+        res = asyncio.run(run_agy_subcommand_json(["test"]))
+        assert isinstance(res, dict)
+        assert res.get("status") == "ok"
+        assert res.get("items") == [1, 2, 3]
+
+    print("✓ test_run_agy_subcommand_json_resilient_to_banners passed")
+
+
 if __name__ == "__main__":
     test_clean_user_prompt_with_context_summary_history()
     test_validate_path_access_null_bytes()
@@ -4518,5 +4578,7 @@ if __name__ == "__main__":
     test_storage_read_artifact_and_import_preview()
     test_agy_driver_unversioned_gemini_models()
     test_tasks_list_active_tasks_safe_mtime()
+    test_import_single_conversation_preserves_project_and_group()
+    test_run_agy_subcommand_json_resilient_to_banners()
     print("\nAll unit tests passed successfully!")
 

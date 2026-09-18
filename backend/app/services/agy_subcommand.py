@@ -35,12 +35,21 @@ async def run_agy_subcommand(args: list[str], timeout: float = 15.0) -> tuple[in
         return -1, "", str(e)
 
 async def run_agy_subcommand_json(args: list[str], timeout: float = 15.0) -> dict | list:
-    """Version qui essaie de parser la sortie en JSON."""
+    """Version qui essaie de parser la sortie en JSON de manière robuste."""
     code, stdout, stderr = await run_agy_subcommand(["--output-format", "json"] + args, timeout)
     if code != 0:
         logger.warning(f"agy {' '.join(args)} a échoué (code {code}): {stderr}")
         raise RuntimeError(stderr or stdout)
     
+    # Tentative d'extraction robuste (gère les bannières ou avertissements initiaux du CLI)
+    try:
+        from app.services.agy_driver import _extract_json_payload
+        extracted = _extract_json_payload(stdout)
+        if isinstance(extracted, (dict, list)):
+            return extracted
+    except Exception as extract_err:
+        logger.debug(f"Erreur extraction payload agy: {extract_err}")
+
     try:
         return json.loads(stdout.strip())
     except json.JSONDecodeError:

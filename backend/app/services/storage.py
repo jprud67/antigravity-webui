@@ -2330,13 +2330,20 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
 
         meta_raw = payload.get("metadata")
         meta_payload: dict[str, Any] = meta_raw if isinstance(meta_raw, dict) else {}
+        project_val = str(payload.get("project") or meta_payload.get("project") or "")
+        project_id_val = str(payload.get("project_id") or meta_payload.get("project_id") or project_val)
+        group_val = str(payload.get("group_id") or meta_payload.get("group_id") or "")
+        project_color_val = str(payload.get("projectColor") or meta_payload.get("projectColor") or "")
+
         update_session_meta(new_id, {
             "customTitle": title,
             "title": title,
             "pinned": bool(meta_payload.get("pinned", False)),
             "archived": bool(meta_payload.get("archived", False)),
             "tags": payload.get("tags") or meta_payload.get("tags") or ["importé"],
-            "project": payload.get("project") or meta_payload.get("project") or ""
+            "project": project_val,
+            "projectColor": project_color_val,
+            "group_id": group_val,
         })
 
         # Persist summary in SQLite database so the imported session appears in session lists
@@ -2385,8 +2392,10 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
                 agent_name,
                 parent_conversation_id,
                 last_user_input_time,
-                last_user_input_step_index
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                last_user_input_step_index,
+                project_id,
+                group_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 new_id,
@@ -2399,7 +2408,9 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
                 "import",
                 parent_conv_id,
                 imported_last_user_time or now_db,
-                imported_last_user_idx
+                imported_last_user_idx,
+                project_id_val,
+                group_val
             )
         )
         if should_close:
