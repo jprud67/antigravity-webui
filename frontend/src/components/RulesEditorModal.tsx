@@ -22,6 +22,7 @@ import {
 } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
+import { useI18n } from '../services/i18n';
 
 interface RulesEditorModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
   onClose,
   currentWorkspace
 }) => {
+  const { t } = useI18n();
   const [fileList, setFileList] = useState<RuleFileItem[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<string>('agents_global');
   const [fileContent, setFileContent] = useState<string>('');
@@ -76,11 +78,11 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
       setOriginalContent(data.content);
       setCurrentFileMeta(data);
     } catch (e: any) {
-      showToast(e.message || 'Erreur lors du chargement du fichier', 'error');
+      showToast(e.message || t('error_loading_file', 'Error loading file'), 'error');
     } finally {
       setLoadingContent(false);
     }
-  }, [currentWorkspace]);
+  }, [currentWorkspace, t]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -112,12 +114,12 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
       })
       .catch((e: any) => {
         if (active) {
-          showToast(e.message || 'Erreur lors du chargement du fichier', 'error');
+          showToast(e.message || t('error_loading_file', 'Error loading file'), 'error');
           setLoadingContent(false);
         }
       });
     return () => { active = false; };
-  }, [isOpen, selectedFileId, currentWorkspace]);
+  }, [isOpen, selectedFileId, currentWorkspace, t]);
 
   if (!isOpen) return null;
 
@@ -140,7 +142,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
 
   const handleSave = async () => {
     if (jsonError) {
-      showToast('Veuillez corriger la syntaxe JSON avant d\'enregistrer.', 'warning');
+      showToast(t('rules_correct_json', 'Please correct JSON syntax before saving.'), 'warning');
       return;
     }
 
@@ -153,7 +155,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
       setTimeout(() => setSaveSuccess(false), 3000);
       await loadFiles();
     } catch (e: any) {
-      showToast(e.message || 'Erreur d\'enregistrement', 'error');
+      showToast(e.message || t('error_saving_file', 'Error saving file'), 'error');
     } finally {
       setSaving(false);
     }
@@ -204,7 +206,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
             </div>
             <div className="min-w-0">
               <h2 className="text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 truncate" style={{ color: 'var(--strong)' }}>
-                <span>Éditeur de Règles</span>
+                <span>{t('rules_editor_title', 'Rules Editor')}</span>
                 <span
                   className="text-[9px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full border hidden xs:inline"
                   style={{
@@ -217,7 +219,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
                 </span>
               </h2>
               <p className="text-[10px] sm:text-[11px] truncate hidden sm:block" style={{ color: 'var(--muted)' }}>
-                Gouvernance globale, permissions, règles d'agents et mémoire unifiée
+                {t('rules_editor_subtitle', 'Global governance, permissions, agent rules, and unified memory')}
               </p>
             </div>
           </div>
@@ -244,8 +246,8 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
             onClick={() => scrollTabs('left')}
             className="p-1.5 rounded-lg border text-slate-400 hover:text-slate-200 hover:bg-black/10 transition-colors shrink-0 cursor-pointer shadow-xs"
             style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}
-            title="Défiler vers la gauche"
-            aria-label="Défiler vers la gauche"
+            title={t('scroll_left', 'Scroll left')}
+            aria-label={t('scroll_left', 'Scroll left')}
           >
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
@@ -268,7 +270,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
                   key={f.id}
                   onClick={async () => {
                     if (hasUnsavedChanges) {
-                      if (!(await showConfirm('Vous avez des modifications non enregistrées. Changer de fichier ?'))) return;
+                      if (!(await showConfirm(t('unsaved_changes_switch', 'You have unsaved changes. Switch file anyway?')))) return;
                     }
                     setSelectedFileId(f.id);
                   }}
@@ -295,8 +297,8 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
             onClick={() => scrollTabs('right')}
             className="p-1.5 rounded-lg border text-slate-400 hover:text-slate-200 hover:bg-black/10 transition-colors shrink-0 cursor-pointer shadow-xs"
             style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}
-            title="Défiler vers la droite"
-            aria-label="Défiler vers la droite"
+            title={t('scroll_right', 'Scroll right')}
+            aria-label={t('scroll_right', 'Scroll right')}
           >
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
@@ -322,7 +324,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
               </span>
               <span>|</span>
               <span className="text-[10px]">
-                {linesCount} lignes • {fileContent.length} caractères
+                {linesCount} {t('lines', 'lines')} • {fileContent.length} {t('characters', 'characters')}
               </span>
               {currentFileMeta?.syntax === 'json' && (
                 <span
@@ -332,7 +334,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
                       : 'bg-emerald-500/20 text-emerald-500 border-emerald-500/40'
                   }`}
                 >
-                  {jsonError ? 'JSON Invalide' : 'JSON Valide'}
+                  {jsonError ? t('json_invalid', 'Invalid JSON') : t('json_valid', 'Valid JSON')}
                 </span>
               )}
             </div>
@@ -347,10 +349,10 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
                   borderColor: 'var(--border)',
                   color: 'var(--text)'
                 }}
-                title="Recharger le fichier depuis le disque"
+                title={t('reload_file_disk', 'Reload file from disk')}
               >
                 <RefreshCw className={`w-3 h-3 ${loadingContent ? 'animate-spin' : ''}`} />
-                <span>Recharger</span>
+                <span>{t('reload', 'Reload')}</span>
               </button>
             </div>
           </div>
@@ -359,7 +361,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
           {jsonError && (
             <div className="px-4 py-2 bg-rose-500/10 border-b border-rose-500/30 text-rose-500 text-xs flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span className="font-mono text-[11px] truncate">Erreur de syntaxe : {jsonError}</span>
+              <span className="font-mono text-[11px] truncate">{t('syntax_error', 'Syntax error')}: {jsonError}</span>
             </div>
           )}
 
@@ -411,14 +413,14 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
         >
           <div className="flex items-center gap-2 text-[11px] text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Copie de sécurité (.bak) créée automatiquement avant enregistrement</span>
+            <span>{t('rules_backup_notice', 'Backup copy (.bak) created automatically before saving')}</span>
           </div>
 
           <div className="flex items-center gap-2.5">
             {saveSuccess && (
               <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 animate-fadeIn">
                 <Check className="w-3.5 h-3.5" />
-                <span>Enregistré avec succès</span>
+                <span>{t('saved_successfully', 'Saved successfully')}</span>
               </span>
             )}
 
@@ -432,7 +434,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
               }`}
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{saving ? 'Sauvegarde en cours...' : 'Enregistrer'}</span>
+              <span>{saving ? t('saving', 'Saving...') : t('save', 'Save')}</span>
             </button>
           </div>
         </div>
