@@ -170,6 +170,8 @@ def list_google_accounts() -> dict[str, Any]:
 
 def _validate_account_file(email: str) -> Path:
     cleaned = email.strip()
+    if cleaned.lower().endswith(".json"):
+        cleaned = cleaned[:-5].strip()
     if not cleaned or "/" in cleaned or "\\" in cleaned or ".." in cleaned or "@" not in cleaned:
         raise ValueError("Adresse email invalide ou chemin suspect.")
     target_file = (ACCOUNTS_DIR / f"{cleaned}.json").resolve()
@@ -657,7 +659,12 @@ def is_quota_error(message: str) -> bool:
         "capacity exceeded",
         "quota_exceeded",
         "resource has been exhausted",
-        "quota_error"
+        "quota_error",
+        "rate_limit_exceeded",
+        "ratelimit",
+        "rate-limit",
+        "rate_limit",
+        "ratelimited"
     ]
     return any(p in lower for p in patterns) or bool(_QUOTA_429_RE.search(lower))
 

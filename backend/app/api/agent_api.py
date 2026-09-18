@@ -48,6 +48,11 @@ class AgentSteerRequest(BaseModel):
     instruction: str = Field(..., description="Nouvelle consigne prioritaire à injecter")
 
 
+class AgentInputRequest(BaseModel):
+    conversation_id: str = Field(..., description="ID de la session à laquelle envoyer l'entrée ou la réponse")
+    text: str = Field(..., description="Texte de la réponse ou commande envoyée sur stdin")
+
+
 # ============================================================================
 # Endpoints
 # ============================================================================
@@ -356,3 +361,31 @@ async def steer_agent(
         "success": True,
         "message": "Instruction de guidage transmise avec succès à l'agent."
     }
+
+
+@router.post("/input")
+async def send_agent_input(
+    req: AgentInputRequest,
+    _: bool = Depends(require_auth)
+):
+    """
+    Transmet une saisie utilisateur stdin ou une réponse à une question interactive à une session en cours.
+    """
+    if not req.conversation_id or not is_safe_conversation_id(req.conversation_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="L'identifiant de conversation (conversation_id) est invalide."
+        )
+    session = execution_manager.get_session(req.conversation_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Aucune session active trouvée pour l'ID {req.conversation_id}."
+        )
+
+    await execution_manager.handle_stdin_input(req.conversation_id, req.text)
+    return {
+        "success": True,
+        "message": f"Entrée transmise avec succès à la session {req.conversation_id}."
+    }
+

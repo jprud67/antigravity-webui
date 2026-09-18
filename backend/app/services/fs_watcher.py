@@ -11,6 +11,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from app.services.storage import is_safe_conversation_id
+
 logger = logging.getLogger("antigravity.fs_watcher")
 
 # Global asyncio queue where all SSE subscribers register themselves
@@ -54,7 +56,7 @@ _UUID_PATTERN = re.compile(
 )
 
 def extract_conv_id(transcript_path: Path, brain_dir: Path | None = None) -> str | None:
-    """Extract conversation UUID from transcript.jsonl path."""
+    """Extract conversation UUID or safe ID from transcript.jsonl path."""
     p = transcript_path.resolve()
     # Case 1: brain_dir/<conv_id>/.system_generated/logs/transcript.jsonl
     if (
@@ -62,25 +64,25 @@ def extract_conv_id(transcript_path: Path, brain_dir: Path | None = None) -> str
         and p.parent.parent.name == ".system_generated"
     ):
         cand = p.parent.parent.parent.name
-        if _UUID_PATTERN.match(cand):
+        if _UUID_PATTERN.match(cand) or is_safe_conversation_id(cand):
             if brain_dir is None or p.parent.parent.parent.parent.resolve() == brain_dir.resolve():
                 return cand
     # Case 2: brain_dir/<conv_id>/transcript.jsonl (legacy / fallback)
     else:
         cand = p.parent.name
-        if _UUID_PATTERN.match(cand):
+        if _UUID_PATTERN.match(cand) or is_safe_conversation_id(cand):
             if brain_dir is None or p.parent.parent.resolve() == brain_dir.resolve():
                 return cand
     return None
 
 
 def extract_conv_id_from_artifact(artifact_path: Path, brain_dir: Path) -> str | None:
-    """Extrait l'UUID de conversation d'un chemin d'artefact confiné dans brain_dir."""
+    """Extrait l'identifiant de conversation d'un chemin d'artefact confiné dans brain_dir."""
     try:
         rel = artifact_path.resolve().relative_to(brain_dir.resolve())
         if rel.parts:
             cand = rel.parts[0]
-            if _UUID_PATTERN.match(cand):
+            if _UUID_PATTERN.match(cand) or is_safe_conversation_id(cand):
                 return cand
     except Exception as e:
         logger.debug(f"Ignored error: {e}")
@@ -121,7 +123,7 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
             return transcripts, artifacts
         try:
             for child in brain_dir.iterdir():
-                if not child.is_dir() or not _UUID_PATTERN.match(child.name):
+                if not child.is_dir() or not (_UUID_PATTERN.match(child.name) or is_safe_conversation_id(child.name)):
                     continue
                 # Primary Antigravity path: brain_dir/<conv_id>/.system_generated/logs/transcript.jsonl
                 t1 = child / ".system_generated" / "logs" / "transcript.jsonl"

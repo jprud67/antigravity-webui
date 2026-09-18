@@ -489,7 +489,7 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
     tag_name = req.tag.strip()
     if not tag_name:
         raise HTTPException(status_code=400, detail="Le nom du tag ne peut être vide.")
-    if tag_name.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', tag_name):
+    if tag_name.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./+]+$', tag_name):
         raise HTTPException(status_code=400, detail="Nom de tag Git invalide.")
 
     remote = req.remote.strip() if req.remote else "origin"

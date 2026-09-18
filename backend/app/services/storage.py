@@ -2157,7 +2157,7 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
     if not is_safe_conversation_id(conversation_id):
         raise ValueError("Identifiant de conversation non valide")
     base_dir = (BRAIN_DIR / conversation_id).resolve()
-    clean_filename = filename
+    clean_filename = filename.lstrip("/\\")
     try:
         target_path = (base_dir / clean_filename).resolve()
     except (RuntimeError, OSError):
@@ -2344,7 +2344,7 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
         for s in steps:
             c = s.get("content") or s.get("thinking") or ""
             if c:
-                preview = str(c)[:150]
+                preview = clean_user_prompt(str(c))[:150]
                 break
 
         parent_conv_id = payload.get("parent_conversation_id") or meta_payload.get("parent_conversation_id") or ""

@@ -4163,6 +4163,168 @@ def test_rules_validate_workspace_path_resilience():
     print("✓ test_rules_validate_workspace_path_resilience passed")
 
 
+def test_fs_watcher_safe_conversation_ids():
+    from pathlib import Path
+    from app.services.fs_watcher import extract_conv_id, extract_conv_id_from_artifact
+
+    p_uuid = Path("/root/.gemini/antigravity-cli/brain/12345678-1234-1234-1234-123456789abc/.system_generated/logs/transcript.jsonl")
+    assert extract_conv_id(p_uuid) == "12345678-1234-1234-1234-123456789abc"
+
+    p_safe = Path("/root/.gemini/antigravity-cli/brain/custom_session_01/.system_generated/logs/transcript.jsonl")
+    assert extract_conv_id(p_safe) == "custom_session_01"
+
+    brain_dir = Path("/root/.gemini/antigravity-cli/brain")
+    art_path = brain_dir / "custom_session_01" / "report.md"
+    assert extract_conv_id_from_artifact(art_path, brain_dir) == "custom_session_01"
+    print("✓ test_fs_watcher_safe_conversation_ids passed")
+
+
+def test_agent_api_input_endpoint():
+    import asyncio
+    import pytest
+    from fastapi import HTTPException
+    from app.api.agent_api import AgentInputRequest, send_agent_input
+
+    req_invalid = AgentInputRequest(conversation_id="../traversal", text="hello")
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(send_agent_input(req_invalid, True))
+    assert exc.value.status_code == 400
+
+    req_not_found = AgentInputRequest(conversation_id="nonexistent-conv-id", text="hello")
+    with pytest.raises(HTTPException) as exc2:
+        asyncio.run(send_agent_input(req_not_found, True))
+    assert exc2.value.status_code == 404
+    print("✓ test_agent_api_input_endpoint passed")
+
+
+def test_auth_secret_key_empty_fallback():
+    from unittest.mock import patch
+    from app.services.auth import create_access_token, verify_access_token
+
+    with patch("app.services.auth.get_auth_config", return_value={"enabled": True, "secret_key": ""}):
+        token = create_access_token()
+        assert token and ":" in token
+        assert verify_access_token(token) is True
+    print("✓ test_auth_secret_key_empty_fallback passed")
+
+
+def test_git_tag_semver_build_metadata():
+    import re
+    tag_pattern = r'^[a-zA-Z0-9_\-\./+]+$'
+    assert re.match(tag_pattern, "v1.2.3+build.1")
+    assert re.match(tag_pattern, "v2.0.0+20260918")
+    assert not re.match(tag_pattern, "tag with spaces")
+    assert not re.match(tag_pattern, "tag;rm -rf")
+    print("✓ test_git_tag_semver_build_metadata passed")
+
+
+def test_google_auth_json_suffix_and_rate_limit_patterns():
+    from app.services.google_auth import _validate_account_file, is_quota_error
+
+    target = _validate_account_file("testuser@gmail.com.json")
+    assert target.name == "testuser@gmail.com.json"
+    assert not target.name.endswith(".json.json")
+
+    assert is_quota_error('{"error": {"code": "rate_limit_exceeded"}}') is True
+    assert is_quota_error("upstream service ratelimit reached") is True
+    assert is_quota_error("gateway rate-limit triggered") is True
+    assert is_quota_error("general syntax error in script") is False
+    print("✓ test_google_auth_json_suffix_and_rate_limit_patterns passed")
+
+
+def test_cron_store_daily_at():
+    from app.services.cron_store import compute_next_run
+
+    res = compute_next_run("daily at 08:30")
+    assert res is not None and "T08:30:00" in res
+
+    res2 = compute_next_run("every day at 23:15")
+    assert res2 is not None and "T23:15:00" in res2
+
+    res3 = compute_next_run("chaque jour à 14:00")
+    assert res3 is not None and "T14:00:00" in res3
+    print("✓ test_cron_store_daily_at passed")
+
+
+def test_tasks_directory_sorting_resilience():
+    from unittest.mock import MagicMock
+    p_good = MagicMock()
+    p_good.stat.return_value.st_mtime = 100.0
+    p_broken = MagicMock()
+    p_broken.stat.side_effect = FileNotFoundError("Gone")
+
+    dirs = [p_good, p_broken]
+    def _safe_mtime(d):
+        try:
+            return d.stat().st_mtime
+        except OSError:
+            return 0.0
+
+    dirs.sort(key=_safe_mtime, reverse=True)
+    assert dirs[0] == p_good
+    assert dirs[1] == p_broken
+    print("✓ test_tasks_directory_sorting_resilience passed")
+
+
+def test_storage_read_artifact_and_import_preview():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services.storage import read_artifact_content, _import_single_conversation
+
+    with tempfile.TemporaryDirectory() as td:
+        brain = Path(td)
+        conv_dir = brain / "conv-test"
+        conv_dir.mkdir(parents=True, exist_ok=True)
+        art = conv_dir / "sample.txt"
+        art.write_text("hello artifact", encoding="utf-8")
+
+        with patch("app.services.storage.BRAIN_DIR", brain):
+            # Test leading slash sanitization
+            content = read_artifact_content("conv-test", "/sample.txt")
+            assert content == "hello artifact"
+
+    # Test clean preview prompt in _import_single_conversation
+    with tempfile.TemporaryDirectory() as td2:
+        brain2 = Path(td2)
+        with patch("app.services.storage.BRAIN_DIR", brain2):
+            payload = {
+                "title": "Clean Preview Test",
+                "steps": [
+                    {
+                        "source": "USER_EXPLICIT",
+                        "type": "USER_INPUT",
+                        "content": "<USER_REQUEST>Write a clean script</USER_REQUEST>"
+                    }
+                ]
+            }
+            res = _import_single_conversation(payload, "2026-09-18T12:00:00Z", "2026-09-18 12:00:00")
+            from app.services.storage import get_db_connection
+            conn = get_db_connection()
+            try:
+                row = conn.execute("SELECT preview FROM conversation_summaries WHERE conversation_id = ?", (res["conversation_id"],)).fetchone()
+                assert row is not None
+                assert "<USER_REQUEST>" not in row[0]
+                assert "Write a clean script" in row[0]
+            finally:
+                conn.close()
+    print("✓ test_storage_read_artifact_and_import_preview passed")
+
+
+def test_agy_driver_unversioned_gemini_models():
+    from app.services.agy_driver import resolve_model_and_effort
+
+    m1, _ = resolve_model_and_effort("gemini", "high")
+    assert m1 == "gemini-3.8-flash-high"
+
+    m2, _ = resolve_model_and_effort("gemini-flash", "low")
+    assert m2 == "gemini-3.8-flash-low"
+
+    m3, _ = resolve_model_and_effort("gemini-pro", "high")
+    assert m3 == "gemini-3.1-pro-high"
+    print("✓ test_agy_driver_unversioned_gemini_models passed")
+
+
 if __name__ == "__main__":
     test_clean_user_prompt_with_context_summary_history()
     test_validate_path_access_null_bytes()
@@ -4322,5 +4484,14 @@ if __name__ == "__main__":
     test_aggregate_steps_preserves_tool_call_id_and_matches()
     test_cron_ticker_loop_terminates_running_procs_on_cancel()
     test_rules_validate_workspace_path_resilience()
+    test_fs_watcher_safe_conversation_ids()
+    test_agent_api_input_endpoint()
+    test_auth_secret_key_empty_fallback()
+    test_git_tag_semver_build_metadata()
+    test_google_auth_json_suffix_and_rate_limit_patterns()
+    test_cron_store_daily_at()
+    test_tasks_directory_sorting_resilience()
+    test_storage_read_artifact_and_import_preview()
+    test_agy_driver_unversioned_gemini_models()
     print("\nAll unit tests passed successfully!")
 

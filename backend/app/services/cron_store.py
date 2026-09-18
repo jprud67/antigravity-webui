@@ -141,6 +141,10 @@ _SCHEDULE_INTERVAL_RE = re.compile(
     r"^(?:every|toutes les|chaque)\s+(\d+)\s*(s|sec|seconds?|secondes?|m|min|mins|minutes?|h|hr|hrs|hours?|heures?|d|day|days?|jours?|w|week|weeks?|semaines?|mo|month|months?|mois)?$",
     re.IGNORECASE
 )
+_DAILY_AT_RE = re.compile(
+    r"^(?:every\s+day|daily|chaque\s+jour|tous\s+les\s+jours)\s+(?:at|à)\s+(\d{1,2}):(\d{2})$",
+    re.IGNORECASE
+)
 
 
 def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
@@ -201,6 +205,19 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
         return (now + timedelta(weeks=1)).isoformat()
     if lower in ("every month", "monthly", "chaque mois", "tous les mois"):
         return (now + timedelta(days=30)).isoformat()
+
+    daily_at_match = _DAILY_AT_RE.match(lower)
+    if daily_at_match:
+        try:
+            h = int(daily_at_match.group(1))
+            m = int(daily_at_match.group(2))
+            if 0 <= h < 24 and 0 <= m < 60:
+                target = now.replace(hour=h, minute=m, second=0)
+                if target <= now:
+                    target += timedelta(days=1)
+                return target.isoformat()
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
 
     match = _SCHEDULE_INTERVAL_RE.match(lower)
     if match:

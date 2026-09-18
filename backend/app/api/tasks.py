@@ -33,8 +33,14 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
             conv_dirs = [target_dir] if target_dir.exists() else []
         else:
             try:
+                def _safe_mtime(d: Path) -> float:
+                    try:
+                        return d.stat().st_mtime
+                    except OSError:
+                        return 0.0
+
                 all_dirs = [d for d in BRAIN_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")]
-                all_dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+                all_dirs.sort(key=_safe_mtime, reverse=True)
                 conv_dirs = all_dirs[:30]
             except Exception:
                 conv_dirs = []

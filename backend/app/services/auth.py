@@ -197,7 +197,7 @@ def verify_password(input_password: str) -> bool:
 
 def create_access_token(expires_in_days: int = 7) -> str:
     config = get_auth_config()
-    secret = config.get("secret_key", DEFAULT_SECRET)
+    secret = config.get("secret_key") or DEFAULT_SECRET
     exp = int(time.time()) + (expires_in_days * 86400)
     payload = f"antigravity_user:{exp}"
     sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
@@ -214,7 +214,7 @@ def verify_access_token(token: str | None) -> bool:
     config = get_auth_config()
     if not config.get("enabled", True):
         return True
-    secret = config.get("secret_key", DEFAULT_SECRET)
+    secret = config.get("secret_key") or DEFAULT_SECRET
     
     parts = token.split(":")
     if len(parts) != 3:

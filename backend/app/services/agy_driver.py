@@ -268,8 +268,8 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
             ver = m_ver.group(1)
             return f"gemini-{ver}-{tier}-{eff}", None
         else:
-            base = norm.rstrip("-")
-            return f"{base}-{eff}", None
+            default_ver = "3.1" if tier == "pro" else "3.8"
+            return f"gemini-{default_ver}-{tier}-{eff}", None
 
     # For other models, use explicit effort if provided, otherwise preserve original suffix if it existed
     target_eff = effort or model_suffix
