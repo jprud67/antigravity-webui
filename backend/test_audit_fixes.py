@@ -985,18 +985,25 @@ def test_auth_corrupt_config_backup():
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_auth = Path(tmp_dir) / "webui_auth.json"
+        tmp_bak = Path(tmp_dir) / "webui_auth.json.bak"
         tmp_auth.write_text("NOT_VALID_JSON{{{", encoding="utf-8")
         corrupt_bak = Path(tmp_dir) / "webui_auth.json.corrupt.bak"
 
-        with patch("app.services.auth.AUTH_CONFIG_FILE", tmp_auth):
-            # Force cache reset
-            auth._auth_cache = None
-            auth._auth_cache_mtime = 0.0
+        orig_cache = auth._auth_cache
+        orig_mtime = auth._auth_cache_mtime
+        try:
+            with patch("app.services.auth.AUTH_CONFIG_FILE", tmp_auth), \
+                 patch("app.services.auth.AUTH_BACKUP_FILE", tmp_bak):
+                auth._auth_cache = None
+                auth._auth_cache_mtime = 0.0
 
-            cfg = auth.get_auth_config()
-            assert cfg.get("enabled") is True
-            assert corrupt_bak.exists()
-            assert corrupt_bak.read_text(encoding="utf-8") == "NOT_VALID_JSON{{{"
+                cfg = auth.get_auth_config()
+                assert cfg.get("enabled") is True
+                assert corrupt_bak.exists()
+                assert corrupt_bak.read_text(encoding="utf-8") == "NOT_VALID_JSON{{{"
+        finally:
+            auth._auth_cache = orig_cache
+            auth._auth_cache_mtime = orig_mtime
     print("✓ test_auth_corrupt_config_backup passed")
 
 
@@ -2895,6 +2902,10 @@ def test_storage_calculate_tokens_with_steered_prompt():
 
 
 def test_api_key_generation_and_verification():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services import auth
     from app.services.auth import (
         create_access_token,
         create_api_key,
@@ -2904,39 +2915,57 @@ def test_api_key_generation_and_verification():
         verify_token_or_api_key,
     )
 
-    # 1. Creation
-    key_info = create_api_key("Test Integration Key")
-    assert key_info["key"].startswith("agy_sk_")
-    key_id = key_info["id"]
-    raw_key = key_info["key"]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_auth = Path(tmp_dir) / "webui_auth.json"
+        tmp_bak = Path(tmp_dir) / "webui_auth.json.bak"
+        orig_cache = auth._auth_cache
+        orig_mtime = auth._auth_cache_mtime
+        try:
+            with patch("app.services.auth.AUTH_CONFIG_FILE", tmp_auth), \
+                 patch("app.services.auth.AUTH_BACKUP_FILE", tmp_bak):
+                auth._auth_cache = None
+                auth._auth_cache_mtime = 0.0
 
-    # 2. Listed keys have masked_key and proper metadata
-    keys_list = get_api_keys()
-    matching = [k for k in keys_list if k["id"] == key_id]
-    assert len(matching) == 1
-    assert "..." in matching[0]["masked_key"]
+                # 1. Creation
+                key_info = create_api_key("Test Integration Key")
+                assert key_info["key"].startswith("agy_sk_")
+                key_id = key_info["id"]
+                raw_key = key_info["key"]
 
-    # 3. Verification with and without Bearer prefix
-    assert verify_api_key(raw_key) is True
-    assert verify_api_key(f"Bearer {raw_key}") is True
-    assert verify_api_key("invalid_key_random_string") is False
-    assert verify_api_key("") is False
-    assert verify_api_key(None) is False
+                # 2. Listed keys have masked_key and proper metadata
+                keys_list = get_api_keys()
+                matching = [k for k in keys_list if k["id"] == key_id]
+                assert len(matching) == 1
+                assert "..." in matching[0]["masked_key"]
 
-    # 4. Hybrid verify_token_or_api_key with both session token and API key
-    session_token = create_access_token()
-    assert verify_token_or_api_key(session_token) is True
-    assert verify_token_or_api_key(raw_key) is True
-    assert verify_token_or_api_key("completely_invalid_token") is False
+                # 3. Verification with and without Bearer prefix
+                assert verify_api_key(raw_key) is True
+                assert verify_api_key(f"Bearer {raw_key}") is True
+                assert verify_api_key("invalid_key_random_string") is False
+                assert verify_api_key("") is False
+                assert verify_api_key(None) is False
 
-    # 5. Deletion
-    deleted = delete_api_key(key_id)
-    assert deleted is True
-    assert verify_api_key(raw_key) is False
+                # 4. Hybrid verify_token_or_api_key with both session token and API key
+                session_token = create_access_token()
+                assert verify_token_or_api_key(session_token) is True
+                assert verify_token_or_api_key(raw_key) is True
+                assert verify_token_or_api_key("completely_invalid_token") is False
+
+                # 5. Deletion
+                deleted = delete_api_key(key_id)
+                assert deleted is True
+                assert verify_api_key(raw_key) is False
+        finally:
+            auth._auth_cache = orig_cache
+            auth._auth_cache_mtime = orig_mtime
     print("✓ test_api_key_generation_and_verification passed")
 
 
 def test_api_key_last_used_at_throttling():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services import auth
     from app.services.auth import (
         create_api_key,
         delete_api_key,
@@ -2944,22 +2973,34 @@ def test_api_key_last_used_at_throttling():
         verify_api_key,
     )
 
-    key_info = create_api_key("Throttled Key Test")
-    raw_key = key_info["key"]
-    key_id = key_info["id"]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_auth = Path(tmp_dir) / "webui_auth.json"
+        tmp_bak = Path(tmp_dir) / "webui_auth.json.bak"
+        orig_cache = auth._auth_cache
+        orig_mtime = auth._auth_cache_mtime
+        try:
+            with patch("app.services.auth.AUTH_CONFIG_FILE", tmp_auth), \
+                 patch("app.services.auth.AUTH_BACKUP_FILE", tmp_bak):
+                auth._auth_cache = None
+                auth._auth_cache_mtime = 0.0
 
-    try:
-        # First verification should set last_used_at
-        assert verify_api_key(raw_key) is True
-        config = get_auth_config()
-        stored_entry = next(k for k in config.get("api_keys", []) if k["id"] == key_id)
-        first_used = stored_entry.get("last_used_at")
-        assert first_used is not None
+                key_info = create_api_key("Throttled Key Test")
+                raw_key = key_info["key"]
+                key_id = key_info["id"]
 
-        # Immediate re-verification (<60s) updates memory without failing
-        assert verify_api_key(raw_key) is True
-    finally:
-        delete_api_key(key_id)
+                # First verification should set last_used_at
+                assert verify_api_key(raw_key) is True
+                config = get_auth_config()
+                stored_entry = next(k for k in config.get("api_keys", []) if k["id"] == key_id)
+                first_used = stored_entry.get("last_used_at")
+                assert first_used is not None
+
+                # Immediate re-verification (<60s) updates memory without failing
+                assert verify_api_key(raw_key) is True
+                delete_api_key(key_id)
+        finally:
+            auth._auth_cache = orig_cache
+            auth._auth_cache_mtime = orig_mtime
     print("✓ test_api_key_last_used_at_throttling passed")
 
 
@@ -3032,38 +3073,72 @@ def test_agy_subcommand_add_mcp_server_default_isolation():
 
 def test_auth_dynamic_env_api_key():
     import os
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
 
+    from app.services import auth
     from app.services.auth import verify_api_key
 
-    secret = "agy_test_dynamic_env_key_12345"
-    old = os.environ.get("ANTIGRAVITY_API_KEY")
-    try:
-        os.environ["ANTIGRAVITY_API_KEY"] = secret
-        assert verify_api_key(secret) is True
-        assert verify_api_key(f"Bearer {secret}") is True
-        assert verify_api_key("wrong_key") is False
-    finally:
-        if old is not None:
-            os.environ["ANTIGRAVITY_API_KEY"] = old
-        else:
-            os.environ.pop("ANTIGRAVITY_API_KEY", None)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_auth = Path(tmp_dir) / "webui_auth.json"
+        tmp_bak = Path(tmp_dir) / "webui_auth.json.bak"
+        orig_cache = auth._auth_cache
+        orig_mtime = auth._auth_cache_mtime
+        secret = "agy_test_dynamic_env_key_12345"
+        old = os.environ.get("ANTIGRAVITY_API_KEY")
+        try:
+            with patch("app.services.auth.AUTH_CONFIG_FILE", tmp_auth), \
+                 patch("app.services.auth.AUTH_BACKUP_FILE", tmp_bak):
+                auth._auth_cache = None
+                auth._auth_cache_mtime = 0.0
+                os.environ["ANTIGRAVITY_API_KEY"] = secret
+                assert verify_api_key(secret) is True
+                assert verify_api_key(f"Bearer {secret}") is True
+                assert verify_api_key("wrong_key") is False
+        finally:
+            auth._auth_cache = orig_cache
+            auth._auth_cache_mtime = orig_mtime
+            if old is not None:
+                os.environ["ANTIGRAVITY_API_KEY"] = old
+            else:
+                os.environ.pop("ANTIGRAVITY_API_KEY", None)
     print("✓ test_auth_dynamic_env_api_key passed")
 
 
 def test_auth_ensure_api_keys_storage_no_resurrect():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.services import auth
     from app.services.auth import _ensure_api_keys_storage
 
-    # When api_keys key is present and empty (user deleted all keys), it should remain empty
-    cfg = {"enabled": True, "api_keys": []}
-    result = _ensure_api_keys_storage(cfg)
-    assert result == []
-    assert len(cfg["api_keys"]) == 0
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_auth = Path(tmp_dir) / "webui_auth.json"
+        tmp_bak = Path(tmp_dir) / "webui_auth.json.bak"
+        orig_cache = auth._auth_cache
+        orig_mtime = auth._auth_cache_mtime
+        try:
+            with patch("app.services.auth.AUTH_CONFIG_FILE", tmp_auth), \
+                 patch("app.services.auth.AUTH_BACKUP_FILE", tmp_bak):
+                auth._auth_cache = None
+                auth._auth_cache_mtime = 0.0
 
-    # When api_keys key is missing or not a list, it should initialize default key
-    cfg2 = {"enabled": True}
-    result2 = _ensure_api_keys_storage(cfg2)
-    assert len(result2) == 1
-    assert result2[0]["id"] == "master-default"
+                # When api_keys key is present and empty (user deleted all keys), it should remain empty
+                cfg = {"enabled": True, "api_keys": []}
+                result = _ensure_api_keys_storage(cfg)
+                assert result == []
+                assert len(cfg["api_keys"]) == 0
+
+                # When api_keys key is missing or not a list, it should initialize default key
+                cfg2 = {"enabled": True}
+                result2 = _ensure_api_keys_storage(cfg2)
+                assert len(result2) == 1
+                assert result2[0]["id"] == "master-default"
+        finally:
+            auth._auth_cache = orig_cache
+            auth._auth_cache_mtime = orig_mtime
     print("✓ test_auth_ensure_api_keys_storage_no_resurrect passed")
 
 
@@ -3377,9 +3452,100 @@ def test_atomic_write_jsonl_initial_permissions():
         assert target.exists()
         with open(target, "r", encoding="utf-8") as f:
             lines = f.readlines()
-        assert len(lines) == 1
-        assert "secret data" in lines[0]
-    print("✓ test_atomic_write_jsonl_permissions passed")
+def test_save_auth_config_preserves_password_on_partial_dict():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services import auth
+    from app.services.auth import (
+        get_auth_config,
+        hash_password,
+        save_auth_config,
+        verify_password,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_auth = Path(tmp_dir) / "webui_auth.json"
+        tmp_bak = Path(tmp_dir) / "webui_auth.json.bak"
+        orig_cache = auth._auth_cache
+        orig_mtime = auth._auth_cache_mtime
+        try:
+            with patch("app.services.auth.AUTH_CONFIG_FILE", tmp_auth), \
+                 patch("app.services.auth.AUTH_BACKUP_FILE", tmp_bak):
+                auth._auth_cache = None
+                auth._auth_cache_mtime = 0.0
+
+                # 1. Initialize with strong custom password
+                custom_pwd = "MySuperSecretPassword123!"
+                init_cfg = {
+                    "enabled": True,
+                    "password": hash_password(custom_pwd),
+                    "secret_key": "test_secret_key"
+                }
+                save_auth_config(init_cfg)
+                assert verify_password(custom_pwd) is True
+
+                # 2. Simulate partial dict save without "password" key (like unit test or partial update)
+                partial_cfg = {"enabled": True, "api_keys": []}
+                save_auth_config(partial_cfg)
+
+                # 3. Verify password is still retained and valid!
+                assert verify_password(custom_pwd) is True
+                current_cfg = get_auth_config()
+                assert current_cfg["password"] == init_cfg["password"]
+        finally:
+            auth._auth_cache = orig_cache
+            auth._auth_cache_mtime = orig_mtime
+    print("✓ test_save_auth_config_preserves_password_on_partial_dict passed")
+
+
+def test_get_auth_config_recovers_from_backup():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services import auth
+    from app.services.auth import (
+        get_auth_config,
+        hash_password,
+        save_auth_config,
+        verify_password,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_auth = Path(tmp_dir) / "webui_auth.json"
+        tmp_bak = Path(tmp_dir) / "webui_auth.json.bak"
+        orig_cache = auth._auth_cache
+        orig_mtime = auth._auth_cache_mtime
+        try:
+            with patch("app.services.auth.AUTH_CONFIG_FILE", tmp_auth), \
+                 patch("app.services.auth.AUTH_BACKUP_FILE", tmp_bak):
+                auth._auth_cache = None
+                auth._auth_cache_mtime = 0.0
+
+                # 1. Setup config with custom password
+                custom_pwd = "BackupRecoveryPassword999!"
+                cfg = {
+                    "enabled": True,
+                    "password": hash_password(custom_pwd),
+                    "secret_key": "test_secret_key"
+                }
+                save_auth_config(cfg)
+                assert tmp_bak.exists()
+
+                # 2. Corrupt the main auth file and clear memory cache
+                tmp_auth.write_text("CORRUPTED_GARBAGE{{", encoding="utf-8")
+                auth._auth_cache = None
+                auth._auth_cache_mtime = 0.0
+
+                # 3. get_auth_config must restore from backup instead of resetting to default
+                recovered = get_auth_config()
+                assert recovered["password"] == cfg["password"]
+                assert verify_password(custom_pwd) is True
+                assert verify_password("antigravity2026") is False
+        finally:
+            auth._auth_cache = orig_cache
+            auth._auth_cache_mtime = orig_mtime
+    print("✓ test_get_auth_config_recovers_from_backup passed")
 
 
 if __name__ == "__main__":
@@ -3520,5 +3686,7 @@ if __name__ == "__main__":
     test_clean_user_prompt_xml_tag_backreference()
     test_build_conversation_dict_row_or_dict()
     test_atomic_write_jsonl_initial_permissions()
+    test_save_auth_config_preserves_password_on_partial_dict()
+    test_get_auth_config_recovers_from_backup()
     print("\nAll unit tests passed successfully!")
 

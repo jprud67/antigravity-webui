@@ -702,8 +702,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setPwdError('Les mots de passe ne correspondent pas');
       return;
     }
-    if (newPassword.length < 4) {
-      setPwdError('Le mot de passe doit faire au moins 4 caractères');
+    if (newPassword.length < 8) {
+      setPwdError('Le mot de passe doit comporter au moins 8 caractères');
       return;
     }
 

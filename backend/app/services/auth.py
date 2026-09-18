@@ -16,6 +16,7 @@ from app.platform_utils import restrict_file_permissions
 logger = logging.getLogger("antigravity.auth")
 
 AUTH_CONFIG_FILE = GEMINI_DIR / "webui_auth.json"
+AUTH_BACKUP_FILE = GEMINI_DIR / "webui_auth.json.bak"
 
 DEFAULT_SECRET = "antigravity-super-secret-webui-token-key-2026"
 DEFAULT_PASSWORD = os.environ.get("WEBUI_PASSWORD") or "antigravity2026"
@@ -30,6 +31,31 @@ _auth_lock = threading.RLock()
 _auth_cache: dict[str, Any] | None = None
 _auth_cache_mtime: float = 0.0
 
+
+def _extract_password_from_any_source() -> str | None:
+    """Tente d'extraire un hash de mot de passe existant depuis le cache, le fichier principal ou le fichier backup."""
+    global _auth_cache
+    if _auth_cache and isinstance(_auth_cache.get("password"), str) and _auth_cache["password"]:
+        return _auth_cache["password"]
+    if AUTH_CONFIG_FILE.exists():
+        try:
+            with open(AUTH_CONFIG_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                if isinstance(d, dict) and d.get("password"):
+                    return str(d["password"])
+        except Exception:
+            pass
+    if AUTH_BACKUP_FILE.exists():
+        try:
+            with open(AUTH_BACKUP_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                if isinstance(d, dict) and d.get("password"):
+                    return str(d["password"])
+        except Exception:
+            pass
+    return None
+
+
 def get_auth_config() -> dict[str, Any]:
     global _auth_cache, _auth_cache_mtime
     with _auth_lock:
@@ -40,11 +66,21 @@ def get_auth_config() -> dict[str, Any]:
                     return _auth_cache.copy()
                 with open(AUTH_CONFIG_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                if isinstance(data, dict):
+                    # Si le mot de passe est absent du fichier (ex: écrasement partiel), le préserver depuis le backup ou cache
+                    if not data.get("password"):
+                        recovered_pwd = _extract_password_from_any_source()
+                        if recovered_pwd:
+                            data["password"] = recovered_pwd
+                            save_auth_config(data)
+                        else:
+                            data["password"] = hash_password(DEFAULT_PASSWORD)
+                            save_auth_config(data)
                     _auth_cache = data
                     _auth_cache_mtime = stat.st_mtime
                     return data.copy()
         except Exception as e:
-            logger.warning(f"Configuration d'authentification illisible — régénération : {e}")
+            logger.warning(f"Configuration d'authentification illisible : {e}")
             if AUTH_CONFIG_FILE.exists():
                 try:
                     corrupt_bak = AUTH_CONFIG_FILE.parent / f"{AUTH_CONFIG_FILE.name}.corrupt.bak"
@@ -54,7 +90,28 @@ def get_auth_config() -> dict[str, Any]:
                 except Exception as bak_err:
                     logger.debug(f"Impossible de sauvegarder le fichier auth corrompu: {bak_err}")
 
-        # Default config
+            # Tentative de récupération prioritaire depuis la sauvegarde miroir (.bak)
+            if AUTH_BACKUP_FILE.exists():
+                try:
+                    with open(AUTH_BACKUP_FILE, "r", encoding="utf-8") as f:
+                        bak_data = json.load(f)
+                    if isinstance(bak_data, dict) and bak_data.get("password"):
+                        logger.warning("Restauration de la configuration d'authentification depuis webui_auth.json.bak")
+                        save_auth_config(bak_data)
+                        return bak_data.copy()
+                except Exception as bak_load_err:
+                    logger.debug(f"Échec de restauration depuis la sauvegarde .bak: {bak_load_err}")
+
+            # Si le cache en mémoire a déjà une configuration valide, NE JAMAIS réinitialiser au défaut !
+            if _auth_cache is not None and _auth_cache.get("password"):
+                logger.warning("Utilisation de la configuration d'authentification en mémoire (cache protégé)")
+                try:
+                    save_auth_config(_auth_cache)
+                except Exception:
+                    pass
+                return _auth_cache.copy()
+
+        # Première installation uniquement (aucun fichier, aucun backup, aucun cache existant)
         config = {
             "enabled": True,
             "password": hash_password(DEFAULT_PASSWORD),
@@ -63,9 +120,28 @@ def get_auth_config() -> dict[str, Any]:
         save_auth_config(config)
         return config.copy()
 
+
 def save_auth_config(config: dict[str, Any]):
     global _auth_cache, _auth_cache_mtime
     with _auth_lock:
+        if not isinstance(config, dict):
+            raise TypeError("La configuration d'authentification doit être un dictionnaire.")
+
+        # Protection absolue contre la perte de mot de passe :
+        # Ne jamais permettre d'écraser la configuration avec un mot de passe vide ou manquant
+        if not config.get("password"):
+            existing_pwd = _extract_password_from_any_source()
+            if existing_pwd:
+                config["password"] = existing_pwd
+            else:
+                config["password"] = hash_password(DEFAULT_PASSWORD)
+
+        if "secret_key" not in config or not config["secret_key"]:
+            if _auth_cache and _auth_cache.get("secret_key"):
+                config["secret_key"] = _auth_cache["secret_key"]
+            else:
+                config["secret_key"] = secrets.token_hex(32)
+
         AUTH_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
         temp_file = AUTH_CONFIG_FILE.parent / f".{AUTH_CONFIG_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
         try:
@@ -76,6 +152,22 @@ def save_auth_config(config: dict[str, Any]):
             restrict_file_permissions(AUTH_CONFIG_FILE)
             _auth_cache = config.copy()
             _auth_cache_mtime = AUTH_CONFIG_FILE.stat().st_mtime
+
+            # Sauvegarde miroir persistante pour parer à toute corruption ou suppression accidentelle
+            bak_temp = AUTH_BACKUP_FILE.parent / f".{AUTH_BACKUP_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
+            try:
+                with open(bak_temp, "w", encoding="utf-8") as f:
+                    json.dump(config, f, indent=2)
+                restrict_file_permissions(bak_temp)
+                bak_temp.replace(AUTH_BACKUP_FILE)
+                restrict_file_permissions(AUTH_BACKUP_FILE)
+            except Exception as bak_err:
+                if bak_temp.exists():
+                    try:
+                        bak_temp.unlink()
+                    except Exception:
+                        pass
+                logger.debug(f"Impossible d'écrire la sauvegarde miroir .bak: {bak_err}")
         except Exception:
             if temp_file.exists():
                 try:
@@ -91,7 +183,9 @@ def verify_password(input_password: str) -> bool:
     config = get_auth_config()
     if not config.get("enabled", True):
         return True
-    configured_pwd = config.get("password", DEFAULT_PASSWORD)
+    configured_pwd = config.get("password")
+    if not configured_pwd:
+        return False
     if configured_pwd.startswith("pbkdf2_sha256$"):
         parts = configured_pwd.split("$")
         if len(parts) == 3:
@@ -99,7 +193,7 @@ def verify_password(input_password: str) -> bool:
             computed = hash_password(input_password.strip(), salt)
             return hmac.compare_digest(computed, configured_pwd)
     
-    # Fallback to direct comparison for legacy plaintext
+    # Fallback to direct comparison for legacy plaintext only
     matched = hmac.compare_digest(input_password.strip(), configured_pwd.strip())
     if matched:
         # Auto-upgrade stored plaintext to secure PBKDF2 hash
@@ -179,7 +273,9 @@ def _ensure_api_keys_storage(config: dict[str, Any]) -> list[dict[str, Any]]:
             "created_at": int(time.time()),
             "last_used_at": None,
         }]
-        save_auth_config(config)
+        # Ne sauvegarder que si 'config' contient le mot de passe, évitant d'écraser la configuration lors de tests
+        if "password" in config:
+            save_auth_config(config)
     return config["api_keys"]
 
 
