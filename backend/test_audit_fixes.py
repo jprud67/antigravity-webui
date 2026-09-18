@@ -3773,6 +3773,29 @@ def test_execution_manager_live_tool_calls_bounding():
     print("✓ test_execution_manager_live_tool_calls_bounding passed")
 
 
+def test_safe_copy_artifacts_handles_exception_without_unbound_error():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services.storage import _safe_copy_artifacts
+
+    with tempfile.TemporaryDirectory() as td:
+        src = Path(td) / "src_session"
+        dst = Path(td) / "dst_session"
+        src.mkdir()
+        dst.mkdir()
+        test_file = src / "test.txt"
+        test_file.write_text("sample")
+
+        # Mock is_safe_path to raise an Exception before target is defined
+        with patch("app.services.storage.is_safe_path", side_effect=RuntimeError("Security check failure")):
+            # Should not raise UnboundLocalError or any other uncaught exception
+            _safe_copy_artifacts(src, dst)
+
+        assert not (dst / "test.txt").exists()
+    print("✓ test_safe_copy_artifacts_handles_exception_without_unbound_error passed")
+
+
 if __name__ == "__main__":
     test_file_download_unicode_and_special_chars()
     test_token_calculation()
@@ -3919,5 +3942,6 @@ if __name__ == "__main__":
     test_fork_conversation_deepcopy_isolation()
     test_updater_git_env_strict_author()
     test_execution_manager_live_tool_calls_bounding()
+    test_safe_copy_artifacts_handles_exception_without_unbound_error()
     print("\nAll unit tests passed successfully!")
 

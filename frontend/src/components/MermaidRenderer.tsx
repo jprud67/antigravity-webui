@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Maximize2, Minimize2, Copy, Check, Eye } from 'lucide-react';
+import { useI18n } from '../services/i18n';
 
 interface MermaidRendererProps {
   chart: string;
 }
 
 export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgContent, setSvgContent] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +80,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
         }
       } catch (err: any) {
         if (isMounted) {
-          setError(err?.message || 'Erreur de rendu Mermaid');
+          setError(err?.message || t('mermaid_render_error', 'Mermaid rendering error'));
         }
       }
     };
@@ -96,7 +98,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
         } catch {}
       }
     };
-  }, [chart, isDarkTheme]);
+  }, [chart, isDarkTheme, t]);
 
   const copyChartCode = async () => {
     try {
@@ -128,14 +130,14 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
         }}
       >
         <div className="flex items-center justify-between mb-2">
-          <span className="font-semibold font-mono text-[11px]" style={{ color: 'var(--accent)' }}>Diagramme Mermaid (Source)</span>
+          <span className="font-semibold font-mono text-[11px]" style={{ color: 'var(--accent)' }}>{t('mermaid_diagram_source', 'Mermaid Diagram (Source)')}</span>
           <button
             onClick={copyChartCode}
             className="text-[10px] flex items-center gap-1 cursor-pointer"
             style={{ color: 'var(--muted)' }}
           >
             {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-            <span>Copier la source</span>
+            <span>{t('mermaid_copy_source', 'Copy source')}</span>
           </button>
         </div>
         <pre
@@ -175,7 +177,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
       >
         <div className="flex items-center gap-2">
           <Eye className="w-3.5 h-3.5 text-sky-500" />
-          <span className="font-semibold text-[11px]" style={{ color: 'var(--strong)' }}>Diagramme Architecture / Flux</span>
+          <span className="font-semibold text-[11px]" style={{ color: 'var(--strong)' }}>{t('mermaid_architecture_flow', 'Architecture / Flow Diagram')}</span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -188,7 +190,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
             }}
           >
             {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-            <span>{copied ? 'Copié' : 'Source'}</span>
+            <span>{copied ? t('copied', 'Copied') : t('source_code', 'Source')}</span>
           </button>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
@@ -198,7 +200,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
               borderColor: 'var(--border)',
               color: 'var(--muted)'
             }}
-            title={fullscreen ? 'Réduire' : 'Plein écran'}
+            title={fullscreen ? t('collapse', 'Collapse') : t('fullscreen', 'Fullscreen')}
           >
             {fullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
@@ -226,7 +228,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart }) => {
             className="my-3 h-24 rounded-2xl border border-dashed flex items-center justify-center text-xs opacity-50 font-mono"
             style={{ borderColor: 'var(--border)' }}
           >
-            Diagramme affiché en plein écran
+            {t('diagram_fullscreen', 'Diagram displayed in full screen')}
           </div>
           {typeof document !== 'undefined' && createPortal(renderContent(true), document.body)}
         </>

@@ -15,6 +15,7 @@ import {
    ChevronLeft
  } from 'lucide-react';
 import { fetchFileTree, fetchFileContent } from '../services/api';
+import { useI18n } from '../services/i18n';
 
 interface FileExplorerModalProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
   currentWorkspace,
   onInsertPath,
 }) => {
+  const { t } = useI18n();
   const [tree, setTree] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -110,7 +112,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
       const data = await fetchFileContent(node.path);
       setFileContent(data.content);
     } catch (err: any) {
-      setFileContent(`// Impossible de charger le fichier : ${err.message}`);
+      setFileContent(`// ${t('file_explorer_load_error', 'Unable to load file')}: ${err.message}`);
     } finally {
       setContentLoading(false);
     }
@@ -248,7 +250,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
               <HardDrive className="w-4 h-4 text-sky-400" />
             </div>
             <div>
-              <h2 className="text-xs font-semibold" style={{ color: 'var(--strong)' }}>Explorateur du Workspace</h2>
+              <h2 className="text-xs font-semibold" style={{ color: 'var(--strong)' }}>{t('file_explorer_title', 'Workspace Explorer')}</h2>
               <p className="text-[10px] font-mono truncate max-w-xs sm:max-w-md" style={{ color: 'var(--muted)' }}>{currentWorkspace}</p>
             </div>
           </div>
@@ -258,7 +260,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
               onClick={loadTree}
               className="p-1.5 rounded-lg transition-colors cursor-pointer"
               style={{ color: 'var(--muted)' }}
-              title="Rafraîchir l'arborescence"
+              title={t('refresh', 'Refresh')}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-sky-400' : ''}`} />
             </button>
@@ -288,7 +290,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
                 <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Rechercher un fichier..."
+                  placeholder={t('file_explorer_search_placeholder', 'Search a file...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-8.5 pr-3 py-1.5 rounded-xl text-xs font-mono border focus:outline-none"
@@ -305,7 +307,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
             <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
               {filteredTree.length === 0 ? (
                 <div className="p-6 text-center text-xs" style={{ color: 'var(--muted)' }}>
-                  {loading ? 'Chargement...' : 'Aucun fichier trouvé.'}
+                  {loading ? t('loading', 'Loading...') : t('file_explorer_no_files', 'No files found.')}
                 </div>
               ) : (
                 renderTree(filteredTree)
@@ -338,7 +340,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
                       }}
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
-                      <span>Arbre</span>
+                      <span>{t('file_explorer_tree', 'Tree')}</span>
                     </button>
                     <span className="font-mono truncate max-w-[140px] sm:max-w-md font-semibold text-[11px]" style={{ color: 'var(--strong)' }}>
                       {selectedFile}
@@ -355,14 +357,14 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
                       }}
                     >
                       {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                      <span className="hidden xs:inline">{copied ? 'Copié' : 'Chemin'}</span>
+                      <span className="hidden xs:inline">{copied ? t('copied', 'Copied!') : t('path', 'Path')}</span>
                     </button>
                     <button
                       onClick={() => insertAndClose(selectedFile)}
                       className="py-1 px-2.5 sm:px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <CornerDownLeft className="w-3 h-3" />
-                      <span>Insérer</span>
+                      <span>{t('insert', 'Insert')}</span>
                     </button>
                   </div>
                 </div>
@@ -376,7 +378,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
                 >
                   {contentLoading ? (
                     <div className="flex items-center justify-center h-full text-xs font-mono" style={{ color: 'var(--muted)' }}>
-                      Chargement du contenu...
+                      {t('file_explorer_loading_content', 'Loading content...')}
                     </div>
                   ) : (
                     <pre className="font-mono text-[11px] leading-relaxed whitespace-pre" style={{ color: 'var(--text)' }}>
@@ -388,8 +390,8 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-xs space-y-2 p-6" style={{ color: 'var(--muted)' }}>
                 <FileCode className="w-10 h-10" style={{ color: 'var(--muted)' }} />
-                <p>Cliquez sur un fichier dans l'arborescence pour l'inspecter</p>
-                <p className="text-[11px]" style={{ color: 'var(--muted)' }}>Vous pourrez aussi l'insérer directement dans votre prompt avec le préfixe @</p>
+                <p>{t('file_explorer_click_to_inspect', 'Click a file in the tree to inspect it')}</p>
+                <p className="text-[11px]" style={{ color: 'var(--muted)' }}>{t('file_explorer_insert_hint', 'You can also insert it directly into your prompt with the @ prefix')}</p>
               </div>
             )}
           </div>

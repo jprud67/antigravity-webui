@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Lock, KeyRound, Eye, EyeOff, ShieldAlert, ArrowRight } from 'lucide-react';
 import { login } from '../services/api';
 import { chatSocket } from '../services/ws';
+import { useI18n } from '../services/i18n';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => {
+  const { t } = useI18n();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -28,7 +30,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
       chatSocket.reconnect();
       onSuccess();
     } catch (err: any) {
-      setError(err.message || 'Mot de passe incorrect');
+      setError(err.message || t('login_incorrect_password', 'Mot de passe incorrect'));
     } finally {
       setLoading(false);
     }
@@ -47,10 +49,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
             <Lock className="w-8 h-8 text-sky-400" />
           </div>
           <h2 className="text-xl font-bold tracking-tight text-white">
-            Poste de Contrôle Sécurisé
+            {t('login_secure_control', 'Poste de Contrôle Sécurisé')}
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-xs">
-            Authentification requise pour piloter le système et l'agent Antigravity
+            {t('login_auth_required', "Authentification requise pour piloter le système et l'agent Antigravity")}
           </p>
         </div>
 
@@ -58,7 +60,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[11px] font-semibold text-slate-300 uppercase tracking-wider mb-2">
-              Mot de passe d'accès
+              {t('login_password_label', "Mot de passe d'accès")}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
@@ -71,7 +73,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
                   setPassword(e.target.value);
                   if (error) setError(null);
                 }}
-                placeholder="Saisissez votre mot de passe..."
+                placeholder={t('login_password_placeholder', 'Saisissez votre mot de passe...')}
                 autoFocus
                 className="w-full pl-10 pr-10 py-3 bg-[#080d1a] border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 transition-all font-mono"
               />
@@ -98,17 +100,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
             className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-medium text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-500/25 transition-all disabled:opacity-50 cursor-pointer"
           >
             {loading ? (
-              <span className="animate-pulse">Vérification...</span>
+              <span className="animate-pulse">{t('login_verifying', 'Vérification...')}</span>
             ) : (
               <>
-                <span>Déverrouiller le Cockpit</span>
+                <span>{t('login_unlock_button', 'Déverrouiller le Cockpit')}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
 
           <p className="text-[10px] text-center text-slate-500">
-            Mot de passe initial par défaut : <code className="text-slate-400 bg-slate-800/80 px-1 py-0.5 rounded">antigravity2026</code> (modifiable dans les réglages).
+            {t('login_default_hint', 'Mot de passe initial par défaut : {0} (modifiable dans les réglages).', 'antigravity2026')}
           </p>
         </form>
       </div>

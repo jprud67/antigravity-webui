@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, X, ShieldCheck, Lock, AlertTriangle } from 'lucide-react';
 import { chatSocket } from '../services/ws';
+import { useI18n } from '../services/i18n';
 
 interface ApprovalCardProps {
   toolName: string;
@@ -15,6 +16,7 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
   path,
   onResolved
 }) => {
+  const { t } = useI18n();
   const [decision, setDecision] = useState<string | null>(null);
 
   const handleAction = (dec: 'allow-once' | 'allow-session' | 'always-allow' | 'deny') => {
@@ -42,10 +44,10 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
         <div className="flex items-center gap-2">
           {isAllowed ? <Check className="w-4 h-4 text-emerald-400" /> : <X className="w-4 h-4 text-rose-400" />}
           <span className="font-medium">
-            {decision === 'allow-once' && 'Action autorisée une seule fois.'}
-            {decision === 'allow-session' && 'Action autorisée pour toute la session.'}
-            {decision === 'always-allow' && 'Action autorisée de manière permanente (règle enregistrée).'}
-            {decision === 'deny' && 'Action refusée par l’utilisateur.'}
+            {decision === 'allow-once' && t('approval_allowed_once', 'Action autorisée une seule fois.')}
+            {decision === 'allow-session' && t('approval_allowed_session', 'Action autorisée pour toute la session.')}
+            {decision === 'always-allow' && t('approval_allowed_always', 'Action autorisée de manière permanente (règle enregistrée).')}
+            {decision === 'deny' && t('approval_denied', 'Action refusée par l’utilisateur.')}
           </span>
         </div>
         <span className="text-[10px] font-mono opacity-70 uppercase tracking-wider">{decision}</span>
@@ -70,7 +72,7 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-amber-500">
-              <span>Confirmation de Sécurité Requise</span>
+              <span>{t('approval_security_required', 'Confirmation de Sécurité Requise')}</span>
             </h4>
             <span
               className="text-[10px] font-mono px-2 py-0.5 rounded-full border"
@@ -85,7 +87,7 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
           </div>
 
           <p className="text-xs leading-relaxed" style={{ color: 'var(--text)' }}>
-            L'agent sollicite votre approbation pour exécuter cette opération sur le système :
+            {t('approval_prompt_text', "L'agent sollicite votre approbation pour exécuter cette opération sur le système :")}
           </p>
 
           {(command || path) && (
@@ -108,7 +110,7 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
               className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-emerald-600/20"
             >
               <Check className="w-3.5 h-3.5" />
-              <span>Autoriser 1 fois</span>
+              <span>{t('approval_btn_once', 'Autoriser 1 fois')}</span>
             </button>
 
             <button
@@ -116,7 +118,7 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
               className="py-1.5 px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-sky-600/20"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Pour la session</span>
+              <span>{t('approval_btn_session', 'Pour la session')}</span>
             </button>
 
             <button
@@ -124,7 +126,7 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
               className="py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-indigo-600/20"
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>Toujours autoriser</span>
+              <span>{t('approval_btn_always', 'Toujours autoriser')}</span>
             </button>
 
             <button
@@ -132,7 +134,7 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
               className="py-1.5 px-3 rounded-lg bg-rose-600/80 hover:bg-rose-500 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
             >
               <X className="w-3.5 h-3.5" />
-              <span>Refuser</span>
+              <span>{t('approval_btn_deny', 'Refuser')}</span>
             </button>
           </div>
         </div>

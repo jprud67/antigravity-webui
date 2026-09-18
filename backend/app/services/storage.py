@@ -572,6 +572,7 @@ def _safe_copy_artifacts(source_dir: Path, target_dir: Path) -> None:
     for item in source_dir.iterdir():
         if item.name in (".system_generated", "scratch") or item.name.startswith((".", ".tmp", ".lock")):
             continue
+        target: Path | None = None
         try:
             # Ne jamais suivre de lien symbolique (évite les traversées et boucles)
             if item.is_symlink():
@@ -586,7 +587,7 @@ def _safe_copy_artifacts(source_dir: Path, target_dir: Path) -> None:
                 shutil.copytree(item, target, dirs_exist_ok=True, symlinks=False)
         except Exception as e:
             logger.warning(f"Failed to copy artifact {item.name}: {e}")
-            if target.exists() and item.is_file():
+            if target is not None and target.exists() and item.is_file():
                 try:
                     target.unlink(missing_ok=True)
                 except Exception:

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { GitCommit, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { copyText } from '../utils/codeBlockUtils';
+import { useI18n } from '../services/i18n';
 
 interface DiffViewerProps {
   filename?: string;
@@ -18,8 +19,10 @@ interface DiffLine {
 export const DiffViewer: React.FC<DiffViewerProps> = ({
   filename,
   diffText,
-  title = 'Modifications de Fichiers (Diff)'
+  title
 }) => {
+  const { t } = useI18n();
+  const displayTitle = title || t('file_diff_title', 'Modifications de Fichiers (Diff)');
   const [collapsed, setCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -110,7 +113,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         <div className="flex items-center gap-2.5">
           <GitCommit className="w-4 h-4 text-sky-500" />
           <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>
-            {filename || title}
+            {filename || displayTitle}
           </span>
           <div className="flex items-center gap-1.5 text-[10px] font-bold ml-2">
             {additionsCount > 0 && (
@@ -137,7 +140,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             }}
           >
             {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-            <span>{copied ? 'Copié' : 'Copier'}</span>
+            <span>{copied ? t('copied', 'Copié') : t('copy', 'Copier')}</span>
           </button>
           <button
             onClick={() => setCollapsed(!collapsed)}
