@@ -266,14 +266,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleClearChatHistory = async () => {
     if (!activeConversation) return;
     const ok = await showConfirm({
-      title: 'Effacer l\'historique',
-      message: 'Voulez-vous vraiment effacer tous les messages de la conversation active ?',
-      confirmText: 'Effacer',
+      title: t('confirm_clear_history_title', 'Clear history'),
+      message: t('confirm_clear_history_msg', 'Do you really want to clear all messages in the active conversation?'),
+      confirmText: t('clear_btn', 'Clear'),
       destructive: true
     });
     if (ok) {
       if (onClearHistory) onClearHistory();
-      showToast('Historique des messages effacé.', 'success');
+      showToast(t('toast_history_cleared', 'Message history cleared.'), 'success');
       onClose();
     }
   };
@@ -289,13 +289,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setUpdateCheck(upd);
       if (force) {
         if (upd.update_available) {
-          showToast(`Mise à jour disponible : ${upd.behind} nouveau(x) commit(s)`, 'info');
+          showToast(t('toast_update_available_commits', 'Update available: {0} new commit(s)').replace('{0}', String(upd.behind)), 'info');
         } else {
-          showToast('Antigravity WebUI est parfaitement à jour !', 'success');
+          showToast(t('toast_up_to_date', 'Antigravity WebUI is up to date!'), 'success');
         }
       }
     } catch (err: any) {
-      showToast(`Erreur lors de la vérification : ${err.message}`, 'error');
+      showToast(t('err_update_check', 'Error checking updates: {0}').replace('{0}', err.message), 'error');
     } finally {
       setCheckingUpdate(false);
     }
@@ -303,24 +303,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleTriggerApplyUpdate = async () => {
     const ok = await showConfirm({
-      title: 'Mettre à jour Antigravity WebUI',
-      message: 'Voulez-vous installer la mise à jour depuis GitHub (origin/main) ? Le serveur récupérera les modifications, recompilera le frontend et redémarrera automatiquement le service.',
-      confirmText: 'Installer la mise à jour',
+      title: t('confirm_update_title', 'Update Antigravity WebUI'),
+      message: t('confirm_update_msg', 'Do you want to install update from GitHub (origin/main)? The server will pull changes, rebuild frontend, and restart service automatically.'),
+      confirmText: t('confirm_update_btn', 'Install update'),
       destructive: false
     });
     if (!ok) return;
 
     setApplyingUpdate(true);
-    setUpdateProgressMsg('Téléchargement des modifications depuis GitHub et compilation...');
+    setUpdateProgressMsg(t('update_progress_download', 'Downloading changes from GitHub and building...'));
     try {
       const res = await applySystemUpdate();
-      setUpdateProgressMsg(res.message || 'Mise à jour réussie ! Redémarrage du serveur...');
-      showToast('Mise à jour appliquée avec succès ! Rechargement...', 'success');
+      setUpdateProgressMsg(res.message || t('update_progress_restarting', 'Update successful! Restarting server...'));
+      showToast(t('toast_update_success_reload', 'Update applied successfully! Reloading...'), 'success');
       setTimeout(() => {
         window.location.reload();
       }, 4000);
     } catch (err: any) {
-      showToast(`Échec de la mise à jour : ${err.message}`, 'error');
+      showToast(t('err_update_apply', 'Update failed: {0}').replace('{0}', err.message), 'error');
       setUpdateProgressMsg(null);
     } finally {
       setApplyingUpdate(false);
@@ -330,20 +330,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleDeleteActiveConv = async () => {
     if (!activeConversation) return;
     const ok = await showConfirm({
-      title: 'Supprimer la session',
-      message: `Supprimer définitivement la session "${convTitle || activeConversation.title || activeConversation.conversation_id.slice(0, 8)}" ? Cette action est irréversible.`,
-      confirmText: 'Supprimer définitivement',
+      title: t('confirm_delete_session_title', 'Delete session'),
+      message: t('confirm_delete_session_msg', 'Permanently delete session "{0}"? This action cannot be undone.').replace('{0}', convTitle || activeConversation.title || activeConversation.conversation_id.slice(0, 8)),
+      confirmText: t('confirm_delete_session_btn', 'Permanently delete'),
       destructive: true
     });
     if (ok) {
       try {
         await deleteConversation(activeConversation.conversation_id);
-        showToast('Session supprimée.', 'success');
+        showToast(t('toast_session_deleted', 'Session deleted.'), 'success');
         if (onDeleteConversation) onDeleteConversation(activeConversation.conversation_id);
         if (onConversationUpdated) onConversationUpdated();
         onClose();
       } catch (e: any) {
-        showToast(`Erreur lors de la suppression : ${e.message}`, 'error');
+        showToast(t('err_session_delete', 'Error deleting session: {0}').replace('{0}', e.message), 'error');
       }
     }
   };
@@ -397,17 +397,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleCreateApiKey = async () => {
     if (!newKeyName.trim()) {
-      showToast('Veuillez saisir un nom pour la clé (ex: Cursor, LangChain)', 'info');
+      showToast(t('toast_enter_key_name', 'Please enter a name for the key (e.g., Cursor, LangChain)'), 'info');
       return;
     }
     setCreatingApiKey(true);
     try {
       const res = await createApiKey(newKeyName.trim());
       setNewKeyName('');
-      showToast(`Clé d'API "${res.api_key.name}" générée avec succès !`, 'success');
+      showToast(t('toast_api_key_created', 'API key "{0}" generated successfully!').replace('{0}', res.api_key.name), 'success');
       await loadApiKeys();
     } catch (e: any) {
-      showToast(`Erreur création clé API: ${e.message}`, 'error');
+      showToast(t('err_create_api_key', 'Error creating API key: {0}').replace('{0}', e.message), 'error');
     } finally {
       setCreatingApiKey(false);
     }
@@ -415,24 +415,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleDeleteApiKey = async (keyId: string, name: string) => {
     const ok = await showConfirm({
-      title: 'Révoquer la clé d\'API',
-      message: `Voulez-vous vraiment révoquer la clé "${name}" ? Les applications externes l'utilisant perdront leur accès.`,
-      confirmText: 'Révoquer la clé',
+      title: t('confirm_revoke_key_title', 'Revoke API key'),
+      message: t('confirm_revoke_key_msg', 'Do you really want to revoke key "{0}"? External apps using it will lose access.').replace('{0}', name),
+      confirmText: t('confirm_revoke_key_btn', 'Revoke key'),
       destructive: true
     });
     if (!ok) return;
     try {
       await deleteApiKey(keyId);
-      showToast('Clé d\'API révoquée avec succès.', 'success');
+      showToast(t('toast_key_revoked', 'API key revoked successfully.'), 'success');
       await loadApiKeys();
     } catch (e: any) {
-      showToast(`Erreur suppression: ${e.message}`, 'error');
+      showToast(t('err_key_revoke', 'Error revoking key: {0}').replace('{0}', e.message), 'error');
     }
   };
 
   const handleCopyText = (text: string, label: string = 'Texte') => {
     navigator.clipboard.writeText(text);
-    showToast(`${label} copié dans le presse-papiers !`, 'success');
+    showToast(t('toast_copied_to_clipboard', '{0} copied to clipboard!').replace('{0}', label), 'success');
   };
 
   useEffect(() => {
@@ -1941,10 +1941,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         }}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>{th.name}</span>
+                          <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>{th.nameKey ? t(th.nameKey, th.name) : th.name}</span>
                           {isSelected && <Check className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />}
                         </div>
-                        <p className="text-[10px] leading-snug" style={{ color: 'var(--muted)' }}>{th.desc}</p>
+                        <p className="text-[10px] leading-snug" style={{ color: 'var(--muted)' }}>{th.descKey ? t(th.descKey, th.desc) : th.desc}</p>
                       </button>
                     );
                   })}
@@ -1955,10 +1955,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                   <Boxes className="w-4 h-4 text-sky-500" />
-                  <span>Nuances & Accents Visuels (Skins Hermes)</span>
+                  <span>{t("visual_accents_skins", "Nuances & Visual Accents (Hermes Skins)")}</span>
                 </h3>
                 <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>
-                  Sélectionnez la palette d'accent et les surfaces spécifiques. Se combine avec le mode clair ou sombre sélectionné ci-dessus.
+                  {t("skins_desc", "Select accent palette and specific surfaces. Combines with light or dark mode selected above.")}
                 </p>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-96 overflow-y-auto pr-1">
@@ -1991,11 +1991,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             ))}
                           </div>
                           <span className="font-bold text-[11px] block truncate" style={{ color: 'var(--strong)' }}>
-                            {sk.name}
+                            {sk.nameKey ? t(sk.nameKey, sk.name) : sk.name}
                           </span>
                         </div>
                         <p className="text-[9px] leading-tight mt-1 line-clamp-2" style={{ color: 'var(--muted)' }}>
-                          {sk.desc}
+                          {sk.descKey ? t(sk.descKey, sk.desc) : sk.desc}
                         </p>
                       </button>
                     );

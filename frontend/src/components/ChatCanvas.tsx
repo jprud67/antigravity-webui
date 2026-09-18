@@ -112,6 +112,7 @@ const copyTextToClipboard = async (text: string): Promise<boolean> => {
  * GitHub-style Callout & Alert Banner Component ([!NOTE], [!TIP], etc.)
  */
 const CalloutBlock = ({ children }: any) => {
+  const { t } = useI18n();
   let calloutType: 'note' | 'tip' | 'important' | 'warning' | 'caution' | null = null;
   let otherChildren = children;
 
@@ -137,11 +138,11 @@ const CalloutBlock = ({ children }: any) => {
 
   if (calloutType) {
     const configs = {
-      note: { title: 'Note', icon: Info, className: 'markdown-callout-note' },
-      tip: { title: 'Astuce', icon: Lightbulb, className: 'markdown-callout-tip' },
-      important: { title: 'Important', icon: AlertCircle, className: 'markdown-callout-important' },
-      warning: { title: 'Avertissement', icon: AlertTriangle, className: 'markdown-callout-warning' },
-      caution: { title: 'Attention', icon: ShieldAlert, className: 'markdown-callout-caution' },
+      note: { title: t('callout_note', 'Note'), icon: Info, className: 'markdown-callout-note' },
+      tip: { title: t('callout_tip', 'Tip'), icon: Lightbulb, className: 'markdown-callout-tip' },
+      important: { title: t('callout_important', 'Important'), icon: AlertCircle, className: 'markdown-callout-important' },
+      warning: { title: t('callout_warning', 'Warning'), icon: AlertTriangle, className: 'markdown-callout-warning' },
+      caution: { title: t('callout_caution', 'Caution'), icon: ShieldAlert, className: 'markdown-callout-caution' },
     };
 
     const cfg = configs[calloutType];
@@ -226,7 +227,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
             e.currentTarget.style.borderColor = 'var(--border)';
             e.currentTarget.style.backgroundColor = 'var(--surface-subtle)';
           }}
-          title={`Artefact Markdown : ${cleanPath} — Cliquer pour ouvrir`}
+          title={t('markdown_artifact_click', 'Markdown Artifact: {0} — Click to open').replace('{0}', cleanPath)}
         >
           <span className="flex items-center gap-3 min-w-0">
             <span
@@ -267,7 +268,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
               }}
             >
               <Download className="w-3 h-3" />
-              <span>Télécharger</span>
+              <span>{t('download', 'Download')}</span>
             </a>
             <span
               className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-colors"
@@ -277,7 +278,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
                 color: 'var(--accent-text)',
               }}
             >
-              <span>Ouvrir</span>
+              <span>{t('open', 'Open')}</span>
               <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
             </span>
           </span>
@@ -338,7 +339,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
             color: '#ffffff',
           }}
         >
-          <span>Télécharger</span>
+          <span>{t('download', 'Download')}</span>
           <Download className="w-2.5 h-2.5" />
         </span>
         <span
@@ -348,7 +349,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
             window.dispatchEvent(new CustomEvent('open-workspace-file', { detail: { path: cleanPath } }));
             if (onOpenFile) onOpenFile();
           }}
-          title="Ouvrir dans le panneau latéral"
+          title={t("open_side_panel", "Open in side panel")}
           className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors ml-0.5 opacity-50 hover:opacity-100 shrink-0"
         >
           <ExternalLink className="w-3 h-3" />
@@ -508,7 +509,7 @@ const ToolItemCard: React.FC<{ tool: ToolCallItem }> = ({ tool }) => {
                 : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
             }`}
           >
-            {tool.status === 'running' ? 'En cours...' : tool.status === 'error' ? 'Erreur' : 'Terminé'}
+            {tool.status === 'running' ? t('status_running', 'Running...') : tool.status === 'error' ? t('status_error', 'Error') : t('status_done', 'Done')}
           </span>
 
           {tool.result && (
@@ -518,7 +519,7 @@ const ToolItemCard: React.FC<{ tool: ToolCallItem }> = ({ tool }) => {
               className="px-2 py-0.5 rounded text-[10px] font-medium border hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
               style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
             >
-              {openDrawer ? 'Fermer' : 'Sortie'}
+              {openDrawer ? t('close', 'Close') : t('output', 'Output')}
             </button>
           )}
         </div>
@@ -534,7 +535,7 @@ const ToolItemCard: React.FC<{ tool: ToolCallItem }> = ({ tool }) => {
               className="flex items-center gap-1 hover:text-strong cursor-pointer"
             >
               {copied ? <Check className="w-2.5 h-2.5 text-emerald-500" /> : <Copy className="w-2.5 h-2.5" />}
-              <span>{copied ? 'Copié' : 'Copier'}</span>
+              <span>{copied ? t('copied', 'Copied') : t('copy', 'Copy')}</span>
             </button>
           </div>
           <pre className="p-2.5 text-[10.5px] font-mono leading-relaxed overflow-x-auto max-h-56 bg-code-bg text-pre-text">
@@ -639,12 +640,12 @@ const ToolActivityFeed: React.FC<{
                   color: hasRunning ? '#F59E0B' : 'var(--accent)',
                 }}
               >
-                {hasRunning ? 'En cours...' : 'Terminé'}
+                {hasRunning ? t('status_running', 'Running...') : t('status_done', 'Done')}
               </span>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0 text-muted text-[11px]">
-              <span>{isExpanded ? 'Masquer' : 'Détails'}</span>
+              <span>{isExpanded ? t('hide', 'Hide') : t('details', 'Details')}</span>
               {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </div>
           </button>
@@ -847,7 +848,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
 
   const handleToggleSpeech = (msgId: string, text: string) => {
     if (!('speechSynthesis' in window)) {
-      showToast('La synthèse vocale n\'est pas supportée par votre navigateur.', 'warning');
+      showToast(t('speech_not_supported', 'Text-to-speech is not supported by your browser.'), 'warning');
       return;
     }
     if (activeSpeakingMsgId === msgId) {
@@ -907,7 +908,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 borderColor: 'var(--border)',
                 color: 'var(--text)',
               }}
-              title="Ouvrir le menu de navigation"
+              title={t("open_nav_menu", "Open navigation menu")}
             >
               <Menu className="w-4 h-4" />
             </button>
@@ -924,7 +925,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 borderColor: 'var(--accent)',
                 color: 'var(--accent-text)',
               }}
-              title="Nouvelle session"
+              title={t("new_session", "New session")}
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -943,7 +944,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
               className="text-xs font-semibold truncate max-w-[140px] sm:max-w-xs block"
               style={{ color: 'var(--strong)' }}
             >
-              {conversationTitle || 'Nouvelle conversation'}
+              {conversationTitle || t('new_conversation', 'New conversation')}
             </span>
 
             {onEditSessionMeta && conversationId && (
@@ -951,7 +952,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 type="button"
                 onClick={onEditSessionMeta}
                 className="p-1 rounded opacity-60 hover:opacity-100 transition-opacity cursor-pointer shrink-0"
-                title="Gérer le titre et les métadonnées"
+                title={t("manage_meta", "Manage title and metadata")}
               >
                 <Edit3 className="w-3 h-3" style={{ color: 'var(--muted)' }} />
               </button>
@@ -1478,10 +1479,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                           type="button"
                           onClick={() => handleCopyMessage(msg.id, msg.content)}
                           className="p-1 hover:opacity-100 opacity-60 cursor-pointer transition-opacity flex items-center gap-1"
-                          title="Copier le message"
+                          title={t("copy_message", "Copy message")}
                         >
                           {copiedMsgId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                          {copiedMsgId === msg.id && <span className="text-[10px] text-emerald-400 font-sans">Copié</span>}
+                          {copiedMsgId === msg.id && <span className="text-[10px] text-emerald-400 font-sans">{t('copied', 'Copied')}</span>}
                         </button>
                       </div>
                     </div>
@@ -1624,7 +1625,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                         )}
                       </div>
                       <div className="flex items-center gap-1 text-[11px] opacity-75">
-                        <span>{isThoughtOpen ? 'Masquer' : 'Afficher'}</span>
+                        <span>{isThoughtOpen ? t('hide', 'Hide') : t('show', 'Show')}</span>
                         {isThoughtOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                       </div>
                     </button>
@@ -1677,10 +1678,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                           borderColor: copiedMsgId === msg.id ? '#10B981' : 'var(--border)',
                           color: copiedMsgId === msg.id ? '#10B981' : undefined,
                         }}
-                        title="Copier la réponse complète"
+                        title={t("copy_full_response", "Copy full response")}
                       >
                         {copiedMsgId === msg.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                        <span>{copiedMsgId === msg.id ? 'Copié !' : 'Copier'}</span>
+                        <span>{copiedMsgId === msg.id ? t('copied', 'Copied!') : t('copy', 'Copy')}</span>
                       </button>
                     )}
 
@@ -1693,7 +1694,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                         title={t("branch_from_step", "Branch from this step (create a branch)")}
                       >
                         <GitBranch className="w-3 h-3 text-fuchsia-500" />
-                        <span className="hidden sm:inline">Bifurquer</span>
+                        <span className="hidden sm:inline">{t("fork", "Fork")}</span>
                       </button>
                     )}
 
@@ -1705,7 +1706,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                           isSpeaking ? 'text-sky-500 bg-sky-500/10 border-sky-500/30' : 'hover:bg-surface-subtle'
                         }`}
                         style={{ borderColor: isSpeaking ? undefined : 'var(--border)' }}
-                        title={isSpeaking ? 'Arrêter la synthèse vocale' : 'Écouter la réponse'}
+                        title={isSpeaking ? t('stop_tts', 'Stop text-to-speech') : t('listen_response', 'Listen to response')}
                       >
                         {isSpeaking ? <VolumeX className="w-3 h-3 text-rose-400 animate-pulse" /> : <Volume2 className="w-3 h-3" />}
                         <span className="hidden sm:inline">{isSpeaking ? t("stop", "Stop") : t("listen", "Listen")}</span>

@@ -294,7 +294,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
           <button
             onClick={() => setActionSuccess(null)}
             className="text-xs hover:opacity-80 p-0.5 rounded cursor-pointer shrink-0"
-            title="Fermer"
+            title="Close"
           >
             ✕
           </button>
@@ -309,7 +309,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
           <button
             onClick={() => setError(null)}
             className="text-xs hover:opacity-80 p-0.5 rounded cursor-pointer shrink-0"
-            title="Fermer"
+            title="Close"
           >
             ✕
           </button>

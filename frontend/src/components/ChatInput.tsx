@@ -157,18 +157,18 @@ export const ChatInput = React.memo<ChatInputProps>(({
       let current = [...prev];
       for (const file of files) {
         if (current.length >= MAX_ATTACHMENTS) {
-          showToast(`Limite maximale de ${MAX_ATTACHMENTS} pièces jointes atteinte.`, 'info');
+          showToast(t('toast_attachment_limit', 'Maximum limit of {0} attachments reached.').replace('{0}', String(MAX_ATTACHMENTS)), 'info');
           break;
         }
         if (file.size > MAX_FILE_SIZE) {
-          showToast(`Le fichier "${file.name}" dépasse la limite autorisée de 10 Mo.`, 'error');
+          showToast(t('toast_file_size_limit', 'File "{0}" exceeds the allowed limit of 10 MB.').replace('{0}', file.name), 'error');
           continue;
         }
         const isImg = file.type.startsWith('image/');
         const reader = new FileReader();
         const id = createAttachmentId();
         reader.onerror = () => {
-          showToast(`Impossible de lire le fichier "${file.name}"`, 'error');
+          showToast(t('toast_read_file_error', 'Unable to read file "{0}"').replace('{0}', file.name), 'error');
         };
         if (isImg) {
           reader.onload = (e) => {
@@ -245,7 +245,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      showToast('La reconnaissance vocale n\'est pas supportée par ce navigateur.', 'error');
+      showToast(t('toast_speech_not_supported', 'Speech recognition is not supported by this browser.'), 'error');
       return;
     }
 
@@ -456,7 +456,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
       }
     }
     onSelectModel(newModelId);
-    showToast(`Modèle appliqué : ${newModelObj?.name || newModelId}`, 'success');
+    showToast(t('toast_model_applied', 'Model applied: {0}').replace('{0}', newModelObj?.name || newModelId), 'success');
   };
 
   const filteredCommands = useMemo(() => {
@@ -475,29 +475,29 @@ export const ChatInput = React.memo<ChatInputProps>(({
     switch (cmd) {
       case '/help':
         if (onOpenHelp) onOpenHelp();
-        else showToast('Tapez / pour voir toutes les commandes slash disponibles.', 'info');
+        else showToast(t('toast_help_hint', 'Type / to see all available slash commands.'), 'info');
         return true;
 
       case '/clear':
         if (onClearChat) {
           onClearChat();
-          showToast('Messages effacés.', 'success');
+          showToast(t('toast_messages_cleared', 'Messages cleared.'), 'success');
         }
         return true;
 
       case '/new':
         if (onNewChat) {
           onNewChat();
-          showToast('Nouvelle conversation créée.', 'success');
+          showToast(t('toast_new_chat_created', 'New conversation created.'), 'success');
         }
         return true;
 
       case '/theme':
         if (args) {
           const res = applyTheme(args);
-          showToast(`Thème / Skin mis à jour : ${res.value}`, 'success');
+          showToast(t('toast_theme_updated', 'Theme / Skin updated: {0}').replace('{0}', res.value), 'success');
         } else {
-          showToast('Usage: /theme <dark|light|system|sienna|catppuccin|ares|zeus...>', 'info');
+          showToast(t('toast_theme_usage', 'Usage: /theme <dark|light|system|sienna|catppuccin|ares|zeus...>'), 'info');
         }
         return true;
 
@@ -506,7 +506,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         if (onOpenGoogleAccount) {
           onOpenGoogleAccount();
         } else {
-          showToast('Ouvrez les Paramètres > Compte Google pour gérer votre compte.', 'info');
+          showToast(t('toast_google_hint', 'Open Settings > Google Account to manage your account.'), 'info');
         }
         return true;
 
@@ -519,21 +519,21 @@ export const ChatInput = React.memo<ChatInputProps>(({
           );
           if (match) {
             setLanguage(match.code);
-            showToast(`Langue définie sur : ${match.flag || ''} ${match.label} (${match.code})`, 'success');
+            showToast(t('toast_lang_set', 'Language set to: {0}').replace('{0}', `${match.flag || ''} ${match.label} (${match.code})`), 'success');
           } else {
-            showToast(`Langue inconnue "${args}". Codes: ${SUPPORTED_LANGUAGES.map((l) => l.code).join(', ')}`, 'error');
+            showToast(t('toast_lang_unknown', 'Unknown language "{0}". Codes: {1}').replace('{0}', args).replace('{1}', SUPPORTED_LANGUAGES.map((l) => l.code).join(', ')), 'error');
           }
         } else {
           if (onOpenLanguages) onOpenLanguages();
           else if (onOpenHelp) onOpenHelp();
-          else showToast(`Langue actuelle : ${getCurrentLanguage()}`, 'info');
+          else showToast(t('toast_lang_current', 'Current language: {0}').replace('{0}', getCurrentLanguage()), 'info');
         }
         return true;
 
       case '/yolo':
         setAutoApprove((prev) => {
           const next = !prev;
-          showToast(next ? '⚡ Mode YOLO (Auto-Run) ACTIVÉ' : 'Mode YOLO désactivé (Demande de validation)', next ? 'success' : 'info');
+          showToast(next ? t('toast_yolo_on', '⚡ YOLO Mode (Auto-Run) ACTIVATED') : t('toast_yolo_off', 'YOLO Mode deactivated (Confirmation requested)'), next ? 'success' : 'info');
           return next;
         });
         return true;
@@ -560,28 +560,28 @@ export const ChatInput = React.memo<ChatInputProps>(({
 
       case '/tasks':
         if (onOpenTasks) onOpenTasks();
-        else showToast('Tableau de bord des tâches indisponible.', 'info');
+        else showToast(t('toast_tasks_unavailable', 'Task dashboard unavailable.'), 'info');
         return true;
 
       case '/skills':
         if (onOpenSkills) onOpenSkills();
-        else showToast('Compétences Antigravity installées.', 'info');
+        else showToast(t('toast_skills_installed', 'Antigravity skills installed.'), 'info');
         return true;
 
       case '/use':
         if (args) {
           handleSubmit('normal', `[Directive de compétence : ${args}] Veuillez consulter et utiliser prioritairement les outils et compétences du skill "${args}".`);
-          showToast(`Skill activé : ${args}`, 'success');
+          showToast(t('toast_skill_activated', 'Skill activated: {0}').replace('{0}', args), 'success');
         } else {
           if (onOpenSkills) onOpenSkills();
-          else showToast('Usage: /use <nom_du_skill>', 'info');
+          else showToast(t('toast_skill_usage', 'Usage: /use <skill_name>'), 'info');
         }
         return true;
 
       case '/files':
       case '/attach':
         if (onOpenFileExplorer) onOpenFileExplorer();
-        else showToast('Explorateur de fichiers non disponible.', 'info');
+        else showToast(t('toast_files_unavailable', 'File explorer unavailable.'), 'info');
         return true;
 
       case '/export':
@@ -591,16 +591,16 @@ export const ChatInput = React.memo<ChatInputProps>(({
       case '/branch':
         if (onForkMessage) {
           onForkMessage();
-          showToast('Branche créée.', 'success');
+          showToast(t('toast_branch_created', 'Branch created.'), 'success');
         }
         return true;
 
       case '/title':
         if (args && onRenameTitle) {
           onRenameTitle(args);
-          showToast(`Conversation renommée : ${args}`, 'success');
+          showToast(t('toast_conv_renamed', 'Conversation renamed: {0}').replace('{0}', args), 'success');
         } else {
-          showToast('Usage: /title <nouveau titre>', 'info');
+          showToast(t('toast_title_usage', 'Usage: /title <new title>'), 'info');
         }
         return true;
 
@@ -611,25 +611,25 @@ export const ChatInput = React.memo<ChatInputProps>(({
       case '/stop':
         if (isStreaming && onStopStreaming) {
           onStopStreaming();
-          showToast('Exécution interrompue.', 'info');
+          showToast(t('toast_exec_stopped', 'Execution stopped.'), 'info');
         }
         return true;
 
       case '/retry':
         if (onRetry) {
           onRetry();
-          showToast('Relance de la dernière instruction...', 'info');
+          showToast(t('toast_retry_launch', 'Relaunching last instruction...'), 'info');
         } else {
-          showToast('Aucun message précédent à relancer.', 'info');
+          showToast(t('toast_retry_none', 'No previous message to retry.'), 'info');
         }
         return true;
 
       case '/undo':
         if (onUndo) {
           onUndo();
-          showToast('Dernière étape annulée.', 'success');
+          showToast(t('toast_step_undone', 'Last step undone.'), 'success');
         } else {
-          showToast('Impossible d\'annuler l\'étape.', 'info');
+          showToast(t('toast_undo_failed', 'Unable to undo step.'), 'info');
         }
         return true;
 
@@ -641,7 +641,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
             ? `[Compactage du contexte - Sujet : ${args}] Veuillez résumer et condenser l'historique de cette session de manière concise.`
             : `[Compactage du contexte] Veuillez résumer et condenser l'historique de cette conversation de manière concise pour optimiser la fenêtre de contexte.`
         );
-        showToast('🗜️ Demande de compression du contexte envoyée...', 'info');
+        showToast(t('toast_compress_sent', '🗜️ Context compression request sent...'), 'info');
         return true;
 
       case '/usage':
@@ -650,11 +650,11 @@ export const ChatInput = React.memo<ChatInputProps>(({
           onShowUsage('usage');
         } else if (usage) {
           showToast(
-            `📊 Tokens: ${usage.totalTokens.toLocaleString()} (Entrée: ${usage.inputTokens.toLocaleString()}, Sortie: ${usage.outputTokens.toLocaleString()})`,
+            t('toast_tokens_usage', '📊 Tokens: {0} (Input: {1}, Output: {2})').replace('{0}', usage.totalTokens.toLocaleString()).replace('{1}', usage.inputTokens.toLocaleString()).replace('{2}', usage.outputTokens.toLocaleString()),
             'info'
           );
         } else {
-          showToast('Métriques de tokens non disponibles.', 'info');
+          showToast(t('toast_tokens_unavailable', 'Token metrics unavailable.'), 'info');
         }
         return true;
 
@@ -662,7 +662,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         if (onShowUsage) {
           onShowUsage('credits');
         } else {
-          showToast('Consultation des crédits Antigravity...', 'info');
+          showToast(t('toast_credits_check', 'Checking Antigravity credits...'), 'info');
         }
         return true;
 
@@ -670,7 +670,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         if (onShowUsage) {
           onShowUsage('changelog');
         } else {
-          showToast('Consultation du journal des modifications...', 'info');
+          showToast(t('toast_changelog_check', 'Viewing changelog...'), 'info');
         }
         return true;
 
@@ -678,7 +678,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         if (onShowStatus) {
           onShowStatus();
         } else {
-          const statText = `🟢 Serveur actif | Modèle: ${currentModelObj?.name || selectedModel} | Workspace: ${currentWorkspace || '/root'}`;
+          const statText = t('toast_server_active', '🟢 Server active | Model: {0} | Workspace: {1}').replace('{0}', currentModelObj?.name || selectedModel).replace('{1}', currentWorkspace || '/root');
           showToast(statText, 'info');
         }
         return true;
@@ -690,7 +690,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         } else if (onOpenUpdates) {
           onOpenUpdates();
         } else {
-          showToast('Vérification des mises à jour...', 'info');
+          showToast(t('toast_checking_updates', 'Checking for updates...'), 'info');
         }
         return true;
 
@@ -699,17 +699,17 @@ export const ChatInput = React.memo<ChatInputProps>(({
           handleSubmit('normal', `[Aparté / Question rapide] ${args}`);
           return true;
         } else {
-          showToast('Usage: /btw <votre question en aparté>', 'info');
+          showToast(t('toast_btw_usage', 'Usage: /btw <your side question>'), 'info');
           return true;
         }
 
       case '/background':
         if (args) {
           handleSubmit('normal', `/goal ${args}`);
-          showToast('Tâche autonome lancée en arrière-plan.', 'success');
+          showToast(t('toast_bg_launched', 'Autonomous task launched in background.'), 'success');
           return true;
         } else {
-          showToast('Usage: /background <instruction de la tâche>', 'info');
+          showToast(t('toast_bg_usage', 'Usage: /background <task instruction>'), 'info');
           return true;
         }
 
@@ -718,7 +718,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
           handleSubmit('steer', args);
           return true;
         } else {
-          showToast('Usage: /steer <nouvelle orientation>', 'info');
+          showToast(t('toast_steer_usage', 'Usage: /steer <new direction>'), 'info');
           return true;
         }
 
@@ -729,9 +729,9 @@ export const ChatInput = React.memo<ChatInputProps>(({
         } else {
           if (isStreaming && onStopStreaming) {
             onStopStreaming();
-            showToast('Exécution interrompue.', 'info');
+            showToast(t('toast_exec_stopped', 'Execution stopped.'), 'info');
           } else {
-            showToast('Usage: /interrupt <nouvelle orientation>', 'info');
+            showToast(t('toast_interrupt_usage', 'Usage: /interrupt <new direction>'), 'info');
           }
           return true;
         }
@@ -741,7 +741,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
           handleSubmit('queue', args);
           return true;
         } else {
-          showToast('Usage: /queue <instruction en attente>', 'info');
+          showToast(t('toast_queue_usage', 'Usage: /queue <pending instruction>'), 'info');
           return true;
         }
 
@@ -752,12 +752,12 @@ export const ChatInput = React.memo<ChatInputProps>(({
           );
           if (found) {
             handleModelChange(found.id);
-            showToast(`Modèle sélectionné : ${found.name}`, 'success');
+            showToast(t('toast_model_selected', 'Selected model: {0}').replace('{0}', found.name), 'success');
           } else {
-            showToast(`Modèle inconnu : ${args}. Modèles: ${models.map((m) => m.name).join(', ')}`, 'error');
+            showToast(t('toast_model_unknown', 'Unknown model: {0}. Models: {1}').replace('{0}', args).replace('{1}', models.map((m) => m.name).join(', ')), 'error');
           }
         } else {
-          showToast(`Modèle actif : ${currentModelObj?.name || selectedModel}`, 'info');
+          showToast(t('toast_model_active', 'Active model: {0}').replace('{0}', currentModelObj?.name || selectedModel), 'info');
         }
         return true;
 

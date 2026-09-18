@@ -134,13 +134,13 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       const text = await file.text();
       const payload = JSON.parse(text);
       const res = await importConversation(payload);
-      showToast(`Session importée : ${res.title}`, 'success');
+      showToast(t('toast_session_imported', 'Session imported: {0}').replace('{0}', res.title), 'success');
       if (onRefreshConversations) {
         await onRefreshConversations();
       }
       onSelectConversation(res.conversation_id);
     } catch (err: any) {
-      showToast(`Erreur lors de l'import : ${err.message}`, 'error');
+      showToast(t('err_session_import', 'Error importing session: {0}').replace('{0}', err.message), 'error');
     } finally {
       e.target.value = '';
     }
@@ -277,7 +277,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   const handleBulkDelete = async () => {
     if (selectedConvIds.size === 0) return;
     const count = selectedConvIds.size;
-    if (!(await showConfirm(`Supprimer définitivement ces ${count} session(s) ? Cette action est irréversible.`, { destructive: true }))) {
+    if (!(await showConfirm(t('confirm_bulk_delete', 'Permanently delete these {0} session(s)? This action cannot be undone.').replace('{0}', String(count)), { destructive: true }))) {
       return;
     }
     setIsBulkLoading(true);
@@ -295,9 +295,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       }
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
-      showToast(`${count} session(s) supprimée(s)`, 'success');
+      showToast(t('toast_bulk_deleted', '{0} session(s) deleted').replace('{0}', String(count)), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de la suppression groupée', 'error');
+      showToast(err.message || t('err_bulk_delete', 'Error during bulk deletion'), 'error');
     } finally {
       setIsBulkLoading(false);
     }
@@ -318,9 +318,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       }
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
-      showToast(pinState ? `${count} session(s) épinglée(s)` : `${count} session(s) désépinglée(s)`, 'success');
+      showToast(pinState ? t('toast_bulk_pinned', '{0} session(s) pinned').replace('{0}', String(count)) : t('toast_bulk_unpinned', '{0} session(s) unpinned').replace('{0}', String(count)), 'success');
     } catch (err: any) {
-      showToast(err.message || "Erreur lors de l'épinglage groupé", 'error');
+      showToast(err.message || t('err_bulk_pin', 'Error during bulk pin/unpin'), 'error');
     } finally {
       setIsBulkLoading(false);
     }
@@ -341,9 +341,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       }
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
-      showToast(archiveState ? `${count} session(s) archivée(s)` : `${count} session(s) désarchivée(s)`, 'success');
+      showToast(archiveState ? t('toast_bulk_archived', '{0} session(s) archived').replace('{0}', String(count)) : t('toast_bulk_unarchived', '{0} session(s) unarchived').replace('{0}', String(count)), 'success');
     } catch (err: any) {
-      showToast(err.message || "Erreur lors de l'archivage groupé", 'error');
+      showToast(err.message || t('err_bulk_archive', 'Error during bulk archiving'), 'error');
     } finally {
       setIsBulkLoading(false);
     }
@@ -371,9 +371,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       setBulkTagInput('');
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
-      showToast(`Tags appliqués à ${count} session(s)`, 'success');
+      showToast(t('toast_bulk_tagged', 'Tags applied to {0} session(s)').replace('{0}', String(count)), 'success');
     } catch (err: any) {
-      showToast(err.message || "Erreur lors de l'application des tags", 'error');
+      showToast(err.message || t('err_bulk_tag', 'Error applying tags'), 'error');
     } finally {
       setIsBulkLoading(false);
     }
@@ -399,9 +399,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       setBulkProjectInput('');
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
-      showToast(clear ? `Projet retiré de ${count} session(s)` : `Projet assigné à ${count} session(s)`, 'success');
+      showToast(clear ? t('toast_project_removed', 'Project removed from {0} session(s)').replace('{0}', String(count)) : t('toast_project_assigned', 'Project assigned to {0} session(s)').replace('{0}', String(count)), 'success');
     } catch (err: any) {
-      showToast(err.message || "Erreur lors de l'assignation du projet", 'error');
+      showToast(err.message || t('err_bulk_project', 'Error assigning project'), 'error');
     } finally {
       setIsBulkLoading(false);
     }
@@ -415,9 +415,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       await bulkConversationExport(Array.from(selectedConvIds));
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
-      showToast(`${count} session(s) exportée(s)`, 'success');
+      showToast(t('toast_bulk_exported', '{0} session(s) exported').replace('{0}', String(count)), 'success');
     } catch (err: any) {
-      showToast(err.message || "Erreur lors de l'export groupé", 'error');
+      showToast(err.message || t('err_bulk_export', 'Error during bulk export'), 'error');
     } finally {
       setIsBulkLoading(false);
     }

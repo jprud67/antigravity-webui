@@ -51,7 +51,7 @@ const ToastEntry: React.FC<{ item: ToastItem; onDismiss: (id: string) => void }>
         onClick={() => { setExiting(true); setTimeout(() => onDismiss(item.id), 200); }}
         className="shrink-0 p-0.5 rounded hover:bg-white/10 transition-colors"
         style={{ color: 'var(--muted)' }}
-        aria-label="Fermer"
+        aria-label="Close"
       >
         <X className="w-3 h-3" />
       </button>

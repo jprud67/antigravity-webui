@@ -49,10 +49,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
             <Lock className="w-8 h-8 text-sky-400" />
           </div>
           <h2 className="text-xl font-bold tracking-tight text-white">
-            {t('login_secure_control', 'Poste de Contrôle Sécurisé')}
+            {t('login_secure_control', 'Secure Control Post')}
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-xs">
-            {t('login_auth_required', "Authentification requise pour piloter le système et l'agent Antigravity")}
+            {t('login_auth_required', 'Authentication required to control system and Antigravity agent')}
           </p>
         </div>
 
@@ -60,7 +60,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[11px] font-semibold text-slate-300 uppercase tracking-wider mb-2">
-              {t('login_password_label', "Mot de passe d'accès")}
+              {t('login_password_label', 'Access Password')}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
@@ -100,17 +100,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
             className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-medium text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-500/25 transition-all disabled:opacity-50 cursor-pointer"
           >
             {loading ? (
-              <span className="animate-pulse">{t('login_verifying', 'Vérification...')}</span>
+              <span className="animate-pulse">{t('login_verifying', 'Verifying...')}</span>
             ) : (
               <>
-                <span>{t('login_unlock_button', 'Déverrouiller le Cockpit')}</span>
+                <span>{t('login_unlock_button', 'Unlock Cockpit')}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
 
           <p className="text-[10px] text-center text-slate-500">
-            {t('login_default_hint', 'Mot de passe initial par défaut : {0} (modifiable dans les réglages).', 'antigravity2026')}
+            {t('login_default_hint', 'Default initial password: {0} (can be changed in settings).').replace('{0}', 'antigravity2026')}
           </p>
         </form>
       </div>

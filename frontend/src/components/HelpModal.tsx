@@ -193,12 +193,12 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
           {activeCategory === 'shortcuts' && (
             <div className="space-y-3">
               {[
-                { key: 'Entrée (Enter)', desc: t('shortcut_enter_desc', 'Send message or submit command') },
-                { key: 'Maj + Entrée (Shift+Enter)', desc: t('shortcut_shift_enter_desc', 'Insert line break in composer') },
+                { key: t('key_enter', 'Enter'), desc: t('shortcut_enter_desc', 'Send message or submit command') },
+                { key: t('key_shift_enter', 'Shift + Enter'), desc: t('shortcut_shift_enter_desc', 'Insert line break in composer') },
                 { key: '/', desc: t('shortcut_slash_desc', 'Open context menu of slash commands') },
-                { key: 'Flèches Haut / Bas', desc: t('shortcut_arrows_desc', 'Navigate commands or recall prompts') },
-                { key: 'Tab ou Entrée', desc: t('shortcut_tab_desc', 'Auto-complete selected command') },
-                { key: 'Échap (Escape)', desc: t('shortcut_esc_desc', 'Close menus, modals or cancel search') }
+                { key: t('key_arrows', 'Up / Down Arrows'), desc: t('shortcut_arrows_desc', 'Navigate commands or recall prompts') },
+                { key: t('key_tab_enter', 'Tab or Enter'), desc: t('shortcut_tab_desc', 'Auto-complete selected command') },
+                { key: t('key_escape', 'Escape (Esc)'), desc: t('shortcut_esc_desc', 'Close menus, modals or cancel search') }
               ].map((s, idx) => (
                 <div
                   key={idx}
@@ -274,7 +274,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
           <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--muted)' }}>
             <span>{t('active_language', 'Active language:')}</span>
             <span className="font-semibold" style={{ color: 'var(--strong)' }}>
-              {SUPPORTED_LANGUAGES.find((l) => l.code === lang)?.label || 'Français'}
+              {SUPPORTED_LANGUAGES.find((l) => l.code === lang)?.label || 'English'}
             </span>
           </div>
 

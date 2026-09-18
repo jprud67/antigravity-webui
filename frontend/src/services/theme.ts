@@ -3,131 +3,173 @@ export type ThemeMode = 'system' | 'dark' | 'light';
 export interface SkinOption {
   id: string;
   name: string;
+  nameKey?: string;
   desc: string;
+  descKey?: string;
   colors: string[];
   isDarkOnly?: boolean;
 }
 
-export const AVAILABLE_THEMES: { id: ThemeMode; name: string; desc: string }[] = [
+export const AVAILABLE_THEMES: { id: ThemeMode; name: string; nameKey?: string; desc: string; descKey?: string }[] = [
   {
     id: 'system',
-    name: 'Système',
-    desc: 'Suit automatiquement le réglage clair ou sombre de votre système d\'exploitation.'
+    name: 'System',
+    nameKey: 'theme_system',
+    desc: 'Automatically follows your operating system light or dark setting.',
+    descKey: 'theme_system_desc'
   },
   {
     id: 'dark',
-    name: 'Sombre',
-    desc: 'Palette sombre standard à faible éblouissement pour les sessions prolongées.'
+    name: 'Dark',
+    nameKey: 'theme_dark',
+    desc: 'Standard low-glare dark palette for prolonged sessions.',
+    descKey: 'theme_dark_desc'
   },
   {
     id: 'light',
-    name: 'Clair',
-    desc: 'Surfaces lumineuses avec texte sombre et contrasté adapté aux environnements éclairés.'
+    name: 'Light',
+    nameKey: 'theme_light',
+    desc: 'Bright surfaces with dark contrasted text for illuminated environments.',
+    descKey: 'theme_light_desc'
   }
 ];
 
 export const AVAILABLE_SKINS: SkinOption[] = [
   {
     id: 'default',
-    name: 'Défaut (Or Hermes)',
-    desc: 'L\'accent or chaleureux et sobre d\'origine d\'Hermes.',
+    name: 'Default (Hermes Gold)',
+    nameKey: 'skin_default',
+    desc: 'Hermes original warm and understated gold accent.',
+    descKey: 'skin_default_desc',
     colors: ['#FFD700', '#FFBF00', '#CD7F32']
   },
   {
     id: 'ares',
-    name: 'Ares (Rouge)',
-    desc: 'Rouge ardent à haute énergie et caractère affirmé.',
+    name: 'Ares (Red)',
+    nameKey: 'skin_ares',
+    desc: 'Fiery high-energy red with assertive character.',
+    descKey: 'skin_ares_desc',
     colors: ['#FF4444', '#CC3333', '#992222']
   },
   {
     id: 'mono',
-    name: 'Mono (Gris)',
-    desc: 'Gris neutre minimaliste, sans distraction pour une concentration totale.',
+    name: 'Mono (Gray)',
+    nameKey: 'skin_mono',
+    desc: 'Minimalist neutral gray without distraction for complete focus.',
+    descKey: 'skin_mono_desc',
     colors: ['#CCCCCC', '#999999', '#666666']
   },
   {
     id: 'graphite',
     name: 'Graphite',
-    desc: 'Atelier workbench moderne avec contrastes soignés et surfaces neutres.',
+    nameKey: 'skin_graphite',
+    desc: 'Modern workbench studio with crisp contrasts and neutral surfaces.',
+    descKey: 'skin_graphite_desc',
     colors: ['#FFFFFF', '#D6D6D6', '#242424']
   },
   {
     id: 'github',
     name: 'GitHub',
-    desc: 'Inspiré de l\'interface GitHub avec bleu d\'action et surfaces adaptatives.',
+    nameKey: 'skin_github',
+    desc: 'Inspired by GitHub interface with action blue and adaptive surfaces.',
+    descKey: 'skin_github_desc',
     colors: ['#0969DA', '#1F883D', '#242424']
   },
   {
     id: 'codex',
     name: 'Codex (OpenAI)',
-    desc: 'Surfaces éditeur épurées avec accents verts émeraude style OpenAI Codex.',
+    nameKey: 'skin_codex',
+    desc: 'Clean editor surfaces with emerald green accents OpenAI Codex style.',
+    descKey: 'skin_codex_desc',
     colors: ['#72B39A', '#242624', '#ECEBE4']
   },
   {
     id: 'terracotta',
     name: 'Terracotta (Claude)',
-    desc: 'Neutres chauds inspirés d\'Anthropic Claude avec accents terre cuite.',
+    nameKey: 'skin_terracotta',
+    desc: 'Warm neutrals inspired by Anthropic Claude with terracotta accents.',
+    descKey: 'skin_terracotta_desc',
     colors: ['#D97757', '#F0EEE6', '#141413']
   },
   {
     id: 'slate',
-    name: 'Slate (Ardoise)',
-    desc: 'Bleu-gris ardoise subtil, sobre et élégant.',
+    name: 'Slate',
+    nameKey: 'skin_slate',
+    desc: 'Subtle, understated and elegant slate blue-gray.',
+    descKey: 'skin_slate_desc',
     colors: ['#334155', '#475569', '#64748B']
   },
   {
     id: 'poseidon',
-    name: 'Poseidon (Océan)',
-    desc: 'Bleu océan calme et apaisant pour les longues sessions de réflexion.',
+    name: 'Poseidon (Ocean)',
+    nameKey: 'skin_poseidon',
+    desc: 'Calm and soothing ocean blue for long thinking sessions.',
+    descKey: 'skin_poseidon_desc',
     colors: ['#0EA5E9', '#0284C7', '#0369A1']
   },
   {
     id: 'sisyphus',
-    name: 'Sisyphus (Pourpre)',
-    desc: 'Violet vif distinctif sans être tape-à-l\'œil.',
+    name: 'Sisyphus (Purple)',
+    nameKey: 'skin_sisyphus',
+    desc: 'Distinctive bright purple without being flashy.',
+    descKey: 'skin_sisyphus_desc',
     colors: ['#A78BFA', '#8B5CF6', '#7C3AED']
   },
   {
     id: 'charizard',
     name: 'Charizard (Orange)',
-    desc: 'Orange flamme énergique, agréable et chaleureux.',
+    nameKey: 'skin_charizard',
+    desc: 'Energetic, warm and pleasant flame orange.',
+    descKey: 'skin_charizard_desc',
     colors: ['#FB923C', '#F97316', '#EA580C']
   },
   {
     id: 'sienna',
-    name: 'Sienna (Terre & Sable)',
-    desc: 'Palette terre et sable avec bulle utilisateur naturelle et tons argile.',
+    name: 'Sienna (Earth & Sand)',
+    nameKey: 'skin_sienna',
+    desc: 'Earth and sand palette with natural user bubbles and clay tones.',
+    descKey: 'skin_sienna_desc',
     colors: ['#D97757', '#C06A49', '#9A523A']
   },
   {
     id: 'catppuccin',
     name: 'Catppuccin (Mocha/Latte)',
-    desc: 'Palette renommée Latte (clair) et Mocha (sombre) avec accent Mauve.',
+    nameKey: 'skin_catppuccin',
+    desc: 'Renowned Latte (light) and Mocha (dark) palette with Mauve accent.',
+    descKey: 'skin_catppuccin_desc',
     colors: ['#CBA6F7', '#B4BEFE', '#8839EF']
   },
   {
     id: 'nous',
-    name: 'Nous (Bleu Acier)',
-    desc: 'Accent bleu acier technique avec bordures distinctes pour ingénieurs.',
+    name: 'Nous (Steel Blue)',
+    nameKey: 'skin_nous',
+    desc: 'Technical steel blue accent with distinct borders for engineers.',
+    descKey: 'skin_nous_desc',
     colors: ['#4682B4', '#3A6E9A', '#2C5F88']
   },
   {
     id: 'geist-contrast',
     name: 'Geist Contrast',
-    desc: 'Monochrome de haute précision inspiré de Geist avec accent jaune discret.',
+    nameKey: 'skin_geist',
+    desc: 'High-precision monochrome inspired by Geist with subtle yellow accent.',
+    descKey: 'skin_geist_desc',
     colors: ['#000000', '#FFFFFF', '#FFF175']
   },
   {
     id: 'zeus',
-    name: 'Zeus (OLED Noir & Or)',
-    desc: 'Surfaces noir pur OLED profondes avec accents or d\'Hermes.',
+    name: 'Zeus (OLED Black & Gold)',
+    nameKey: 'skin_zeus',
+    desc: 'Deep OLED pure black surfaces with Hermes gold accents.',
+    descKey: 'skin_zeus_desc',
     colors: ['#FFD700', '#FFBF00', '#1A1A00'],
     isDarkOnly: true
   },
   {
     id: 'neon',
     name: 'Cyber Neon',
-    desc: 'Ambiance futuriste haute technologie aux reflets néons cyberpunk.',
+    nameKey: 'skin_neon',
+    desc: 'Futuristic high-tech atmosphere with cyberpunk neon glows.',
+    descKey: 'skin_neon_desc',
     colors: ['#B347FF', '#C76BFF', '#00DDFF']
   }
 ];
