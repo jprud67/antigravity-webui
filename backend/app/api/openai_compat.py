@@ -640,11 +640,12 @@ async def _tool_mode_response(req: ChatCompletionRequest, tool_list: list[dict[s
     async def sse_generator() -> AsyncGenerator[str, None]:
         # Décision bufferisée : l'enveloppe JSON doit être analysée avant de savoir si la
         # réponse est un tool_call ou du texte ; les fragments SSE sont ensuite émis d'un bloc.
+        role_sent = False
         if reasoning:
             yield build_chunk({"role": "assistant", "reasoning_content": reasoning})
+            role_sent = True
         if tool_call_payload:
-            yield build_chunk({
-                "role": "assistant",
+            first_tool_delta: dict[str, Any] = {
                 "tool_calls": [
                     {
                         "index": 0,
@@ -656,7 +657,11 @@ async def _tool_mode_response(req: ChatCompletionRequest, tool_list: list[dict[s
                         }
                     }
                 ]
-            })
+            }
+            if not role_sent:
+                first_tool_delta["role"] = "assistant"
+                role_sent = True
+            yield build_chunk(first_tool_delta)
             yield build_chunk({
                 "tool_calls": [
                     {
@@ -666,7 +671,11 @@ async def _tool_mode_response(req: ChatCompletionRequest, tool_list: list[dict[s
                 ]
             })
         else:
-            yield build_chunk({"role": "assistant", "content": message["content"]})
+            text_delta: dict[str, Any] = {"content": message["content"]}
+            if not role_sent:
+                text_delta["role"] = "assistant"
+                role_sent = True
+            yield build_chunk(text_delta)
         yield build_chunk({}, finish=finish_reason, with_usage=True)
         yield "data: [DONE]\n\n"
 

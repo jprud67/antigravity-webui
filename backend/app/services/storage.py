@@ -2375,7 +2375,7 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
 
         cloned_steps = []
         for s in steps:
-            cloned = dict(s)
+            cloned = copy.deepcopy(s)
             cloned["conversation_id"] = new_id
             cloned_steps.append(cloned)
 

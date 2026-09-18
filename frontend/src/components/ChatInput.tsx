@@ -762,7 +762,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
           onSelectEffort(args.toLowerCase() as any);
           showToast(t('toast_reasoning_effort_set', 'Reasoning effort set to: {0}').replace('{0}', args), 'success');
         } else {
-          showToast(`Effort actuel : ${selectedEffort}. Choix: low, medium, high`, 'info');
+          showToast(t('toast_reasoning_effort_current', 'Current effort: {0}. Choices: low, medium, high').replace('{0}', selectedEffort), 'info');
         }
         return true;
 
@@ -770,7 +770,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         if (onOpenWorkspace) {
           onOpenWorkspace();
         } else {
-          showToast(`Workspace actif : ${currentWorkspace || '/root'}`, 'info');
+          showToast(t('toast_workspace_active', 'Active workspace: {0}').replace('{0}', currentWorkspace || '/root'), 'info');
         }
         return true;
 

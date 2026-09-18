@@ -5016,6 +5016,134 @@ def test_storage_bulk_delete_conversations_rollback():
     print("✓ test_storage_bulk_delete_conversations_rollback passed")
 
 
+def test_openai_compat_tool_mode_sse_role_deduplication():
+    """Verify _tool_mode_response only emits role in the first SSE delta chunk."""
+    import asyncio
+    import json
+    from unittest.mock import AsyncMock, patch
+
+    from app.api.openai_compat import (
+        ChatCompletionRequest,
+        ChatMessage,
+        create_chat_completion,
+    )
+
+    req1 = ChatCompletionRequest(
+        model="gemini-flash",
+        messages=[ChatMessage(role="user", content="run tool")],
+        tools=[{"type": "function", "function": {"name": "run_command"}}],
+        stream=True,
+    )
+    outcome1 = {
+        "kind": "tool_call",
+        "name": "run_command",
+        "arguments": {"CommandLine": "ls"},
+        "id": "call_123",
+        "thinking": "I will run the command",
+        "usage": {"total_tokens": 50},
+    }
+
+    async def collect_chunks(resp):
+        chunks = []
+        async for raw in resp.body_iterator:
+            for line in raw.split("\n"):
+                if line.startswith("data: ") and line != "data: [DONE]":
+                    chunks.append(json.loads(line[6:]))
+        return chunks
+
+    with patch("app.api.openai_compat.tool_bridge.run_turn", new_callable=AsyncMock, return_value=outcome1):
+        resp1 = asyncio.run(create_chat_completion(req1))
+        chunks1 = asyncio.run(collect_chunks(resp1))
+
+    assert len(chunks1) >= 4
+    delta0 = chunks1[0]["choices"][0]["delta"]
+    assert delta0.get("role") == "assistant"
+    assert delta0.get("reasoning_content") == "I will run the command"
+
+    delta1 = chunks1[1]["choices"][0]["delta"]
+    assert "role" not in delta1, f"Expected no 'role' in delta1, got: {delta1}"
+    assert "tool_calls" in delta1
+
+    delta2 = chunks1[2]["choices"][0]["delta"]
+    assert "role" not in delta2, f"Expected no 'role' in delta2, got: {delta2}"
+
+    # Case 2: without reasoning, with text content
+    req2 = ChatCompletionRequest(
+        model="gemini-flash",
+        messages=[ChatMessage(role="user", content="hello")],
+        tools=[{"type": "function", "function": {"name": "run_command"}}],
+        stream=True,
+    )
+    outcome2 = {
+        "kind": "message",
+        "content": "Hello user!",
+        "thinking": None,
+        "usage": {"total_tokens": 20},
+    }
+    with patch("app.api.openai_compat.tool_bridge.run_turn", new_callable=AsyncMock, return_value=outcome2):
+        resp2 = asyncio.run(create_chat_completion(req2))
+        chunks2 = asyncio.run(collect_chunks(resp2))
+
+    assert len(chunks2) >= 2
+    delta_text0 = chunks2[0]["choices"][0]["delta"]
+    assert delta_text0.get("role") == "assistant"
+    assert delta_text0.get("content") == "Hello user!"
+
+    delta_finish = chunks2[1]["choices"][0]["delta"]
+    assert "role" not in delta_finish
+    print("✓ test_openai_compat_tool_mode_sse_role_deduplication passed")
+
+
+def test_import_single_conversation_deepcopy_isolation():
+    """Verify _import_single_conversation deep-copies steps avoiding memory mutations."""
+    from datetime import datetime, timezone
+
+    from app.services.storage import (
+        _import_single_conversation,
+        delete_conversation,
+        get_conversation_transcript,
+    )
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    nested_args = {"CommandLine": "echo original"}
+    original_step = {
+        "step_index": 0,
+        "type": "RUN_COMMAND",
+        "source": "ASSISTANT",
+        "tool_calls": [
+            {
+                "name": "run_command",
+                "args": nested_args
+            }
+        ]
+    }
+    steps_input = [original_step]
+    payload = {
+        "title": "Test Deepcopy Import",
+        "steps": steps_input
+    }
+
+    res = _import_single_conversation(payload, now_iso, now_db)
+    cid = res["conversation_id"]
+
+    try:
+        # Mutate the original in-memory dict after import
+        nested_args["CommandLine"] = "echo MUTATED"
+
+        stored_steps = get_conversation_transcript(cid)
+        assert len(stored_steps) == 1
+        stored_tc = stored_steps[0].get("tool_calls", [{}])[0]
+        stored_args = stored_tc.get("args", {})
+        assert stored_args.get("CommandLine") == "echo original"
+        assert stored_args.get("CommandLine") != "echo MUTATED"
+    finally:
+        delete_conversation(cid)
+
+    print("✓ test_import_single_conversation_deepcopy_isolation passed")
+
+
 if __name__ == "__main__":
     test_execution_manager_safe_session_iteration()
     test_openai_compat_error_event_quota_propagation()
@@ -5208,6 +5336,8 @@ if __name__ == "__main__":
     test_storage_aggregate_steps_tool_call_id_isolation()
     test_conversations_update_metadata_empty_group_id()
     test_agent_api_run_turn_is_quota_flag_and_french()
+    test_openai_compat_tool_mode_sse_role_deduplication()
+    test_import_single_conversation_deepcopy_isolation()
     print("\nAll unit tests passed successfully!")
 
 
