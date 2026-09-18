@@ -11,6 +11,7 @@ logger = logging.getLogger("antigravity.agy_subcommand")
 async def run_agy_subcommand(args: list[str], timeout: float = 15.0) -> tuple[int, str, str]:
     """Exécute agy avec les args donnés, retourne (returncode, stdout, stderr)."""
     cmd = [AGY_BIN] + args
+    proc = None
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -23,10 +24,11 @@ async def run_agy_subcommand(args: list[str], timeout: float = 15.0) -> tuple[in
         return ret_code, stdout.decode(errors="replace"), stderr.decode(errors="replace")
     except asyncio.TimeoutError:
         logger.error(f"Timeout executing agy {' '.join(args)}")
-        try:
-            await terminate_process_group_async(proc, grace=0.5)
-        except Exception as kill_err:
-            logger.debug(f"Erreur arrêt sous-processus agy après timeout: {kill_err}")
+        if proc:
+            try:
+                await terminate_process_group_async(proc, grace=0.5)
+            except Exception as kill_err:
+                logger.debug(f"Erreur arrêt sous-processus agy après timeout: {kill_err}")
         return -1, "", f"Timeout après {timeout}s"
     except Exception as e:
         logger.error(f"Erreur d'exécution agy {' '.join(args)}: {e}")

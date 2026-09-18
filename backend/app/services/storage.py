@@ -159,7 +159,7 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
         "workspace_uris": r["workspace_uris"],
         "status": r["status"],
         "agent_name": r["agent_name"],
-        "parent_conversation_id": (r.get("parent_conversation_id") if isinstance(r, dict) else (r["parent_conversation_id"] if "parent_conversation_id" in r.keys() else None)) or None,
+        "parent_conversation_id": (r.get("parent_conversation_id") if isinstance(r, dict) else (r["parent_conversation_id"] if "parent_conversation_id" in tuple(r.keys()) else None)) or None,
         "pinned": bool(meta.get("pinned", False)),
         "archived": bool(meta.get("archived", False)),
         "tags": safe_tags,

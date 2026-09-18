@@ -223,6 +223,19 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
     if "gpt-oss" in norm:
         return "gpt-oss-120b-medium", None
 
+    # Generic / OpenAI model slugs (used by Cursor, LiteLLM, Continue, OpenAI SDKs)
+    # Map to flagship Antigravity model
+    openai_generic_models = {
+        "default", "auto",
+        "gpt-4", "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo",
+        "o1", "o1-mini", "o1-preview", "o3", "o3-mini",
+    }
+    if norm in openai_generic_models or (norm.startswith("gpt-") and "oss" not in norm) or norm.startswith("text-davinci"):
+        eff_clean = effort.strip().lower() if (effort and effort.strip()) else "high"
+        if eff_clean not in ["high", "medium", "low"]:
+            eff_clean = "high"
+        return f"gemini-3.8-flash-{eff_clean}", None
+
     # Extract any existing suffix
     model_suffix = None
     for sfx in ["-high", "-medium", "-low"]:

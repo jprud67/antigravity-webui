@@ -34,7 +34,6 @@ _auth_cache_mtime: float = 0.0
 
 def _extract_password_from_any_source() -> str | None:
     """Tente d'extraire un hash de mot de passe existant depuis le cache, le fichier principal ou le fichier backup."""
-    global _auth_cache
     if _auth_cache and isinstance(_auth_cache.get("password"), str) and _auth_cache["password"]:
         return _auth_cache["password"]
     if AUTH_CONFIG_FILE.exists():
@@ -281,60 +280,63 @@ def _ensure_api_keys_storage(config: dict[str, Any]) -> list[dict[str, Any]]:
 
 def get_api_keys() -> list[dict[str, Any]]:
     """Retourne la liste des clés d'API configurées pour les apps externes."""
-    config = get_auth_config()
-    keys = _ensure_api_keys_storage(config)
-    result = []
-    for k in keys:
-        raw_key = k.get("key", "")
-        # Masquage partiel pour l'affichage public
-        masked = f"{raw_key[:10]}...{raw_key[-4:]}" if len(raw_key) > 14 else raw_key
-        result.append({
-            "id": k.get("id"),
-            "name": k.get("name", "Sans nom"),
-            "masked_key": masked,
-            "key": raw_key,  # Disponible pour affichage/copie dans la WebUI
-            "created_at": k.get("created_at"),
-            "last_used_at": k.get("last_used_at"),
-        })
-    return result
+    with _auth_lock:
+        config = get_auth_config()
+        keys = _ensure_api_keys_storage(config)
+        result = []
+        for k in keys:
+            raw_key = k.get("key", "")
+            # Masquage partiel pour l'affichage public
+            masked = f"{raw_key[:10]}...{raw_key[-4:]}" if len(raw_key) > 14 else raw_key
+            result.append({
+                "id": k.get("id"),
+                "name": k.get("name", "Sans nom"),
+                "masked_key": masked,
+                "key": raw_key,  # Disponible pour affichage/copie dans la WebUI
+                "created_at": k.get("created_at"),
+                "last_used_at": k.get("last_used_at"),
+            })
+        return result
 
 
 def create_api_key(name: str = "Application Externe") -> dict[str, Any]:
     """Génère une nouvelle clé d'API sécurisée pour une application externe."""
-    config = get_auth_config()
-    keys = _ensure_api_keys_storage(config)
-    new_id = f"key_{uuid.uuid4().hex[:8]}"
-    raw_key = f"agy_sk_{secrets.token_hex(24)}"
-    now = int(time.time())
-    new_entry = {
-        "id": new_id,
-        "name": name.strip() or "Application Externe",
-        "key": raw_key,
-        "created_at": now,
-        "last_used_at": None,
-    }
-    keys.append(new_entry)
-    config["api_keys"] = keys
-    save_auth_config(config)
-    return {
-        "id": new_id,
-        "name": new_entry["name"],
-        "key": raw_key,
-        "created_at": now,
-    }
+    with _auth_lock:
+        config = get_auth_config()
+        keys = _ensure_api_keys_storage(config)
+        new_id = f"key_{uuid.uuid4().hex[:8]}"
+        raw_key = f"agy_sk_{secrets.token_hex(24)}"
+        now = int(time.time())
+        new_entry = {
+            "id": new_id,
+            "name": name.strip() or "Application Externe",
+            "key": raw_key,
+            "created_at": now,
+            "last_used_at": None,
+        }
+        keys.append(new_entry)
+        config["api_keys"] = keys
+        save_auth_config(config)
+        return {
+            "id": new_id,
+            "name": new_entry["name"],
+            "key": raw_key,
+            "created_at": now,
+        }
 
 
 def delete_api_key(key_id: str) -> bool:
     """Supprime une clé d'API par son identifiant."""
-    config = get_auth_config()
-    keys = _ensure_api_keys_storage(config)
-    initial_count = len(keys)
-    keys = [k for k in keys if k.get("id") != key_id]
-    if len(keys) < initial_count:
-        config["api_keys"] = keys
-        save_auth_config(config)
-        return True
-    return False
+    with _auth_lock:
+        config = get_auth_config()
+        keys = _ensure_api_keys_storage(config)
+        initial_count = len(keys)
+        keys = [k for k in keys if k.get("id") != key_id]
+        if len(keys) < initial_count:
+            config["api_keys"] = keys
+            save_auth_config(config)
+            return True
+        return False
 
 
 def verify_api_key(key: str | None) -> bool:
@@ -356,16 +358,16 @@ def verify_api_key(key: str | None) -> bool:
         return True
 
     # 2. Vérification dans le fichier de configuration auth
-    config = get_auth_config()
-    keys = _ensure_api_keys_storage(config)
-    for k in keys:
-        stored = k.get("key", "")
-        if stored and hmac.compare_digest(key, stored):
-            now = int(time.time())
-            last_used = k.get("last_used_at") or 0
-            # Mettre à jour last_used_at et persister si plus de 60 secondes se sont écoulées
-            if now - last_used > 60:
-                with _auth_lock:
+    with _auth_lock:
+        config = get_auth_config()
+        keys = list(_ensure_api_keys_storage(config))
+        for k in keys:
+            stored = k.get("key", "")
+            if stored and hmac.compare_digest(key, stored):
+                now = int(time.time())
+                last_used = k.get("last_used_at") or 0
+                # Mettre à jour last_used_at et persister si plus de 60 secondes se sont écoulées
+                if now - last_used > 60:
                     current = get_auth_config()
                     for item in current.get("api_keys", []):
                         if item.get("id") == k.get("id"):
@@ -375,9 +377,9 @@ def verify_api_key(key: str | None) -> bool:
                         save_auth_config(current)
                     except Exception as e:
                         logger.debug(f"Impossible de sauvegarder last_used_at: {e}")
-            else:
-                k["last_used_at"] = now
-            return True
+                else:
+                    k["last_used_at"] = now
+                return True
 
     return False
 

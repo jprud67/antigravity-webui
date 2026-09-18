@@ -63,8 +63,29 @@ def _raise_http_for_error(msg: str, context: str = "") -> None:
 
 class ChatMessage(BaseModel):
     role: str = "user"
-    content: str | None = ""
+    content: Any = ""
     name: str | None = None
+
+
+def _extract_message_content(content: Any) -> str:
+    """Extrait le texte d'un message qu'il soit sous forme de chaîne ou de liste de blocs (multi-part)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, str):
+                parts.append(part)
+            elif isinstance(part, dict):
+                text = part.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+                elif part.get("type") == "text" and "text" in part:
+                    parts.append(str(part.get("text", "")))
+        return "\n".join(parts)
+    if content is None:
+        return ""
+    return str(content)
 
 
 class ChatCompletionRequest(BaseModel):
@@ -133,15 +154,15 @@ def _messages_to_prompt(messages: list[ChatMessage], has_conv_id: bool = False) 
     if has_conv_id and len(messages) > 1:
         last_msg = messages[-1]
         if last_msg.role.lower() == "user":
-            return (last_msg.content or "").strip()
+            return _extract_message_content(last_msg.content).strip()
 
     if len(messages) == 1 and messages[0].role == "user":
-        return messages[0].content or ""
+        return _extract_message_content(messages[0].content)
 
     formatted_turns: list[str] = []
     for msg in messages:
         role = msg.role.lower()
-        content = (msg.content or "").strip()
+        content = _extract_message_content(msg.content).strip()
         if not content:
             continue
         if role == "system":
@@ -267,6 +288,9 @@ async def create_chat_completion(
                         # Pensée / Raisonnement (DeepSeek R1 / OpenAI o1 reasoning_content)
                         thinking_delta = su.get("thinking")
                         if thinking_delta:
+                            delta_payload: dict[str, Any] = {"reasoning_content": thinking_delta}
+                            if not first_chunk_sent:
+                                delta_payload["role"] = "assistant"
                             chunk = {
                                 "id": completion_id,
                                 "object": "chat.completion.chunk",
@@ -276,10 +300,7 @@ async def create_chat_completion(
                                 "choices": [
                                     {
                                         "index": 0,
-                                        "delta": {
-                                            "role": "assistant" if not first_chunk_sent else None,
-                                            "reasoning_content": thinking_delta
-                                        },
+                                        "delta": delta_payload,
                                         "finish_reason": None
                                     }
                                 ]
@@ -292,6 +313,9 @@ async def create_chat_completion(
                             text_delta = su.get("text_delta")
                             if text_delta:
                                 full_content_emitted += text_delta
+                                delta_payload = {"content": text_delta}
+                                if not first_chunk_sent:
+                                    delta_payload["role"] = "assistant"
                                 chunk = {
                                     "id": completion_id,
                                     "object": "chat.completion.chunk",
@@ -301,10 +325,7 @@ async def create_chat_completion(
                                     "choices": [
                                         {
                                             "index": 0,
-                                            "delta": {
-                                                "role": "assistant" if not first_chunk_sent else None,
-                                                "content": text_delta
-                                            },
+                                            "delta": delta_payload,
                                             "finish_reason": None
                                         }
                                     ]
@@ -320,6 +341,9 @@ async def create_chat_completion(
                         resp_text = res.get("response", "")
                         # Si aucun delta n'a été émis avant, émettre la réponse complète
                         if resp_text and not full_content_emitted:
+                            delta_payload = {"content": resp_text}
+                            if not first_chunk_sent:
+                                delta_payload["role"] = "assistant"
                             chunk = {
                                 "id": completion_id,
                                 "object": "chat.completion.chunk",
@@ -329,10 +353,7 @@ async def create_chat_completion(
                                 "choices": [
                                     {
                                         "index": 0,
-                                        "delta": {
-                                            "role": "assistant" if not first_chunk_sent else None,
-                                            "content": resp_text
-                                        },
+                                        "delta": delta_payload,
                                         "finish_reason": None
                                     }
                                 ]

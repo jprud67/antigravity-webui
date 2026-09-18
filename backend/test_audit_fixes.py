@@ -2905,6 +2905,7 @@ def test_api_key_generation_and_verification():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
+
     from app.services import auth
     from app.services.auth import (
         create_access_token,
@@ -2965,6 +2966,7 @@ def test_api_key_last_used_at_throttling():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
+
     from app.services import auth
     from app.services.auth import (
         create_api_key,
@@ -3405,6 +3407,7 @@ def test_clean_user_prompt_xml_tag_backreference():
 
 def test_build_conversation_dict_row_or_dict():
     import sqlite3
+
     from app.services.storage import _build_conversation_dict
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
@@ -3444,6 +3447,7 @@ def test_build_conversation_dict_row_or_dict():
 
 def test_atomic_write_jsonl_initial_permissions():
     import tempfile
+
     from app.services.storage import atomic_write_jsonl
     with tempfile.TemporaryDirectory() as td:
         target = Path(td) / "test_out.jsonl"
@@ -3452,10 +3456,15 @@ def test_atomic_write_jsonl_initial_permissions():
         assert target.exists()
         with open(target, "r", encoding="utf-8") as f:
             lines = f.readlines()
+        assert len(lines) == 1
+        assert "secret data" in lines[0]
+
+
 def test_save_auth_config_preserves_password_on_partial_dict():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
+
     from app.services import auth
     from app.services.auth import (
         get_auth_config,
@@ -3503,6 +3512,7 @@ def test_get_auth_config_recovers_from_backup():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
+
     from app.services import auth
     from app.services.auth import (
         get_auth_config,
@@ -3546,6 +3556,119 @@ def test_get_auth_config_recovers_from_backup():
             auth._auth_cache = orig_cache
             auth._auth_cache_mtime = orig_mtime
     print("✓ test_get_auth_config_recovers_from_backup passed")
+
+
+def test_openai_multipart_message_content():
+    from app.api.openai_compat import (
+        ChatMessage,
+        _extract_message_content,
+        _messages_to_prompt,
+    )
+
+    # Plain string content
+    msg_str = ChatMessage(role="user", content="Hello world")
+    assert _extract_message_content(msg_str.content) == "Hello world"
+
+    # Multi-part content list (OpenAI SDK / Cursor / LiteLLM format)
+    multi_content = [
+        {"type": "text", "text": "Part 1 of message"},
+        {"type": "text", "text": "Part 2 of message"},
+    ]
+    msg_multi = ChatMessage(role="user", content=multi_content)
+    assert _extract_message_content(msg_multi.content) == "Part 1 of message\nPart 2 of message"
+
+    # Single turn prompt resolution with multi-part
+    prompt = _messages_to_prompt([msg_multi])
+    assert prompt == "Part 1 of message\nPart 2 of message"
+
+    # Multi turn prompt resolution
+    sys_msg = ChatMessage(role="system", content="System instruction")
+    assistant_msg = ChatMessage(role="assistant", content="Assistant reply")
+    conv_prompt = _messages_to_prompt([sys_msg, assistant_msg, msg_multi])
+    assert "[Directives Système / Contexte]:\nSystem instruction" in conv_prompt
+    assert "[Assistant Antigravity]:\nAssistant reply" in conv_prompt
+    assert "[Utilisateur]:\nPart 1 of message\nPart 2 of message" in conv_prompt
+    print("✓ test_openai_multipart_message_content passed")
+
+
+def test_openai_model_mapping_and_aliases():
+    from app.services.agy_driver import resolve_model_and_effort
+
+    # Standard OpenAI models mapped to gemini-3.8-flash-high
+    m1, e1 = resolve_model_and_effort("gpt-4", None)
+    assert m1 == "gemini-3.8-flash-high"
+    assert e1 is None
+
+    m2, e2 = resolve_model_and_effort("gpt-4o", "medium")
+    assert m2 == "gemini-3.8-flash-medium"
+    assert e2 is None
+
+    m3, e3 = resolve_model_and_effort("o1-mini", None)
+    assert m3 == "gemini-3.8-flash-high"
+    assert e3 is None
+
+    m4, e4 = resolve_model_and_effort("default", None)
+    assert m4 == "gemini-3.8-flash-high"
+    assert e4 is None
+
+    # Claude models preserved
+    mc, ec = resolve_model_and_effort("claude-sonnet-4-6", None)
+    assert mc == "claude-sonnet-4-6"
+    assert ec is None
+
+    print("✓ test_openai_model_mapping_and_aliases passed")
+
+
+def test_api_key_concurrent_thread_safety():
+    import concurrent.futures
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.services import auth
+    from app.services.auth import (
+        create_api_key,
+        delete_api_key,
+        get_api_keys,
+        verify_api_key,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_auth = Path(tmp_dir) / "webui_auth.json"
+        tmp_bak = Path(tmp_dir) / "webui_auth.json.bak"
+        orig_cache = auth._auth_cache
+        orig_mtime = auth._auth_cache_mtime
+        try:
+            with patch("app.services.auth.AUTH_CONFIG_FILE", tmp_auth), \
+                 patch("app.services.auth.AUTH_BACKUP_FILE", tmp_bak):
+                auth._auth_cache = None
+                auth._auth_cache_mtime = 0.0
+
+                def worker(idx: int):
+                    k = create_api_key(f"Worker {idx}")
+                    assert verify_api_key(k["key"]) is True
+                    return k["id"]
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                    key_ids = list(executor.map(worker, range(10)))
+
+                keys = get_api_keys()
+                # 1 initial master key + 10 worker keys = 11 keys
+                assert len(keys) == 11
+                created_ids = {k["id"] for k in keys}
+                for kid in key_ids:
+                    assert kid in created_ids
+
+                for kid in key_ids:
+                    assert delete_api_key(kid) is True
+
+                remaining = get_api_keys()
+                assert len(remaining) == 1
+                assert remaining[0]["id"] == "master-default"
+        finally:
+            auth._auth_cache = orig_cache
+            auth._auth_cache_mtime = orig_mtime
+    print("✓ test_api_key_concurrent_thread_safety passed")
 
 
 if __name__ == "__main__":
@@ -3688,5 +3811,8 @@ if __name__ == "__main__":
     test_atomic_write_jsonl_initial_permissions()
     test_save_auth_config_preserves_password_on_partial_dict()
     test_get_auth_config_recovers_from_backup()
+    test_openai_multipart_message_content()
+    test_openai_model_mapping_and_aliases()
+    test_api_key_concurrent_thread_safety()
     print("\nAll unit tests passed successfully!")
 
