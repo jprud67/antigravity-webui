@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Gauge, Coins, BrainCircuit, ArrowDownRight, ArrowUpRight, Sparkles } from 'lucide-react';
+import { useI18n } from '../services/i18n';
 
 export interface TokenUsageData {
   inputTokens: number;
@@ -20,6 +21,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
   modelId = 'gemini-3.8-flash',
   activePrompt = ''
 }) => {
+  const { t } = useI18n();
   const [showPopover, setShowPopover] = useState(false);
 
   // Accurate model context limits
@@ -100,7 +102,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
         onMouseEnter={() => setShowPopover(true)}
         onMouseLeave={() => setShowPopover(false)}
         className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-mono border transition-all cursor-pointer select-none ${badgeColor}`}
-        title="Télémétrie du contexte et tokens consommés"
+        title={t('context_telemetry', 'Context telemetry and token consumption')}
       >
         {/* Circular SVG Ring */}
         <div className="relative w-5 h-5 flex items-center justify-center">
@@ -148,11 +150,11 @@ export const ContextRing: React.FC<ContextRingProps> = ({
           <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: 'var(--border)' }}>
             <div className="flex items-center gap-1.5 font-semibold" style={{ color: 'var(--strong)' }}>
               <Gauge className="w-3.5 h-3.5 text-sky-500" />
-              <span>Contexte Consommé</span>
+              <span>{t('context_consumed', 'Consumed Context')}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${isEstimated ? 'bg-sky-500/10 text-sky-500 border border-sky-500/20' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'}`}>
-                {isEstimated ? 'Estimé' : 'API Live'}
+                {isEstimated ? t('estimated', 'Estimated') : t('api_live', 'API Live')}
               </span>
               <span className="font-mono text-[10px]" style={{ color: 'var(--muted)' }}>
                 {displayPercent}
@@ -168,10 +170,10 @@ export const ContextRing: React.FC<ContextRingProps> = ({
                 className="h-full rounded-full transition-all duration-300"
               />
             </div>
-            <div className="flex justify-between text-[10px] font-mono" style={{ color: 'var(--muted)' }}>
-              <span>{formatNum(total)} utilisés</span>
-              <span>Max : {formatNum(contextLimit)}</span>
-            </div>
+              <div className="flex justify-between text-[10px] font-mono" style={{ color: 'var(--muted)' }}>
+                <span>{t('tokens_used', '{0} used').replace('{0}', formatNum(total))}</span>
+                <span>{t('tokens_max', 'Max: {0}').replace('{0}', formatNum(contextLimit))}</span>
+              </div>
           </div>
 
           {/* Token Breakdown - Exact Mathematical Consistency */}
@@ -186,7 +188,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
             <div className="flex items-center justify-between" style={{ color: 'var(--muted)' }}>
               <span className="flex items-center gap-1" style={{ color: 'var(--muted)' }}>
                 <ArrowDownRight className="w-3 h-3 text-sky-500" />
-                Prompt (Base + Historique) :
+                {t('prompt_base_history', 'Prompt (Base + History):')}
               </span>
               <span className="font-medium" style={{ color: 'var(--strong)' }}>{formatNum(baseInput)}</span>
             </div>
@@ -195,7 +197,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
               <div className="flex items-center justify-between text-sky-500">
                 <span className="flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-sky-500" />
-                  + Saisie en cours :
+                  {t('current_input', '+ Current input:')}
                 </span>
                 <span className="font-semibold">+{formatNum(promptTokens)}</span>
               </div>
@@ -203,9 +205,9 @@ export const ContextRing: React.FC<ContextRingProps> = ({
 
             {thinking > 0 && (
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1 text-amber-500">
+                  <span className="flex items-center gap-1 text-amber-500">
                   <BrainCircuit className="w-3 h-3 text-amber-500" />
-                  Réflexion (Thinking) :
+                  {t('thinking', 'Thinking')}:
                 </span>
                 <span className="text-amber-500 font-medium">{formatNum(thinking)}</span>
               </div>
@@ -215,7 +217,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1 text-emerald-500">
                   <ArrowUpRight className="w-3 h-3 text-emerald-500" />
-                  Réponse (Génération) :
+                  {t('response', 'Response (Generation):')}
                 </span>
                 <span className="font-medium" style={{ color: 'var(--strong)' }}>
                   {formatNum(responseTextTokens > 0 ? responseTextTokens : rawOutput)}
@@ -227,7 +229,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
               className="pt-1.5 mt-1 border-t flex items-center justify-between font-semibold"
               style={{ borderColor: 'var(--border)', color: 'var(--strong)' }}
             >
-              <span style={{ color: 'var(--text)' }}>Total Contexte Actif :</span>
+              <span style={{ color: 'var(--text)' }}>{t('total_active_context', 'Total Active Context:')}</span>
               <span style={{ color: 'var(--strong)' }}>{formatNum(total)}</span>
             </div>
           </div>
@@ -236,7 +238,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
           <div className="pt-1 flex items-center justify-between text-[11px]">
             <span className="text-slate-500 flex items-center gap-1">
               <Coins className="w-3.5 h-3.5 text-amber-400" />
-              Coût estimé :
+              {t('estimated_cost', 'Estimated Cost')}:
             </span>
             <span className="font-mono font-semibold text-emerald-400">
               ${estCost < 0.0001 && estCost > 0 ? '<0.0001' : estCost.toFixed(4)}

@@ -210,7 +210,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     return (
       <div className="flex items-center justify-center h-64 text-slate-400 text-xs">
         <RefreshCw className="w-5 h-5 animate-spin mr-2 text-sky-400" />
-        Inspection du dépôt Git...
+        {t('git_checking_repo', 'Checking Git repository...')}
       </div>
     );
   }
@@ -219,9 +219,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     return (
       <div className="p-8 text-center text-slate-400 space-y-3">
         <GitBranch className="w-10 h-10 mx-auto text-slate-600" />
-        <p className="text-sm font-medium text-slate-300">Aucun dépôt Git détecté</p>
+        <p className="text-sm font-medium text-slate-300">{t('git_no_repo', 'No Git repository detected')}</p>
         <p className="text-xs text-slate-500 max-w-xs mx-auto">
-          Le répertoire <code className="text-sky-400 bg-slate-800/80 px-1 py-0.5 rounded">{currentWorkspace}</code> n'est pas initialisé sous Git.
+          {t('git_no_repo_desc', 'The directory {0} is not initialized under Git.').replace('{0}', '')}
+          <code className="text-sky-400 bg-slate-800/80 px-1 py-0.5 rounded">{currentWorkspace}</code>
         </p>
       </div>
     );
@@ -253,20 +254,20 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
           )}
           {status?.clean ? (
             <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-              <CheckCircle2 className="w-3 h-3" /> Propre
+              <CheckCircle2 className="w-3 h-3" /> {t('git_clean', 'Clean')}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-              <AlertCircle className="w-3 h-3" /> {allChangedFiles.length} fichier(s)
+              <AlertCircle className="w-3 h-3" /> {t('git_files_changed', '{0} file(s) changed').replace('{0}', String(allChangedFiles.length))}
             </span>
           )}
           {status && status.ahead > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded-full border border-sky-500/20" title={`${status.ahead} commit(s) en avance sur le distant`}>
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded-full border border-sky-500/20" title={t('git_ahead', '{0} commit(s) ahead of remote').replace('{0}', String(status.ahead))}>
               ↑ {status.ahead}
             </span>
           )}
           {status && status.behind > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded-full border border-rose-500/20" title={`${status.behind} commit(s) en retard sur le distant`}>
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded-full border border-rose-500/20" title={t('git_behind', '{0} commit(s) behind remote').replace('{0}', String(status.behind))}>
               ↓ {status.behind}
             </span>
           )}
@@ -318,7 +319,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
       {status?.conflicts && status.conflicts.length > 0 && (
         <div className="p-2 bg-rose-500/15 border-b border-rose-500/40 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2 shrink-0 font-medium">
           <ShieldAlert className="w-4 h-4 shrink-0 text-rose-500 animate-pulse" />
-          <span>{status.conflicts.length} conflit(s) de fusion non résolu(s). Résolvez-les avant de committer.</span>
+          <span>{t('git_conflict_warning', '{0} unresolved merge conflict(s). Resolve them before committing.').replace('{0}', String(status.conflicts.length))}</span>
         </div>
       )}
 
@@ -333,15 +334,15 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
             className="text-[11px] font-semibold uppercase tracking-wider mb-2 flex items-center justify-between"
             style={{ color: 'var(--muted)' }}
           >
-            <span>Fichiers modifiés ({allChangedFiles.length})</span>
+            <span>{t('git_changed_files', 'Changed files')} ({allChangedFiles.length})</span>
             {allChangedFiles.length > 0 && (
-              <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Cliquez pour voir le diff</span>
+              <span className="text-[10px]" style={{ color: 'var(--muted)' }}>{t('git_click_for_diff', 'Click to view diff')}</span>
             )}
           </div>
 
           {allChangedFiles.length === 0 ? (
             <div className="text-xs py-3 text-center italic" style={{ color: 'var(--muted)' }}>
-              Aucune modification non validée dans l'arbre de travail.
+              {t('git_no_changes', 'No uncommitted changes in working tree.')}
             </div>
           ) : (
             <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
@@ -407,11 +408,11 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                 </span>
                 {isDiffStaged ? (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold">
-                    Indexé
+                    {t('git_diff_staged', 'Staged')}
                   </span>
                 ) : (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-600 dark:text-slate-400">
-                    Non indexé
+                    {t('git_diff_unstaged', 'Unstaged')}
                   </span>
                 )}
                 {allChangedFiles.find((f) => f.path === selectedFile)?.type === 'S+M' && (
@@ -421,14 +422,14 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                       onClick={() => handleSelectFile(selectedFile, false)}
                       className={`px-1.5 py-0.5 text-[10px] rounded cursor-pointer ${!isDiffStaged ? 'bg-sky-500/20 text-sky-600 dark:text-sky-400 font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-70'}`}
                     >
-                      Non indexé
+                      {t('git_diff_unstaged', 'Unstaged')}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleSelectFile(selectedFile, true)}
                       className={`px-1.5 py-0.5 text-[10px] rounded cursor-pointer ${isDiffStaged ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-70'}`}
                     >
-                      Indexé
+                      {t('git_diff_staged', 'Staged')}
                     </button>
                   </div>
                 )}
@@ -438,7 +439,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                 className="text-[10px] hover:underline cursor-pointer"
                 style={{ color: 'var(--muted)' }}
               >
-                Fermer diff
+                {t('git_close_diff', 'Close diff')}
               </button>
             </div>
             <div
@@ -446,12 +447,12 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
               style={{ backgroundColor: 'var(--code-bg)' }}
             >
               {loadingDiff ? (
-                <div className="p-4 text-center text-xs" style={{ color: 'var(--muted)' }}>Chargement du diff...</div>
+                <div className="p-4 text-center text-xs" style={{ color: 'var(--muted)' }}>{t('git_loading_diff', 'Loading diff...')}</div>
               ) : activeDiff ? (
                 <DiffViewer diffText={activeDiff} filename={selectedFile} />
               ) : (
                 <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>
-                  Aucun diff textuel disponible pour ce fichier.
+                  {t('git_no_diff', 'No textual diff available for this file.')}
                 </div>
               )}
             </div>
@@ -472,7 +473,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
               style={{ color: 'var(--muted)' }}
             >
               <Clock className="w-3 h-3" />
-              Dernier commit ({status.last_commit.time})
+              {t('git_last_commit', 'Last commit')} ({status.last_commit.time})
             </div>
             <div className="font-mono text-[11px] truncate" style={{ color: 'var(--text)' }}>
               <span className="text-sky-500 font-bold mr-2">{status.last_commit.hash}</span>
@@ -495,7 +496,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
             type="text"
             value={commitMessage}
             onChange={(e) => setCommitMessage(e.target.value)}
-            placeholder="Message de commit (ex: Add feature X)..."
+            placeholder={t('git_commit_placeholder', 'Commit message (e.g. Add feature X)...')}
             disabled={committing || allChangedFiles.length === 0}
             className="w-full px-3 py-2 border rounded-xl text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50"
             style={{
@@ -513,7 +514,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                 onChange={(e) => setStageAll(e.target.checked)}
                 className="rounded border-slate-400 dark:border-slate-700 text-sky-500 focus:ring-0"
               />
-              <span>Indexer tous les fichiers (`git add -A`)</span>
+              <span>{t('git_stage_all', 'Stage all files (`git add -A`)')}</span>
             </label>
 
             <button
@@ -522,7 +523,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
               className="py-1.5 px-3 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-medium text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-md shadow-sky-500/20"
             >
               <GitCommit className="w-3.5 h-3.5" />
-              <span>{committing ? 'Validation...' : 'Commiter'}</span>
+              <span>{committing ? t('committing', 'Committing...') : t('commit', 'Commit')}</span>
             </button>
           </div>
         </form>
@@ -532,7 +533,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
           style={{ borderColor: 'var(--border)' }}
         >
           <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
-            Auteur : <code style={{ color: 'var(--strong)' }}>jprud67 &lt;jprud67@gmail.com&gt;</code>
+            {t('git_author', 'Author:')} <code style={{ color: 'var(--strong)' }}>jprud67 &lt;jprud67@gmail.com&gt;</code>
           </span>
 
           <div className="flex items-center gap-2">
@@ -545,10 +546,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                 borderColor: 'var(--border)',
                 color: 'var(--text)'
               }}
-              title="Tirer les commits depuis le dépôt distant (git pull)"
+              title={t('git_pull_title', 'Pull commits from remote repository (git pull)')}
             >
               <DownloadCloud className={`w-3.5 h-3.5 ${pulling ? 'animate-bounce text-sky-500' : ''}`} />
-              <span>{pulling ? 'Pull en cours...' : 'Tirer'}</span>
+              <span>{pulling ? t('pulling', 'Pulling...') : t('git_pull', 'Pull')}</span>
             </button>
 
             <button
@@ -560,10 +561,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                 borderColor: 'var(--border)',
                 color: 'var(--text)'
               }}
-              title="Pousser les commits vers le dépôt distant (git push)"
+              title={t('git_push_title', 'Push commits to remote repository (git push)')}
             >
               <UploadCloud className={`w-3.5 h-3.5 ${pushing ? 'animate-bounce text-sky-500' : ''}`} />
-              <span>{pushing ? 'Push en cours...' : 'Pousser'}</span>
+              <span>{pushing ? t('pushing', 'Pushing...') : t('git_push', 'Push')}</span>
             </button>
           </div>
         </div>

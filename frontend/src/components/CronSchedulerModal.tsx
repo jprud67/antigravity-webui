@@ -27,6 +27,7 @@ import {
 } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
+import { useI18n } from '../services/i18n';
 
 interface CronSchedulerModalProps {
   isOpen: boolean;
@@ -35,12 +36,12 @@ interface CronSchedulerModalProps {
 }
 
 const SCHEDULE_PRESETS = [
-  { label: 'Toutes les 5 minutes', expr: '*/5 * * * *' },
-  { label: 'Toutes les 15 minutes', expr: '*/15 * * * *' },
-  { label: 'Toutes les heures', expr: '0 * * * *' },
-  { label: 'Tous les jours à 09:00 UTC', expr: '0 9 * * *' },
-  { label: 'Tous les lundis à 08:00 UTC', expr: '0 8 * * 1' },
-  { label: 'Personnalisé (Cron)', expr: 'custom' },
+  { key: 'cron_every_5m', label: 'Every 5 minutes', expr: '*/5 * * * *' },
+  { key: 'cron_every_15m', label: 'Every 15 minutes', expr: '*/15 * * * *' },
+  { key: 'cron_every_hour', label: 'Every hour', expr: '0 * * * *' },
+  { key: 'cron_every_day_9am', label: 'Every day at 09:00 UTC', expr: '0 9 * * *' },
+  { key: 'cron_every_monday_8am', label: 'Every Monday at 08:00 UTC', expr: '0 8 * * 1' },
+  { key: 'cron_custom', label: 'Custom (Cron)', expr: 'custom' },
 ];
 
 export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
@@ -48,6 +49,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
   onClose,
   onExecutePrompt
 }) => {
+  const { t, lang } = useI18n();
   const [cronData, setCronData] = useState<CronListResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +83,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
       setCronData(data);
     } catch (e: any) {
       console.error('Failed to load cron jobs', e);
-      setError(e.message || 'Erreur lors du chargement des tâches planifiées');
+      setError(e.message || t('cron_error_load', 'Error loading scheduled tasks'));
     } finally {
       setLoading(false);
     }
@@ -100,14 +102,14 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
       .catch((e: any) => {
         if (active) {
           console.error('Failed to load cron jobs', e);
-          setError(e.message || 'Erreur lors du chargement des tâches planifiées');
+          setError(e.message || t('cron_error_load', 'Error loading scheduled tasks'));
           setLoading(false);
         }
       });
     return () => {
       active = false;
     };
-  }, [isOpen]);
+  }, [isOpen, t]);
 
   if (!isOpen) return null;
 
@@ -128,11 +130,11 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
       });
       setName('');
       setPrompt('');
-      setActionNotice('Tâche planifiée créée avec succès');
+      setActionNotice(t('cron_created', 'Scheduled task created successfully'));
       setTimeout(() => setActionNotice(null), 3000);
       await loadCrons();
     } catch (e: any) {
-      showToast(e.message || 'Erreur création', 'error');
+      showToast(e.message || t('cron_error_create', 'Error creating task'), 'error');
     } finally {
       setSubmitting(false);
     }

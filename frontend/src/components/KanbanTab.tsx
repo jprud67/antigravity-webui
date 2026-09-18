@@ -8,6 +8,7 @@ import {
 } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
+import { useI18n } from '../services/i18n';
 import { 
   Plus, 
   RefreshCw, 
@@ -30,6 +31,7 @@ interface KanbanTabProps {
 }
 
 export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecutePrompt }) => {
+  const { t } = useI18n();
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [columns, setColumns] = useState<{
     todo: KanbanTask[];
@@ -60,7 +62,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
       setColumns(data.columns);
     } catch (e: any) {
       console.error('Failed to load kanban tasks', e);
-      setError(e.message || 'Erreur de chargement du Kanban');
+      setError(e.message || t('kanban_error_load', 'Error loading Kanban'));
     } finally {
       setLoading(false);
     }
@@ -78,7 +80,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
       .catch((e: any) => {
         if (active) {
           console.error('Failed to load kanban tasks', e);
-          setError(e.message || 'Erreur de chargement du Kanban');
+          setError(e.message || t('kanban_error_load', 'Error loading Kanban'));
         }
       })
       .finally(() => {
@@ -138,19 +140,19 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
       setIsModalOpen(false);
       await loadTasks();
     } catch (e: any) {
-      showToast(e.message || 'Erreur lors de la sauvegarde', 'error');
+      showToast(e.message || t('kanban_error_save', 'Error saving task'), 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    if (!(await showConfirm('Supprimer définitivement cette tâche ?', { destructive: true }))) return;
+    if (!(await showConfirm(t('kanban_delete_confirm', 'Permanently delete this task?'), { destructive: true }))) return;
     try {
       await deleteKanbanTask(taskId);
       await loadTasks();
     } catch (e: any) {
-      showToast(e.message || 'Erreur suppression', 'error');
+      showToast(e.message || t('kanban_error_delete', 'Error deleting task'), 'error');
     }
   };
 
@@ -164,9 +166,10 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
   };
 
   const handleExecuteWithAntigravity = (task: KanbanTask) => {
+    const taskLabel = t('kanban_task_label', 'Task');
     const prompt = task.body 
-      ? `[TÂCHE KANBAN: ${task.title}]\n\n${task.body}`
-      : `[TÂCHE KANBAN: ${task.title}]`;
+      ? `[${taskLabel.toUpperCase()}: ${task.title}]\n\n${task.body}`
+      : `[${taskLabel.toUpperCase()}: ${task.title}]`;
     
     // Automatically advance task to 'running' if it was in 'todo'
     if (task.status === 'todo' || task.status === 'ready') {
@@ -182,14 +185,14 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
     if (p >= 2) {
       return (
         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30">
-          Urgent
+          {t('kanban_priority_urgent', 'Critical')}
         </span>
       );
     }
     if (p === 1) {
       return (
         <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30">
-          Prioritaire
+          {t('kanban_priority_high', 'High')}
         </span>
       );
     }
@@ -202,7 +205,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
           color: 'var(--muted)'
         }}
       >
-        Normal
+        {t('kanban_priority_normal', 'Normal')}
       </span>
     );
   };
@@ -237,7 +240,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Filtrer les tâches..."
+            placeholder={t('kanban_filter_placeholder', 'Filter tasks...')}
             className="w-full border rounded-lg pl-8 pr-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
             style={{
               backgroundColor: 'var(--input-bg)',
@@ -249,7 +252,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
 
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono hidden sm:inline" style={{ color: 'var(--muted)' }}>
-            {tasks.length} {tasks.length > 1 ? 'tâches' : 'tâche'}
+            {t('kanban_task_count', '{0} task(s)').replace('{0}', String(tasks.length))}
           </span>
 
           <button
@@ -261,7 +264,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
               borderColor: 'var(--border)',
               color: 'var(--muted)'
             }}
-            title="Rafraîchir le tableau"
+            title={t('kanban_refresh', 'Refresh')}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -271,7 +274,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-sky-600/20 cursor-pointer transition-all"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Tâche</span>
+            <span>{t('kanban_task_label', 'Task')}</span>
           </button>
         </div>
       </div>
@@ -302,7 +305,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
           >
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-sky-400" />
-              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>À faire</span>
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>{t('kanban_col_todo', 'To do')}</span>
             </div>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/20">
               {filterTasks(columns.todo).length}
@@ -345,7 +348,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                     <button
                       onClick={() => handleExecuteWithAntigravity(task)}
                       className="p-1 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 transition-colors cursor-pointer"
-                      title="Exécuter avec Antigravity"
+                      title={t('kanban_execute_antigravity', 'Execute with Antigravity')}
                     >
                       <Play className="w-3 h-3" />
                     </button>
@@ -353,7 +356,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                       onClick={() => openEditModal(task)}
                       className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                       style={{ color: 'var(--muted)' }}
-                      title="Modifier"
+                      title={t('kanban_edit', 'Edit')}
                     >
                       <Edit3 className="w-3 h-3" />
                     </button>
@@ -361,7 +364,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                       onClick={() => handleMoveStatus(task, 'running')}
                       className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                       style={{ color: 'var(--muted)' }}
-                      title="Déplacer vers En cours"
+                      title={t('kanban_move_running', 'Move to In progress')}
                     >
                       <ChevronRight className="w-3 h-3" />
                     </button>
@@ -389,7 +392,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
           >
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>En cours</span>
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>{t('kanban_col_running', 'In progress')}</span>
             </div>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/20">
               {filterTasks(columns.running).length}
@@ -423,7 +426,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                     onClick={() => handleMoveStatus(task, 'todo')}
                     className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                     style={{ color: 'var(--muted)' }}
-                    title="Revenir à Faire"
+                    title={t('kanban_move_todo', 'Move back to To do')}
                   >
                     <ChevronLeft className="w-3 h-3" />
                   </button>
@@ -432,21 +435,21 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                     <button
                       onClick={() => handleExecuteWithAntigravity(task)}
                       className="p-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 transition-colors cursor-pointer"
-                      title="Reprendre dans Antigravity"
+                      title={t('kanban_resume_antigravity', 'Resume in Antigravity')}
                     >
                       <Play className="w-3 h-3" />
                     </button>
                     <button
                       onClick={() => handleMoveStatus(task, 'blocked')}
                       className="p-1 rounded hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 transition-colors cursor-pointer"
-                      title="Marquer Bloqué"
+                      title={t('kanban_move_blocked', 'Mark as Blocked')}
                     >
                       <AlertTriangle className="w-3 h-3" />
                     </button>
                     <button
                       onClick={() => handleMoveStatus(task, 'done')}
                       className="p-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-300 transition-colors cursor-pointer"
-                      title="Marquer Terminé"
+                      title={t('kanban_mark_done', 'Mark Done')}
                     >
                       <CheckCircle2 className="w-3 h-3" />
                     </button>
@@ -474,7 +477,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
           >
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-rose-500" />
-              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>Bloqué</span>
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>{t('kanban_col_blocked', 'Blocked')}</span>
             </div>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-500/20">
               {filterTasks(columns.blocked).length}
@@ -508,7 +511,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                     onClick={() => handleMoveStatus(task, 'todo')}
                     className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                     style={{ color: 'var(--muted)' }}
-                    title="Débloquer vers À faire"
+                    title={t('kanban_move_todo', 'Move back to To do')}
                   >
                     <ChevronLeft className="w-3 h-3" />
                   </button>
@@ -517,14 +520,14 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                     <button
                       onClick={() => handleExecuteWithAntigravity(task)}
                       className="p-1 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 transition-colors cursor-pointer"
-                      title="Résoudre le blocage avec Antigravity"
+                      title={t('kanban_solve_blocked', 'Solve with Antigravity')}
                     >
                       <Play className="w-3 h-3" />
                     </button>
                     <button
                       onClick={() => handleDeleteTask(task.id)}
                       className="p-1 rounded hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 transition-colors cursor-pointer"
-                      title="Supprimer"
+                      title={t('kanban_delete', 'Delete')}
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -552,7 +555,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
           >
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>Terminé</span>
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>{t('kanban_col_done', 'Done')}</span>
             </div>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/20">
               {filterTasks(columns.done).length}
@@ -586,7 +589,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                     onClick={() => handleMoveStatus(task, 'running')}
                     className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                     style={{ color: 'var(--muted)' }}
-                    title="Rouvrir la tâche"
+                    title={t('kanban_reopen', 'Reopen task')}
                   >
                     <ChevronLeft className="w-3 h-3" />
                   </button>
@@ -594,7 +597,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                   <button
                     onClick={() => handleDeleteTask(task.id)}
                     className="p-1 rounded hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 transition-colors cursor-pointer"
-                    title="Supprimer"
+                    title={t('kanban_delete', 'Delete')}
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -622,7 +625,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
             >
               <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                 {editingTask ? <Edit3 className="w-4 h-4 text-sky-500" /> : <Plus className="w-4 h-4 text-sky-500" />}
-                <span>{editingTask ? 'Modifier la tâche' : 'Nouvelle tâche Kanban'}</span>
+                <span>{editingTask ? t('kanban_edit_task', 'Edit task') : t('kanban_new_task', 'New task')}</span>
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -636,14 +639,14 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
             <form onSubmit={handleSaveTask} className="mt-4 space-y-3.5">
               <div>
                 <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text)' }}>
-                  Titre de la tâche *
+                  {t('kanban_task_title', 'Task title *')}
                 </label>
                 <input
                   type="text"
                   required
                   value={taskTitle}
                   onChange={e => setTaskTitle(e.target.value)}
-                  placeholder="ex: Implémenter l'authentification OAuth2"
+                  placeholder={t('kanban_task_title_placeholder', 'e.g. Implement OAuth2 authentication')}
                   className="w-full border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
                   style={{
                     backgroundColor: 'var(--bg)',
@@ -655,13 +658,13 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
 
               <div>
                 <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text)' }}>
-                  Description / Instructions pour Antigravity
+                  {t('kanban_task_body', 'Description / Instructions for Antigravity')}
                 </label>
                 <textarea
                   rows={4}
                   value={taskBody}
                   onChange={e => setTaskBody(e.target.value)}
-                  placeholder="Spécifiez les fichiers à modifier, contraintes techniques ou critères d'acceptation..."
+                  placeholder={t('kanban_task_body_placeholder', 'Specify files to modify, technical constraints or acceptance criteria...')}
                   className="w-full border rounded-lg p-3 text-xs focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
                   style={{
                     backgroundColor: 'var(--bg)',
@@ -674,7 +677,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text)' }}>
-                    Priorité
+                    {t('kanban_priority', 'Priority')}
                   </label>
                   <select
                     value={taskPriority}
@@ -686,15 +689,15 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                       color: 'var(--text)'
                     }}
                   >
-                    <option value={0}>⚪ Normal</option>
-                    <option value={1}>🟡 Prioritaire</option>
-                    <option value={2}>🔴 Urgent</option>
+                    <option value={0}>⚪ {t('kanban_priority_normal', 'Normal')}</option>
+                    <option value={1}>🟡 {t('kanban_priority_high', 'High')}</option>
+                    <option value={2}>🔴 {t('kanban_priority_urgent', 'Critical')}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text)' }}>
-                    Assigné à
+                    {t('kanban_assignee', 'Assignee')}
                   </label>
                   <input
                     type="text"
@@ -712,7 +715,7 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
 
                 <div>
                   <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--text)' }}>
-                    Statut
+                    {t('kanban_status', 'Status')}
                   </label>
                   <select
                     value={taskStatus}
@@ -724,10 +727,10 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                       color: 'var(--text)'
                     }}
                   >
-                    <option value="todo">À faire</option>
-                    <option value="running">En cours</option>
-                    <option value="blocked">Bloqué</option>
-                    <option value="done">Terminé</option>
+                    <option value="todo">{t('kanban_col_todo', 'To do')}</option>
+                    <option value="running">{t('kanban_col_running', 'In progress')}</option>
+                    <option value="blocked">{t('kanban_col_blocked', 'Blocked')}</option>
+                    <option value="done">{t('kanban_col_done', 'Done')}</option>
                   </select>
                 </div>
               </div>
@@ -746,14 +749,14 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                     color: 'var(--text)'
                   }}
                 >
-                  Annuler
+                  {t('cancel', 'Cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={submitting || !taskTitle.trim()}
                   className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-sky-600/30 cursor-pointer transition-all disabled:opacity-50"
                 >
-                  {submitting ? 'Enregistrement...' : editingTask ? 'Mettre à jour' : 'Créer la tâche'}
+                  {submitting ? t('saving', 'Saving...') : editingTask ? t('update_task', 'Update') : t('create_task', 'Create task')}
                 </button>
               </div>
             </form>
