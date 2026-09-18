@@ -4448,6 +4448,10 @@ def test_is_blocked_sensitive_path_cloud_credentials():
 
     assert is_blocked_sensitive_path("/home/user/.aws/credentials") is True
     assert is_blocked_sensitive_path("/root/.azure/token.json") is True
+    assert is_blocked_sensitive_path("/home/user/.gcloud/credentials.db") is True
+    assert is_blocked_sensitive_path("/home/user/.config/gcloud/credentials.db") is True
+    assert is_blocked_sensitive_path("/home/user/.bash_history") is True
+    assert is_blocked_sensitive_path("/home/user/.zsh_history") is True
     assert is_blocked_sensitive_path("/workspace/credentials") is True
     assert is_blocked_sensitive_path("/workspace/client_secret.json") is True
     assert is_blocked_sensitive_path("/workspace/client_secret_oauth2.json") is True
@@ -4474,6 +4478,8 @@ def test_kill_task_marks_task_log_as_cancelled():
         task_dir.mkdir(parents=True, exist_ok=True)
         tfile = task_dir / "task-cancel-123"
         tfile.write_text("Starting task execution...\n", encoding="utf-8")
+        tfile2 = task_dir / "task-cancel-456.log"
+        tfile2.write_text("Starting task 456...\n", encoding="utf-8")
 
         with patch("app.api.tasks.BRAIN_DIR", brain_path):
             marked = _mark_task_cancelled("task-cancel-123")
@@ -4481,6 +4487,14 @@ def test_kill_task_marks_task_log_as_cancelled():
             content = tfile.read_text(encoding="utf-8")
             assert "Task cancelled by user" in content
             assert "Completed At:" in content
+
+            marked2 = _mark_task_cancelled("task-cancel-456")
+            assert marked2 is True
+            content2 = tfile2.read_text(encoding="utf-8")
+            assert "Task cancelled by user" in content2
+
+            marked3 = _mark_task_cancelled("test-conv-cancel/task-cancel-456")
+            assert marked3 is True
 
     print("✓ test_kill_task_marks_task_log_as_cancelled passed")
 
@@ -4504,6 +4518,64 @@ def test_undo_turn_invalidates_execution_manager_session():
         mock_exec_mgr.remove_session.assert_called_once_with("test-conv-undo")
 
     print("✓ test_undo_turn_invalidates_execution_manager_session passed")
+
+
+def test_openai_compat_french_quota_detection():
+    """Verify that _raise_http_for_error and _is_quota_error detect French quota messages and is_quota flag."""
+    from fastapi import HTTPException
+    from app.api.openai_compat import _is_quota_error, _raise_http_for_error
+
+    msg_fr = "Quota Google épuisé sur tous les comptes disponibles."
+    assert _is_quota_error(msg_fr) is True
+
+    try:
+        _raise_http_for_error(msg_fr, context="test")
+        assert False, "Should have raised HTTPException"
+    except HTTPException as e:
+        assert e.status_code == 429
+        assert e.detail["error"]["code"] == "rate_limit_exceeded"
+
+    # With is_quota=True explicitly
+    try:
+        _raise_http_for_error("Custom unknown error string", is_quota=True)
+        assert False, "Should have raised HTTPException"
+    except HTTPException as e:
+        assert e.status_code == 429
+
+    print("✓ test_openai_compat_french_quota_detection passed")
+
+
+def test_storage_update_conversation_summary_fields():
+    """Verify update_conversation_summary_fields updates title, project_id, group_id."""
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services.storage import ensure_db_schema, get_db_connection, update_conversation_summary_fields
+
+    with tempfile.TemporaryDirectory() as td:
+        db_file = Path(td) / "conversations.db"
+        with patch("app.services.storage.CONVERSATION_DB", db_file), \
+             patch("app.services.storage._schema_initialized", False):
+            ensure_db_schema()
+            conn = get_db_connection()
+            conn.execute(
+                "INSERT INTO conversation_summaries (conversation_id, title, project_id, group_id) VALUES (?, ?, ?, ?)",
+                ("conv-test-1", "Old Title", "old-project", "old-group")
+            )
+            conn.commit()
+            conn.close()
+
+            res = update_conversation_summary_fields("conv-test-1", title="New Title", project_id="new-project", group_id="new-group")
+            assert res is True
+
+            conn = get_db_connection()
+            row = conn.execute("SELECT title, project_id, group_id FROM conversation_summaries WHERE conversation_id = ?", ("conv-test-1",)).fetchone()
+            conn.close()
+            assert row[0] == "New Title"
+            assert row[1] == "new-project"
+            assert row[2] == "new-group"
+
+    print("✓ test_storage_update_conversation_summary_fields passed")
 
 
 if __name__ == "__main__":
@@ -4681,5 +4753,7 @@ if __name__ == "__main__":
     test_is_blocked_sensitive_path_cloud_credentials()
     test_kill_task_marks_task_log_as_cancelled()
     test_undo_turn_invalidates_execution_manager_session()
+    test_openai_compat_french_quota_detection()
+    test_storage_update_conversation_summary_fields()
     print("\nAll unit tests passed successfully!")
 

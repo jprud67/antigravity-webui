@@ -211,7 +211,9 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
         resolved = Path(target).resolve()
         parts = resolved.parts
         # Répertoires système et dossiers cachés sensibles
-        if any(p in (".ssh", ".gnupg", ".aws", ".azure") for p in parts):
+        if any(p in (".ssh", ".gnupg", ".aws", ".azure", ".gcloud") for p in parts):
+            return True
+        if any(parts[i] == ".config" and parts[i + 1] == "gcloud" for i in range(len(parts) - 1)):
             return True
         # Points de montage système root
         if len(parts) > 1 and parts[1] in ("proc", "sys", "dev"):
@@ -230,6 +232,8 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
             "google_accounts.json",
             "credentials",
             "client_secret.json",
+            ".bash_history",
+            ".zsh_history",
         ):
             return True
         if name.startswith("client_secret") and name.endswith(".json"):

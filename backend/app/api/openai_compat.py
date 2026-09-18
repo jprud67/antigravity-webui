@@ -30,6 +30,10 @@ _QUOTA_KEYWORDS = (
     "429",
     "RATE_LIMIT_EXCEEDED",
     "exceeded your current quota",
+    "quota épuisé",
+    "quota atteint",
+    "limite de quota",
+    "quota google épuisé",
 )
 
 def _is_quota_error(msg: str) -> bool:
@@ -37,9 +41,9 @@ def _is_quota_error(msg: str) -> bool:
     msg_lower = msg.lower()
     return any(kw.lower() in msg_lower for kw in _QUOTA_KEYWORDS)
 
-def _raise_http_for_error(msg: str, context: str = "") -> None:
+def _raise_http_for_error(msg: str, context: str = "", is_quota: bool = False) -> None:
     """Lève l'HTTPException appropriée selon le type d'erreur CLI."""
-    if _is_quota_error(msg):
+    if is_quota or _is_quota_error(msg):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={
@@ -562,6 +566,7 @@ async def _tool_mode_response(req: ChatCompletionRequest, tool_list: list[dict[s
         _raise_http_for_error(
             str(outcome.get("message") or "Erreur inconnue du pont tool calling"),
             context="/v1/chat/completions (tool bridge)",
+            is_quota=bool(outcome.get("quota")),
         )
 
     usage = _extract_usage_info(outcome.get("usage"))

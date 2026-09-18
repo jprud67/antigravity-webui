@@ -681,6 +681,8 @@ _HARD_QUOTA_PATTERNS = [
     "exhausted your capacity",
     "resource has been exhausted",
     "capacity exceeded",
+    "quota épuisé",
+    "quota atteint",
 ]
 
 

@@ -153,21 +153,34 @@ def _mark_task_cancelled(task_id: str) -> bool:
     if not BRAIN_DIR.exists():
         return False
     clean_tid = task_id.strip()
-    pure_tid = clean_tid.split("/")[-1].strip() if "/" in clean_tid else clean_tid
+    cid_part = None
+    if "/" in clean_tid:
+        parts = clean_tid.split("/")
+        cid_part = parts[0].strip()
+        pure_tid = parts[-1].strip()
+    else:
+        pure_tid = clean_tid
+
+    cands = [pure_tid]
+    if not pure_tid.endswith(".log"):
+        cands.append(f"{pure_tid}.log")
+
     marked = False
     try:
-        for cdir in BRAIN_DIR.iterdir():
+        candidate_dirs = [BRAIN_DIR / cid_part] if cid_part and (BRAIN_DIR / cid_part).is_dir() else BRAIN_DIR.iterdir()
+        for cdir in candidate_dirs:
             if not cdir.is_dir():
                 continue
-            tfile = cdir / ".system_generated" / "tasks" / pure_tid
-            if tfile.exists() and tfile.is_file():
-                try:
-                    with open(tfile, "a", encoding="utf-8") as f:
-                        f.write(f"\n[Task cancelled by user]\nCompleted At: {datetime.now(timezone.utc).isoformat()}\n")
-                    marked = True
-                    break
-                except Exception:
-                    pass
+            for cand in cands:
+                tfile = cdir / ".system_generated" / "tasks" / cand
+                if tfile.exists() and tfile.is_file():
+                    try:
+                        with open(tfile, "a", encoding="utf-8") as f:
+                            f.write(f"\n[Task cancelled by user]\nCompleted At: {datetime.now(timezone.utc).isoformat()}\n")
+                        marked = True
+                        return True
+                    except Exception:
+                        pass
     except Exception as e:
         logger.debug(f"Error marking task log file as cancelled: {e}")
     return marked

@@ -1101,6 +1101,41 @@ def update_conversation_title(conversation_id: str, new_title: str) -> bool:
         conn.close()
     return True
 
+def update_conversation_summary_fields(
+    conversation_id: str,
+    title: str | None = None,
+    project_id: str | None = None,
+    group_id: str | None = None,
+) -> bool:
+    """Updates one or more specific columns in SQLite conversation_summaries."""
+    if not is_safe_conversation_id(conversation_id):
+        return False
+    updates = []
+    params: list[Any] = []
+    if title is not None:
+        updates.append("title = ?")
+        params.append(title.strip())
+    if project_id is not None:
+        updates.append("project_id = ?")
+        params.append(project_id.strip())
+    if group_id is not None:
+        updates.append("group_id = ?")
+        params.append(group_id.strip())
+    if not updates:
+        return True
+    params.append(conversation_id)
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(f"UPDATE conversation_summaries SET {', '.join(updates)} WHERE conversation_id = ?", params)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return True
+
 def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
     if not is_safe_conversation_id(conversation_id):
         raise ValueError("Invalid conversation_id")

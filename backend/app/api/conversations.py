@@ -29,6 +29,7 @@ from app.services.storage import (
     list_conversations,
     search_conversations,
     undo_conversation_turn,
+    update_conversation_summary_fields,
     update_conversation_title,
 )
 
@@ -52,6 +53,8 @@ class MetadataUpdateRequest(BaseModel):
     project: str | None = None
     projectColor: str | None = None
     customTitle: str | None = None
+    groupId: str | None = None
+    group_id: str | None = None
 
 @router.get("", response_model=list[dict[str, Any]])
 def get_conversations(limit: int = 100, q: str | None = None, _ = Depends(require_auth)):
@@ -272,6 +275,21 @@ def update_metadata(conversation_id: str, req: MetadataUpdateRequest, _ = Depend
     if "tags" in updates and isinstance(updates["tags"], list):
         updates["tags"] = [t.strip() for t in updates["tags"] if isinstance(t, str) and t.strip()]
     updated = update_session_meta(conversation_id, updates)
+
+    title_val = updates.get("customTitle")
+    project_val = updates.get("project")
+    group_val = updates.get("group_id") or updates.get("groupId")
+    if title_val is not None or project_val is not None or group_val is not None:
+        try:
+            update_conversation_summary_fields(
+                conversation_id,
+                title=title_val,
+                project_id=project_val,
+                group_id=group_val,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to sync conversation summary metadata for {conversation_id}: {e}")
+
     return {"success": True, "conversation_id": conversation_id, "metadata": updated}
 
 @router.delete("/{conversation_id}")
