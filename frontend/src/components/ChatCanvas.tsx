@@ -167,6 +167,7 @@ const CalloutBlock = ({ children }: any) => {
  * Clickable Interactive File Link or External URL
  */
 const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: any) => {
+  const { t } = useI18n();
   if (href && (href.startsWith('file://') || href.startsWith('workspace://'))) {
     let cleanHref = href;
     if (href.startsWith('workspace://')) {
@@ -436,6 +437,7 @@ const formatToolResult = (result: any): string => {
 };
 
 const ToolItemCard: React.FC<{ tool: ToolCallItem }> = ({ tool }) => {
+  const { t } = useI18n();
   const [openDrawer, setOpenDrawer] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -555,6 +557,7 @@ const ToolActivityFeed: React.FC<{
   onAnswerQuestion?: (answer: string) => void;
   onQuickPrompt?: (prompt: string) => void;
 }> = ({ toolCalls, isExpanded, onToggle, onAnswerQuestion, onQuickPrompt }) => {
+  const { t } = useI18n();
   const [showAllTools, setShowAllTools] = useState(false);
   const interactiveTools = toolCalls.filter(
     (t) => t.name === 'ask_question' || t.name === 'ask_permission' || t.name === 'ask_custom_permission'
@@ -687,6 +690,7 @@ const ToolActivityFeed: React.FC<{
  * Checkpoint Divider in timeline
  */
 const CheckpointDivider: React.FC<{ content: string; stepIndex?: number }> = ({ content, stepIndex }) => {
+  const { t } = useI18n();
 
   const [isOpen, setIsOpen] = useState(false);
   return (

@@ -112,14 +112,14 @@ interface SettingsModalProps {
   onConversationUpdated?: () => void;
 }
 
-const MODEL_DESCRIPTIONS: Record<string, { desc: string; badge: string; iconColor: string }> = {
-  'gemini-3.8-flash': { desc: t('model_gemini_38', 'Ultra-fast, high performance and versatile. Ideal for daily development.'), badge: t('badge_recommended', 'Recommended'), iconColor: 'text-sky-400 bg-sky-500/10 border-sky-500/30' },
-  'gemini-3.7-flash': { desc: t('model_gemini_37', 'Fast, robust code generation with solid reasoning.'), badge: t('badge_fast', 'Fast'), iconColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' },
-  'gemini-3.6-flash': { desc: t('model_gemini_36', 'Lightweight and highly responsive model for simple tasks.'), badge: t('badge_light', 'Light'), iconColor: 'text-teal-400 bg-teal-500/10 border-teal-500/30' },
-  'gemini-3.1-pro': { desc: t('model_gemini_31', 'Deep reasoning for complex architectures and large refactoring.'), badge: t('badge_expert', 'Expert'), iconColor: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/30' },
-  'claude-sonnet-4-6': { desc: t('model_claude_sonnet', 'Excellence in code analysis and native Thinking reasoning.'), badge: 'Thinking', iconColor: 'text-purple-400 bg-purple-500/10 border-purple-500/30' },
-  'claude-opus-4-6-thinking': { desc: t('model_claude_opus', 'Maximum reflection capabilities for demanding algorithmic problems.'), badge: t('badge_premium', 'Premium'), iconColor: 'text-fuchsia-400 bg-fuchsia-500/10 border-fuchsia-500/30' },
-  'gpt-oss-120b': { desc: t('model_gpt_oss', 'High performance 120B open-weights model.'), badge: 'Open-OSS', iconColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
+const MODEL_DESCRIPTIONS: Record<string, { desc: string; descKey?: string; badge: string; badgeKey?: string; iconColor: string }> = {
+  'gemini-3.8-flash': { desc: 'Ultra-fast, high performance and versatile. Ideal for daily development.', descKey: 'model_gemini_38', badge: 'Recommended', badgeKey: 'badge_recommended', iconColor: 'text-sky-400 bg-sky-500/10 border-sky-500/30' },
+  'gemini-3.7-flash': { desc: 'Fast, robust code generation with solid reasoning.', descKey: 'model_gemini_37', badge: 'Fast', badgeKey: 'badge_fast', iconColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' },
+  'gemini-3.6-flash': { desc: 'Lightweight and highly responsive model for simple tasks.', descKey: 'model_gemini_36', badge: 'Light', badgeKey: 'badge_light', iconColor: 'text-teal-400 bg-teal-500/10 border-teal-500/30' },
+  'gemini-3.1-pro': { desc: 'Deep reasoning for complex architectures and large refactoring.', descKey: 'model_gemini_31', badge: 'Expert', badgeKey: 'badge_expert', iconColor: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/30' },
+  'claude-sonnet-4-6': { desc: 'Excellence in code analysis and native Thinking reasoning.', descKey: 'model_claude_sonnet', badge: 'Thinking', iconColor: 'text-purple-400 bg-purple-500/10 border-purple-500/30' },
+  'claude-opus-4-6-thinking': { desc: 'Maximum reflection capabilities for demanding algorithmic problems.', descKey: 'model_claude_opus', badge: 'Premium', badgeKey: 'badge_premium', iconColor: 'text-fuchsia-400 bg-fuchsia-500/10 border-fuchsia-500/30' },
+  'gpt-oss-120b': { desc: 'High performance 120B open-weights model.', descKey: 'model_gpt_oss', badge: 'Open-OSS', iconColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
 };
 
 const CONV_PALETTE = ['#0ea5e9', '#10b981', '#f59e0b', '#f43f5e', '#6366f1', '#a855f7', '#ec4899', '#06b6d4'] as const;
@@ -1377,8 +1377,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {models.map((m) => {
                     const isSelected = selectedModelId === m.id;
                     const meta = MODEL_DESCRIPTIONS[m.id] || {
-                      desc: 'Modèle supporté par Antigravity CLI.',
-                      badge: 'Standard',
+                      desc: t('default_model_desc', 'Model supported by Antigravity CLI.'),
+                      badge: t('standard', 'Standard'),
                       iconColor: 'text-sky-500 bg-sky-500/10 border-sky-500/30'
                     };
 
@@ -1401,10 +1401,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>{m.name}</span>
                               <span className={`text-[9px] px-1.5 py-0.2 rounded border font-mono font-bold ${meta.iconColor}`}>
-                                {meta.badge}
+                                {meta.badgeKey ? t(meta.badgeKey, meta.badge) : meta.badge}
                               </span>
                             </div>
-                            <p className="text-[11px] mt-1 leading-snug" style={{ color: 'var(--muted)' }}>{meta.desc}</p>
+                            <p className="text-[11px] mt-1 leading-snug" style={{ color: 'var(--muted)' }}>
+                              {meta.descKey ? t(meta.descKey, meta.desc) : meta.desc}
+                            </p>
                           </div>
                         </div>
 
