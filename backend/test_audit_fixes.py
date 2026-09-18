@@ -4523,6 +4523,7 @@ def test_undo_turn_invalidates_execution_manager_session():
 def test_openai_compat_french_quota_detection():
     """Verify that _raise_http_for_error and _is_quota_error detect French quota messages and is_quota flag."""
     from fastapi import HTTPException
+
     from app.api.openai_compat import _is_quota_error, _raise_http_for_error
 
     msg_fr = "Quota Google épuisé sur tous les comptes disponibles."
@@ -4550,7 +4551,12 @@ def test_storage_update_conversation_summary_fields():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
-    from app.services.storage import ensure_db_schema, get_db_connection, update_conversation_summary_fields
+
+    from app.services.storage import (
+        ensure_db_schema,
+        get_db_connection,
+        update_conversation_summary_fields,
+    )
 
     with tempfile.TemporaryDirectory() as td:
         db_file = Path(td) / "conversations.db"
@@ -4575,7 +4581,108 @@ def test_storage_update_conversation_summary_fields():
             assert row[1] == "new-project"
             assert row[2] == "new-group"
 
+            # Verify clearing group_id with empty string
+            res_clear = update_conversation_summary_fields("conv-test-1", group_id="")
+            assert res_clear is True
+            conn = get_db_connection()
+            row = conn.execute("SELECT group_id FROM conversation_summaries WHERE conversation_id = ?", ("conv-test-1",)).fetchone()
+            conn.close()
+            assert row[0] == ""
+
     print("✓ test_storage_update_conversation_summary_fields passed")
+
+
+def test_storage_aggregate_steps_tool_call_id_isolation():
+    """Verify aggregate_steps_into_turns never assigns a result with tool_call_id to a different pending tool."""
+    from app.services.storage import aggregate_steps_into_turns
+
+    steps = [
+        {
+            "step_index": 0,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "created_at": "2026-09-18T20:00:00Z",
+            "tool_calls": [
+                {"id": "call_1", "name": "tool_one", "args": {}},
+                {"id": "call_2", "name": "tool_two", "args": {}},
+            ],
+        },
+        {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "TOOL_OUTPUT",
+            "created_at": "2026-09-18T20:00:01Z",
+            "tool_call_id": "call_2",
+            "content": "output for call 2",
+        },
+    ]
+
+    turns = aggregate_steps_into_turns(steps)
+    assert len(turns) == 1
+    acts = turns[0]["tool_activities"]
+    assert len(acts) == 2
+    # call_1 should NOT have been assigned call_2's result
+    assert acts[0]["id"] == "call_1"
+    assert acts[0]["result"] == ""  # flushed as empty
+    # call_2 must receive the output
+    assert acts[1]["id"] == "call_2"
+    assert acts[1]["result"] == "output for call 2"
+    print("✓ test_storage_aggregate_steps_tool_call_id_isolation passed")
+
+
+def test_conversations_update_metadata_empty_group_id():
+    """Verify conversations update_metadata preserves empty string group_id."""
+    from unittest.mock import patch
+
+    from app.api.conversations import MetadataUpdateRequest, update_metadata
+
+    with patch("app.api.conversations.update_session_meta") as mock_session_meta, \
+         patch("app.api.conversations.update_conversation_summary_fields") as mock_summary_fields:
+        mock_session_meta.return_value = {"group_id": ""}
+        req = MetadataUpdateRequest(group_id="")
+        res = update_metadata("conv-group-test", req)
+        assert res["success"] is True
+        mock_summary_fields.assert_called_once_with(
+            "conv-group-test",
+            title=None,
+            project_id=None,
+            group_id="",
+        )
+    print("✓ test_conversations_update_metadata_empty_group_id passed")
+
+
+def test_agent_api_run_turn_is_quota_flag_and_french():
+    """Verify run_agent_turn raises HTTP 429 when is_quota=True or French quota message is received."""
+    from unittest.mock import patch
+
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.agent_api import AgentRunRequest, run_agent_turn
+
+    async def mock_stream_turn_quota(*args, **kwargs):
+        yield {"event": "error", "code": 1, "message": "Google CLI failure", "is_quota": True}
+
+    req = AgentRunRequest(prompt="test prompt", stream=False)
+    with patch("app.api.agent_api.stream_turn", side_effect=mock_stream_turn_quota):
+        with pytest.raises(HTTPException) as exc_info:
+            import asyncio
+            asyncio.run(run_agent_turn(req))
+        assert exc_info.value.status_code == 429
+        assert exc_info.value.detail["error"]["type"] == "quota_exceeded"
+
+    async def mock_stream_turn_french(*args, **kwargs):
+        yield {"event": "error", "code": 1, "message": "quota épuisé sur le projet", "is_quota": False}
+
+    with patch("app.api.agent_api.stream_turn", side_effect=mock_stream_turn_french):
+        with pytest.raises(HTTPException) as exc_info:
+            import asyncio
+            asyncio.run(run_agent_turn(req))
+        assert exc_info.value.status_code == 429
+        assert exc_info.value.detail["error"]["type"] == "quota_exceeded"
+
+    print("✓ test_agent_api_run_turn_is_quota_flag_and_french passed")
+
 
 
 def test_is_blocked_sensitive_path_extended():
@@ -4599,6 +4706,7 @@ def test_files_validate_path_access_url_fragments():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
+
     from app.api.files import _validate_path_access
 
     with tempfile.TemporaryDirectory() as td:
@@ -4618,6 +4726,7 @@ def test_files_validate_path_access_url_fragments():
 def test_execution_manager_unregister_socket_prune_flag():
     """Verify unregister_socket respects prune=False parameter."""
     from unittest.mock import MagicMock, patch
+
     from app.services.execution_manager import ExecutionManager
 
     em = ExecutionManager()
@@ -4642,6 +4751,7 @@ def test_tasks_list_active_tasks_expanded_markers():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
+
     from app.api.tasks import list_active_tasks
 
     with tempfile.TemporaryDirectory() as td:
@@ -4845,5 +4955,9 @@ if __name__ == "__main__":
     test_undo_turn_invalidates_execution_manager_session()
     test_openai_compat_french_quota_detection()
     test_storage_update_conversation_summary_fields()
+    test_storage_aggregate_steps_tool_call_id_isolation()
+    test_conversations_update_metadata_empty_group_id()
+    test_agent_api_run_turn_is_quota_flag_and_french()
     print("\nAll unit tests passed successfully!")
+
 

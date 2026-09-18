@@ -278,7 +278,7 @@ def update_metadata(conversation_id: str, req: MetadataUpdateRequest, _ = Depend
 
     title_val = updates.get("customTitle")
     project_val = updates.get("project")
-    group_val = updates.get("group_id") or updates.get("groupId")
+    group_val = updates.get("group_id") if "group_id" in updates else updates.get("groupId")
     if title_val is not None or project_val is not None or group_val is not None:
         try:
             update_conversation_summary_fields(

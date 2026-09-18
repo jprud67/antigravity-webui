@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api.auth import require_auth
+from app.api.openai_compat import _is_quota_error
 from app.config import DEFAULT_WORKSPACE
 from app.services.agy_driver import (
     get_credits,
@@ -276,7 +277,22 @@ async def run_agent_turn(
                 if res.get("usage"):
                     usage_stats = res["usage"]
             elif evt_type == "error":
-                raise RuntimeError(event.get("message") or "Erreur CLI Antigravity")
+                is_q = bool(event.get("is_quota"))
+                err_text = event.get("message") or "Erreur CLI Antigravity"
+                if is_q or _is_quota_error(err_text):
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail={
+                            "error": {
+                                "code": "rate_limit_exceeded",
+                                "message": "Quota Google Cloud épuisé. Antigravity bascule automatiquement entre les comptes disponibles. Réessayez dans quelques instants.",
+                                "type": "quota_exceeded",
+                                "source": "/api/v1/agent/run",
+                            }
+                        },
+                        headers={"Retry-After": "60"},
+                    )
+                raise RuntimeError(err_text)
 
     except HTTPException:
         raise  # Laisser passer les HTTPException déjà construites
@@ -284,8 +300,7 @@ async def run_agent_turn(
         err_msg = str(e)
         logger.error(f"Erreur durant l'exécution synchrone agent API: {err_msg}")
         # Détection quota Google Cloud (RESOURCE_EXHAUSTED 429)
-        quota_keywords = ("RESOURCE_EXHAUSTED", "quota reached", "Individual quota", "rate limit", "429", "RATE_LIMIT_EXCEEDED")
-        if any(kw.lower() in err_msg.lower() for kw in quota_keywords):
+        if _is_quota_error(err_msg):
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail={
@@ -293,10 +308,10 @@ async def run_agent_turn(
                         "code": "rate_limit_exceeded",
                         "message": "Quota Google Cloud épuisé. Antigravity bascule automatiquement entre les comptes disponibles. Réessayez dans quelques instants.",
                         "type": "quota_exceeded",
-                        "source": "/api/v1/agent/run"
+                        "source": "/api/v1/agent/run",
                     }
                 },
-                headers={"Retry-After": "60"}
+                headers={"Retry-After": "60"},
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

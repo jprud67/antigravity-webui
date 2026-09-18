@@ -23,10 +23,16 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({
     setDecision(dec);
     // Derive rule to add if permanent
     let rule: string | undefined = undefined;
-    if (command) {
-      rule = 'command(*)';
-    } else if (path) {
-      rule = 'write_file(/)';
+    if (dec === 'always-allow') {
+      if (command) {
+        const trimmed = command.trim();
+        const firstWord = trimmed.split(/\s+/)[0];
+        rule = firstWord ? `command(${firstWord} *)` : `command(${trimmed})`;
+      } else if (path) {
+        rule = `write_file(${path})`;
+      } else if (toolName) {
+        rule = `${toolName}(*)`;
+      }
     }
 
     chatSocket.sendApproval(dec, rule);

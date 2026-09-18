@@ -322,7 +322,7 @@ export class ChatWebSocketClient {
       if (this.pendingPayloads.length > 20) {
         this.pendingPayloads.shift();
       }
-      if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+      if (!this.ws || this.ws.readyState === WebSocket.CLOSED || this.ws.readyState === WebSocket.CLOSING) {
         this.connect();
       }
       return;

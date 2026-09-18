@@ -1248,9 +1248,13 @@ export function t(key: string, defaultValOrArg?: string | number, ...args: (stri
  */
 export function useI18n() {
   const [lang, setLang] = useState<string>(currentLanguage);
+  const [, setRevision] = useState(0);
 
   useEffect(() => {
-    const handler = (newLang: string) => setLang(newLang);
+    const handler = (newLang: string) => {
+      setLang(newLang);
+      setRevision((rev) => rev + 1);
+    };
     LISTENERS.add(handler);
     return () => {
       LISTENERS.delete(handler);

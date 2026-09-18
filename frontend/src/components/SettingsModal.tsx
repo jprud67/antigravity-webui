@@ -86,6 +86,7 @@ import {
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 import { showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
+import { copyText } from '../utils/codeBlockUtils';
 
 export const GoogleIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24">
@@ -430,10 +431,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleCopyText = (text: string, label?: string) => {
+  const handleCopyText = async (text: string, label?: string) => {
     const lbl = label || t('text_label', 'Texte');
-    navigator.clipboard.writeText(text);
-    showToast(t('toast_copied_to_clipboard', '{0} copied to clipboard!').replace('{0}', lbl), 'success');
+    const ok = await copyText(text);
+    if (ok) {
+      showToast(t('toast_copied_to_clipboard', '{0} copied to clipboard!').replace('{0}', lbl), 'success');
+    } else {
+      showToast(t('toast_copy_failed', 'Impossible de copier dans le presse-papier'), 'error');
+    }
   };
 
   useEffect(() => {

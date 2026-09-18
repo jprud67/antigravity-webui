@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Lock, KeyRound, Eye, EyeOff, ShieldAlert, ArrowRight } from 'lucide-react';
 import { login } from '../services/api';
 import { chatSocket } from '../services/ws';
+import { syncClient } from '../services/sync';
 import { useI18n } from '../services/i18n';
 
 interface LoginModalProps {
@@ -28,6 +29,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
     try {
       await login(password);
       chatSocket.reconnect();
+      syncClient.reconnect();
       onSuccess();
     } catch (err: any) {
       setError(err.message || t('login_incorrect_password', 'Mot de passe incorrect'));

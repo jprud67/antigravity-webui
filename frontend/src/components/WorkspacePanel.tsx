@@ -832,7 +832,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               const match = /language-(\w+)/.exec(className || '');
                               const language = match ? match[1] : '';
                               const codeContent = String(children).replace(/\n$/, '');
-                              if (!inline) {
+                              const isBlock = Boolean(match) || (typeof inline === 'boolean' ? !inline : String(children).includes('\n'));
+                              if (isBlock) {
                                 if (language === 'mermaid') {
                                   return <MermaidRenderer chart={codeContent} />;
                                 }

@@ -1123,11 +1123,15 @@ def update_conversation_summary_fields(
         params.append(group_id.strip())
     if not updates:
         return True
+    for item in updates:
+        col = item.split()[0]
+        if col not in _ALLOWED_CONVERSATION_SUMMARY_COLUMNS:
+            raise ValueError(f"Invalid column: {col}")
     params.append(conversation_id)
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute(f"UPDATE conversation_summaries SET {', '.join(updates)} WHERE conversation_id = ?", params)
+        cursor.execute(f"UPDATE conversation_summaries SET {', '.join(updates)} WHERE conversation_id = ?", params)  # nosec B608
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1589,7 +1593,13 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                     if act.get("id") == tool_call_id and act.get("result") is None:
                         pending = act
                         break
-            if not pending:
+                if not pending:
+                    for act in activities:
+                        if not act.get("id") and act.get("result") is None:
+                            pending = act
+                            pending["id"] = tool_call_id
+                            break
+            else:
                 for act in activities:
                     if act.get("result") is None:
                         pending = act

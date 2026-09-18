@@ -10,11 +10,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api.auth import require_auth
+from app.services import tool_bridge
 from app.services.agy_driver import (
     get_model_families,
     stream_turn,
 )
-from app.services import tool_bridge
 from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.openai_compat")

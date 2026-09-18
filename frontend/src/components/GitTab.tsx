@@ -23,7 +23,7 @@ interface GitTabProps {
 export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
   const { t } = useI18n();
   const [status, setStatus] = useState<GitStatusResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Selected file for diff

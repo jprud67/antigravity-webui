@@ -69,7 +69,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
   }, [isOpen, conversationId]);
 
   const handleKillProcess = async (pid: number) => {
-    if (!(await showConfirm(t('task_kill_confirm', `Confirm forced stop of process PID ${pid}?`, pid), { destructive: true }))) return;
+    if (!(await showConfirm(t('task_kill_confirm', 'Confirm forced stop of process PID {0}?', pid), { destructive: true }))) return;
     setKillingPid(pid);
     try {
       await killTask(pid);
@@ -82,7 +82,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
   };
 
   const handleKillTask = async (taskId: string) => {
-    if (!(await showConfirm(t('task_kill_confirm', `Confirm forced stop of task ${taskId}?`, taskId), { destructive: true }))) return;
+    if (!(await showConfirm(t('task_kill_confirm', 'Confirm forced stop of task {0}?', taskId), { destructive: true }))) return;
     setKillingTaskId(taskId);
     try {
       await killTask(undefined, taskId);

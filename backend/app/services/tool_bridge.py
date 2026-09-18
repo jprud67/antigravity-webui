@@ -146,7 +146,8 @@ def render_conversation(messages: list[dict[str, Any]] | None) -> str:
                 for tc in tool_calls:
                     if not isinstance(tc, dict):
                         continue
-                    fn = tc.get("function") if isinstance(tc.get("function"), dict) else {}
+                    fn_obj = tc.get("function")
+                    fn = fn_obj if isinstance(fn_obj, dict) else {}
                     name = fn.get("name") or tc.get("name") or ""
                     arguments = _format_tool_arguments(fn.get("arguments"))
                     lines.append(f"id={tc.get('id') or ''} name={name} arguments={arguments}")
@@ -165,7 +166,8 @@ def _tool_choice_hint(tool_choice: Any) -> str:
             return "IMPORTANT: You MUST request a function call now (action=\"tool_call\")."
         return ""
     if isinstance(tool_choice, dict):
-        fn = tool_choice.get("function") if isinstance(tool_choice.get("function"), dict) else {}
+        fn_obj = tool_choice.get("function")
+        fn = fn_obj if isinstance(fn_obj, dict) else {}
         name = fn.get("name") or tool_choice.get("name")
         if isinstance(name, str) and name.strip():
             return (

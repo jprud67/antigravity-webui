@@ -310,10 +310,14 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
       const outputText = content || (s.error ? String(s.error) : '');
       const tools = currentAssistantMsg.toolCalls || [];
       const toolCallId = s.tool_call_id || s.call_id;
-      // Appairer prioritairement par ID, puis avec le premier outil en attente (FIFO)
-      const targetTool = (toolCallId ? tools.find((t) => t.id === toolCallId && t.result === undefined) : null)
-        || tools.find((t) => t.result === undefined);
+      // Appairer prioritairement par ID, puis avec un outil anonyme en attente
+      const targetTool = toolCallId
+        ? tools.find((t) => t.id === toolCallId && t.result === undefined) || tools.find((t) => !t.id && t.result === undefined)
+        : tools.find((t) => t.result === undefined);
       if (targetTool) {
+        if (!targetTool.id && toolCallId) {
+          targetTool.id = toolCallId;
+        }
         targetTool.result = outputText;
         targetTool.status = isErr ? 'error' : 'done';
       } else {

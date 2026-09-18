@@ -148,66 +148,62 @@ export const ChatInput = React.memo<ChatInputProps>(({
     toastTimerRef.current = setTimeout(() => setToastMessage(null), 3000);
   }, []);
 
-  const handleAddFiles = useCallback((files: File[]) => {
+  const handleAddFiles = useCallback(async (files: File[]) => {
     if (!files || files.length === 0) return;
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 Mo
     const MAX_ATTACHMENTS = 10;
 
-    setAttachments((prev) => {
-      let current = [...prev];
-      for (const file of files) {
-        if (current.length >= MAX_ATTACHMENTS) {
-          showToast(t('toast_attachment_limit', 'Maximum limit of {0} attachments reached.').replace('{0}', String(MAX_ATTACHMENTS)), 'info');
-          break;
-        }
-        if (file.size > MAX_FILE_SIZE) {
-          showToast(t('toast_file_size_limit', 'File "{0}" exceeds the allowed limit of 10 MB.').replace('{0}', file.name), 'error');
-          continue;
-        }
-        const isImg = file.type.startsWith('image/');
-        const reader = new FileReader();
-        const id = createAttachmentId();
-        reader.onerror = () => {
-          showToast(t('toast_read_file_error', 'Unable to read file "{0}"').replace('{0}', file.name), 'error');
-        };
-        if (isImg) {
-          reader.onload = (e) => {
-            const content = e.target?.result as string;
-            setAttachments((latest) => [
-              ...latest,
-              {
-                id,
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                content,
-                isImage: true,
-                previewUrl: content
-              }
-            ]);
-          };
-          reader.readAsDataURL(file);
-        } else {
-          reader.onload = (e) => {
-            const content = (e.target?.result as string) || '';
-            setAttachments((latest) => [
-              ...latest,
-              {
-                id,
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                content,
-                isImage: false
-              }
-            ]);
-          };
-          reader.readAsText(file);
-        }
+    const remainingSlots = Math.max(0, MAX_ATTACHMENTS - attachments.length);
+    if (remainingSlots <= 0) {
+      showToast(t('toast_attachment_limit', 'Maximum limit of {0} attachments reached.').replace('{0}', String(MAX_ATTACHMENTS)), 'info');
+      return;
+    }
+
+    const filesToProcess = files.slice(0, remainingSlots);
+    if (files.length > remainingSlots) {
+      showToast(t('toast_attachment_limit', 'Maximum limit of {0} attachments reached.').replace('{0}', String(MAX_ATTACHMENTS)), 'info');
+    }
+
+    for (const file of filesToProcess) {
+      if (file.size > MAX_FILE_SIZE) {
+        showToast(t('toast_file_size_limit', 'File "{0}" exceeds the allowed limit of 10 MB.').replace('{0}', file.name), 'error');
+        continue;
       }
-      return current;
-    });
-  }, [showToast, t]);
+      const isImg = file.type.startsWith('image/');
+      const id = createAttachmentId();
+
+      try {
+        const content = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error('Read error'));
+          reader.onload = (e) => resolve((e.target?.result as string) || '');
+          if (isImg) {
+            reader.readAsDataURL(file);
+          } else {
+            reader.readAsText(file);
+          }
+        });
+
+        setAttachments((latest) => {
+          if (latest.length >= MAX_ATTACHMENTS) return latest;
+          return [
+            ...latest,
+            {
+              id,
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              content,
+              isImage: isImg,
+              previewUrl: isImg ? content : undefined,
+            }
+          ];
+        });
+      } catch {
+        showToast(t('toast_read_file_error', 'Unable to read file "{0}"').replace('{0}', file.name), 'error');
+      }
+    }
+  }, [attachments.length, showToast, t]);
 
   const handleRemoveAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));

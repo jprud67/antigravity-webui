@@ -6,6 +6,11 @@ import { type ConfirmRequest, registerConfirmListener } from '../services/dialog
 export const ConfirmDialogContainer: React.FC = () => {
   const [queue, setQueue] = useState<ConfirmRequest[]>([]);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const queueRef = useRef<ConfirmRequest[]>(queue);
+
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
 
   const pushConfirm = useCallback((req: ConfirmRequest) => {
     setQueue((prev) => [...prev, req]);
@@ -13,7 +18,10 @@ export const ConfirmDialogContainer: React.FC = () => {
 
   useEffect(() => {
     registerConfirmListener(pushConfirm);
-    return () => { registerConfirmListener(null); };
+    return () => {
+      registerConfirmListener(null);
+      queueRef.current.forEach((req) => req.resolve(false));
+    };
   }, [pushConfirm]);
 
   const current = queue[0];

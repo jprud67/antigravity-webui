@@ -461,7 +461,8 @@ async def stream_turn(
             yield {
                 "event": "error",
                 "code": returncode,
-                "message": message or f"agy failed with exit code {returncode}"
+                "message": message or f"agy failed with exit code {returncode}",
+                "is_quota": bool(quota_line),
             }
     except asyncio.CancelledError:
         pid_str = proc.pid if proc else "none"

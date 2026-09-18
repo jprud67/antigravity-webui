@@ -27,15 +27,32 @@ const BG_MAP: Record<ToastType, string> = {
 // ─── Single Toast ────────────────────────────────────────────────
 const ToastEntry: React.FC<{ item: ToastItem; onDismiss: (id: string) => void }> = ({ item, onDismiss }) => {
   const [exiting, setExiting] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissedRef = useRef(false);
+
+  const handleDismiss = useCallback(() => {
+    if (dismissedRef.current) return;
+    dismissedRef.current = true;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setExiting(true);
+    exitTimerRef.current = setTimeout(() => {
+      onDismiss(item.id);
+    }, 200);
+  }, [item.id, onDismiss]);
 
   useEffect(() => {
     timerRef.current = setTimeout(() => {
-      setExiting(true);
-      setTimeout(() => onDismiss(item.id), 250);
+      handleDismiss();
     }, item.duration);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [item.id, item.duration, onDismiss]);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+    };
+  }, [item.duration, handleDismiss]);
 
   const Icon = ICON_MAP[item.type];
 
@@ -48,7 +65,7 @@ const ToastEntry: React.FC<{ item: ToastItem; onDismiss: (id: string) => void }>
       <Icon className={`w-4 h-4 shrink-0 ${COLOR_MAP[item.type]}`} />
       <span className="text-sm leading-snug flex-1" style={{ fontFamily: 'var(--font-ui)' }}>{item.message}</span>
       <button
-        onClick={() => { setExiting(true); setTimeout(() => onDismiss(item.id), 200); }}
+        onClick={handleDismiss}
         className="shrink-0 p-0.5 rounded hover:bg-white/10 transition-colors"
         style={{ color: 'var(--muted)' }}
         aria-label="Close"

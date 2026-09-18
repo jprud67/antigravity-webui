@@ -436,6 +436,7 @@ export function App() {
         // Only reload transcript if it's the active conversation AND we're not streaming
         if (convId === activeConversationIdRef.current && !isStreamingRef.current) {
           fetchConversationTranscript(convId).then((data) => {
+            if (activeConversationIdRef.current !== convId) return;
             const chatMsgs = parseStepsToMessages(data.steps || []);
             setMessages(chatMsgs);
             const normUsage = normalizeUsage(data.usage);
@@ -630,6 +631,8 @@ export function App() {
           setActiveConversationId(update.conversation_id);
           chatSocket.setCurrentConversation(update.conversation_id);
           navigateToConversation(update.conversation_id, true);
+        } else if (update.conversation_id && activeConversationIdRef.current && update.conversation_id !== activeConversationIdRef.current) {
+          return;
         }
 
         // Live Context & Token Telemetry
@@ -922,6 +925,9 @@ export function App() {
       } else if (event.event === 'queue_cleared') {
         setQueueCount(0);
       } else if (event.event === 'error') {
+        if (event.conversation_id && activeConversationIdRef.current && event.conversation_id !== activeConversationIdRef.current) {
+          return;
+        }
         setIsStreaming(false);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
@@ -948,6 +954,9 @@ export function App() {
           ];
         });
       } else if (event.event === 'done') {
+        if (event.conversation_id && activeConversationIdRef.current && event.conversation_id !== activeConversationIdRef.current) {
+          return;
+        }
         if (typeof event.queue_size === 'number') {
           setQueueCount(event.queue_size);
           if (event.queue_size === 0) {

@@ -3,6 +3,7 @@ import { X, Folder, FolderPlus, Check, ArrowUp, Trash2 } from 'lucide-react';
 import type { WorkspaceFolder } from '../types';
 import { fetchWorkspaces, exploreDirectory, addWorkspace, deleteWorkspace } from '../services/api';
 import { useI18n } from '../services/i18n';
+import { showConfirm } from '../services/dialog';
 
 interface WorkspaceModalProps {
   isOpen: boolean;
@@ -62,6 +63,11 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
 
   const handleDeleteWorkspace = async (e: React.MouseEvent, pathToDel: string) => {
     e.stopPropagation();
+    const confirmed = await showConfirm(
+      t('workspace_delete_confirm', 'Are you sure you want to remove workspace "{0}" from trusted list?').replace('{0}', pathToDel),
+      { destructive: true }
+    );
+    if (!confirmed) return;
     try {
       const res = await deleteWorkspace(pathToDel);
       if (res?.workspaces) {
