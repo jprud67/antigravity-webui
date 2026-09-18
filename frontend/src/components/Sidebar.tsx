@@ -233,7 +233,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     });
 
     return [
-      { label: '📌 Épinglées', items: pinned },
+      { label: `📌 ${t('pinned_section', 'Pinned')}`, items: pinned },
       { label: '📅 Aujourd\'hui', items: today },
       { label: '📅 Hier', items: yesterday },
       { label: '📅 7 derniers jours', items: last7Days },
@@ -430,7 +430,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden animate-fadeIn"
           onClick={onCloseMobile}
-          aria-label="Fermer le menu latéral"
+          aria-label={t("sidebar_close_aria", "Close sidebar")}
         />
       )}
 
@@ -497,7 +497,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 borderColor: isBulkMode ? 'var(--accent)' : 'var(--border)',
                 color: isBulkMode ? '#ffffff' : 'var(--muted)',
               }}
-              title={isBulkMode ? "Quitter la sélection multiple" : "Sélection multiple & actions groupées"}
+              title={isBulkMode ? t("exit_bulk_mode", "Exit multiple selection mode") : t("bulk_selection_actions", "Multiple selection & bulk actions")}
             >
               <CheckSquare className="w-4 h-4" />
             </button>
@@ -539,7 +539,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 borderColor: 'var(--accent)',
                 color: 'var(--accent)',
               }}
-              title={t('new_session', 'Nouvelle session')}
+              title={t('new_session', 'New session')}
             >
               <Plus className="w-4 h-4" />
             </a>
@@ -594,7 +594,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
           <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5" style={{ color: 'var(--muted)' }} />
           <input
             type="text"
-            placeholder={t('search_sessions', 'Rechercher sessions & contenu...')}
+            placeholder={t('search_sessions', 'Search sessions & content...')}
             value={searchFilter}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-8 pr-7 py-1.5 rounded-lg text-xs placeholder-slate-400 focus:outline-none transition-colors"
@@ -681,10 +681,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             borderColor: isBulkMode ? 'var(--accent)' : 'var(--border)',
             color: isBulkMode ? '#ffffff' : 'var(--strong)',
           }}
-          title={isBulkMode ? "Quitter le mode sélection" : "Activer la sélection multiple & actions groupées"}
+          title={isBulkMode ? t("exit_bulk_mode", "Exit multiple selection mode") : t("toggle_bulk_mode", "Toggle multiple selection & bulk actions")}
         >
           <CheckSquare className="w-3.5 h-3.5 shrink-0" />
-          <span>{isBulkMode ? 'Fermer sélection' : 'Actions groupées'}</span>
+          <span>{isBulkMode ? t('close_selection', 'Close selection') : t('bulk_actions', 'Bulk actions')}</span>
           {selectedConvIds.size > 0 && (
             <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/25 text-white font-bold ml-0.5">
               {selectedConvIds.size}
@@ -715,7 +715,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               ) : (
                 <Square className="w-3.5 h-3.5 text-slate-400" />
               )}
-              <span>{isAllSelected ? 'Tout désélectionner' : 'Tout sélectionner'}</span>
+              <span>{isAllSelected ? t('deselect_all', 'Deselect all') : t('select_all', 'Select all')}</span>
             </button>
 
             <div className="flex items-center gap-2">
@@ -735,7 +735,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                   setSelectedConvIds(new Set());
                 }}
                 className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                title="Quitter la sélection"
+                title={t("exit_selection", "Exit selection")}
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -755,10 +755,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 backgroundColor: 'var(--surface)',
                 color: 'var(--text)',
               }}
-              title="Épingler la sélection"
+              title={t("pin_selection", "Pin selection")}
             >
               <Pin className="w-3 h-3 text-amber-500" />
-              <span className="hidden sm:inline">Épingler</span>
+              <span className="hidden sm:inline">{t("pin", "Pin")}</span>
             </button>
 
             {/* Unpin */}
@@ -772,10 +772,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 backgroundColor: 'var(--surface)',
                 color: 'var(--text)',
               }}
-              title="Désépingler la sélection"
+              title={t("unpin_selection", "Unpin selection")}
             >
               <PinOff className="w-3 h-3 text-slate-400" />
-              <span className="hidden sm:inline">Désépingler</span>
+              <span className="hidden sm:inline">{t("unpin", "Unpin")}</span>
             </button>
 
             {/* Tags */}
@@ -792,7 +792,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 backgroundColor: 'var(--surface)',
                 color: 'var(--text)',
               }}
-              title="Gérer les tags"
+              title={t("manage_tags", "Manage tags")}
             >
               <Tag className="w-3 h-3 text-emerald-500" />
               <span className="hidden sm:inline">Tags</span>
@@ -816,7 +816,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               title="Assigner un projet"
             >
               <Folder className="w-3 h-3 text-indigo-500" />
-              <span className="hidden sm:inline">Projet</span>
+              <span className="hidden sm:inline">{t("project", "Project")}</span>
             </button>
 
             {/* Archive / Unarchive */}
@@ -830,10 +830,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 backgroundColor: 'var(--surface)',
                 color: 'var(--text)',
               }}
-              title={isAllSelectedArchived ? "Désarchiver la sélection" : "Archiver la sélection"}
+              title={isAllSelectedArchived ? t("unarchive_selection", "Unarchive selection") : t("archive_selection", "Archive selection")}
             >
               <Archive className="w-3 h-3 text-purple-500" />
-              <span className="hidden sm:inline">{isAllSelectedArchived ? 'Désarchiver' : 'Archiver'}</span>
+              <span className="hidden sm:inline">{isAllSelectedArchived ? t('unarchive', 'Unarchive') : t('archive', 'Archive')}</span>
             </button>
 
             {/* Export */}
@@ -847,7 +847,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 backgroundColor: 'var(--surface)',
                 color: 'var(--text)',
               }}
-              title="Exporter la sélection en JSON"
+              title={t("export_selection_json", "Export selection to JSON")}
             >
               <Download className="w-3 h-3 text-sky-500" />
               <span className="hidden sm:inline">Export</span>
@@ -863,7 +863,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 borderColor: 'rgba(239, 68, 68, 0.3)',
                 backgroundColor: 'rgba(239, 68, 68, 0.05)',
               }}
-              title="Supprimer définitivement la sélection"
+              title={t("delete_selection_permanently", "Permanently delete selection")}
             >
               {isBulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3 text-red-500" />}
               <span className="hidden sm:inline">Supprimer</span>
@@ -875,7 +875,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             {selectedConvIds.size === 0 ? (
               <span className="italic">💡 Cochez les cases des conversations ci-dessous pour appliquer une action.</span>
             ) : (
-              <span className="text-sky-500 font-medium">✓ {selectedConvIds.size} conversation(s) sélectionnée(s)</span>
+              <span className="text-sky-500 font-medium">✓ {t("conversations_selected", "{0} conversation(s) selected").replace("{0}", String(selectedConvIds.size))}</span>
             )}
           </div>
         </div>
@@ -885,7 +885,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       <div className="flex-1 overflow-y-auto p-2 space-y-3">
         {filtered.length === 0 ? (
           <div className="p-6 text-center text-xs text-slate-500">
-            {searchFilter || selectedTag ? 'Aucune session ne correspond aux filtres.' : 'Aucune session trouvée.'}
+            {searchFilter || selectedTag ? t('no_sessions_match_filters', 'No sessions match filters.') : t('no_sessions_found', 'No sessions found.')}
           </div>
         ) : (
           groupedConversations.map((group) => (
@@ -979,14 +979,14 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                                 setSelectedConvIds(new Set([conv.conversation_id]));
                               }}
                               className="w-4 h-4 rounded hidden group-hover:flex items-center justify-center text-slate-400 hover:text-sky-500 transition-colors cursor-pointer"
-                              title="Sélectionner pour actions groupées"
+                              title={t("select_for_bulk", "Select for bulk actions")}
                             >
                               <Square className="w-3.5 h-3.5" />
                             </button>
 
                             {/* Normal icon (hidden on hover) */}
                             {conv.is_running ? (
-                              <span className="relative flex h-2.5 w-2.5 shrink-0 group-hover:hidden" title="Tâche en cours d'exécution en arrière-plan...">
+                              <span className="relative flex h-2.5 w-2.5 shrink-0 group-hover:hidden" title={t("task_running_bg", "Task running in background...")}>
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                               </span>
@@ -994,7 +994,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                               <div
                                 className="w-2.5 h-2.5 rounded-full shrink-0 group-hover:hidden"
                                 style={{ backgroundColor: conv.projectColor }}
-                                title={`Projet: ${conv.project || 'Sans nom'}`}
+                                title={`${t('project', 'Project')}: ${conv.project || t('unnamed', 'Unnamed')}`}
                               />
                             ) : isBranch ? (
                               <span title="Session issue d'une bifurcation (branche)" className="group-hover:hidden">
@@ -1029,7 +1029,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                                 isPinned ? 'text-amber-500' : 'opacity-0 group-hover:opacity-100'
                               }`}
                               style={{ color: isPinned ? '#F59E0B' : 'var(--muted)' }}
-                              title={isPinned ? 'Désépingler' : 'Épingler en haut'}
+                              title={isPinned ? t('unpin', 'Unpin') : t('pin_to_top', 'Pin to top')}
                             >
                               <Pin className={`w-3 h-3 ${isPinned ? 'fill-current' : ''}`} />
                             </button>
@@ -1045,7 +1045,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                               }}
                               className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
                               style={{ color: 'var(--muted)' }}
-                              title="Gérer les tags, projet et titre"
+                              title={t("manage_tags_project_title", "Manage tags, project and title")}
                             >
                               <MoreVertical className="w-3 h-3" />
                             </button>
@@ -1139,7 +1139,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               <div className="w-5 h-5 rounded-md bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
                 <Activity className="w-3 h-3 text-indigo-500" />
               </div>
-              <span className="font-medium text-[11px]">{t('tasks_and_subagents', 'Tâches & Sous-agents')}</span>
+              <span className="font-medium text-[11px]">{t('tasks_and_subagents', 'Tasks & Sub-agents')}</span>
             </div>
             <span className="text-[10px] text-indigo-500 group-hover:translate-x-0.5 transition-transform">→</span>
           </button>
@@ -1167,7 +1167,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             backgroundColor: 'var(--surface-subtle)',
             borderColor: 'var(--border)',
           }}
-          title={activeGoogleAccount?.email ? `Compte Google actif: ${activeGoogleAccount.email}` : 'Gérer les comptes Google'}
+          title={activeGoogleAccount?.email ? t('active_google_account', 'Active Google account: {0}').replace('{0}', activeGoogleAccount.email) : t('manage_google_accounts', 'Manage Google accounts')}
         >
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 bg-white shadow-xs p-0.5">
@@ -1183,7 +1183,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 Compte Google
               </div>
               <div className="text-[11px] font-mono truncate font-medium" style={{ color: 'var(--text)' }}>
-                {activeGoogleAccount?.email || 'Non connecté'}
+                {activeGoogleAccount?.email || t('not_connected', 'Not connected')}
               </div>
             </div>
           </div>
@@ -1217,18 +1217,18 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             onClick={updateAvailable && onOpenUpdates ? onOpenUpdates : onOpenSettings}
             className="p-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 relative"
             style={{ color: 'var(--muted)' }}
-            title={updateAvailable ? 'Mise à jour disponible ! Cliquez pour voir.' : t('settings', 'Paramètres Antigravity')}
+            title={updateAvailable ? t('update_available_click', 'Update available! Click to view.') : t('settings', 'Settings')}
           >
             <SettingsIcon className="w-4 h-4" />
             <span className="text-[11px] font-medium" style={{ color: 'var(--text)' }}>
-              {t('settings', 'Paramètres')}
+              {t('settings', 'Settings')}
             </span>
             {updateAvailable && (
               <span
                 className="ml-0.5 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-500 text-black leading-none animate-pulse shrink-0"
-                title="Mise à jour disponible"
+                title={t("update_available", "Update available")}
               >
-                MàJ
+                {t("update_short", "Update")}
               </span>
             )}
           </button>
@@ -1240,7 +1240,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 onClick={onOpenLanguages}
                 className="p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 hover:bg-black/5 dark:hover:bg-white/5"
                 style={{ color: 'var(--muted)' }}
-                title={`Langue: ${currentLangObj?.label || 'Français'} (15 langues disponibles)`}
+                title={t('language_available', 'Language: {0} (15 languages available)').replace('{0}', currentLangObj?.label || 'English')}
               >
                 <span className="text-xs">{currentLangObj?.flag || '🌐'}</span>
                 <span className="text-[10px] font-mono uppercase">{lang}</span>
@@ -1268,7 +1268,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               }}
               className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
               style={{ color: 'var(--muted)' }}
-              title="Changer rapidement de thème visuel"
+              title={t("change_visual_theme", "Quickly change visual theme")}
             >
               <Palette className="w-4 h-4" />
             </button>
@@ -1278,7 +1278,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 onClick={onLogout}
                 className="p-1.5 rounded-lg transition-colors cursor-pointer hover:text-rose-500 hover:bg-rose-500/10"
                 style={{ color: 'var(--muted)' }}
-                title={t('logout', 'Déconnexion')}
+                title={t('logout', 'Logout')}
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -1305,10 +1305,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm" style={{ color: 'var(--strong)' }}>
-                    Tags groupés
+                    {t("bulk_tags", "Bulk tags")}
                   </h3>
                   <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                    Appliquer aux {selectedConvIds.size} sessions sélectionnées
+                    {t("apply_to_n_sessions", "Apply to {0} selected sessions").replace("{0}", String(selectedConvIds.size))}
                   </p>
                 </div>
               </div>
@@ -1323,7 +1323,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text)' }}>
-                  Tags (séparés par des virgules) :
+                  {t("tags_comma_separated", "Tags (comma separated):")}
                 </label>
                 <input
                   type="text"
@@ -1455,7 +1455,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                     Assigner un projet
                   </h3>
                   <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                    Appliquer aux {selectedConvIds.size} sessions sélectionnées
+                    {t("apply_to_n_sessions", "Apply to {0} selected sessions").replace("{0}", String(selectedConvIds.size))}
                   </p>
                 </div>
               </div>
@@ -1516,7 +1516,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 onClick={() => handleApplyBulkProject(true)}
                 disabled={isBulkLoading}
                 className="px-3 py-1.5 rounded-xl text-xs font-medium border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                title="Retirer l'assignation de projet de toutes les sessions sélectionnées"
+                title={t("remove_project_all_selected", "Remove project assignment from all selected sessions")}
               >
                 Dissocier le projet
               </button>

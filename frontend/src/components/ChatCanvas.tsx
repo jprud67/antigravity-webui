@@ -199,7 +199,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
 
     const handleDownload = (e: React.MouseEvent) => {
       e.stopPropagation();
-      showToast(`Téléchargement de « ${filename} » démarré`, 'info');
+      showToast(t('download_started', 'Download of "{0}" started').replace('{0}', filename), 'info');
     };
 
     if (isArtifact) {
@@ -242,7 +242,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
                 className="text-[10px] uppercase font-mono font-bold tracking-wider block"
                 style={{ color: 'var(--accent)' }}
               >
-                Artefact généré
+                {t("generated_artifact", "Generated artifact")}
               </span>
               <span
                 className="text-[13px] font-semibold truncate block group-hover:opacity-90 transition-colors"
@@ -257,7 +257,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
               href={downloadUrl}
               download={filename}
               onClick={handleDownload}
-              title={`Télécharger « ${filename} »`}
+              title={t("download_file", "Download \"{0}\"").replace("{0}", filename)}
               className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:scale-105 no-underline"
               style={{
                 backgroundColor: 'var(--surface)',
@@ -303,7 +303,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
           e.currentTarget.style.borderColor = 'var(--border)';
           e.currentTarget.style.backgroundColor = 'var(--surface-subtle)';
         }}
-        title={`Cliquer pour télécharger directement « ${filename} »`}
+        title={t("click_download_direct", "Click to download \"{0}\" directly").replace("{0}", filename)}
       >
         <span
           className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 border"
@@ -525,7 +525,7 @@ const ToolItemCard: React.FC<{ tool: ToolCallItem }> = ({ tool }) => {
       {openDrawer && tool.result && (
         <div className="mt-1 rounded-lg border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
           <div className="flex items-center justify-between px-2.5 py-1 bg-surface-subtle border-b text-[10px] text-muted">
-            <span>Sortie d'exécution</span>
+            <span>{t("execution_output", "Execution output")}</span>
             <button
               type="button"
               onClick={handleCopyResult}
@@ -627,7 +627,7 @@ const ToolActivityFeed: React.FC<{
                 <Zap className={`w-3 h-3 text-amber-500 ${hasRunning ? 'animate-bounce' : ''}`} />
               </div>
               <span className="font-semibold text-xs truncate" style={{ color: 'var(--strong)' }}>
-                Activité de l'agent ({summary})
+                {t("agent_activity_summary", "Agent activity ({0})").replace("{0}", summary)}
               </span>
               <span
                 className="text-[10px] font-mono px-2 py-0.5 rounded-full font-medium shrink-0"
@@ -655,7 +655,7 @@ const ToolActivityFeed: React.FC<{
                   className="w-full py-1.5 px-3 rounded-lg text-[11px] font-medium border text-center transition-colors cursor-pointer border-dashed"
                   style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
                 >
-                  Afficher les {actionTools.length - 8} actions précédentes...
+                  {t("show_previous_actions", "Show previous {0} actions...").replace("{0}", String(actionTools.length - 8))}
                 </button>
               )}
 
@@ -672,7 +672,7 @@ const ToolActivityFeed: React.FC<{
                   className="w-full py-1 px-3 text-[10px] opacity-70 hover:opacity-100 text-center cursor-pointer"
                   style={{ color: 'var(--muted)' }}
                 >
-                  Réduire (voir uniquement les 8 dernières)
+                  {t("collapse_see_last", "Collapse (see last {0} only)").replace("{0}", "8")}
                 </button>
               )}
             </div>
@@ -704,7 +704,7 @@ const CheckpointDivider: React.FC<{ content: string; stepIndex?: number }> = ({ 
           }}
         >
           <Clock className="w-3 h-3 text-amber-500" />
-          <span>Point de contrôle & contexte {stepIndex !== undefined ? `#${stepIndex}` : ''}</span>
+          <span>{t("checkpoint_context", "Checkpoint & context")} {stepIndex !== undefined ? `#${stepIndex}` : ''}</span>
           {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
         <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border)' }} />
@@ -1046,7 +1046,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                     style={{ color: 'var(--text)' }}
                   >
                     <Terminal className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span className="font-medium">Terminal</span>
+                    <span className="font-medium">{t("terminal", "Terminal")}</span>
                   </button>
                 )}
 
@@ -1091,7 +1091,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                     style={{ color: 'var(--text)' }}
                   >
                     <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span className="font-medium">Crons & Tâches</span>
+                    <span className="font-medium">{t("crons_tasks", "Crons & Tasks")}</span>
                   </button>
                 )}
 
@@ -1106,7 +1106,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                     style={{ color: 'var(--text)' }}
                   >
                     <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span className="font-medium">Règles & Mémoire</span>
+                    <span className="font-medium">{t("rules_memory", "Rules & Memory")}</span>
                   </button>
                 )}
 
@@ -1121,7 +1121,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                     style={{ borderColor: 'var(--border-subtle)', color: 'var(--text)' }}
                   >
                     <Download className="w-4 h-4 text-sky-400 shrink-0" />
-                    <span className="font-medium">Exporter la session</span>
+                    <span className="font-medium">{t("export_session", "Export session")}</span>
                   </button>
                 )}
               </div>
@@ -1141,10 +1141,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                   borderColor: 'var(--border)',
                   color: 'var(--text)'
                 }}
-                title="Exporter la session au format HTML, Markdown ou JSON"
+                title={t("export_session_title", "Export session to HTML, Markdown or JSON")}
               >
                 <Download className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
-                <span className="text-[11px] font-medium hidden sm:inline">Exporter</span>
+                <span className="text-[11px] font-medium hidden sm:inline">{t("export", "Export")}</span>
                 <ChevronDown className="w-3 h-3 opacity-60" />
               </button>
 
@@ -1169,7 +1169,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                     <Globe className="w-4 h-4 text-sky-400 shrink-0" />
                     <div className="flex flex-col text-left">
                       <span className="font-semibold text-[11px]">HTML Autonome</span>
-                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Complet & stylé hors-ligne</span>
+                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>{t("offline_styled", "Complete & styled offline")}</span>
                     </div>
                   </a>
 
@@ -1185,7 +1185,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                     <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
                     <div className="flex flex-col text-left">
                       <span className="font-semibold text-[11px]">Markdown (.md)</span>
-                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Format structuré GitHub</span>
+                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>{t("github_structured", "GitHub structured format")}</span>
                     </div>
                   </a>
 
@@ -1200,7 +1200,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                   >
                     <Code2 className="w-4 h-4 text-amber-400 shrink-0" />
                     <div className="flex flex-col text-left">
-                      <span className="font-semibold text-[11px]">Données JSON (.json)</span>
+                      <span className="font-semibold text-[11px]">{t("json_data", "JSON Data (.json)")}</span>
                       <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Transcript brut complet</span>
                     </div>
                   </a>
@@ -1218,7 +1218,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 borderColor: 'var(--border)',
                 color: 'var(--text)'
               }}
-              title="Terminal Interactif (/terminal)"
+              title={t("interactive_terminal", "Interactive Terminal (/terminal)")}
             >
               <Terminal className="w-3.5 h-3.5 text-amber-400" />
               <span className="text-[11px] font-medium hidden lg:inline">Terminal</span>
@@ -1250,7 +1250,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 borderColor: 'var(--border)',
                 color: 'var(--text)'
               }}
-              title="Tableau Kanban (/kanban)"
+              title={t("kanban_board", "Kanban Board (/kanban)")}
             >
               <KanbanIcon className="w-3.5 h-3.5 text-violet-400" />
               <span className="text-[11px] font-medium">Kanban</span>
@@ -1266,7 +1266,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 borderColor: 'var(--border)',
                 color: 'var(--text)'
               }}
-              title="Planificateur de Tâches & Crons (/crons)"
+              title={t("task_cron_scheduler", "Task & Cron Scheduler (/crons)")}
             >
               <Clock className="w-3.5 h-3.5 text-amber-400" />
               <span className="text-[11px] font-medium">Crons</span>
@@ -1282,10 +1282,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 borderColor: 'var(--border)',
                 color: 'var(--text)'
               }}
-              title="Règles Système & Mémoire AGENTS.md (/rules)"
+              title={t("system_rules_memory", "System Rules & AGENTS.md Memory (/rules)")}
             >
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-[11px] font-medium">Règles</span>
+              <span className="text-[11px] font-medium">{t("rules", "Rules")}</span>
             </button>
           )}
 
@@ -1432,12 +1432,12 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                         </div>
                         <div className="min-w-0">
                           <span className="font-semibold text-xs truncate block" style={{ color: 'var(--strong)' }}>
-                            Tâche d'arrière-plan terminée : <span className="font-mono text-emerald-500">{msg.taskId}</span>
+                            {t("bg_task_completed", "Background task completed: {0}").replace("{0}", "")} <span className="font-mono text-emerald-500">{msg.taskId}</span>
                           </span>
                         </div>
                       </div>
                       <details className="text-[11px] text-muted shrink-0">
-                        <summary className="cursor-pointer hover:text-strong select-none">Voir détails</summary>
+                        <summary className="cursor-pointer hover:text-strong select-none">{t("see_details", "See details")}</summary>
                         <pre
                           className="mt-2 p-2.5 rounded-lg text-[10.5px] font-mono overflow-x-auto max-h-48 border leading-relaxed"
                           style={{
@@ -1574,7 +1574,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                   <div className="mb-3.5 p-3.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-500 text-xs flex items-start gap-2.5 shadow-xs">
                     <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
                     <div className="space-y-1 flex-1 min-w-0">
-                      <p className="font-bold text-xs uppercase tracking-wide">Alerte d'exécution ou Quota API</p>
+                      <p className="font-bold text-xs uppercase tracking-wide">{t("api_quota_alert", "Execution Alert or API Quota")}</p>
                       <p className="font-mono text-[11.5px] whitespace-pre-wrap leading-relaxed opacity-90">{msg.error}</p>
                     </div>
                   </div>
@@ -1592,7 +1592,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                   >
                     <span className="w-2 h-2 rounded-full animate-ping shrink-0" style={{ backgroundColor: 'var(--accent)' }} />
                     <BrainCircuit className="w-3.5 h-3.5 animate-pulse" style={{ color: 'var(--accent)' }} />
-                    <span className="font-medium text-[11px] tracking-wide">Raisonnement en cours...</span>
+                    <span className="font-medium text-[11px] tracking-wide">{t("reasoning_in_progress", "Thinking in progress...")}</span>
                   </div>
                 )}
 
@@ -1613,8 +1613,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                     >
                       <div className="flex items-center gap-2">
                         <BrainCircuit className="w-3.5 h-3.5 text-purple-500" />
-                        <span className="font-mono text-[11.5px] font-semibold">Raisonnement interne</span>
-                        <span className="text-[10px] opacity-60 font-mono">({msg.thought.length} caractères)</span>
+                        <span className="font-mono text-[11.5px] font-semibold">{t("internal_reasoning", "Internal reasoning")}</span>
+                        <span className="text-[10px] opacity-60 font-mono">({t("char_count", "{0} characters").replace("{0}", String(msg.thought.length))})</span>
                         {msg.isLive && !msg.content && (
                           <span className="w-1.5 h-1.5 rounded-full animate-ping ml-1" style={{ backgroundColor: 'var(--accent)' }} />
                         )}
@@ -1686,7 +1686,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                         onClick={() => onForkMessage(msg.stepIndex !== undefined ? msg.stepIndex : msgIdx)}
                         className="px-2.5 py-1 rounded-md border flex items-center gap-1 hover:text-strong hover:bg-surface-subtle transition-all cursor-pointer"
                         style={{ borderColor: 'var(--border)' }}
-                        title="Bifurquer à partir de cette étape (créer une branche)"
+                        title={t("branch_from_step", "Branch from this step (create a branch)")}
                       >
                         <GitBranch className="w-3 h-3 text-fuchsia-500" />
                         <span className="hidden sm:inline">Bifurquer</span>
@@ -1704,7 +1704,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                         title={isSpeaking ? 'Arrêter la synthèse vocale' : 'Écouter la réponse'}
                       >
                         {isSpeaking ? <VolumeX className="w-3 h-3 text-rose-400 animate-pulse" /> : <Volume2 className="w-3 h-3" />}
-                        <span className="hidden sm:inline">{isSpeaking ? 'Arrêter' : 'Écouter'}</span>
+                        <span className="hidden sm:inline">{isSpeaking ? t("stop", "Stop") : t("listen", "Listen")}</span>
                       </button>
                     )}
 
@@ -1714,10 +1714,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                         onClick={onRetry}
                         className="px-2.5 py-1 rounded-md border flex items-center gap-1 hover:text-strong hover:bg-surface-subtle transition-all cursor-pointer text-sky-500 hover:border-sky-500/40"
                         style={{ borderColor: 'var(--border)' }}
-                        title="Relancer la dernière instruction (Retry)"
+                        title={t("retry_instruction", "Relaunch last instruction (Retry)")}
                       >
                         <RotateCcw className="w-3 h-3" />
-                        <span className="hidden sm:inline">Réessayer</span>
+                        <span className="hidden sm:inline">{t("retry", "Retry")}</span>
                       </button>
                     )}
                   </div>
