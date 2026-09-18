@@ -383,8 +383,8 @@ async def terminal_websocket(
     selected_subprotocol: str | None = None
     raw_subprotocols = websocket.headers.get("sec-websocket-protocol", "")
     if raw_subprotocols:
-        for sp in raw_subprotocols.split(","):
-            sp_clean = sp.strip()
+        subprotocols = [sp.strip() for sp in raw_subprotocols.split(",") if sp.strip()]
+        for sp_clean in subprotocols:
             if sp_clean.startswith("token."):
                 raw_token = sp_clean[6:]
                 if not effective_token:
@@ -409,10 +409,13 @@ async def terminal_websocket(
                     except Exception:
                         if verify_token_or_api_key(raw_token):
                             effective_token = raw_token
-                selected_subprotocol = sp_clean
                 break
-            elif sp_clean == "terminal":
-                selected_subprotocol = "terminal"
+        if "terminal" in subprotocols:
+            selected_subprotocol = "terminal"
+        elif any(sp.startswith("token.") for sp in subprotocols):
+            selected_subprotocol = next(sp for sp in subprotocols if sp.startswith("token."))
+        elif subprotocols:
+            selected_subprotocol = subprotocols[0]
 
     # Verify authentication
     config = get_auth_config()

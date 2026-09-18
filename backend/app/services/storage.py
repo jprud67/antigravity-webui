@@ -1045,6 +1045,9 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
         cursor = conn.cursor()
         cursor.executemany("DELETE FROM conversation_summaries WHERE conversation_id = ?", [(cid,) for cid in safe_ids])
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 

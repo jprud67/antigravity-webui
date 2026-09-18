@@ -4894,7 +4894,134 @@ def test_tool_bridge_schema_injection_on_large_prompt():
     print("✓ test_tool_bridge_schema_injection_on_large_prompt passed")
 
 
+def test_execution_manager_safe_session_iteration():
+    """Verify get_session and get_running_conversations safely iterate when sessions dictionary changes."""
+    from app.services.execution_manager import ExecutionManager, ExecutionSession
+
+    em = ExecutionManager()
+    s1 = ExecutionSession(conversation_id="conv-iter-1")
+    s1.is_running = True
+    s2 = ExecutionSession(conversation_id="conv-iter-2")
+    s2.is_running = True
+    em.sessions["conv-iter-1"] = s1
+    em.sessions["conv-iter-2"] = s2
+
+    running = em.get_running_conversations()
+    assert "conv-iter-1" in running
+    assert "conv-iter-2" in running
+
+    found = em.get_session(None)
+    assert found is not None
+    assert found.conversation_id in ("conv-iter-1", "conv-iter-2")
+    print("✓ test_execution_manager_safe_session_iteration passed")
+
+
+def test_openai_compat_error_event_quota_propagation():
+    """Verify create_chat_completion raises HTTP 429 when error event has is_quota=True."""
+    import asyncio
+    from unittest.mock import patch
+
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.openai_compat import ChatCompletionRequest, create_chat_completion
+
+    async def mock_stream_turn(*args, **kwargs):
+        yield {"event": "error", "message": "Resource exhausted", "is_quota": True}
+
+    req = ChatCompletionRequest(
+        model="gemini-2.5-pro",
+        messages=[{"role": "user", "content": "hello"}],
+        stream=False,
+    )
+
+    with patch("app.api.openai_compat.stream_turn", side_effect=mock_stream_turn):
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(create_chat_completion(req))
+        assert exc_info.value.status_code == 429
+        assert exc_info.value.headers.get("Retry-After") == "60"
+        assert exc_info.value.detail["error"]["type"] == "quota_exceeded"
+    print("✓ test_openai_compat_error_event_quota_propagation passed")
+
+
+def test_openai_compat_streaming_error_is_quota():
+    """Verify create_chat_completion in streaming mode outputs quota_exceeded when is_quota=True."""
+    import asyncio
+    from unittest.mock import patch
+
+    from app.api.openai_compat import ChatCompletionRequest, create_chat_completion
+
+    async def mock_stream_turn(*args, **kwargs):
+        yield {"event": "error", "message": "Backend failure", "is_quota": True}
+
+    req = ChatCompletionRequest(
+        model="gemini-2.5-pro",
+        messages=[{"role": "user", "content": "hello"}],
+        stream=True,
+    )
+
+    with patch("app.api.openai_compat.stream_turn", side_effect=mock_stream_turn):
+        resp = asyncio.run(create_chat_completion(req))
+
+        async def read_stream():
+            lines = []
+            async for chunk in resp.body_iterator:
+                lines.append(chunk)
+            return "".join(lines)
+
+        body = asyncio.run(read_stream())
+        assert "quota_exceeded" in body
+        assert "Quota épuisé" in body
+    print("✓ test_openai_compat_streaming_error_is_quota passed")
+
+
+def test_session_metadata_group_id_default_and_normalization():
+    """Verify session metadata includes group_id in defaults and normalizes properly."""
+    from app.services.session_metadata import _normalize_meta, make_default_meta
+
+    defaults = make_default_meta()
+    assert "group_id" in defaults
+    assert defaults["group_id"] == ""
+
+    norm1 = _normalize_meta({"groupId": "group-abc"})
+    assert norm1["group_id"] == "group-abc"
+
+    norm2 = _normalize_meta({"group_id": "group-xyz"})
+    assert norm2["group_id"] == "group-xyz"
+
+    norm3 = _normalize_meta({})
+    assert norm3["group_id"] == ""
+    print("✓ test_session_metadata_group_id_default_and_normalization passed")
+
+
+def test_storage_bulk_delete_conversations_rollback():
+    """Verify bulk_delete_conversations rolls back SQLite transaction on failure."""
+    from unittest.mock import MagicMock, patch
+
+    import pytest
+
+    from app.services.storage import bulk_delete_conversations
+
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_cursor.executemany.side_effect = RuntimeError("Disk I/O error")
+    mock_conn.cursor.return_value = mock_cursor
+
+    with patch("app.services.storage.get_db_connection", return_value=mock_conn):
+        with pytest.raises(RuntimeError):
+            bulk_delete_conversations(["conv-fail-1", "conv-fail-2"])
+
+        mock_conn.rollback.assert_called_once()
+        mock_conn.close.assert_called_once()
+    print("✓ test_storage_bulk_delete_conversations_rollback passed")
+
+
 if __name__ == "__main__":
+    test_execution_manager_safe_session_iteration()
+    test_openai_compat_error_event_quota_propagation()
+    test_openai_compat_streaming_error_is_quota()
+    test_session_metadata_group_id_default_and_normalization()
+    test_storage_bulk_delete_conversations_rollback()
     test_agy_driver_prompt_passing_threshold()
     test_cron_ticker_run_agy_task_large_prompt()
     test_tool_bridge_schema_injection_on_large_prompt()

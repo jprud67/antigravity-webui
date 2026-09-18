@@ -385,7 +385,7 @@ async def create_chat_completion(
                     elif evt_type == "error":
                         has_error = True
                         err_msg = event.get("message") or "Erreur lors de l'exécution"
-                        is_quota = _is_quota_error(err_msg)
+                        is_quota = bool(event.get("is_quota")) or _is_quota_error(err_msg)
                         error_chunk = {
                             "id": completion_id,
                             "object": "chat.completion.chunk",
@@ -487,7 +487,11 @@ async def create_chat_completion(
                 if res.get("usage"):
                     usage_data = _extract_usage_info(res["usage"])
             elif evt_type == "error":
-                raise RuntimeError(event.get("message") or "Erreur CLI Antigravity")
+                _raise_http_for_error(
+                    str(event.get("message") or "Erreur CLI Antigravity"),
+                    context="/v1/chat/completions",
+                    is_quota=bool(event.get("is_quota")),
+                )
 
     except HTTPException:
         raise  # Laisser passer les HTTPException déjà construites

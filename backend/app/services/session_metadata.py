@@ -77,6 +77,7 @@ def _normalize_meta(meta: dict[str, Any]) -> dict[str, Any]:
     meta["project"] = str(meta.get("project") or "")
     meta["projectColor"] = str(meta.get("projectColor") or "")
     meta["customTitle"] = str(meta.get("customTitle") or "")
+    meta["group_id"] = str(meta.get("group_id") or meta.get("groupId") or "")
     return meta
 
 
@@ -87,7 +88,8 @@ def make_default_meta() -> dict[str, Any]:
         "tags": [],
         "project": "",
         "projectColor": "",
-        "customTitle": ""
+        "customTitle": "",
+        "group_id": ""
     }
 
 def get_session_meta(conversation_id: str) -> dict[str, Any]:

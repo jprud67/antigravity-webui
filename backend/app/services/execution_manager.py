@@ -739,7 +739,7 @@ class ExecutionManager:
         else:
             if self.active_session and self.active_session.is_busy:
                 return self.active_session
-            running = [s for s in self.sessions.values() if s.is_busy]
+            running = [s for s in list(self.sessions.values()) if s.is_busy]
             if running:
                 return running[0]
         return None
@@ -750,7 +750,7 @@ class ExecutionManager:
         return bool(session and session.is_busy)
 
     def get_running_conversations(self) -> list[str]:
-        cids = {cid for cid, s in self.sessions.items() if s.is_busy and cid}
+        cids = {cid for cid, s in list(self.sessions.items()) if s.is_busy and cid}
         if self.active_session and self.active_session.is_busy and self.active_session.conversation_id:
             cids.add(self.active_session.conversation_id)
         return list(cids)

@@ -57,7 +57,7 @@ class MetadataUpdateRequest(BaseModel):
     group_id: str | None = None
 
 @router.get("", response_model=list[dict[str, Any]])
-def get_conversations(limit: int = 100, q: str | None = None, _ = Depends(require_auth)):
+def get_conversations(limit: int = Query(100, ge=1, le=1000), q: str | None = None, _ = Depends(require_auth)):
     running_set = set(execution_manager.get_running_conversations())
     if q and q.strip():
         items = search_conversations(query=q.strip(), limit=limit)
@@ -68,7 +68,7 @@ def get_conversations(limit: int = 100, q: str | None = None, _ = Depends(requir
     return items
 
 @router.get("/search", response_model=list[dict[str, Any]])
-def search(q: str = Query(..., min_length=1), limit: int = 50, _ = Depends(require_auth)):
+def search(q: str = Query(..., min_length=1), limit: int = Query(50, ge=1, le=500), _ = Depends(require_auth)):
     items = search_conversations(query=q, limit=limit)
     running_set = set(execution_manager.get_running_conversations())
     for c in items:
