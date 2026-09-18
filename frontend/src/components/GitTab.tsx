@@ -276,7 +276,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
         <button
           onClick={() => { void loadStatus(); }}
           disabled={loading}
-          title="Actualiser"
+          title={t('refresh', 'Refresh')}
           className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
           style={{ color: 'var(--muted)' }}
         >
@@ -294,7 +294,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
           <button
             onClick={() => setActionSuccess(null)}
             className="text-xs hover:opacity-80 p-0.5 rounded cursor-pointer shrink-0"
-            title="Close"
+            title={t('close', 'Close')}
           >
             ✕
           </button>
@@ -309,7 +309,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
           <button
             onClick={() => setError(null)}
             className="text-xs hover:opacity-80 p-0.5 rounded cursor-pointer shrink-0"
-            title="Close"
+            title={t('close', 'Close')}
           >
             ✕
           </button>

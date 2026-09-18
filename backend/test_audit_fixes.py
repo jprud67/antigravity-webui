@@ -3402,6 +3402,14 @@ def test_clean_user_prompt_xml_tag_backreference():
     prompt2 = "Hello <SKILLS>valid skill</SKILLS> middle <ARTIFACTS>valid artifact</ARTIFACTS> end"
     cleaned2 = clean_user_prompt(prompt2)
     assert "middle" in cleaned2, f"Expected 'middle' preserved, got '{cleaned2}'"
+
+    # Steering prefixes stripping (French and English)
+    assert clean_user_prompt("⚡ [Guidage] Fix the bug") == "Fix the bug"
+    assert clean_user_prompt("⚡ [Steering] Fix the bug") == "Fix the bug"
+    assert clean_user_prompt("📥 [En attente] Check file") == "Check file"
+    assert clean_user_prompt("📥 [Queued] Check file") == "Check file"
+    assert clean_user_prompt("[Instruction Prioritaire de Guidage]: Run tests") == "Run tests"
+    assert clean_user_prompt("[Priority Steering Instruction]: Run tests") == "Run tests"
     print("✓ test_clean_user_prompt_xml_tag_backreference passed")
 
 

@@ -66,32 +66,11 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
-    let active = true;
-    fetchKanbanTasks()
-      .then((data) => {
-        if (active) {
-          setTasks(data.tasks);
-          setColumns(data.columns);
-        }
-      })
-      .catch((e: any) => {
-        if (active) {
-          console.error('Failed to load kanban tasks', e);
-          setError(e.message || t('kanban_error_load', 'Error loading Kanban'));
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [currentWorkspace]);
+    void loadTasks();
+  }, [loadTasks, currentWorkspace]);
 
   const openCreateModal = () => {
     setEditingTask(null);

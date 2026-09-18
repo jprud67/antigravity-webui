@@ -241,7 +241,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       { label: `🗄️ ${t('older', 'Older')}`, items: older },
       { label: `📦 ${t('archives', 'Archives')}`, items: archived },
     ].filter((g) => g.items.length > 0);
-  }, [filtered]);
+  }, [filtered, t]);
 
   // Bulk selection helpers & handlers
   const isAllSelected = useMemo(() => {
@@ -577,7 +577,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             <FolderGit2 className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
             <div className="min-w-0">
               <span className="text-[10px] block uppercase tracking-wider font-semibold" style={{ color: 'var(--muted)' }}>
-                Workspace actif
+                {t('active_workspace', 'Active Workspace')}
               </span>
               <p className="text-xs truncate font-mono font-medium" style={{ color: 'var(--strong)' }}>
                 {currentWorkspace}
@@ -659,7 +659,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         <div className="flex items-center gap-1.5 min-w-0">
           <MessageSquare className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
           <span className="text-[11px] font-semibold uppercase tracking-wider truncate" style={{ color: 'var(--muted)' }}>
-            Discussions ({filtered.length})
+            {t('discussions', 'Discussions')} ({filtered.length})
           </span>
         </div>
 
@@ -997,7 +997,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                                 title={`${t('project', 'Project')}: ${conv.project || t('unnamed', 'Unnamed')}`}
                               />
                             ) : isBranch ? (
-                              <span title="Session issue d'une bifurcation (branche)" className="group-hover:hidden">
+                              <span title={t('forked_session_hint', 'Session forked from a branch')} className="group-hover:hidden">
                                 <GitBranch className="w-3 h-3 text-fuchsia-500 shrink-0" />
                               </span>
                             ) : (
@@ -1253,7 +1253,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 onClick={onOpenHelp}
                 className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
                 style={{ color: 'var(--muted)' }}
-                title="Aide & Raccourcis (/help)"
+                title={t('help_and_shortcuts', 'Help & Shortcuts (/help)')}
               >
                 <HelpCircle className="w-4 h-4" />
               </button>
@@ -1327,7 +1327,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 </label>
                 <input
                   type="text"
-                  placeholder="ex: frontend, release-v2, bugfix"
+                  placeholder={t('bulk_tag_placeholder', 'e.g. frontend, release-v2, bugfix')}
                   value={bulkTagInput}
                   onChange={(e) => setBulkTagInput(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl text-xs focus:outline-none transition-colors"
@@ -1470,11 +1470,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text)' }}>
-                  Nom du projet :
+                  {t('project_name', 'Project name:')}
                 </label>
                 <input
                   type="text"
-                  placeholder="ex: LeadForge, E-Commerce, Refactor"
+                  placeholder={t('bulk_project_placeholder', 'e.g. LeadForge, E-Commerce, Refactor')}
                   value={bulkProjectInput}
                   onChange={(e) => setBulkProjectInput(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl text-xs focus:outline-none transition-colors"

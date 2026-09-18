@@ -22,7 +22,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   title
 }) => {
   const { t } = useI18n();
-  const displayTitle = title || t('file_diff_title', 'Modifications de Fichiers (Diff)');
+  const displayTitle = title || t('file_diff_title', 'File Changes (Diff)');
   const [collapsed, setCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
 

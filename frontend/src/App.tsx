@@ -5,6 +5,7 @@ import { ChatInput } from './components/ChatInput';
 
 const ArtifactViewer = lazy(() => import('./components/ArtifactViewer').then(m => ({ default: m.ArtifactViewer })));
 const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+import type { SettingsTab } from './components/SettingsModal';
 const WorkspaceModal = lazy(() => import('./components/WorkspaceModal').then(m => ({ default: m.WorkspaceModal })));
 const LoginModal = lazy(() => import('./components/LoginModal').then(m => ({ default: m.LoginModal })));
 const FileExplorerModal = lazy(() => import('./components/FileExplorerModal').then(m => ({ default: m.FileExplorerModal })));
@@ -200,7 +201,7 @@ export function App() {
   const [isCronModalOpen, setIsCronModalOpen] = useState(false);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates'>('models');
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('models');
   const [activeGoogleAccount, setActiveGoogleAccount] = useState<GoogleAccountInfo | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
 

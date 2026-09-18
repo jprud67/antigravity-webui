@@ -327,7 +327,10 @@ _XML_TAGS_RE = re.compile(
     rf'</?(?:USER_REQUEST|{_TAGS_PATTERN})(?:\s+[^>]*)?>',
     re.IGNORECASE,
 )
-_STEERING_PREFIX_RE = re.compile(r'^(?:⚡\s*\[Guidage\]\s*|📥\s*\[En attente\]\s*|\[Instruction Prioritaire de Guidage\]\s*:?\s*)+')
+_STEERING_PREFIX_RE = re.compile(
+    r'^(?:⚡\s*\[(?:Guidage|Steering)\]\s*|📥\s*\[(?:En attente|Queued)\]\s*|\[(?:Instruction Prioritaire de Guidage|Priority Steering Instruction)\]\s*:?\s*)+',
+    re.IGNORECASE,
+)
 
 
 def clean_user_prompt(raw: Any) -> str:

@@ -1027,7 +1027,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 borderColor: showMobileToolsMenu ? 'var(--accent)' : 'var(--border)',
                 color: showMobileToolsMenu ? 'var(--accent-text)' : 'var(--text)',
               }}
-              title="Outils & Extensions"
+              title={t('tools_and_extensions', 'Tools & Extensions')}
             >
               <MoreHorizontal className="w-4 h-4" />
             </button>
@@ -1239,7 +1239,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 borderColor: 'var(--border)',
                 color: 'var(--text)'
               }}
-              title="Gestionnaire Git (/git)"
+              title={t('git_manager_title', 'Git Manager (/git)')}
             >
               <GitPullRequest className="w-3.5 h-3.5 text-rose-400" />
               <span className="text-[11px] font-medium hidden lg:inline">Git</span>

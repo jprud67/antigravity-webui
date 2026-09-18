@@ -1356,7 +1356,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                 borderColor: attachments.length > 0 ? 'var(--accent)' : 'var(--border)',
                 color: attachments.length > 0 ? 'var(--accent)' : 'var(--text)'
               }}
-              title={t('attach_files_tooltip', 'Attacher des fichiers (images, code, texte) ou glisser-déposer')}
+              title={t('attach_files_tooltip', 'Attach files (images, code, text) or drag & drop')}
             >
               <Paperclip className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
               {attachments.length > 0 && (
@@ -1378,7 +1378,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                 borderColor: isListening ? '#EF4444' : 'var(--border)',
                 color: isListening ? '#EF4444' : 'var(--muted)'
               }}
-              title={isListening ? t('stop_voice', 'Arrêter la dictée vocale') : t('voice_dictation', 'Activer la dictée vocale (Microphone)')}
+              title={isListening ? t('stop_voice', 'Stop voice dictation') : t('voice_dictation', 'Enable voice dictation (Microphone)')}
             >
               {isListening ? <MicOff className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> : <Mic className="w-4 h-4 sm:w-3.5 sm:h-3.5" />}
             </button>
@@ -1389,7 +1389,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
               onClick={() => {
                 const next = !autoApprove;
                 setAutoApprove(next);
-                showToast(next ? t('yolo_mode_enabled_toast', '⚡ Mode YOLO activé (Exécution autonome)') : t('yolo_mode_disabled_toast', 'Mode YOLO désactivé (Confirmation requise)'), next ? 'success' : 'info');
+                showToast(next ? t('yolo_mode_enabled_toast', '⚡ YOLO mode enabled (Autonomous execution)') : t('yolo_mode_disabled_toast', 'YOLO mode disabled (Confirmation required)'), next ? 'success' : 'info');
               }}
               className="flex items-center gap-1.5 px-2.5 py-1.5 sm:py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer shadow-sm shrink-0"
               style={{
@@ -1397,7 +1397,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                 borderColor: autoApprove ? 'var(--accent)' : 'var(--border)',
                 color: autoApprove ? 'var(--accent-text)' : 'var(--muted)'
               }}
-              title={autoApprove ? t('yolo_active_tooltip', 'YOLO actif: exécution autonome sans confirmation. Cliquer pour désactiver.') : t('yolo_inactive_tooltip', 'YOLO inactif: demande de confirmation avant chaque outil.')}
+              title={autoApprove ? t('yolo_active_tooltip', 'YOLO active: autonomous execution without confirmation. Click to disable.') : t('yolo_inactive_tooltip', 'YOLO inactive: confirmation prompt before each tool.')}
             >
               <Zap className="w-3 h-3 fill-current" />
               <span>YOLO</span>
@@ -1416,7 +1416,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                 borderColor: showHistoryMenu ? 'var(--accent)' : 'var(--border)',
                 color: showHistoryMenu ? 'var(--accent)' : 'var(--muted)'
               }}
-              title="Historique des prompts (Touches ↑ / ↓ dans le terminal)"
+              title={t('prompt_history_tooltip', 'Prompt history (Keys ↑ / ↓ in input)')}
             >
               <History className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
@@ -1433,7 +1433,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                 borderColor: 'var(--border)',
                 color: 'var(--muted)'
               }}
-              title={`Workspace: ${currentWorkspace || '/root'} (Cliquer pour changer)`}
+              title={t('workspace_click_to_change', 'Workspace: {0} (Click to change)').replace('{0}', currentWorkspace || '/root')}
             >
               <Folder className="w-3 h-3 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
               <span className="truncate max-w-[100px]" style={{ color: 'var(--text)' }}>
@@ -1480,21 +1480,21 @@ export const ChatInput = React.memo<ChatInputProps>(({
                   onChange={(e) => onSelectEffort(e.target.value as any)}
                   className="bg-transparent text-[11px] font-mono outline-none cursor-pointer"
                   style={{ color: 'var(--text)' }}
-                  title={t('thinking_effort_level_tooltip', 'Niveau de réflexion / Effort')}
+                  title={t('thinking_effort_level_tooltip', 'Thinking Effort Level')}
                 >
                   {supportedEfforts.includes('high') && (
                     <option value="high" style={{ backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
-                      {t('effort_high', 'Effort : Haut')}
+                      {t('effort_high', 'High Effort')}
                     </option>
                   )}
                   {supportedEfforts.includes('medium') && (
                     <option value="medium" style={{ backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
-                      {t('effort_medium', 'Effort : Moyen')}
+                      {t('effort_medium', 'Medium Effort')}
                     </option>
                   )}
                   {supportedEfforts.includes('low') && (
                     <option value="low" style={{ backgroundColor: 'var(--surface)', color: 'var(--text)' }}>
-                      {t('effort_low', 'Effort : Faible')}
+                      {t('effort_low', 'Low Effort')}
                     </option>
                   )}
                 </select>
