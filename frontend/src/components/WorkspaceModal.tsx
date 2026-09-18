@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Folder, FolderPlus, Check, ArrowUp, Trash2 } from 'lucide-react';
 import type { WorkspaceFolder } from '../types';
 import { fetchWorkspaces, exploreDirectory, addWorkspace, deleteWorkspace } from '../services/api';
+import { useI18n } from '../services/i18n';
 
 interface WorkspaceModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
   currentWorkspace,
   onSelectWorkspace,
 }) => {
+  const { t } = useI18n();
   const [trustedList, setTrustedList] = useState<string[]>([]);
   const [browserData, setBrowserData] = useState<WorkspaceFolder | null>(null);
   const [loading, setLoading] = useState(false);
@@ -97,8 +99,8 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
               <Folder className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold tracking-tight" style={{ color: 'var(--strong)' }}>Gestion des Workspaces & Projets</h2>
-              <p className="text-[11px]" style={{ color: 'var(--muted)' }}>Définissez l'espace racine sur lequel Antigravity intervient</p>
+              <h2 className="text-sm font-bold tracking-tight" style={{ color: 'var(--strong)' }}>{t('workspace_modal_title', 'Workspaces & Projects Management')}</h2>
+              <p className="text-[11px]" style={{ color: 'var(--muted)' }}>{t('workspace_modal_subtitle', 'Define the root directory where Antigravity operates')}</p>
             </div>
           </div>
           <button
@@ -114,7 +116,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
         <div className="p-6 space-y-5 text-xs">
           {/* Active / Trusted Workspaces */}
           <div className="space-y-2">
-            <label className="font-semibold" style={{ color: 'var(--strong)' }}>Workspaces Actifs & Autorisés</label>
+            <label className="font-semibold" style={{ color: 'var(--strong)' }}>{t('active_trusted_workspaces', 'Active & Authorized Workspaces')}</label>
             <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
               {trustedList.map((ws) => {
                 const isActive = ws === currentWorkspace;
@@ -134,7 +136,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
                     </div>
                     {isActive ? (
                       <span className="text-[10px] px-2.5 py-0.5 rounded-full border flex items-center gap-1 font-sans font-medium shrink-0" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--accent)', color: 'var(--accent)' }}>
-                        <Check className="w-3 h-3" /> Actif
+                        <Check className="w-3 h-3" /> {t('active', 'Active')}
                       </span>
                     ) : (
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -150,11 +152,11 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
                             color: 'var(--text)'
                           }}
                         >
-                          Sélectionner
+                          {t('select', 'Select')}
                         </button>
                         <button
                           onClick={(e) => handleDeleteWorkspace(e, ws)}
-                          title="Retirer des workspaces"
+                          title={t('remove_workspace', 'Remove from workspaces')}
                           className="p-1.5 rounded-lg border transition-colors cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/10"
                           style={{
                             borderColor: 'var(--border)',
@@ -172,7 +174,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
 
           {/* Directory Navigator */}
           <div className="space-y-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-            <label className="font-semibold" style={{ color: 'var(--strong)' }}>Explorateur de dossiers locaux</label>
+            <label className="font-semibold" style={{ color: 'var(--strong)' }}>{t('local_folder_explorer', 'Local folder explorer')}</label>
             {browserData && (
               <div
                 className="border rounded-2xl p-4 space-y-2.5 shadow-inner"
@@ -183,7 +185,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
               >
                 <div className="flex items-center justify-between font-mono text-[11px] pb-2.5 border-b" style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}>
                   <div className="flex items-center gap-1.5 truncate">
-                    <span style={{ color: 'var(--muted)' }}>Dossier:</span>
+                    <span style={{ color: 'var(--muted)' }}>{t('folder', 'Folder')}:</span>
                     <span className="font-semibold truncate max-w-sm" style={{ color: 'var(--accent)' }}>{browserData.current_path}</span>
                   </div>
                   {browserData.parent_path && (
@@ -192,14 +194,14 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
                       className="flex items-center gap-1 shrink-0 text-[11px] font-sans font-medium cursor-pointer"
                       style={{ color: 'var(--accent)' }}
                     >
-                      <ArrowUp className="w-3 h-3" /> Dossier parent
+                      <ArrowUp className="w-3 h-3" /> {t('parent_folder', 'Parent folder')}
                     </button>
                   )}
                 </div>
 
                 <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
                   {loading ? (
-                    <div className="p-4 text-center" style={{ color: 'var(--muted)' }}>Chargement...</div>
+                    <div className="p-4 text-center" style={{ color: 'var(--muted)' }}>{t('loading', 'Loading...')}</div>
                   ) : (
                     browserData.entries
                       .filter((e) => e.is_dir)
@@ -226,7 +228,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
                               color: 'var(--text)'
                             }}
                           >
-                            <FolderPlus className="w-3 h-3" /> Utiliser
+                            <FolderPlus className="w-3 h-3" /> {t('workspace_use', 'Use')}
                           </button>
                         </div>
                       ))
@@ -254,7 +256,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
               color: 'var(--text)'
             }}
           >
-            Fermer
+            {t('close', 'Close')}
           </button>
         </div>
       </div>

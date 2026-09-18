@@ -29,6 +29,7 @@ import { DiffViewer } from './DiffViewer';
 import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent, fetchGitStatus, type GitStatusResult, getAuthToken, triggerFileDownload } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
+import { useI18n } from '../services/i18n';
 import type { ArtifactItem } from '../types';
 
 export type RightPanelTab = 'files' | 'artifacts' | 'terminal' | 'git' | 'kanban';
@@ -54,6 +55,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   onInsertPath,
   onExecutePrompt,
 }) => {
+  const { t } = useI18n();
   const [panelWidth, setPanelWidth] = useState<number>(540);
   const isResizingRef = useRef(false);
 
@@ -109,10 +111,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   // Unsaved changes guard
   const checkUnsavedChanges = useCallback(async (): Promise<boolean> => {
     if (isEditingFile && editedFileContent !== fileContent) {
-      return await showConfirm('Vous avez des modifications non enregistrées. Voulez-vous continuer sans sauvegarder ?', {
-        title: 'Modifications non enregistrées',
-        confirmLabel: 'Abandonner les modifications',
-        cancelLabel: 'Continuer l\'édition',
+      return await showConfirm(t('unsaved_changes_message', 'You have unsaved changes. Do you want to continue without saving?'), {
+        title: t('unsaved_changes_title', 'Unsaved changes'),
+        confirmLabel: t('discard_changes', 'Discard changes'),
+        cancelLabel: t('continue_editing', 'Continue editing'),
         destructive: true
       });
     }
@@ -163,9 +165,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } catch (err: any) {
       const msg = String(err?.message || '');
       if (msg.toLowerCase().includes('volumineux') || msg.includes('2 Mo') || msg.toLowerCase().includes('large')) {
-        setFileContent('⚠️ Ce fichier dépasse la limite de 2 Mo pour l\'éditeur intégré.\nVeuillez utiliser le bouton « Télécharger » ci-dessus pour le consulter ou le manipuler sur votre machine.');
+        setFileContent(`⚠️ ${t('file_explorer_load_error', 'File too large for built-in editor. Please use the Download button above.')}`);
       } else {
-        setFileContent(`Erreur lors du chargement du fichier : ${msg || 'Erreur inconnue'}`);
+        setFileContent(`${t('error', 'Error')}: ${msg || t('error', 'Unknown error')}`);
       }
       setEditedFileContent('');
     } finally {
@@ -181,13 +183,13 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       const res = await fetch(downloadUrl, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
-      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      if (!res.ok) throw new Error(`Error ${res.status}`);
       const blob = await res.blob();
-      const filename = selectedFilePath.split(/[/\\]/).pop() || 'fichier';
+      const filename = selectedFilePath.split(/[/\\]/).pop() || 'file';
       triggerFileDownload(blob, filename);
-      showToast(`Téléchargement de « ${filename} » terminé`, 'success');
+      showToast(`${t('download', 'Download')} « ${filename} » ${t('done', 'done')}`, 'success');
     } catch {
-      showToast('Erreur lors du téléchargement du fichier.', 'error');
+      showToast(t('error_downloading_file', 'Error downloading file.'), 'error');
     }
   }, [selectedFilePath]);
 
@@ -200,7 +202,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch {
-      showToast('Erreur lors de la sauvegarde du fichier.', 'error');
+      showToast(t('error_saving_file', 'Error saving file.'), 'error');
     } finally {
       setSavingFile(false);
     }
@@ -212,7 +214,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       const content = await fetchArtifactContent(art.conversation_id, art.relative_path || art.filename);
       setArtifactMarkdown(content);
     } catch {
-      setArtifactMarkdown('Impossible de charger le contenu de cet artifact.');
+      setArtifactMarkdown(t('error_loading_file', 'Unable to load artifact content.'));
     }
   }, []);
 
@@ -360,7 +362,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       e.stopPropagation();
                       onInsertPath(item.path);
                     }}
-                    title="Insérer ce chemin dans le prompt"
+                    title={t('insert_path_in_prompt', 'Insert this path into prompt')}
                     className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300 transition-opacity"
                   >
                     <Plus className="w-3 h-3" />
@@ -433,7 +435,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             }`}
           >
             <FolderTree className="w-3.5 h-3.5" />
-            <span>Fichiers</span>
+            <span>{t('files', 'Files')}</span>
           </button>
 
           <button
@@ -445,7 +447,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Artifacts</span>
+            <span>{t('artifacts', 'Artifacts')}</span>
           </button>
 
           <button
@@ -457,7 +459,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             }`}
           >
             <TerminalIcon className="w-3.5 h-3.5" />
-            <span>Terminal</span>
+            <span>{t('terminal', 'Terminal')}</span>
           </button>
 
           <button
@@ -481,7 +483,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             }`}
           >
             <KanbanIcon className="w-3.5 h-3.5" />
-            <span>Kanban</span>
+            <span>{t('kanban', 'Kanban')}</span>
           </button>
         </div>
 
@@ -495,7 +497,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                 borderColor: 'var(--border)',
                 color: 'var(--text)'
               }}
-              title={`Branche git active : ${gitStatus.branch}`}
+              title={t('active_git_branch', 'Active git branch: {0}').replace('{0}', gitStatus.branch)}
             >
               <GitBranch className="w-3 h-3 text-emerald-500 shrink-0" />
               <span className="font-semibold truncate max-w-[90px]">{gitStatus.branch}</span>
@@ -510,7 +512,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
           <button
             onClick={handleClose}
             className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-            title="Fermer le volet latéral"
+            title={t('close_side_panel', 'Close side panel')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -545,7 +547,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
               }}
             >
               <div className="flex items-center gap-2 truncate font-mono text-[11px]" style={{ color: 'var(--muted)' }}>
-                <span>Racine :</span>
+                <span>{t('root_path', 'Root:')}</span>
                 <strong className="truncate" style={{ color: 'var(--strong)' }}>{currentWorkspace}</strong>
               </div>
               <button
@@ -568,11 +570,11 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                 }}
               >
                 {loadingTree && !fileTree ? (
-                  <div className="p-4 text-center text-xs" style={{ color: 'var(--muted)' }}>Chargement...</div>
+                  <div className="p-4 text-center text-xs" style={{ color: 'var(--muted)' }}>{t('loading', 'Loading...')}</div>
                 ) : fileTree && fileTree.items ? (
                   renderTreeItems(fileTree.items)
                 ) : (
-                  <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>Aucun fichier</div>
+                  <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>{t('no_files', 'No files')}</div>
                 )}
               </div>
 
@@ -608,9 +610,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           <button
                             onClick={() => onInsertPath(selectedFilePath)}
                             className="text-[10px] text-sky-500 hover:text-sky-400 font-medium cursor-pointer mr-1"
-                            title="Insérer le chemin"
+                            title={t('insert_path_in_prompt', 'Insert this path into prompt')}
                           >
-                            + Insérer
+                            + {t('insert_path', 'Insert path')}
                           </button>
                         )}
                         <button
@@ -622,10 +624,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             borderColor: 'var(--border)',
                             color: 'var(--text)',
                           }}
-                          title="Télécharger le fichier sur votre appareil"
+                          title={t('download_file_to_device', 'Download file to your device')}
                         >
                           <Download className="w-2.5 h-2.5" />
-                          <span>Télécharger</span>
+                          <span>{t('download', 'Download')}</span>
                         </button>
                         {selectedFilePath.endsWith('.md') && !isEditingFile && (
                           <button
@@ -637,10 +639,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               borderColor: showMarkdownPreview ? 'var(--accent)' : 'var(--border)',
                               color: showMarkdownPreview ? 'var(--accent)' : 'var(--text)',
                             }}
-                            title="Basculer aperçu Markdown"
+                            title={t('toggle_markdown_preview', 'Toggle Markdown preview')}
                           >
                             {showMarkdownPreview ? <Code className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
-                            <span>{showMarkdownPreview ? 'Source' : 'Aperçu'}</span>
+                            <span>{showMarkdownPreview ? t('source', 'Source') : t('preview', 'Preview')}</span>
                           </button>
                         )}
                         {!isBinaryFile(selectedFilePath) && (
@@ -659,7 +661,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             }}
                           >
                             <Edit3 className="w-2.5 h-2.5" />
-                            <span>{isEditingFile ? 'Lecture' : 'Éditer'}</span>
+                            <span>{isEditingFile ? t('reading_mode', 'Reading') : t('edit_mode', 'Edit')}</span>
                           </button>
                         )}
                         {isEditingFile && (
@@ -669,7 +671,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer bg-sky-600 hover:bg-sky-500 text-white"
                           >
                             {saveSuccess ? <Check className="w-2.5 h-2.5" /> : <Save className="w-2.5 h-2.5" />}
-                            <span>{saveSuccess ? 'Enregistré' : savingFile ? '...' : 'Sauvegarder'}</span>
+                            <span>{saveSuccess ? t('saved', 'Saved') : savingFile ? '...' : t('save', 'Save')}</span>
                           </button>
                         )}
                       </div>
@@ -682,7 +684,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       }}
                     >
                       {loadingContent ? (
-                        <div style={{ color: 'var(--muted)' }}>Chargement du contenu...</div>
+                        <div style={{ color: 'var(--muted)' }}>{t('loading_content', 'Loading content...')}</div>
                       ) : isEditingFile ? (
                         <textarea
                           value={editedFileContent}
@@ -710,7 +712,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               {selectedFilePath.split(/[/\\]/).pop()}
                             </h4>
                             <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                              Fichier binaire (document bureautique ou archive).
+                              {t('binary_file_desc', 'Binary file (office document or archive).')}
                             </p>
                           </div>
                           <button
@@ -723,7 +725,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             }}
                           >
                             <Download className="w-3.5 h-3.5" />
-                            <span>Télécharger le fichier</span>
+                            <span>{t('download_file', 'Download file')}</span>
                           </button>
                         </div>
                       ) : selectedFilePath.endsWith('.md') && showMarkdownPreview ? (
@@ -739,7 +741,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   </>
                 ) : (
                   <div className="flex-1 flex items-center justify-center text-xs p-4 text-center" style={{ color: 'var(--muted)' }}>
-                    Sélectionnez un fichier pour prévisualiser ou éditer son contenu.
+                    {t('select_file_preview', 'Select a file to preview or edit its contents.')}
                   </div>
                 )}
               </div>
@@ -779,7 +781,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                 }}
               >
                 {artifacts.length === 0 ? (
-                  <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>Aucun artifact</div>
+                  <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>{t('no_artifacts', 'No artifacts')}</div>
                 ) : (
                   artifacts.map((art) => {
                     const isSelected = selectedArtifact?.filename === art.filename;
@@ -862,7 +864,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   </div>
                 ) : (
                   <div className="h-full flex items-center justify-center text-xs" style={{ color: 'var(--muted)' }}>
-                    Sélectionnez un document à afficher.
+                    {t('select_document_to_view', 'Select a document to display.')}
                   </div>
                 )}
               </div>

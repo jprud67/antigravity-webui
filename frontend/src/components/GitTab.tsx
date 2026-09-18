@@ -14,12 +14,14 @@ import {
 } from 'lucide-react';
 import { fetchGitStatus, fetchGitDiff, gitCommit, gitPush, gitPull, type GitStatusResult } from '../services/api';
 import { DiffViewer } from './DiffViewer';
+import { useI18n } from '../services/i18n';
 
 interface GitTabProps {
   currentWorkspace: string;
 }
 
 export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
+  const { t } = useI18n();
   const [status, setStatus] = useState<GitStatusResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +86,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
       }
       return data;
     } catch (err: any) {
-      setError(err.message || 'Impossible de récupérer le statut Git');
+      setError(err.message || t('git_cannot_get_status', 'Cannot get Git status'));
       return null;
     } finally {
       setLoading(false);
@@ -112,7 +114,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
       })
       .catch((err: any) => {
         if (active) {
-          setError(err.message || 'Impossible de récupérer le statut Git');
+          setError(err.message || t('git_cannot_get_status', 'Cannot get Git status'));
         }
       })
       .finally(() => {
@@ -134,13 +136,13 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     setError(null);
     try {
       await gitCommit(commitMessage.trim(), currentWorkspace, stageAll);
-      setActionSuccess('Commit effectué avec succès');
+      setActionSuccess(t('git_commit_success', 'Commit successful'));
       setCommitMessage('');
       await loadStatus();
       setActiveDiff(null);
       setSelectedFile(null);
     } catch (err: any) {
-      setError(err.message || 'Erreur lors du commit');
+      setError(err.message || t('git_commit_error', 'Error during commit'));
     } finally {
       setCommitting(false);
     }
@@ -152,10 +154,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     setError(null);
     try {
       await gitPush(currentWorkspace);
-      setActionSuccess(`Modifications poussées avec succès sur origin/${status?.branch || 'main'}`);
+      setActionSuccess(`${t('git_push_success', 'Changes pushed successfully to origin')}/${status?.branch || 'main'}`);
       await loadStatus();
     } catch (err: any) {
-      setError(err.message || 'Erreur lors du push');
+      setError(err.message || t('git_push_error', 'Error during push'));
     } finally {
       setPushing(false);
     }
@@ -167,12 +169,12 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
     setError(null);
     try {
       const res = await gitPull(currentWorkspace);
-      setActionSuccess(`Modifications récupérées avec succès depuis origin/${status?.branch || 'main'}: ${res.output || 'À jour'}`);
+      setActionSuccess(`${t('git_pull_success', 'Changes pulled successfully from origin')}/${status?.branch || 'main'}: ${res.output || 'Up to date'}`);
       await loadStatus();
       setActiveDiff(null);
       setSelectedFile(null);
     } catch (err: any) {
-      setError(err.message || 'Erreur lors du pull');
+      setError(err.message || t('git_pull_error', 'Error during pull'));
     } finally {
       setPulling(false);
     }
