@@ -896,7 +896,7 @@ def test_kill_task_rejects_system_words():
     print("✓ test_kill_task_rejects_system_words passed")
 
 
-def test_undo_conversation_turn_nullifies_last_user_time():
+def test_undo_conversation_turn_updates_last_user_time_not_null():
     import sqlite3
     import tempfile
     from pathlib import Path
@@ -919,7 +919,7 @@ def test_undo_conversation_turn_nullifies_last_user_time():
             {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Hi there!"}
         ])
 
-        # Create test database
+        # Create test database with NOT NULL constraint matching production schema
         db_file = tmp_brain / "conversations.db"
         conn = sqlite3.connect(str(db_file))
         cursor = conn.cursor()
@@ -930,7 +930,7 @@ def test_undo_conversation_turn_nullifies_last_user_time():
                 preview TEXT,
                 last_modified_time TEXT,
                 last_user_input_step_index INTEGER,
-                last_user_input_time TEXT
+                last_user_input_time DATETIME NOT NULL
             )
         """)
         cursor.execute("""
@@ -944,13 +944,13 @@ def test_undo_conversation_turn_nullifies_last_user_time():
             res = storage.undo_conversation_turn(conv_id)
             assert res["step_count"] == 0
 
-            # Verify that in DB, last_user_input_time was updated to NULL
+            # Verify that in DB, last_user_input_time was updated safely without violating NOT NULL constraint
             conn_verify = sqlite3.connect(str(db_file))
             row = conn_verify.cursor().execute("SELECT last_user_input_time, last_user_input_step_index FROM conversation_summaries WHERE conversation_id = ?", (conv_id,)).fetchone()
             conn_verify.close()
-            assert row[0] is None
+            assert row[0] is not None
             assert row[1] == -1
-    print("✓ test_undo_conversation_turn_nullifies_last_user_time passed")
+    print("✓ test_undo_conversation_turn_updates_last_user_time_not_null passed")
 
 
 def test_cron_update_jobs_noop_when_unchanged():
@@ -3671,6 +3671,108 @@ def test_api_key_concurrent_thread_safety():
     print("✓ test_api_key_concurrent_thread_safety passed")
 
 
+def test_fork_conversation_deepcopy_isolation():
+    import sqlite3
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.services import storage
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_brain = Path(tmp_dir) / "brain"
+        tmp_brain.mkdir(parents=True, exist_ok=True)
+        source_cid = "11111111-1111-1111-1111-111111111111"
+        source_dir = tmp_brain / source_cid / ".system_generated" / "logs"
+        source_dir.mkdir(parents=True, exist_ok=True)
+
+        initial_tool_args = {"param": "original_value"}
+        source_steps = [
+            {
+                "step_index": 0,
+                "type": "USER_INPUT",
+                "source": "USER_EXPLICIT",
+                "content": "Perform task"
+            },
+            {
+                "step_index": 1,
+                "type": "PLANNER_RESPONSE",
+                "source": "MODEL",
+                "tool_calls": [{"name": "run_command", "args": initial_tool_args}]
+            }
+        ]
+        storage.atomic_write_jsonl(source_dir / "transcript.jsonl", source_steps)
+
+        # Setup mock db
+        db_file = tmp_brain / "conversations.db"
+        with patch("app.services.storage.BRAIN_DIR", tmp_brain), \
+             patch("app.services.storage.CONVERSATION_DB", db_file), \
+             patch("app.services.storage.get_db_connection", side_effect=lambda: sqlite3.connect(str(db_file))):
+            storage._schema_initialized = False
+            storage.ensure_db_schema()
+            fork_res = storage.fork_conversation(source_cid, up_to_step_index=1, new_title="Forked Branch")
+            fork_cid = fork_res["conversation_id"]
+
+            fork_transcript = storage.get_conversation_transcript(fork_cid)
+            assert len(fork_transcript) == 2
+            # Mutate forked step nested structure
+            fork_transcript[1]["tool_calls"][0]["args"]["param"] = "mutated_fork_value"
+
+            # Check original transcript
+            original_transcript = storage.get_conversation_transcript(source_cid)
+            assert original_transcript[1]["tool_calls"][0]["args"]["param"] == "original_value"
+    print("✓ test_fork_conversation_deepcopy_isolation passed")
+
+
+def test_updater_git_env_strict_author():
+    from app.services.updater import _DEFAULT_GIT_ENV
+    assert _DEFAULT_GIT_ENV["GIT_AUTHOR_NAME"] == "jprud67"
+    assert _DEFAULT_GIT_ENV["GIT_AUTHOR_EMAIL"] == "jprud67@gmail.com"
+    assert _DEFAULT_GIT_ENV["GIT_COMMITTER_NAME"] == "jprud67"
+    assert _DEFAULT_GIT_ENV["GIT_COMMITTER_EMAIL"] == "jprud67@gmail.com"
+    print("✓ test_updater_git_env_strict_author passed")
+
+
+def test_execution_manager_live_tool_calls_bounding():
+    import asyncio
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession("test-bounding-cid")
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        # Simulate broadcasting 120 tool start events
+        for i in range(120):
+            loop.run_until_complete(session.broadcast({
+                "event": "tool_start",
+                "tool": {
+                    "id": f"call_{i}",
+                    "name": "view_file",
+                    "args": {"path": f"/test/file_{i}.txt"}
+                }
+            }))
+            # Mark all except the last 5 as done
+            if i < 115:
+                loop.run_until_complete(session.broadcast({
+                    "event": "tool_finish",
+                    "tool": {
+                        "id": f"call_{i}",
+                        "name": "view_file",
+                        "output": f"Content {i}"
+                    }
+                }))
+
+        # Assert internal live_tool_calls is bounded to <= 100
+        assert len(session.live_tool_calls) <= 100
+
+        # Assert get_live_state returns capped tool_calls (<= 50)
+        state = session.get_live_state()
+        assert len(state["live_state"]["tool_calls"]) <= 50
+    finally:
+        loop.close()
+    print("✓ test_execution_manager_live_tool_calls_bounding passed")
+
+
 if __name__ == "__main__":
     test_file_download_unicode_and_special_chars()
     test_token_calculation()
@@ -3710,7 +3812,7 @@ if __name__ == "__main__":
     test_is_safe_conversation_id_hardened()
     test_rules_hermes_write_restricted()
     test_kill_task_rejects_system_words()
-    test_undo_conversation_turn_nullifies_last_user_time()
+    test_undo_conversation_turn_updates_last_user_time_not_null()
     test_cron_delete_cancels_running_job()
     test_bulk_conversations_empty_and_limit()
     test_bulk_export_limit()
@@ -3814,5 +3916,8 @@ if __name__ == "__main__":
     test_openai_multipart_message_content()
     test_openai_model_mapping_and_aliases()
     test_api_key_concurrent_thread_safety()
+    test_fork_conversation_deepcopy_isolation()
+    test_updater_git_env_strict_author()
+    test_execution_manager_live_tool_calls_bounding()
     print("\nAll unit tests passed successfully!")
 

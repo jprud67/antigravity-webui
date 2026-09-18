@@ -48,13 +48,22 @@ REFRESH_INTERVAL_SECONDS = 6 * 3600
 _update_result_cache: dict[str, Any] | None = None
 
 
+_DEFAULT_GIT_ENV = {
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_ASKPASS": "",
+    "SSH_ASKPASS": "",
+    "GIT_AUTHOR_NAME": "jprud67",
+    "GIT_AUTHOR_EMAIL": "jprud67@gmail.com",
+    "GIT_COMMITTER_NAME": "jprud67",
+    "GIT_COMMITTER_EMAIL": "jprud67@gmail.com",
+}
+
+
 def _git_cmd(args: list[str], timeout: int = 10, cwd: Path | None = None) -> str | None:
     target_cwd = cwd or REPO_DIR
     env = {
         **os.environ,
-        "GIT_TERMINAL_PROMPT": "0",
-        "GIT_ASKPASS": "",
-        "SSH_ASKPASS": "",
+        **_DEFAULT_GIT_ENV,
     }
     try:
         res = subprocess.run(
@@ -249,9 +258,7 @@ def check_for_updates(force: bool = False) -> dict[str, Any]:
         # 1. Fetch des dernières références du dépôt distant
         fetch_env = {
             **os.environ,
-            "GIT_TERMINAL_PROMPT": "0",
-            "GIT_ASKPASS": "",
-            "SSH_ASKPASS": "",
+            **_DEFAULT_GIT_ENV,
         }
         fetch_res = subprocess.run(
             ["git", "fetch", "origin", "main", "--quiet"],
@@ -352,9 +359,7 @@ async def apply_update() -> dict[str, Any]:
     # 2. Pull fast-forward (avec tentative de rebase automatique si divergence sans conflit)
     git_env = {
         **os.environ,
-        "GIT_TERMINAL_PROMPT": "0",
-        "GIT_ASKPASS": "",
-        "SSH_ASKPASS": "",
+        **_DEFAULT_GIT_ENV,
     }
     pull_proc = await asyncio.create_subprocess_exec(
         "git", "pull", "--ff-only", "origin", "main",

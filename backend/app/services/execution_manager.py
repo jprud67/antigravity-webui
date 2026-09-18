@@ -92,7 +92,7 @@ class ExecutionSession:
             "live_state": {
                 "thought": self.live_thought,
                 "content": self.live_content,
-                "tool_calls": self.live_tool_calls,
+                "tool_calls": self.live_tool_calls[-50:] if len(self.live_tool_calls) > 50 else self.live_tool_calls,
                 "usage": self.live_usage,
                 "pending_approval": self.pending_approval,
             },
@@ -209,6 +209,11 @@ class ExecutionSession:
                     if tool_id:
                         new_tool_call["id"] = tool_id
                     self.live_tool_calls.append(new_tool_call)
+                    if len(self.live_tool_calls) > 100:
+                        running_calls = [t for t in self.live_tool_calls if t.get("status") == "running"]
+                        done_calls = [t for t in self.live_tool_calls if t.get("status") != "running"]
+                        keep_done = max(10, 100 - len(running_calls))
+                        self.live_tool_calls = (running_calls + done_calls[-keep_done:])[-100:]
 
         elif evt_type == "command_result":
             cmd = event.get("command", {})

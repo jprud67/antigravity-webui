@@ -149,6 +149,12 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     else:
         safe_lmt = str(raw_lmt) if raw_lmt is not None else ""
 
+    parent_id = None
+    try:
+        parent_id = r["parent_conversation_id"] or None
+    except (IndexError, KeyError):
+        parent_id = None
+
     return {
         "conversation_id": cid,
         "title": display_title,
@@ -159,7 +165,7 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
         "workspace_uris": r["workspace_uris"],
         "status": r["status"],
         "agent_name": r["agent_name"],
-        "parent_conversation_id": (r.get("parent_conversation_id") if isinstance(r, dict) else (r["parent_conversation_id"] if "parent_conversation_id" in tuple(r.keys()) else None)) or None,
+        "parent_conversation_id": parent_id,
         "pinned": bool(meta.get("pinned", False)),
         "archived": bool(meta.get("archived", False)),
         "tags": safe_tags,
@@ -636,7 +642,7 @@ def fork_conversation(
 
     forked_transcripts = []
     for idx, step in enumerate(forked_steps):
-        cloned = dict(step)
+        cloned = copy.deepcopy(step)
         if "conversation_id" in cloned:
             cloned["conversation_id"] = new_id
         cloned["step_index"] = idx
@@ -645,7 +651,7 @@ def fork_conversation(
 
     forked_full_transcripts = []
     for idx, step in enumerate(forked_full_steps):
-        cloned = dict(step)
+        cloned = copy.deepcopy(step)
         if "conversation_id" in cloned:
             cloned["conversation_id"] = new_id
         cloned["step_index"] = idx
@@ -1134,24 +1140,15 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
                 new_last_user_time = s.get("created_at") or s.get("timestamp")
                 break
 
-        if new_last_user_time:
-            cursor.execute(
-                """
-                UPDATE conversation_summaries
-                SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = ?
-                WHERE conversation_id = ?
-                """,
-                (len(remaining_steps), new_preview, now_str, new_last_user_idx, new_last_user_time, conversation_id)
-            )
-        else:
-            cursor.execute(
-                """
-                UPDATE conversation_summaries
-                SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = NULL
-                WHERE conversation_id = ?
-                """,
-                (len(remaining_steps), new_preview, now_str, new_last_user_idx, conversation_id)
-            )
+        effective_user_time = new_last_user_time or now_str
+        cursor.execute(
+            """
+            UPDATE conversation_summaries
+            SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = ?
+            WHERE conversation_id = ?
+            """,
+            (len(remaining_steps), new_preview, now_str, new_last_user_idx, effective_user_time, conversation_id)
+        )
         conn.commit()
     finally:
         conn.close()
