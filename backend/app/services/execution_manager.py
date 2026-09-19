@@ -146,10 +146,16 @@ class ExecutionSession:
                 self.live_usage = update["usage"]
 
             if update.get("step_type") in ("permission_request", "ask_permission"):
+                cmd_val = update.get("command")
+                if isinstance(cmd_val, str):
+                    cmd_val = cmd_val.strip()
+                path_val = update.get("path")
+                if isinstance(path_val, str):
+                    path_val = path_val.strip()
                 self.pending_approval = {
-                    "toolName": update.get("tool_name") or "Action Requise",
-                    "command": update.get("command"),
-                    "path": update.get("path")
+                    "toolName": update.get("tool_name") or update.get("tool") or "Action Requise",
+                    "command": cmd_val,
+                    "path": path_val
                 }
 
             if update.get("step_type") == "tool":
@@ -281,10 +287,16 @@ class ExecutionSession:
                 self.live_usage = res["usage"]
 
         elif evt_type == "approval_request":
+            cmd_val = event.get("command")
+            if isinstance(cmd_val, str):
+                cmd_val = cmd_val.strip()
+            path_val = event.get("path")
+            if isinstance(path_val, str):
+                path_val = path_val.strip()
             self.pending_approval = {
-                "toolName": event.get("tool_name") or "Action système",
-                "command": event.get("command"),
-                "path": event.get("path")
+                "toolName": event.get("tool_name") or event.get("tool") or "Action Requise",
+                "command": cmd_val,
+                "path": path_val
             }
         elif evt_type == "approval_resolved" or evt_type in ("done", "interrupted", "error", "model_failover", "account_failover"):
             self.pending_approval = None

@@ -414,7 +414,7 @@ _TAGS_PATTERN = (
     r"COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|"
     r"TOOL_CALL|AGENT_MODE"
 )
-_USER_REQUEST_RE = re.compile(r'<USER_REQUEST>([\s\S]*?)</USER_REQUEST>', re.IGNORECASE)
+_USER_REQUEST_RE = re.compile(r'<USER_REQUEST(?:\s+[^>]*)?>([\s\S]*?)</USER_REQUEST>', re.IGNORECASE)
 _XML_BLOCKS_RE = re.compile(
     rf'<({_TAGS_PATTERN})(?:\s+[^>]*)?>[\s\S]*?</\1>',
     re.IGNORECASE,
@@ -1774,14 +1774,37 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
             for tc in tool_calls:
                 if not isinstance(tc, dict):
                     continue
-                name = tc.get("name") or tc.get("tool_name") or tc.get("toolAction") or "tool"
+                raw_fn = tc.get("function")
+                fn: dict[str, Any] = raw_fn if isinstance(raw_fn, dict) else {}
+                name = (
+                    tc.get("name")
+                    or tc.get("tool_name")
+                    or tc.get("toolAction")
+                    or fn.get("name")
+                    or "tool"
+                )
                 raw_args = tc.get("args")
                 if raw_args is None:
-                    raw_args = tc.get("parameters") or {}
+                    raw_args = tc.get("parameters")
+                if raw_args is None and "arguments" in fn:
+                    raw_args = fn.get("arguments")
+                if raw_args is None:
+                    raw_args = {}
+
+                if isinstance(raw_args, str):
+                    try:
+                        parsed_args = json.loads(raw_args)
+                        if isinstance(parsed_args, dict):
+                            raw_args = parsed_args
+                    except Exception:
+                        raw_args = {"raw": raw_args}
+                elif not isinstance(raw_args, dict):
+                    raw_args = {"raw": raw_args}
+
                 mapped_tools.append({
                     "id": tc.get("id") or tc.get("tool_call_id") or tc.get("call_id"),
                     "name": name,
-                    "args": raw_args if isinstance(raw_args, dict) else {},
+                    "args": raw_args,
                     "result": None,
                     "status": "done" if s.get("status") == "DONE" else "running"
                 })

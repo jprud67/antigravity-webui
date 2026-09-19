@@ -6285,6 +6285,7 @@ def test_storage_canonical_transcript_precedence_over_legacy():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
+
     from app.services.storage import get_conversation_transcript, undo_conversation_turn
 
     with tempfile.TemporaryDirectory() as td:
@@ -6329,7 +6330,8 @@ def test_storage_canonical_transcript_precedence_over_legacy():
 def test_openai_compat_tool_mode_string_and_dict_arguments():
     import asyncio
     import json
-    from app.api.openai_compat import _tool_mode_response, ChatCompletionRequest
+
+    from app.api.openai_compat import ChatCompletionRequest, _tool_mode_response
 
     req = ChatCompletionRequest(
         model="gemini-2.5-flash",
@@ -6368,6 +6370,7 @@ def test_openai_compat_tool_mode_string_and_dict_arguments():
 
 def test_execution_manager_submit_prompt_data_purity():
     import asyncio
+
     from app.services.execution_manager import ExecutionManager
 
     async def run_test():
@@ -6395,7 +6398,8 @@ def test_openai_compat_streaming_fallback_first_chunk_flag():
     import asyncio
     import json
     from unittest.mock import patch
-    from app.api.openai_compat import create_chat_completion, ChatCompletionRequest
+
+    from app.api.openai_compat import ChatCompletionRequest, create_chat_completion
 
     async def _mock_stream_turn(*args, **kwargs):
         # Yield result without any prior step_update text_delta
@@ -6427,7 +6431,8 @@ def test_openai_compat_streaming_fallback_first_chunk_flag():
 
 def test_execution_manager_stdin_safe_closing():
     import asyncio
-    from unittest.mock import MagicMock, AsyncMock
+    from unittest.mock import AsyncMock, MagicMock
+
     from app.services.execution_manager import ExecutionManager
 
     async def _run():
@@ -6455,6 +6460,142 @@ def test_execution_manager_stdin_safe_closing():
 
     asyncio.run(_run())
     print("✓ test_execution_manager_stdin_safe_closing passed")
+
+
+def test_clean_user_prompt_with_attributes():
+    from app.services.storage import clean_user_prompt
+
+    raw = (
+        '<CONTEXT_SUMMARY>Previous session summary</CONTEXT_SUMMARY>\n'
+        '<USER_REQUEST id="step-1" timestamp="2026-09-19T12:00:00Z">\n'
+        'Fais une analyse du code\n'
+        '</USER_REQUEST>'
+    )
+    res = clean_user_prompt(raw)
+    assert res == "Fais une analyse du code"
+
+
+def test_storage_aggregate_steps_openai_tool_calls():
+    import json
+
+    from app.services.storage import aggregate_steps_into_turns
+
+    steps = [
+        {
+            "step_index": 0,
+            "type": "USER_INPUT",
+            "source": "USER_EXPLICIT",
+            "content": "<USER_REQUEST>Execute command</USER_REQUEST>",
+        },
+        {
+            "step_index": 1,
+            "type": "PLANNER_RESPONSE",
+            "source": "MODEL",
+            "content": "Running the requested command now.",
+            "tool_calls": [
+                {
+                    "id": "call_12345",
+                    "type": "function",
+                    "function": {
+                        "name": "run_command",
+                        "arguments": json.dumps({"CommandLine": "git status", "Cwd": "/root"}),
+                    },
+                }
+            ],
+        },
+        {
+            "step_index": 2,
+            "type": "TOOL_RESULT",
+            "tool_call_id": "call_12345",
+            "content": "On branch main",
+            "status": "DONE",
+        },
+    ]
+    turns = aggregate_steps_into_turns(steps)
+    assert len(turns) == 2
+    assert turns[0]["role"] == "user"
+    assert turns[0]["content"] == "Execute command"
+
+    asst_turn = turns[1]
+    assert asst_turn["role"] == "assistant"
+    assert asst_turn["content"] == "Running the requested command now."
+    assert len(asst_turn["tool_activities"]) == 1
+    act = asst_turn["tool_activities"][0]
+    assert act["id"] == "call_12345"
+    assert act["name"] == "run_command"
+    assert act["args"] == {"CommandLine": "git status", "Cwd": "/root"}
+    assert act["result"] == "On branch main"
+    assert act["status"] == "done"
+
+
+def test_files_validate_path_access_schemes():
+    from pathlib import Path
+
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.files import _validate_path_access
+    from app.config import DEFAULT_WORKSPACE
+
+    # Valid schemes
+    p1 = _validate_path_access(Path("workspace://sub/file.txt"))
+    assert p1 == Path(DEFAULT_WORKSPACE).resolve() / "sub" / "file.txt"
+
+    p2 = _validate_path_access(Path("workspace:///sub/file.txt"))
+    assert p2 == Path(DEFAULT_WORKSPACE).resolve() / "sub" / "file.txt"
+
+    p3 = _validate_path_access(Path(f"file://{DEFAULT_WORKSPACE}/sub/file.txt"))
+    assert p3 == Path(DEFAULT_WORKSPACE).resolve() / "sub" / "file.txt"
+
+    p4 = _validate_path_access(Path(f"file:////{DEFAULT_WORKSPACE}/sub/file.txt"))
+    assert p4 == Path(DEFAULT_WORKSPACE).resolve() / "sub" / "file.txt"
+
+    p5 = _validate_path_access(Path(f"file://localhost/{DEFAULT_WORKSPACE}/sub/file.txt"))
+    assert p5 == Path(DEFAULT_WORKSPACE).resolve() / "sub" / "file.txt"
+
+    # Empty scheme paths should raise 400
+    with pytest.raises(HTTPException) as exc1:
+        _validate_path_access(Path("workspace://"))
+    assert exc1.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc2:
+        _validate_path_access(Path("file:///"))
+    assert exc2.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc3:
+        _validate_path_access(Path("file://localhost"))
+    assert exc3.value.status_code == 400
+
+
+def test_execution_manager_pending_approval_sanitization():
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession(conversation_id="sanitization_test")
+    # Step update with whitespace and missing tool name
+    session._update_live_state({
+        "event": "step_update",
+        "step_update": {
+            "step_type": "permission_request",
+            "command": "  git status  \n",
+            "path": "  /root/test.txt  "
+        }
+    })
+    assert session.pending_approval is not None
+    assert session.pending_approval["toolName"] == "Action Requise"
+    assert session.pending_approval["command"] == "git status"
+    assert session.pending_approval["path"] == "/root/test.txt"
+
+    # Approval request event
+    session._update_live_state({
+        "event": "approval_request",
+        "tool_name": "run_command",
+        "command": " ls -la ",
+        "path": None
+    })
+    assert session.pending_approval is not None
+    assert session.pending_approval["toolName"] == "run_command"
+    assert session.pending_approval["command"] == "ls -la"
+    assert session.pending_approval["path"] is None
 
 
 
@@ -6703,6 +6844,10 @@ if __name__ == "__main__":
     test_storage_canonical_transcript_precedence_over_legacy()
     test_openai_compat_tool_mode_string_and_dict_arguments()
     test_execution_manager_submit_prompt_data_purity()
+    test_clean_user_prompt_with_attributes()
+    test_storage_aggregate_steps_openai_tool_calls()
+    test_files_validate_path_access_schemes()
+    test_execution_manager_pending_approval_sanitization()
     print("\nAll unit tests passed successfully!")
 
 

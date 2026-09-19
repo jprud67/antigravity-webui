@@ -119,6 +119,9 @@ export class ChatWebSocketClient {
             if (!item.conversation_id && this.currentConversationId) {
               item.conversation_id = this.currentConversationId;
             }
+            if (item._enqueuedAt) {
+              delete item._enqueuedAt;
+            }
             try {
               this.ws.send(JSON.stringify(item));
             } catch (e) {
@@ -326,12 +329,17 @@ export class ChatWebSocketClient {
           (p) => p.action !== payload.action || p.conversation_id !== payload.conversation_id
         );
       } else if (payload.action === 'prompt') {
+        const now = Date.now();
         const isDuplicatePrompt = this.pendingPayloads.some(
-          (p) => p.action === 'prompt' && p.conversation_id === payload.conversation_id && p.prompt === payload.prompt
+          (p) => p.action === 'prompt' &&
+                 p.conversation_id === payload.conversation_id &&
+                 p.prompt === payload.prompt &&
+                 (now - (p._enqueuedAt || 0)) < 1000
         );
         if (isDuplicatePrompt) {
           return;
         }
+        payload._enqueuedAt = now;
       }
       this.pendingPayloads.push(payload);
       if (this.pendingPayloads.length > 20) {
@@ -354,12 +362,17 @@ export class ChatWebSocketClient {
           (p) => p.action !== payload.action || p.conversation_id !== payload.conversation_id
         );
       } else if (payload.action === 'prompt') {
+        const now = Date.now();
         const isDuplicatePrompt = this.pendingPayloads.some(
-          (p) => p.action === 'prompt' && p.conversation_id === payload.conversation_id && p.prompt === payload.prompt
+          (p) => p.action === 'prompt' &&
+                 p.conversation_id === payload.conversation_id &&
+                 p.prompt === payload.prompt &&
+                 (now - (p._enqueuedAt || 0)) < 1000
         );
         if (isDuplicatePrompt) {
           return;
         }
+        payload._enqueuedAt = now;
       }
       this.pendingPayloads.push(payload);
       if (this.pendingPayloads.length > 20) {
