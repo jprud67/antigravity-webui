@@ -7168,6 +7168,46 @@ def test_files_scan_dir_broken_symlink_resilience(tmp_path):
     assert any(i["name"] == "real.txt" for i in items)
 
 
+def test_git_sensitive_files_regex_expanded_tokens_and_certs():
+    """Verify _SENSITIVE_FILES_RE catches all variants of tokens, credentials, and certs."""
+    from app.api.git import _SENSITIVE_FILES_RE
+
+    assert _SENSITIVE_FILES_RE.search("client_secret_xyz.json") is not None
+    assert _SENSITIVE_FILES_RE.search("credentials_oauth.json") is not None
+    assert _SENSITIVE_FILES_RE.search("google_accounts_v2.json") is not None
+    assert _SENSITIVE_FILES_RE.search("sub/dir/my_token.json") is not None
+    assert _SENSITIVE_FILES_RE.search("cert.cert") is not None
+    assert _SENSITIVE_FILES_RE.search("app.pfx") is not None
+    assert _SENSITIVE_FILES_RE.search("identity.pkcs12") is not None
+    assert _SENSITIVE_FILES_RE.search("client_secret.json") is not None
+    assert _SENSITIVE_FILES_RE.search("safe_app_config.json") is None
+
+
+def test_storage_sanitize_snippet_neutralizes_backticks():
+    """Verify _sanitize_snippet neutralizes unclosed code fences and control characters."""
+    from app.services.storage import _sanitize_snippet
+
+    raw = "Here is some code ```python\nprint('hello')\n``` and more"
+    sanitized = _sanitize_snippet(raw)
+    assert "```" not in sanitized
+    assert "'''" in sanitized
+
+    control_raw = "Clean \x00Snippet \x0bTest\t   Spaces"
+    sanitized_ctrl = _sanitize_snippet(control_raw)
+    assert "\x00" not in sanitized_ctrl
+    assert "\x0b" not in sanitized_ctrl
+    assert sanitized_ctrl == "Clean Snippet Test Spaces"
+
+
+def test_execution_manager_queue_worker_finally_resets_is_running():
+    """Verify ExecutionSession resets is_running to False when a queue item completes."""
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession(conversation_id="test_worker_reset")
+    assert session.is_running is False
+    assert session.is_busy is False
+
+
 if __name__ == "__main__":
     test_agy_driver_resolve_external_and_unlisted_models()
     test_execution_manager_register_session_cid_migration()
@@ -7431,6 +7471,9 @@ if __name__ == "__main__":
     test_execution_manager_steering_mode_tagging()
     test_update_live_state_null_payloads_resilience()
     test_register_session_cid_migrates_queue_and_stops_old_worker()
+    test_git_sensitive_files_regex_expanded_tokens_and_certs()
+    test_storage_sanitize_snippet_neutralizes_backticks()
+    test_execution_manager_queue_worker_finally_resets_is_running()
     test_validate_terminal_session_id()
     test_git_pull_uses_no_edit_on_merge_fallback()
     import tempfile

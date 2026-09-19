@@ -39,14 +39,17 @@ export const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({
     }
   }, [toolArgs]);
 
-  const [prevArgsKey, setPrevArgsKey] = useState(argsKey);
-  if (argsKey !== prevArgsKey) {
-    setPrevArgsKey(argsKey);
+  const isInitialMount = React.useRef(true);
+  React.useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     setSelectedAnswers({});
     setCustomInputs({});
     setSubmitted(false);
     setFinalAnswer('');
-  }
+  }, [argsKey]);
 
   if (questions.length === 0) return null;
 

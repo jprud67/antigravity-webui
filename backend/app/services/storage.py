@@ -1423,10 +1423,11 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
     }
 
 def _sanitize_snippet(snippet: Any) -> str:
-    """Nettoie une chaîne d'aperçu de recherche en supprimant les caractères de contrôle et null bytes."""
+    """Nettoie une chaîne d'aperçu de recherche en supprimant les caractères de contrôle, null bytes et blocs de code Markdown non fermés."""
     if not snippet:
         return ""
     cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", str(snippet))
+    cleaned = re.sub(r"`{3,}", "'''", cleaned)
     return re.sub(r"\s+", " ", cleaned).strip()
 
 

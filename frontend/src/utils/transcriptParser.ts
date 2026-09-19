@@ -80,7 +80,7 @@ export function cleanUserPrompt(raw: any): string {
   const trimmedStart = str.trimStart();
   // Optimisation de performance : court-circuiter si aucun délimiteur XML ou préfixe de guidage
   if (!trimmedStart.includes('<') && !trimmedStart.startsWith('⚡') && !trimmedStart.startsWith('📥') && !trimmedStart.startsWith('[')) {
-    return trimmedStart.trimEnd();
+    return str.trimEnd();
   }
 
   // 1. Retirer les blocs de métadonnées, contexte et paramètres système

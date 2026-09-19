@@ -493,16 +493,19 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
                 except (json.JSONDecodeError, OSError) as e:
                     logger.debug(f"Ignored error: {e}")
             if not _proc_running(proc):
-                time.sleep(0.2)
-                if TOKEN_FILE.exists() and TOKEN_FILE.stat().st_size > 0:
-                    try:
-                        with open(TOKEN_FILE, "r", encoding="utf-8") as f:
-                            data = json.load(f)
-                            if isinstance(data, dict) and data:
-                                token_ready = True
-                                break
-                    except (json.JSONDecodeError, OSError) as e:
-                        logger.debug(f"Ignored error: {e}")
+                for _ in range(5):
+                    time.sleep(0.25)
+                    if TOKEN_FILE.exists() and TOKEN_FILE.stat().st_size > 0:
+                        try:
+                            with open(TOKEN_FILE, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                                if isinstance(data, dict) and data:
+                                    token_ready = True
+                                    break
+                        except (json.JSONDecodeError, OSError) as e:
+                            logger.debug(f"Ignored error during token read: {e}")
+                    if token_ready:
+                        break
                 break
             time.sleep(0.3)
 

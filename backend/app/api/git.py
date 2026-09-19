@@ -27,7 +27,7 @@ _RAW_TOKEN_RE = re.compile(
     r"\b(?:ghp_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{30,}|glpat-[a-zA-Z0-9\-_]{20,}|AIza[0-9A-Za-z\-_]{30,40}|sk-[a-zA-Z0-9_\-]{20,})\b"
 )
 _SENSITIVE_FILES_RE = re.compile(
-    r'(^|/)(?:\.env(?:\.[a-zA-Z0-9_\-]+)?|id_rsa[a-zA-Z0-9_\-]*|id_ed25519[a-zA-Z0-9_\-]*|webui_auth\.json|antigravity-oauth-token.*|google_accounts\.json|credentials\.json|client_secret.*\.json|session_metadata\.json|.*\.db|.*\.sqlite|.*\.sqlite3|.*\.pem|.*\.key)$',
+    r'(^|/)(?:\.env(?:\.[a-zA-Z0-9_\-]+)?|id_rsa[a-zA-Z0-9_\-]*|id_ed25519[a-zA-Z0-9_\-]*|webui_auth\.json|antigravity-oauth-token.*|google_accounts.*\.json|credentials.*\.json|client_secret.*\.json|.*token.*\.json|session_metadata\.json|.*\.db|.*\.sqlite|.*\.sqlite3|.*\.pem|.*\.key|.*\.cert|.*\.pfx|.*\.pkcs12)$',
     re.IGNORECASE
 )
 

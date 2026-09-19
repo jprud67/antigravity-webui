@@ -640,6 +640,7 @@ class ExecutionSession:
                         logger.error(f"[Session {self.conversation_id}] Worker task error: {e}")
                 finally:
                     self.active_task = None
+                    self.is_running = False
                     self.is_steering = False
                     self.last_active_at = time.time()
                     self.message_queue.task_done()
