@@ -52,6 +52,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     let active = true;
+    setLoading(true);
     fetchTasksList(conversationId || undefined)
       .then((res) => {
         if (active) {

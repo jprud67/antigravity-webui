@@ -124,14 +124,14 @@ class ExecutionSession:
     def _update_live_state(self, event: dict[str, Any]):
         evt_type = event.get("event")
         if evt_type == "init":
-            cid = event.get("conversation_id")
+            cid = _clean_cid(event.get("conversation_id"))
             if cid:
                 self.conversation_id = cid
                 execution_manager.register_session_cid(self, cid)
 
         elif evt_type == "step_update":
             update = event.get("step_update", {})
-            cid = update.get("conversation_id")
+            cid = _clean_cid(update.get("conversation_id"))
             if cid:
                 self.conversation_id = cid
                 execution_manager.register_session_cid(self, cid)
@@ -333,7 +333,8 @@ class ExecutionSession:
                         agent_mode=agent_mode,
                         proc_callback=on_proc_spawned
                     ):
-                        cid = event.get("conversation_id") or event.get("step_update", {}).get("conversation_id")
+                        raw_cid = event.get("conversation_id") or event.get("step_update", {}).get("conversation_id")
+                        cid = _clean_cid(raw_cid)
                         if cid and not self.conversation_id:
                             self.conversation_id = cid
                             execution_manager.register_session_cid(self, cid)
@@ -637,9 +638,10 @@ class ExecutionManager:
             f"WebSocket client disconnected; {len(self.get_running_conversations())} background task(s) continue running uninterrupted."
         )
 
-    def register_session_cid(self, session: ExecutionSession, cid: str):
-        if cid:
-            self.sessions[cid] = session
+    def register_session_cid(self, session: ExecutionSession, cid: str | None) -> None:
+        clean = _clean_cid(cid)
+        if clean:
+            self.sessions[clean] = session
 
     def prune_inactive_sessions(self, max_idle_seconds: float = 3600.0):
         """

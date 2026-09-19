@@ -664,7 +664,13 @@ def is_quota_error(message: str) -> bool:
         "ratelimit",
         "rate-limit",
         "rate_limit",
-        "ratelimited"
+        "ratelimited",
+        "quota épuisé",
+        "quota epuise",
+        "quota atteint",
+        "limite de quota",
+        "quota google épuisé",
+        "quota google epuise"
     ]
     return any(p in lower for p in patterns) or bool(_QUOTA_429_RE.search(lower))
 

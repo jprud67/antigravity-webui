@@ -203,10 +203,15 @@ export function App() {
     setIsRightPanelOpen(true);
   }, []);
 
+  const [pendingOpenFile, setPendingOpenFile] = useState<string | null>(null);
+
   useEffect(() => {
-    const handleOpenFile = () => {
+    const handleOpenFile = (e: any) => {
       setIsRightPanelOpen(true);
       setRightPanelTab('files');
+      if (e?.detail?.path) {
+        setPendingOpenFile(e.detail.path);
+      }
     };
     window.addEventListener('open-workspace-file', handleOpenFile);
     return () => window.removeEventListener('open-workspace-file', handleOpenFile);
@@ -1656,6 +1661,8 @@ export function App() {
         conversationId={activeConversationId || undefined}
         onInsertPath={handleInsertPath}
         onExecutePrompt={(p) => setQuickPrompt(p)}
+        initialFilePath={pendingOpenFile}
+        onClearInitialFilePath={() => setPendingOpenFile(null)}
       />
 
       {/* Modals & Panels */}

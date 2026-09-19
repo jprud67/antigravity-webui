@@ -608,7 +608,7 @@ async def _cached_agy_command(
         except Exception as e:
             logger.warning(f"Error running agy {' '.join(agy_args)}: {e}")
 
-        return cache["data"] or fallback
+        return cache["data"] if cache.get("data") is not None else fallback
 
 
 async def get_usage_quota() -> dict[str, Any]:

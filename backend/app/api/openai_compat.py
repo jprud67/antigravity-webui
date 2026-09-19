@@ -15,31 +15,16 @@ from app.services.agy_driver import (
     get_model_families,
     stream_turn,
 )
+from app.services.google_auth import is_quota_error
 from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.openai_compat")
 router = APIRouter(prefix="/v1", tags=["openai-compatibility"])
 
 
-# Signatures d'erreur de quota Google Cloud (429 RESOURCE_EXHAUSTED)
-_QUOTA_KEYWORDS = (
-    "RESOURCE_EXHAUSTED",
-    "quota reached",
-    "Individual quota",
-    "rate limit",
-    "429",
-    "RATE_LIMIT_EXCEEDED",
-    "exceeded your current quota",
-    "quota épuisé",
-    "quota atteint",
-    "limite de quota",
-    "quota google épuisé",
-)
-
 def _is_quota_error(msg: str) -> bool:
     """Détecte si un message d'erreur correspond à une erreur de quota Google Cloud."""
-    msg_lower = msg.lower()
-    return any(kw.lower() in msg_lower for kw in _QUOTA_KEYWORDS)
+    return is_quota_error(msg)
 
 def _raise_http_for_error(msg: str, context: str = "", is_quota: bool = False) -> None:
     """Lève l'HTTPException appropriée selon le type d'erreur CLI."""

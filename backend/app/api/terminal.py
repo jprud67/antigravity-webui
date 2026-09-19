@@ -15,6 +15,7 @@ from app.api.auth import require_auth
 from app.platform_utils import (
     IS_MACOS,
     IS_WINDOWS,
+    is_blocked_sensitive_path,
     spawn_group_kwargs,
     terminate_process_group_async,
 )
@@ -427,7 +428,14 @@ async def terminal_websocket(
     await websocket.accept(subprotocol=selected_subprotocol)
 
     default_home = os.environ.get("HOME") or os.environ.get("USERPROFILE") or str(Path.home())
-    cwd = workspace if workspace and os.path.isdir(workspace) else default_home
+    cwd = default_home
+    if workspace and os.path.isdir(workspace):
+        try:
+            resolved_ws = str(Path(workspace).resolve())
+            if not is_blocked_sensitive_path(resolved_ws):
+                cwd = resolved_ws
+        except Exception:
+            cwd = default_home
     # Identify session (default to global persistent session for workspace)
     # hash() est non-déterministe entre redémarrages (PYTHONHASHSEED) → utiliser hashlib pour un ID stable
     sid = session_id or f"ws_{hashlib.sha256(cwd.encode()).hexdigest()[:8]}"

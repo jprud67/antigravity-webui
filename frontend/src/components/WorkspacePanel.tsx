@@ -43,6 +43,8 @@ interface WorkspacePanelProps {
   conversationId?: string;
   onInsertPath?: (path: string) => void;
   onExecutePrompt?: (prompt: string) => void;
+  initialFilePath?: string | null;
+  onClearInitialFilePath?: () => void;
 }
 
 export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
@@ -54,6 +56,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   conversationId,
   onInsertPath,
   onExecutePrompt,
+  initialFilePath,
+  onClearInitialFilePath,
 }) => {
   const { t } = useI18n();
   const [panelWidth, setPanelWidth] = useState<number>(540);
@@ -307,6 +311,13 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     window.addEventListener('open-workspace-file', handleOpenFile);
     return () => window.removeEventListener('open-workspace-file', handleOpenFile);
   }, [handleSelectFile]);
+
+  useEffect(() => {
+    if (initialFilePath && isOpen) {
+      handleSelectFile(initialFilePath);
+      onClearInitialFilePath?.();
+    }
+  }, [initialFilePath, isOpen, handleSelectFile, onClearInitialFilePath]);
 
   const toggleFolder = (folderPath: string) => {
     setExpandedFolders((prev) => ({ ...prev, [folderPath]: !prev[folderPath] }));

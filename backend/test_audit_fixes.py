@@ -5324,6 +5324,99 @@ def test_git_commit_unstages_sensitive_env_file():
     print("✓ test_git_commit_unstages_sensitive_env_file passed")
 
 
+def test_openai_compat_delegates_to_google_auth_is_quota_error():
+    from app.api.openai_compat import _is_quota_error
+    from app.services.google_auth import is_quota_error
+
+    # French phrases
+    assert _is_quota_error("Quota épuisé pour cette ressource") is True
+    assert _is_quota_error("Quota Google épuisé sur tous les comptes disponibles") is True
+    assert _is_quota_error("Le quota atteint la limite autorisée") is True
+
+    # Standard API errors
+    assert _is_quota_error("API rate limit exceeded") is True
+    assert _is_quota_error("status 429 Too Many Requests") is True
+    assert _is_quota_error("RESOURCE_EXHAUSTED") is True
+
+    # No false positives
+    assert _is_quota_error("Found 429 files in directory") is False
+    assert _is_quota_error("Commit a429fd8b1 merged into main") is False
+    assert _is_quota_error("Listening on port 4290") is False
+
+    # Identity check with google_auth.is_quota_error
+    sample = "HTTP 429: Too Many Requests"
+    assert _is_quota_error(sample) == is_quota_error(sample)
+    print("✓ test_openai_compat_delegates_to_google_auth_is_quota_error passed")
+
+
+def test_execution_manager_register_session_cid_sanitization():
+    from unittest.mock import MagicMock
+
+    from app.services.execution_manager import ExecutionManager, ExecutionSession
+
+    em = ExecutionManager()
+    dummy_session = MagicMock(spec=ExecutionSession)
+
+    # Invalid / falsy CIDs should not be registered
+    em.register_session_cid(dummy_session, None)
+    em.register_session_cid(dummy_session, "")
+    em.register_session_cid(dummy_session, "   ")
+    em.register_session_cid(dummy_session, "null")
+    em.register_session_cid(dummy_session, "undefined")
+    em.register_session_cid(dummy_session, "none")
+
+    assert len(em.sessions) == 0
+
+    # Valid CID with leading/trailing whitespace should be stripped and registered
+    em.register_session_cid(dummy_session, "  conv-uuid-12345  ")
+    assert "conv-uuid-12345" in em.sessions
+    assert "  conv-uuid-12345  " not in em.sessions
+    print("✓ test_execution_manager_register_session_cid_sanitization passed")
+
+
+def test_agy_driver_cached_empty_data_truthiness():
+    import asyncio
+    import time
+
+    from app.services.agy_driver import _cached_agy_command
+
+    cache = {"data": {}, "timestamp": time.time()}
+    lock = asyncio.Lock()
+    fallback = {"status": "fallback"}
+
+    # When cache contains an empty dict {}, it should be returned, NOT fallback
+    async def _test():
+        res = await _cached_agy_command(
+            agy_args=["dummy"],
+            cache=cache,
+            lock=lock,
+            ttl=10.0,
+            fallback=fallback,
+        )
+        assert res == {}
+        assert res != fallback
+
+    asyncio.run(_test())
+    print("✓ test_agy_driver_cached_empty_data_truthiness passed")
+
+
+def test_terminal_cwd_sensitive_path_guard():
+    from app.platform_utils import is_blocked_sensitive_path
+
+    # Blocked paths
+    assert is_blocked_sensitive_path("/root/.ssh") is True
+    assert is_blocked_sensitive_path("/home/user/.gnupg") is True
+    assert is_blocked_sensitive_path("/proc/1/cmdline") is True
+    assert is_blocked_sensitive_path("/sys/kernel") is True
+    assert is_blocked_sensitive_path("/dev/null") is True
+    assert is_blocked_sensitive_path("/etc/shadow") is True
+
+    # Safe workspace paths
+    assert is_blocked_sensitive_path("/root/antigravity-webui") is False
+    assert is_blocked_sensitive_path("/home/user/workspace/project") is False
+    print("✓ test_terminal_cwd_sensitive_path_guard passed")
+
+
 if __name__ == "__main__":
     test_execution_manager_safe_session_iteration()
     test_openai_compat_error_event_quota_propagation()
@@ -5526,6 +5619,10 @@ if __name__ == "__main__":
     test_git_push_and_pull_disallow_option_injection()
     test_git_tag_disallows_option_injection()
     test_git_commit_unstages_sensitive_env_file()
+    test_openai_compat_delegates_to_google_auth_is_quota_error()
+    test_execution_manager_register_session_cid_sanitization()
+    test_agy_driver_cached_empty_data_truthiness()
+    test_terminal_cwd_sensitive_path_guard()
     print("\nAll unit tests passed successfully!")
 
 
