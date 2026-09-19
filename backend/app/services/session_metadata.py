@@ -91,6 +91,7 @@ def _normalize_meta(meta: dict[str, Any]) -> dict[str, Any]:
     meta["projectColor"] = str(meta.get("projectColor") or "").strip()
     meta["customTitle"] = str(meta.get("customTitle") or "").strip()
     meta["group_id"] = str(meta.get("group_id") or meta.get("groupId") or "").strip()
+    meta["project_id"] = str(meta.get("project_id") or meta.get("projectId") or meta.get("project") or "").strip()
     return meta
 
 
@@ -102,7 +103,8 @@ def make_default_meta() -> dict[str, Any]:
         "project": "",
         "projectColor": "",
         "customTitle": "",
-        "group_id": ""
+        "group_id": "",
+        "project_id": "",
     }
 
 def get_session_meta(conversation_id: str) -> dict[str, Any]:

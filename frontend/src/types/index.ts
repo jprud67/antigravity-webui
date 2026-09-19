@@ -9,6 +9,8 @@ export interface Conversation {
   status: string;
   agent_name?: string;
   parent_conversation_id?: string | null;
+  project_id?: string;
+  group_id?: string;
   pinned?: boolean;
   archived?: boolean;
   tags?: string[];

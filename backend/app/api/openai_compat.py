@@ -61,9 +61,21 @@ class ChatMessage(BaseModel):
 
 
 def _extract_message_content(content: Any) -> str:
-    """Extrait le texte d'un message qu'il soit sous forme de chaîne ou de liste de blocs (multi-part)."""
+    """Extrait le texte d'un message qu'il soit sous forme de chaîne, de dictionnaire ou de liste de blocs (multi-part)."""
     if isinstance(content, str):
         return content
+    if isinstance(content, dict):
+        text = content.get("text")
+        if isinstance(text, str):
+            return text
+        inner = content.get("content")
+        if isinstance(inner, str):
+            return inner
+        if text is not None:
+            return str(text)
+        if inner is not None:
+            return str(inner)
+        return ""
     if isinstance(content, list):
         parts: list[str] = []
         for part in content:
@@ -73,6 +85,8 @@ def _extract_message_content(content: Any) -> str:
                 text = part.get("text")
                 if isinstance(text, str):
                     parts.append(text)
+                elif "content" in part and isinstance(part.get("content"), str):
+                    parts.append(str(part.get("content")))
                 elif part.get("type") == "text" and "text" in part:
                     parts.append(str(part.get("text", "")))
         return "\n".join(parts)

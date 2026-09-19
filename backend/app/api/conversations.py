@@ -55,6 +55,8 @@ class MetadataUpdateRequest(BaseModel):
     customTitle: str | None = None
     groupId: str | None = None
     group_id: str | None = None
+    projectId: str | None = None
+    project_id: str | None = None
 
 @router.get("", response_model=list[dict[str, Any]])
 def get_conversations(limit: int = Query(100, ge=1, le=1000), q: str | None = None, _ = Depends(require_auth)):
@@ -160,11 +162,27 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
         updates: dict[str, Any] = {}
         if "project" in payload:
             updates["project"] = payload.get("project") or ""
+        if "project_id" in payload:
+            updates["project_id"] = payload.get("project_id") or ""
+        if "projectId" in payload:
+            updates["project_id"] = payload.get("projectId") or ""
         if "projectColor" in payload:
             updates["projectColor"] = payload.get("projectColor") or ""
-        
+        if "group_id" in payload:
+            updates["group_id"] = payload.get("group_id") or ""
+        if "groupId" in payload:
+            updates["group_id"] = payload.get("groupId") or ""
+
         try:
             bulk_update_session_meta(ids, updates)
+            proj_val = updates.get("project_id") or updates.get("project")
+            grp_val = updates.get("group_id")
+            if proj_val is not None or grp_val is not None:
+                for cid in ids:
+                    try:
+                        update_conversation_summary_fields(cid, project_id=proj_val, group_id=grp_val)
+                    except Exception as e:
+                        logger.debug(f"Ignored sync error: {e}")
             for cid in ids:
                 results[cid] = True
             return {"success": True, "action": action, "count": len(ids), "results": results}
@@ -277,7 +295,7 @@ def update_metadata(conversation_id: str, req: MetadataUpdateRequest, _ = Depend
     updated = update_session_meta(conversation_id, updates)
 
     title_val = updates.get("customTitle")
-    project_val = updates.get("project")
+    project_val = updates.get("project_id") if "project_id" in updates else (updates.get("projectId") if "projectId" in updates else updates.get("project"))
     group_val = updates.get("group_id") if "group_id" in updates else updates.get("groupId")
     if title_val is not None or project_val is not None or group_val is not None:
         try:

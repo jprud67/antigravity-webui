@@ -23,7 +23,9 @@ _COAUTHOR_RE = re.compile(
 _URL_CRED_RE = re.compile(r"https?://([^/@:]+):([^/@:]+)@", re.IGNORECASE)
 _TOKEN_CRED_RE = re.compile(r"https?://([^/@:]+)@", re.IGNORECASE)
 _GIT_CRED_RE = re.compile(r"(?:git(?:\+https?|\+ssh)?|ssh)://(?:[^/@:]+:[^/@:]+@|[^/@:]+@)", re.IGNORECASE)
-_RAW_TOKEN_RE = re.compile(r"\b(?:ghp_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{30,}|glpat-[a-zA-Z0-9\-_]{20,})\b")
+_RAW_TOKEN_RE = re.compile(
+    r"\b(?:ghp_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{30,}|glpat-[a-zA-Z0-9\-_]{20,}|AIza[0-9A-Za-z\-_]{30,40}|sk-[a-zA-Z0-9_\-]{20,})\b"
+)
 
 
 def _mask_git_output(text: str) -> str:

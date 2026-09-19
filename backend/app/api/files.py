@@ -292,18 +292,34 @@ def download_file(path: str = Query(...), _ = Depends(require_auth)):
     if not resolved_path.is_file():
         raise HTTPException(status_code=400, detail="La cible n'est pas un fichier.")
 
-    media_type, _ = mimetypes.guess_type(resolved_path.name)
+    known_mime_types = {
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".doc": "application/msword",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ".pdf": "application/pdf",
+        ".json": "application/json; charset=utf-8",
+        ".md": "text/markdown; charset=utf-8",
+        ".markdown": "text/markdown; charset=utf-8",
+        ".yaml": "text/yaml; charset=utf-8",
+        ".yml": "text/yaml; charset=utf-8",
+        ".csv": "text/csv; charset=utf-8",
+        ".tsv": "text/tab-separated-values; charset=utf-8",
+        ".svg": "image/svg+xml",
+        ".txt": "text/plain; charset=utf-8",
+        ".log": "text/plain; charset=utf-8",
+        ".py": "text/x-python; charset=utf-8",
+        ".ts": "text/typescript; charset=utf-8",
+        ".tsx": "text/typescript-jsx; charset=utf-8",
+        ".js": "text/javascript; charset=utf-8",
+        ".html": "text/html; charset=utf-8",
+        ".css": "text/css; charset=utf-8",
+    }
     ext = resolved_path.suffix.lower()
-    if ext == ".docx":
-        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    elif ext == ".doc":
-        media_type = "application/msword"
-    elif ext == ".xlsx":
-        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    elif ext == ".pptx":
-        media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-    elif ext == ".pdf":
-        media_type = "application/pdf"
+    media_type = known_mime_types.get(ext)
+    if not media_type:
+        guessed, _ = mimetypes.guess_type(resolved_path.name)
+        media_type = guessed
 
     return FileResponse(
         path=str(resolved_path),
