@@ -1543,6 +1543,21 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
             })
             continue
 
+        # 1b. Context Summary (Handoff / Session Memory Consolidation)
+        if stype == "CONTEXT_SUMMARY":
+            flush_asst()
+            clean_summary = content.strip()
+            if clean_summary.startswith("<CONTEXT_SUMMARY>") and clean_summary.endswith("</CONTEXT_SUMMARY>"):
+                clean_summary = clean_summary[len("<CONTEXT_SUMMARY>"): -len("</CONTEXT_SUMMARY>")].strip()
+            turns.append({
+                "role": "system",
+                "subtype": "context_summary",
+                "step_index": step_index,
+                "timestamp": ts,
+                "content": clean_summary or "Synthèse de continuité de session",
+            })
+            continue
+
         # 2. User input
         if source == "USER_EXPLICIT" or stype == "USER_INPUT":
             flush_asst()
@@ -1740,6 +1755,8 @@ def export_conversation_markdown(conversation_id: str) -> str:
             if subtype == "task":
                 task_id = turn.get("task_id", "Tâche")
                 md_lines.append(f"> ⚙️ **Notification de tâche [{task_id}] (Étape #{idx})**")
+            elif subtype == "context_summary":
+                md_lines.append(f"> 📋 **Synthèse de Continuité & Contexte de Session (Étape #{idx})**")
             else:
                 md_lines.append(f"> ℹ️ **Notification Système (Étape #{idx})**")
             if turn.get("content"):
@@ -1832,7 +1849,12 @@ def export_conversation_html(conversation_id: str) -> str:
 
         if role == "system":
             subtype = turn.get("subtype", "system")
-            label = f"⚙️ Tâche [{turn.get('task_id', 'Tâche')}]" if subtype == "task" else "ℹ️ Notification Système"
+            if subtype == "task":
+                label = f"⚙️ Tâche [{turn.get('task_id', 'Tâche')}]"
+            elif subtype == "context_summary":
+                label = "📋 Synthèse de Continuité & Contexte de Session"
+            else:
+                label = "ℹ️ Notification Système"
             escaped_sys = _clean_html_text(turn.get("content", ""))
             messages_html.append(f"""
             <div class="system-divider">
@@ -2277,7 +2299,10 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
         raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
     if is_blocked_sensitive_path(target_path):
         raise PermissionError("Accès refusé : ce fichier est sensible ou restreint.")
-    rel_parts = target_path.relative_to(base_dir).parts
+    try:
+        rel_parts = target_path.relative_to(base_dir).parts
+    except ValueError:
+        raise PermissionError("Accès refusé : tentative de traversée de répertoire non autorisée.")
     if ".system_generated" in rel_parts or "scratch" in rel_parts:
         raise PermissionError("Accès refusé : les fichiers système internes ou temporaires ne sont pas accessibles via les artefacts.")
     if not target_path.exists() or not target_path.is_file():

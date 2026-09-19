@@ -73,11 +73,24 @@ def _to_bool(val: Any) -> bool:
 def _normalize_meta(meta: dict[str, Any]) -> dict[str, Any]:
     meta["pinned"] = _to_bool(meta.get("pinned", False))
     meta["archived"] = _to_bool(meta.get("archived", False))
-    meta["tags"] = [str(t) for t in meta.get("tags", [])] if isinstance(meta.get("tags"), list) else []
-    meta["project"] = str(meta.get("project") or "")
-    meta["projectColor"] = str(meta.get("projectColor") or "")
-    meta["customTitle"] = str(meta.get("customTitle") or "")
-    meta["group_id"] = str(meta.get("group_id") or meta.get("groupId") or "")
+    raw_tags = meta.get("tags")
+    if isinstance(raw_tags, list):
+        seen_tags = set()
+        cleaned_tags = []
+        for t in raw_tags:
+            if t is None:
+                continue
+            s = str(t).strip()
+            if s and s.lower() not in ("none", "null", "undefined") and s not in seen_tags:
+                seen_tags.add(s)
+                cleaned_tags.append(s)
+        meta["tags"] = cleaned_tags
+    else:
+        meta["tags"] = []
+    meta["project"] = str(meta.get("project") or "").strip()
+    meta["projectColor"] = str(meta.get("projectColor") or "").strip()
+    meta["customTitle"] = str(meta.get("customTitle") or "").strip()
+    meta["group_id"] = str(meta.get("group_id") or meta.get("groupId") or "").strip()
     return meta
 
 

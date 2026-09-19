@@ -314,8 +314,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
   useEffect(() => {
     if (initialFilePath && isOpen) {
-      handleSelectFile(initialFilePath);
-      onClearInitialFilePath?.();
+      queueMicrotask(() => {
+        handleSelectFile(initialFilePath);
+        onClearInitialFilePath?.();
+      });
     }
   }, [initialFilePath, isOpen, handleSelectFile, onClearInitialFilePath]);
 

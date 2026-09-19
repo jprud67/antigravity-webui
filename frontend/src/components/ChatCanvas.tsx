@@ -1467,6 +1467,36 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                   </div>
                 );
               }
+              if (msg.subtype === 'context_summary') {
+                return (
+                  <div key={msg.id} className="my-3 max-w-4xl mx-auto w-full animate-fadeIn">
+                    <div
+                      className="p-3.5 rounded-xl border text-xs shadow-xs"
+                      style={{
+                        backgroundColor: 'var(--surface-subtle)',
+                        borderColor: 'var(--border)',
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-2.5 mb-2 pb-2 border-b" style={{ borderColor: 'var(--border)' }}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400 shrink-0">
+                            <BrainCircuit className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>
+                            {t("session_continuity_summary", "Synthèse de continuité & mémoire de session")}
+                          </span>
+                        </div>
+                        <span className="text-[10.5px] text-muted font-mono">
+                          {t("context_reset", "Compteur réinitialisé • Contexte actif")}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted leading-relaxed whitespace-pre-wrap font-sans">
+                        {msg.content}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               return <CheckpointDivider key={msg.id} content={msg.content} stepIndex={msg.stepIndex} />;
             }
 

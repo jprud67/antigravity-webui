@@ -167,6 +167,24 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
       continue;
     }
 
+    // 1b. Synthèse de continuité / Contexte transféré
+    if (stype === 'CONTEXT_SUMMARY') {
+      flushAssistant();
+      let summaryContent = content.trim();
+      if (summaryContent.startsWith('<CONTEXT_SUMMARY>') && summaryContent.endsWith('</CONTEXT_SUMMARY>')) {
+        summaryContent = summaryContent.slice(17, -18).trim();
+      }
+      messages.push({
+        id: `context-summary-${idx}`,
+        role: 'system',
+        subtype: 'context_summary',
+        content: summaryContent || 'Synthèse du contexte de la session précédente',
+        stepIndex,
+        timestamp: createdAt
+      });
+      continue;
+    }
+
     // 2. Message Utilisateur
     if (src === 'USER_EXPLICIT' || stype === 'USER_INPUT') {
       flushAssistant();

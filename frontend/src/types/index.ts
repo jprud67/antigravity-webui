@@ -38,7 +38,7 @@ export interface ChatMessage {
   stepIndex?: number;
   isLive?: boolean;
   error?: string;
-  subtype?: 'checkpoint' | 'task' | 'error' | 'system';
+  subtype?: 'checkpoint' | 'task' | 'error' | 'system' | 'context_summary';
   taskId?: string;
 }
 

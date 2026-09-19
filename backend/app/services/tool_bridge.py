@@ -252,7 +252,9 @@ def _find_json_object(text: str) -> dict[str, Any] | None:
     decoder = json.JSONDecoder()
     best: dict[str, Any] | None = None
     index = 0
-    while True:
+    iterations = 0
+    while iterations < 500:
+        iterations += 1
         pos = text.find("{", index)
         if pos == -1:
             break

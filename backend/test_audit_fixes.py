@@ -5595,6 +5595,99 @@ def test_files_validate_path_access_localhost_and_empty_guards():
     print("✓ test_files_validate_path_access_localhost_and_empty_guards passed")
 
 
+def test_storage_context_summary_aggregation_and_export():
+    from unittest.mock import patch
+    from app.services.storage import aggregate_steps_into_turns, export_conversation_markdown, export_conversation_html
+
+    steps = [
+        {
+            "step_index": 0,
+            "source": "SYSTEM",
+            "type": "CONTEXT_SUMMARY",
+            "content": "<CONTEXT_SUMMARY>\n# Contexte Transféré\n- Tâche 1: OK\n</CONTEXT_SUMMARY>"
+        },
+        {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "content": "✨ Nouvelle section initialisée !"
+        }
+    ]
+
+    turns = aggregate_steps_into_turns(steps)
+    assert len(turns) == 2
+    assert turns[0]["role"] == "system"
+    assert turns[0]["subtype"] == "context_summary"
+    assert "Contexte Transféré" in turns[0]["content"]
+    assert "<CONTEXT_SUMMARY>" not in turns[0]["content"]
+    assert turns[1]["role"] == "assistant"
+    assert "Nouvelle section" in turns[1]["content"]
+
+    with patch("app.services.storage.get_conversation_transcript", return_value=steps), \
+         patch("app.services.storage.get_conversation_by_id", return_value={"title": "Handoff Test"}):
+        md = export_conversation_markdown("conv-test-handoff")
+        assert "Synthèse de Continuité & Contexte de Session" in md
+        assert "Contexte Transféré" in md
+        assert "Nouvelle section initialisée !" in md
+
+        html_out = export_conversation_html("conv-test-handoff")
+        assert "Synthèse de Continuité & Contexte de Session" in html_out
+        assert "Contexte Transféré" in html_out
+        assert "Nouvelle section initialisée !" in html_out
+    print("✓ test_storage_context_summary_aggregation_and_export passed")
+
+
+def test_session_metadata_tag_sanitization_and_deduplication():
+    from app.services.session_metadata import _normalize_meta
+
+    raw = {
+        "tags": [" backend ", "frontend", "backend", "None", "", None, "null", "  frontend  ", "api"],
+        "project": "  my-project  ",
+        "customTitle": "  Session Title  ",
+        "group_id": "  group-1  ",
+        "pinned": "yes",
+        "archived": "0"
+    }
+    normalized = _normalize_meta(raw)
+    assert normalized["tags"] == ["backend", "frontend", "api"]
+    assert normalized["project"] == "my-project"
+    assert normalized["customTitle"] == "Session Title"
+    assert normalized["group_id"] == "group-1"
+    assert normalized["pinned"] is True
+    assert normalized["archived"] is False
+    print("✓ test_session_metadata_tag_sanitization_and_deduplication passed")
+
+
+def test_read_artifact_content_traversal_permission_error():
+    import pytest
+    from app.services.storage import read_artifact_content
+
+    with pytest.raises((PermissionError, FileNotFoundError, ValueError)):
+        read_artifact_content("test-conv-traversal", "../../../../etc/passwd")
+
+    with pytest.raises(PermissionError):
+        # Even if a path resolves outside or in restricted area
+        read_artifact_content("test-conv-traversal", ".system_generated/logs/transcript.jsonl")
+    print("✓ test_read_artifact_content_traversal_permission_error passed")
+
+
+def test_tool_bridge_find_json_object_iteration_bounded():
+    from app.services.tool_bridge import _find_json_object
+
+    # Valid schema output
+    sample = 'Leading text... {"action": "final", "tool": "", "arguments": {}, "content": "Done!"} trailing'
+    parsed = _find_json_object(sample)
+    assert parsed is not None
+    assert parsed.get("action") == "final"
+    assert parsed.get("content") == "Done!"
+
+    # Pathological text with many brackets
+    pathological = "{" * 600 + " not json " + "}" * 600
+    res = _find_json_object(pathological)
+    assert res is None or isinstance(res, dict)
+    print("✓ test_tool_bridge_find_json_object_iteration_bounded passed")
+
+
 if __name__ == "__main__":
     test_execution_manager_safe_session_iteration()
     test_openai_compat_error_event_quota_propagation()
@@ -5808,6 +5901,10 @@ if __name__ == "__main__":
     test_storage_search_conversations_metadata_snippet_sanitization()
     test_execution_manager_update_live_state_error_and_cancelled()
     test_files_validate_path_access_localhost_and_empty_guards()
+    test_storage_context_summary_aggregation_and_export()
+    test_session_metadata_tag_sanitization_and_deduplication()
+    test_read_artifact_content_traversal_permission_error()
+    test_tool_bridge_find_json_object_iteration_bounded()
     print("\nAll unit tests passed successfully!")
 
 
