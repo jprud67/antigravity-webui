@@ -168,19 +168,26 @@ def _messages_to_prompt(messages: list[ChatMessage], has_conv_id: bool = False) 
         if last_msg.role.lower() == "user":
             return _extract_message_content(last_msg.content).strip()
 
-    if len(messages) == 1 and messages[0].role == "user":
+    if len(messages) == 1 and messages[0].role.lower() == "user":
         return _extract_message_content(messages[0].content)
 
     formatted_turns: list[str] = []
     for msg in messages:
         role = msg.role.lower()
         content = _extract_message_content(msg.content).strip()
-        if not content:
+        if not content and not msg.tool_calls:
             continue
         if role == "system":
             formatted_turns.append(f"[Directives Système / Contexte]:\n{content}\n")
         elif role == "assistant":
-            formatted_turns.append(f"[Assistant Antigravity]:\n{content}\n")
+            tc_info = ""
+            if msg.tool_calls:
+                tc_info = f"\n[Tool Calls]: {json.dumps(msg.tool_calls, ensure_ascii=False) if not isinstance(msg.tool_calls, str) else msg.tool_calls}"
+            formatted_turns.append(f"[Assistant Antigravity]:\n{content}{tc_info}\n")
+        elif role == "tool":
+            tool_id = msg.tool_call_id or msg.name or ""
+            prefix = f"[Résultat Outil ({tool_id})]:" if tool_id else "[Résultat Outil]:"
+            formatted_turns.append(f"{prefix}\n{content}\n")
         else:
             formatted_turns.append(f"[Utilisateur]:\n{content}\n")
 

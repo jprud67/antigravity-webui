@@ -50,6 +50,18 @@ async def _broadcast(event: dict[str, Any]) -> None:
     for q in dead:
         _subscribers.discard(q)
 
+async def broadcast_event(event: dict[str, Any]) -> None:
+    """Diffuse de manière asynchrone un événement SSE à tous les abonnés WebUI."""
+    await _broadcast(event)
+
+def notify_event_sync(event: dict[str, Any]) -> None:
+    """Notifie immédiatement les abonnés SSE depuis un contexte synchrone si une boucle d'événements tourne."""
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_broadcast(event))
+    except RuntimeError:
+        pass
+
 _UUID_PATTERN = re.compile(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
     re.IGNORECASE

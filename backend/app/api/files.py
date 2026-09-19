@@ -263,12 +263,14 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
         for attempt in range(3):
             try:
                 tmp_path.replace(resolved_path)
+                tmp_path = None
                 break
             except (PermissionError, OSError):
                 if attempt == 2:
                     import shutil
                     shutil.copy2(tmp_path, resolved_path)
                     tmp_path.unlink(missing_ok=True)
+                    tmp_path = None
                     break
                 import time
                 time.sleep(0.05)

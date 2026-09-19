@@ -5928,6 +5928,70 @@ def test_files_validate_path_access_control_chars():
     print("✓ test_files_validate_path_access_control_chars passed")
 
 
+def test_tool_bridge_codefence_fast_path():
+    from app.services.tool_bridge import _find_json_object
+
+    fenced = 'Voici ma réponse :\n```json\n{"action": "tool_call", "tool": "search", "arguments": {"q": "python"}, "content": ""}\n```'
+    parsed = _find_json_object(fenced)
+    assert parsed is not None
+    assert parsed.get("action") == "tool_call"
+    assert parsed.get("tool") == "search"
+    assert parsed.get("arguments") == {"q": "python"}
+    print("✓ test_tool_bridge_codefence_fast_path passed")
+
+
+def test_openai_compat_prompt_tool_role_formatting():
+    from app.api.openai_compat import ChatMessage, _messages_to_prompt
+
+    messages = [
+        ChatMessage(role="user", content="Cherche les fichiers"),
+        ChatMessage(role="assistant", content="Je cherche...", tool_calls=[{"id": "call_1", "function": {"name": "ls"}}]),
+        ChatMessage(role="tool", content="file1.txt\nfile2.txt", tool_call_id="call_1"),
+    ]
+    prompt = _messages_to_prompt(messages)
+    assert "[Utilisateur]:" in prompt
+    assert "[Assistant Antigravity]:" in prompt
+    assert "[Tool Calls]:" in prompt
+    assert "[Résultat Outil (call_1)]:" in prompt
+    assert "file1.txt" in prompt
+    print("✓ test_openai_compat_prompt_tool_role_formatting passed")
+
+
+def test_storage_aggregate_steps_flushes_running_tool_status():
+    from app.services.storage import aggregate_steps_into_turns
+
+    # Turn where tool was running and never finalized by output step
+    steps = [
+        {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Run tool", "step_index": 0},
+        {
+            "type": "PLANNER_RESPONSE",
+            "source": "MODEL",
+            "content": "",
+            "step_index": 1,
+            "tool_calls": [{"id": "call_abc", "name": "run_cmd", "args": {"cmd": "ls"}}],
+            "status": "RUNNING"
+        },
+        {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Next turn", "step_index": 2}
+    ]
+    turns = aggregate_steps_into_turns(steps)
+    assert len(turns) == 3
+    asst_turn = turns[1]
+    assert asst_turn["role"] == "assistant"
+    tool_acts = asst_turn["tool_activities"]
+    assert len(tool_acts) == 1
+    # Status should have been finalized away from 'running' to 'cancelled'
+    assert tool_acts[0]["status"] == "cancelled"
+    print("✓ test_storage_aggregate_steps_flushes_running_tool_status passed")
+
+
+def test_fs_watcher_broadcast_and_notify_sync():
+    from app.services.fs_watcher import notify_event_sync
+
+    # Should safely no-op or dispatch without raising RuntimeError
+    notify_event_sync({"type": "test_ping", "ts": 123456.0})
+    print("✓ test_fs_watcher_broadcast_and_notify_sync passed")
+
+
 if __name__ == "__main__":
     test_agy_driver_resolve_external_and_unlisted_models()
     test_execution_manager_register_session_cid_migration()
@@ -6155,6 +6219,10 @@ if __name__ == "__main__":
     test_git_mask_output_extended_tokens()
     test_session_metadata_project_id_and_group_sync()
     test_conversations_api_metadata_project_id_sync()
+    test_tool_bridge_codefence_fast_path()
+    test_openai_compat_prompt_tool_role_formatting()
+    test_storage_aggregate_steps_flushes_running_tool_status()
+    test_fs_watcher_broadcast_and_notify_sync()
     print("\nAll unit tests passed successfully!")
 
 

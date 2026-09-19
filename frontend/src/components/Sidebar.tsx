@@ -292,15 +292,17 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       if (activeConversationId && ids.includes(activeConversationId)) {
         onNewConversation();
       }
-      if (onRefreshConversations) {
-        await onRefreshConversations();
-      }
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
       showToast(t('toast_bulk_deleted', '{0} session(s) deleted').replace('{0}', String(count)), 'success');
     } catch (err: any) {
       showToast(err.message || t('err_bulk_delete', 'Error during bulk deletion'), 'error');
     } finally {
+      if (onRefreshConversations) {
+        try {
+          await onRefreshConversations();
+        } catch {}
+      }
       setIsBulkLoading(false);
     }
   };
@@ -315,15 +317,17 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         action: pinState ? 'pin' : 'unpin',
         conversation_ids: ids,
       });
-      if (onRefreshConversations) {
-        await onRefreshConversations();
-      }
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
       showToast(pinState ? t('toast_bulk_pinned', '{0} session(s) pinned').replace('{0}', String(count)) : t('toast_bulk_unpinned', '{0} session(s) unpinned').replace('{0}', String(count)), 'success');
     } catch (err: any) {
       showToast(err.message || t('err_bulk_pin', 'Error during bulk pin/unpin'), 'error');
     } finally {
+      if (onRefreshConversations) {
+        try {
+          await onRefreshConversations();
+        } catch {}
+      }
       setIsBulkLoading(false);
     }
   };
@@ -338,15 +342,17 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         action: archiveState ? 'archive' : 'unarchive',
         conversation_ids: ids,
       });
-      if (onRefreshConversations) {
-        await onRefreshConversations();
-      }
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
       showToast(archiveState ? t('toast_bulk_archived', '{0} session(s) archived').replace('{0}', String(count)) : t('toast_bulk_unarchived', '{0} session(s) unarchived').replace('{0}', String(count)), 'success');
     } catch (err: any) {
       showToast(err.message || t('err_bulk_archive', 'Error during bulk archiving'), 'error');
     } finally {
+      if (onRefreshConversations) {
+        try {
+          await onRefreshConversations();
+        } catch {}
+      }
       setIsBulkLoading(false);
     }
   };
@@ -366,9 +372,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         conversation_ids: Array.from(selectedConvIds),
         payload: { tags, mode: bulkTagMode },
       });
-      if (onRefreshConversations) {
-        await onRefreshConversations();
-      }
       setShowBulkTagModal(false);
       setBulkTagInput('');
       setSelectedConvIds(new Set());
@@ -377,6 +380,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     } catch (err: any) {
       showToast(err.message || t('err_bulk_tag', 'Error applying tags'), 'error');
     } finally {
+      if (onRefreshConversations) {
+        try {
+          await onRefreshConversations();
+        } catch {}
+      }
       setIsBulkLoading(false);
     }
   };
@@ -394,9 +402,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
           projectColor: clear ? '' : bulkProjectColor,
         },
       });
-      if (onRefreshConversations) {
-        await onRefreshConversations();
-      }
       setShowBulkProjectModal(false);
       setBulkProjectInput('');
       setSelectedConvIds(new Set());
@@ -405,6 +410,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     } catch (err: any) {
       showToast(err.message || t('err_bulk_project', 'Error assigning project'), 'error');
     } finally {
+      if (onRefreshConversations) {
+        try {
+          await onRefreshConversations();
+        } catch {}
+      }
       setIsBulkLoading(false);
     }
   };

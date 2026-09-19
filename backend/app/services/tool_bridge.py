@@ -31,6 +31,7 @@ tentative est relancée — sans cela, l'endpoint /v1 resterait bloqué jusqu'au
 import asyncio
 import json
 import logging
+import re
 import time
 import uuid
 from typing import Any
@@ -249,6 +250,19 @@ def _find_json_object(text: str) -> dict[str, Any] | None:
     """Cherche un objet JSON (de préférence avec une clé 'action') dans un texte libre."""
     if not text:
         return None
+
+    # 1. Tentative rapide par bloc de code markdown ```json ... ```
+    m = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text, re.IGNORECASE)
+    if m:
+        try:
+            cand = json.loads(m.group(1))
+            if isinstance(cand, dict):
+                if "action" in cand:
+                    return cand
+        except Exception:
+            pass
+
+    # 2. Décodage progressif des objets JSON dans le texte
     decoder = json.JSONDecoder()
     best: dict[str, Any] | None = None
     index = 0

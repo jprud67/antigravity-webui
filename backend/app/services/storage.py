@@ -1288,6 +1288,20 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         conn.close()
 
     usage = calculate_conversation_tokens(remaining_steps)
+    try:
+        from app.services.fs_watcher import notify_event_sync
+        notify_event_sync({
+            "type": "transcript_updated",
+            "conversation_id": conversation_id,
+            "ts": time.time()
+        })
+        notify_event_sync({
+            "type": "conversations_updated",
+            "ts": time.time()
+        })
+    except Exception as notify_err:
+        logger.debug(f"Failed to notify fs_watcher on undo: {notify_err}")
+
     return {
         "conversation_id": conversation_id,
         "step_count": len(remaining_steps),
@@ -1434,7 +1448,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                     with open(t_file, "r", encoding="utf-8-sig", errors="replace") as f:
                         lines = f.readlines()[-500:]
 
-                for line in lines:
+                for line in reversed(lines):
                     line_str = line.strip().lstrip("\ufeff")
                     if not line_str:
                         continue
@@ -1509,6 +1523,8 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
             for act in current_asst.get("tool_activities", []):
                 if act.get("result") is None:
                     act["result"] = ""
+                if act.get("status") == "running":
+                    act["status"] = "done" if act.get("result") else "cancelled"
             if current_asst.get("content") or current_asst.get("thinking") or current_asst.get("tool_activities"):
                 turns.append(current_asst)
             current_asst = None

@@ -129,32 +129,6 @@ async def run_agy_task(
     if job_id:
         _running_job_procs[job_id] = proc
 
-    if via_stdin and proc.stdin is not None:
-        payload = json.dumps({
-            "event": "user",
-            "message": {
-                "role": "user",
-                "content": [{"type": "text", "text": effective_prompt}],
-            },
-        }).encode("utf-8")
-        stdin_obj: Any = proc.stdin
-        try:
-            res = stdin_obj.write(payload + b"\n")
-            if inspect.isawaitable(res):
-                await res
-            drain = stdin_obj.drain()
-            if inspect.isawaitable(drain):
-                await drain
-        except (BrokenPipeError, ConnectionResetError):
-            pass
-        finally:
-            try:
-                res_close = stdin_obj.close()
-                if inspect.isawaitable(res_close):
-                    await res_close
-            except Exception:
-                pass
-
     stdout_chunks: list = []
     stderr_chunks: list = []
     quota_seen: dict[str, Any] = {"line": None}
@@ -194,6 +168,32 @@ async def run_agy_task(
         asyncio.create_task(pump(proc.stderr, stderr_chunks, watch_quota=True)),
     ]
     quota_task = asyncio.create_task(quota_supervisor())
+
+    if via_stdin and proc.stdin is not None:
+        payload = json.dumps({
+            "event": "user",
+            "message": {
+                "role": "user",
+                "content": [{"type": "text", "text": effective_prompt}],
+            },
+        }).encode("utf-8")
+        stdin_obj: Any = proc.stdin
+        try:
+            res = stdin_obj.write(payload + b"\n")
+            if inspect.isawaitable(res):
+                await res
+            drain = stdin_obj.drain()
+            if inspect.isawaitable(drain):
+                await drain
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        finally:
+            try:
+                res_close = stdin_obj.close()
+                if inspect.isawaitable(res_close):
+                    await res_close
+            except Exception:
+                pass
 
     timed_out = False
     try:
