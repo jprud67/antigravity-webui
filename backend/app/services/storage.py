@@ -49,6 +49,28 @@ def is_safe_conversation_id(conversation_id: str) -> bool:
         return False
 
 
+def _notify_conversations_changed() -> None:
+    """Notifie les abonnés SSE d'une mise à jour de la liste des conversations."""
+    try:
+        from app.services.fs_watcher import notify_event_sync
+        notify_event_sync({"type": "conversations_updated", "ts": time.time()})
+    except Exception as e:
+        logger.debug(f"Failed to notify conversations_updated: {e}")
+
+
+def _notify_transcript_changed(conversation_id: str) -> None:
+    """Notifie les abonnés SSE d'une mise à jour du transcript d'une conversation."""
+    try:
+        from app.services.fs_watcher import notify_event_sync
+        notify_event_sync({
+            "type": "transcript_updated",
+            "conversation_id": conversation_id,
+            "ts": time.time()
+        })
+    except Exception as e:
+        logger.debug(f"Failed to notify transcript_updated for {conversation_id}: {e}")
+
+
 def get_default_workspace_uri() -> str:
     """Safely return the default workspace as a file URI."""
     try:
@@ -835,6 +857,9 @@ def fork_conversation(
             "customTitle": ""
         })
 
+    _notify_transcript_changed(new_id)
+    _notify_conversations_changed()
+
     return {
         "conversation_id": new_id,
         "title": title,
@@ -1032,6 +1057,9 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
         "customTitle": ""
     })
 
+    _notify_transcript_changed(new_id)
+    _notify_conversations_changed()
+
     return {
         "conversation_id": new_id,
         "title": title,
@@ -1083,6 +1111,7 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
         _safe_rmtree(BRAIN_DIR / cid, BRAIN_DIR)
 
     bulk_delete_session_meta(safe_ids)
+    _notify_conversations_changed()
     return True
 
 def delete_conversation(conversation_id: str) -> bool:
@@ -1111,6 +1140,7 @@ def delete_conversation(conversation_id: str) -> bool:
 
     # Delete metadata
     delete_session_meta(conversation_id)
+    _notify_conversations_changed()
     return True
 
 def update_conversation_title(conversation_id: str, new_title: str) -> bool:
@@ -1130,6 +1160,7 @@ def update_conversation_title(conversation_id: str, new_title: str) -> bool:
         raise
     finally:
         conn.close()
+    _notify_conversations_changed()
     return True
 
 def update_conversation_summary_fields(
@@ -1169,6 +1200,7 @@ def update_conversation_summary_fields(
         raise
     finally:
         conn.close()
+    _notify_conversations_changed()
     return True
 
 def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
@@ -1289,19 +1321,8 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         conn.close()
 
     usage = calculate_conversation_tokens(remaining_steps)
-    try:
-        from app.services.fs_watcher import notify_event_sync
-        notify_event_sync({
-            "type": "transcript_updated",
-            "conversation_id": conversation_id,
-            "ts": time.time()
-        })
-        notify_event_sync({
-            "type": "conversations_updated",
-            "ts": time.time()
-        })
-    except Exception as notify_err:
-        logger.debug(f"Failed to notify fs_watcher on undo: {notify_err}")
+    _notify_transcript_changed(conversation_id)
+    _notify_conversations_changed()
 
     return {
         "conversation_id": conversation_id,
@@ -1414,6 +1435,10 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                         c_item["match_snippet"] = _sanitize_snippet(meta.get("customTitle") or meta.get("project") or c_item.get("preview"))
                         matched.append(c_item)
                         seen_ids.add(cid)
+                        if len(matched) >= limit:
+                            break
+                    if len(matched) >= limit:
+                        break
     finally:
         conn.close()
 
@@ -2635,6 +2660,9 @@ def import_conversation(payload: dict[str, Any] | list[Any]) -> dict[str, Any]:
         finally:
             conn.close()
         primary_id = imported[-1]["conversation_id"] if imported else ""
+        for cid in created_ids:
+            _notify_transcript_changed(cid)
+        _notify_conversations_changed()
         return {
             "success": True,
             "conversation_id": primary_id,
@@ -2649,5 +2677,8 @@ def import_conversation(payload: dict[str, Any] | list[Any]) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise TypeError("Format de payload non valide pour l'import de conversation")
 
-    return _import_single_conversation(payload, now_iso, now_db)
+    res = _import_single_conversation(payload, now_iso, now_db)
+    _notify_transcript_changed(res["conversation_id"])
+    _notify_conversations_changed()
+    return res
 

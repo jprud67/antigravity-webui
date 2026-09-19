@@ -874,6 +874,7 @@ export function App() {
       } else if (event.event === 'steered') {
         setIsStreaming(true);
       } else if (event.event === 'model_failover') {
+        setPendingApproval(null);
         showToast(
           `🔄 Quota atteint avec ${event.previous_model}. Basculement automatique sur ${event.new_model} et relance...`,
           'info'
@@ -895,6 +896,7 @@ export function App() {
         });
         setIsStreaming(true);
       } else if (event.event === 'account_failover') {
+        setPendingApproval(null);
         showToast(
           `🔄 Quota atteint sur ${event.previous_account}. Basculement automatique sur ${event.new_account} et relance...`,
           'info'
@@ -936,6 +938,7 @@ export function App() {
           return;
         }
         setIsStreaming(false);
+        setPendingApproval(null);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last && last.role === 'assistant') {

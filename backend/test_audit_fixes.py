@@ -6070,6 +6070,118 @@ def test_files_save_file_content_temp_handling():
     print("✓ test_files_save_file_content_temp_handling passed")
 
 
+def test_fs_watcher_notify_sync_threadsafe_fallback():
+    import asyncio
+    import threading
+    from unittest.mock import MagicMock, patch
+
+    from app.services.fs_watcher import notify_event_sync, set_main_loop
+
+    mock_loop = MagicMock(spec=asyncio.AbstractEventLoop)
+    mock_loop.is_closed.return_value = False
+    set_main_loop(mock_loop)
+
+    called = []
+
+    def runner():
+        def fake_rts(coro, loop):
+            coro.close()
+            return MagicMock()
+
+        with patch("asyncio.run_coroutine_threadsafe", side_effect=fake_rts) as mock_rts:
+            notify_event_sync({"type": "thread_event", "ts": 123.0})
+            assert mock_rts.called
+            called.append(True)
+
+    t = threading.Thread(target=runner)
+    t.start()
+    t.join()
+    assert len(called) == 1
+    set_main_loop(None)
+    print("✓ test_fs_watcher_notify_sync_threadsafe_fallback passed")
+
+
+def test_storage_notification_helpers():
+    from unittest.mock import patch
+
+    from app.services.storage import (
+        _notify_conversations_changed,
+        _notify_transcript_changed,
+    )
+
+    events = []
+    with patch("app.services.fs_watcher.notify_event_sync", side_effect=lambda ev: events.append(ev)):
+        _notify_conversations_changed()
+        assert len(events) == 1
+        assert events[0]["type"] == "conversations_updated"
+
+        _notify_transcript_changed("conv-test-notify")
+        assert len(events) == 2
+        assert events[1]["type"] == "transcript_updated"
+        assert events[1]["conversation_id"] == "conv-test-notify"
+
+    print("✓ test_storage_notification_helpers passed")
+
+
+def test_execution_session_clear_pending_approval():
+    import asyncio
+
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession(conversation_id="conv-test-approval")
+    session.pending_approval = {"toolName": "shell", "command": "ls"}
+    events = []
+
+    async def mock_broadcast(evt):
+        events.append(evt)
+
+    session.broadcast = mock_broadcast  # type: ignore[method-assign]
+
+    async def run_test():
+        await session._clear_pending_approval(decision="cancelled", reason="failover")
+        assert session.pending_approval is None
+        assert len(events) == 1
+        assert events[0]["event"] == "approval_resolved"
+        assert events[0]["conversation_id"] == "conv-test-approval"
+        assert events[0]["decision"] == "cancelled"
+        assert events[0]["reason"] == "failover"
+
+        await session._clear_pending_approval(decision="cancelled", reason="failover")
+        assert len(events) == 1
+
+    asyncio.run(run_test())
+    print("✓ test_execution_session_clear_pending_approval passed")
+
+
+def test_files_save_file_content_exception_cleanup():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from fastapi import HTTPException
+
+    from app.api.files import SaveFileRequest, save_file_content
+
+    with tempfile.TemporaryDirectory() as td:
+        ws_path = Path(td)
+        target = ws_path / "protected_target.txt"
+        with (
+            patch("app.api.files.DEFAULT_WORKSPACE", str(ws_path)),
+            patch("pathlib.Path.replace", side_effect=PermissionError("Simulated disk write failure")),
+            patch("shutil.copy2", side_effect=PermissionError("Simulated copy failure")),
+        ):
+            req = SaveFileRequest(path=str(target), content="Should Fail")
+            try:
+                save_file_content(req, True)
+                assert False, "Should have raised HTTPException"
+            except HTTPException as exc:
+                assert exc.status_code == 500
+            tmp_files = list(ws_path.glob(".*.tmp.*"))
+            assert len(tmp_files) == 0, f"Leftover temp files found: {tmp_files}"
+
+    print("✓ test_files_save_file_content_exception_cleanup passed")
+
+
 if __name__ == "__main__":
     test_agy_driver_resolve_external_and_unlisted_models()
     test_execution_manager_register_session_cid_migration()
@@ -6304,6 +6416,10 @@ if __name__ == "__main__":
     test_storage_undo_conversation_turn_notification()
     test_agent_api_steer_empty_instruction()
     test_files_save_file_content_temp_handling()
+    test_fs_watcher_notify_sync_threadsafe_fallback()
+    test_storage_notification_helpers()
+    test_execution_session_clear_pending_approval()
+    test_files_save_file_content_exception_cleanup()
     print("\nAll unit tests passed successfully!")
 
 

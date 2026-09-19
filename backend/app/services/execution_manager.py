@@ -289,6 +289,20 @@ class ExecutionSession:
         elif evt_type == "approval_resolved" or evt_type in ("done", "interrupted", "error", "model_failover", "account_failover"):
             self.pending_approval = None
 
+    async def _clear_pending_approval(self, decision: str = "cancelled", reason: str = "reset") -> None:
+        """Réinitialise et diffuse la résolution de toute approbation en suspens si nécessaire."""
+        if self.pending_approval:
+            self.pending_approval = None
+            try:
+                await self.broadcast({
+                    "event": "approval_resolved",
+                    "conversation_id": self.conversation_id,
+                    "decision": decision,
+                    "reason": reason
+                })
+            except Exception as e:
+                logger.debug(f"Failed broadcasting approval_resolved: {e}")
+
     async def run_turn(self, params: dict[str, Any]):
         self.is_running = True
         self.started_at = time.time()
@@ -376,6 +390,7 @@ class ExecutionSession:
                 except asyncio.CancelledError:
                     # Note: the canceller (user "interrupt" or steering) is responsible for
                     # broadcasting the relevant event; avoid duplicating "interrupted" here.
+                    await self._clear_pending_approval(reason="interrupted")
                     for tc in self.live_tool_calls:
                         if isinstance(tc, dict) and tc.get("status") == "running":
                             tc["status"] = "cancelled"
@@ -389,6 +404,7 @@ class ExecutionSession:
                     if is_quota_error(err_text):
                         quota_error_detected = True
                     else:
+                        await self._clear_pending_approval(reason="error")
                         for tc in self.live_tool_calls:
                             if isinstance(tc, dict) and tc.get("status") == "running":
                                 tc["status"] = "error"
@@ -408,6 +424,7 @@ class ExecutionSession:
                         logger.error(
                             f"[Session {self.conversation_id}] Quota error detected and max failover attempts ({max_failover_attempts}) reached."
                         )
+                        await self._clear_pending_approval(reason="error")
                         for tc in self.live_tool_calls:
                             if isinstance(tc, dict) and tc.get("status") == "running":
                                 tc["status"] = "error"
@@ -456,7 +473,7 @@ class ExecutionSession:
                                     self.live_thought = ""
                                     self.live_content = ""
                                     self.live_tool_calls = []
-                                    self.pending_approval = None
+                                    await self._clear_pending_approval(reason="failover")
                                     self.active_proc = None
                                     await self.broadcast({
                                         "event": "model_failover",
@@ -489,7 +506,7 @@ class ExecutionSession:
                         self.live_thought = ""
                         self.live_content = ""
                         self.live_tool_calls = []
-                        self.pending_approval = None
+                        await self._clear_pending_approval(reason="failover")
                         self.active_proc = None
                         await self.broadcast({
                             "event": "account_failover",
@@ -502,6 +519,7 @@ class ExecutionSession:
                         await asyncio.sleep(1.0)
                         continue
                     else:
+                        await self._clear_pending_approval(reason="error")
                         for tc in self.live_tool_calls:
                             if isinstance(tc, dict) and tc.get("status") == "running":
                                 tc["status"] = "error"
@@ -529,6 +547,7 @@ class ExecutionSession:
                     return
 
             # All failover attempts were exhausted without a conclusive outcome
+            await self._clear_pending_approval(reason="error")
             for tc in self.live_tool_calls:
                 if isinstance(tc, dict) and tc.get("status") == "running":
                     tc["status"] = "error"
@@ -548,7 +567,7 @@ class ExecutionSession:
                     logger.debug(f"Error terminating active_proc in finally: {e}")
             self.active_proc = None
             self.is_running = False
-            self.pending_approval = None
+            await self._clear_pending_approval(reason="completed")
             self.last_active_at = time.time()
 
     async def queue_worker(self):
@@ -643,6 +662,7 @@ class ExecutionManager:
                     break
             target_session.is_running = False
             target_session.active_proc = None
+            target_session.pending_approval = None
             logger.info(f"Removed execution session for conversation {conversation_id} from memory.")
 
     def register_socket(self, ws: WebSocket):

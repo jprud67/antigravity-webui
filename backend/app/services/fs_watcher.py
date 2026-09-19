@@ -50,17 +50,34 @@ async def _broadcast(event: dict[str, Any]) -> None:
     for q in dead:
         _subscribers.discard(q)
 
+_main_loop: asyncio.AbstractEventLoop | None = None
+
+def set_main_loop(loop: asyncio.AbstractEventLoop | None) -> None:
+    """Enregistre la boucle d'événements principale du serveur pour les notifications depuis les threads de travail."""
+    global _main_loop
+    _main_loop = loop
+
+def get_main_loop() -> asyncio.AbstractEventLoop | None:
+    return _main_loop
+
 async def broadcast_event(event: dict[str, Any]) -> None:
     """Diffuse de manière asynchrone un événement SSE à tous les abonnés WebUI."""
     await _broadcast(event)
 
 def notify_event_sync(event: dict[str, Any]) -> None:
-    """Notifie immédiatement les abonnés SSE depuis un contexte synchrone si une boucle d'événements tourne."""
+    """Notifie immédiatement les abonnés SSE depuis un contexte synchrone ou un worker thread."""
     try:
         loop = asyncio.get_running_loop()
         loop.create_task(_broadcast(event))
+        return
     except RuntimeError:
         pass
+
+    if _main_loop is not None and not _main_loop.is_closed():
+        try:
+            asyncio.run_coroutine_threadsafe(_broadcast(event), _main_loop)
+        except Exception as e:
+            logger.debug(f"Failed to dispatch event via run_coroutine_threadsafe: {e}")
 
 _UUID_PATTERN = re.compile(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
@@ -110,6 +127,11 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
     Broadcasts SSE events to all connected WebUI clients.
     """
     logger.info(f"Starting filesystem watcher — brain: {brain_dir}, db: {conv_db}, interval: {poll_interval}s")
+    global _main_loop
+    try:
+        _main_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        pass
 
     def _get_db_mtime() -> float:
         try:

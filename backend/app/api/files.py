@@ -283,6 +283,8 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
             "last_modified": stat.st_mtime
         }
     except HTTPException:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
         raise
     except Exception as e:
         if tmp_path is not None:

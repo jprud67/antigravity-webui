@@ -2,6 +2,7 @@ import copy
 import json
 import logging
 import threading
+import time
 import uuid
 from typing import Any
 
@@ -53,6 +54,11 @@ def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
             restrict_file_permissions(SESSION_METADATA_FILE)
             _cached_meta = copy.deepcopy(metadata)
             _cached_mtime = SESSION_METADATA_FILE.stat().st_mtime
+            try:
+                from app.services.fs_watcher import notify_event_sync
+                notify_event_sync({"type": "conversations_updated", "ts": time.time()})
+            except Exception as notify_err:
+                logger.debug(f"Failed to notify conversations_updated on metadata save: {notify_err}")
         except Exception as e:
             logger.error(f"Failed to write session metadata: {e}")
             if tmp_file and tmp_file.exists():

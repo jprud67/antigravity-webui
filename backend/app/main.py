@@ -31,7 +31,7 @@ from app.api.workspaces import router as ws_router
 from app.config import BRAIN_DIR, CONVERSATION_DB
 from app.services.cron_ticker import cron_ticker_loop
 from app.services.execution_manager import execution_manager
-from app.services.fs_watcher import watch_filesystem
+from app.services.fs_watcher import set_main_loop, watch_filesystem
 from app.services.google_auth import restore_stashed_token_if_needed
 from app.services.storage import ensure_db_schema
 from app.services.updater import prefetch_update_check
@@ -55,6 +55,7 @@ def _warn_if_default_password() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Démarre les services d'arrière-plan : watcher FS, ticker des tâches planifiées, prefetch MAJ."""
+    set_main_loop(asyncio.get_running_loop())
     ensure_db_schema()
     restore_stashed_token_if_needed()
     prefetch_update_check()
@@ -85,6 +86,7 @@ async def lifespan(app: FastAPI):
         await close_all_terminal_sessions()
     except Exception as e:
         logger.debug(f"Erreur arrêt sessions terminal: {e}")
+    set_main_loop(None)
     logger.info("Filesystem watcher stopped")
     logger.info("Cron ticker stopped")
 
