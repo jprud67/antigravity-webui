@@ -356,7 +356,7 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
         if add_res.returncode != 0:
             raise HTTPException(status_code=500, detail=f"Échec du git add : {add_res.stderr}")
 
-    commit_res = run_git(["commit", "--no-signoff", "-m", clean_msg], target)
+    commit_res = run_git(["commit", "--no-signoff", "--author=jprud67 <jprud67@gmail.com>", "-m", clean_msg], target)
     if commit_res.returncode != 0:
         err_msg = commit_res.stderr or commit_res.stdout or ""
         if "nothing to commit" in err_msg.lower() or "working tree clean" in err_msg.lower():

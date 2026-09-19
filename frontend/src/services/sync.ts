@@ -78,6 +78,7 @@ class SyncSSEClient {
   private _scheduleReconnect() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
       this.connect();
       // Exponential backoff capped at 30s
       this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, this.maxReconnectDelay);
@@ -85,7 +86,10 @@ class SyncSSEClient {
   }
 
   disconnect() {
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.es?.close();
     this.es = null;
   }

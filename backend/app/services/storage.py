@@ -1759,6 +1759,12 @@ def export_conversation_markdown(conversation_id: str) -> str:
         if content:
             md_lines.append(content)
             md_lines.append("")
+        elif not tool_activities and not thinking:
+            md_lines.append("*(Réponse vide)*")
+            md_lines.append("")
+        elif not content and tool_activities:
+            md_lines.append("*(Exécution d'outils terminée)*")
+            md_lines.append("")
 
         md_lines.append("---")
         md_lines.append("")
@@ -1865,6 +1871,15 @@ def export_conversation_html(conversation_id: str) -> str:
             """
 
         escaped_content = _clean_html_text(content)
+        if not escaped_content.strip():
+            if not tool_activities and not thinking:
+                display_content = "<em>(Message vide)</em>"
+            elif tool_activities:
+                display_content = "<em>(Exécution d'outils terminée)</em>"
+            else:
+                display_content = ""
+        else:
+            display_content = escaped_content
 
         messages_html.append(f"""
         <div class="message-row {'row-user' if is_user else 'row-assistant'}">
@@ -1876,7 +1891,7 @@ def export_conversation_html(conversation_id: str) -> str:
                 </div>
                 {thought_html}
                 {tools_html}
-                <div class="content">{escaped_content}</div>
+                <div class="content">{display_content}</div>
             </div>
         </div>
         """)

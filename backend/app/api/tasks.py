@@ -18,7 +18,7 @@ logger = logging.getLogger("antigravity.tasks")
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 class KillTaskRequest(BaseModel):
-    pid: int | None = None
+    pid: int | str | None = None
     task_id: str | None = None
 
 @router.get("/list")
@@ -197,7 +197,13 @@ def _mark_task_cancelled(task_id: str) -> bool:
 
 @router.post("/kill")
 def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
-    target_pid = req.pid
+    target_pid: int | None = None
+    if req.pid is not None:
+        try:
+            target_pid = int(req.pid)
+        except (ValueError, TypeError):
+            target_pid = None
+
     if target_pid is not None and target_pid <= 100:
         raise HTTPException(
             status_code=403,
@@ -216,7 +222,7 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
     if not target_pid or target_pid <= 0:
         if req.task_id:
             try:
-                clean_tid = req.task_id.strip()
+                clean_tid = str(req.task_id).strip()
                 pure_tid = clean_tid.split("/")[-1].strip() if "/" in clean_tid else clean_tid
                 raw_cands = [clean_tid]
                 if pure_tid and pure_tid != clean_tid:

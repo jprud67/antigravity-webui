@@ -170,21 +170,23 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
       }
       resizeTimer = requestAnimationFrame(() => {
         resizeTimer = null;
-        if (fitAddonRef.current && xtermRef.current && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        if (fitAddonRef.current && xtermRef.current && terminalRef.current && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           try {
-            fitAddonRef.current.fit();
-            const cols = xtermRef.current.cols;
-            const rows = xtermRef.current.rows;
-            if (cols > 0 && rows > 0 && (cols !== lastCols || rows !== lastRows)) {
-              lastCols = cols;
-              lastRows = rows;
-              wsRef.current.send(
-                JSON.stringify({
-                  action: 'resize',
-                  cols,
-                  rows,
-                })
-              );
+            if (terminalRef.current.clientWidth > 0 && terminalRef.current.clientHeight > 0) {
+              fitAddonRef.current.fit();
+              const cols = xtermRef.current.cols;
+              const rows = xtermRef.current.rows;
+              if (cols > 0 && rows > 0 && (cols !== lastCols || rows !== lastRows)) {
+                lastCols = cols;
+                lastRows = rows;
+                wsRef.current.send(
+                  JSON.stringify({
+                    action: 'resize',
+                    cols,
+                    rows,
+                  })
+                );
+              }
             }
           } catch {}
         }

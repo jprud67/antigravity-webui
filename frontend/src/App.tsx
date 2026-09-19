@@ -376,6 +376,8 @@ export function App() {
 
   const handleLogout = () => {
     clearAuthToken();
+    syncClient.disconnect();
+    chatSocket.reconnect();
     setIsAuthenticated(false);
     setIsAuthModalOpen(true);
   };

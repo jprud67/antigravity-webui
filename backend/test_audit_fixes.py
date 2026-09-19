@@ -5144,6 +5144,61 @@ def test_import_single_conversation_deepcopy_isolation():
     print("✓ test_import_single_conversation_deepcopy_isolation passed")
 
 
+def test_git_commit_enforces_author_flag():
+    import subprocess
+    from unittest.mock import MagicMock, patch
+    from app.api.git import CommitRequest, git_commit
+
+    mock_run = MagicMock()
+    mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="[main 12345] test commit", stderr="")
+
+    with patch("app.api.git._validate_workspace") as mock_val, patch("app.api.git.run_git", mock_run):
+        mock_val.return_value = Path("/tmp")
+        res = git_commit(CommitRequest(message="feat: test commit", stage_all=True))
+        assert res["success"] is True
+        commit_calls = [call for call in mock_run.call_args_list if "commit" in call[0][0]]
+        assert len(commit_calls) == 1
+        commit_args = commit_calls[0][0][0]
+        assert any("--author=jprud67 <jprud67@gmail.com>" in arg for arg in commit_args)
+    print("✓ test_git_commit_enforces_author_flag passed")
+
+
+def test_kill_task_string_pid_resilience():
+    from unittest.mock import patch
+    from app.api.tasks import KillTaskRequest, kill_task
+
+    # Test string PID
+    req = KillTaskRequest(pid="999999999")
+    with patch("app.api.tasks.psutil.Process", side_effect=Exception("no process")):
+        try:
+            kill_task(req)
+        except Exception as e:
+            assert "int" not in str(e).lower()
+
+    # Test empty string PID with task_id
+    req2 = KillTaskRequest(pid="", task_id="nonexistent-task-id")
+    res = kill_task(req2)
+    assert res["success"] is False
+    print("✓ test_kill_task_string_pid_resilience passed")
+
+
+def test_export_conversation_markdown_tool_only_turn():
+    from unittest.mock import patch
+    from app.services.storage import export_conversation_markdown
+
+    mock_steps = [
+        {"step_index": 1, "source": "USER_EXPLICIT", "type": "USER_INPUT", "content": "Run tool"},
+        {"step_index": 2, "source": "MODEL", "type": "PLANNER_RESPONSE", "content": "", "tool_calls": [{"tool_name": "test_cmd", "arguments": {"cmd": "ls"}}]},
+        {"step_index": 3, "source": "SYSTEM", "type": "TOOL_OUTPUT", "content": "file1.txt"}
+    ]
+    with patch("app.services.storage.get_conversation_transcript", return_value=mock_steps), \
+         patch("app.services.storage.get_conversation_by_id", return_value={"title": "Test Title"}):
+        md = export_conversation_markdown("dummy-id")
+        assert "Exécution d'outils terminée" in md
+        assert "test_cmd" in md
+    print("✓ test_export_conversation_markdown_tool_only_turn passed")
+
+
 if __name__ == "__main__":
     test_execution_manager_safe_session_iteration()
     test_openai_compat_error_event_quota_propagation()
@@ -5338,6 +5393,9 @@ if __name__ == "__main__":
     test_agent_api_run_turn_is_quota_flag_and_french()
     test_openai_compat_tool_mode_sse_role_deduplication()
     test_import_single_conversation_deepcopy_isolation()
+    test_git_commit_enforces_author_flag()
+    test_kill_task_string_pid_resilience()
+    test_export_conversation_markdown_tool_only_turn()
     print("\nAll unit tests passed successfully!")
 
 

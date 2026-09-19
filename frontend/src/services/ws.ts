@@ -203,9 +203,16 @@ export class ChatWebSocketClient {
     if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
       // Tab is visible again — reset the heartbeat timeout that may have fired while hidden
       this.resetHeartbeatTimeout();
-      // Reconnect if disconnected while tab was hidden
-      if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+      // Reconnect if disconnected or closing while tab was hidden
+      if (!this.ws || this.ws.readyState === WebSocket.CLOSED || this.ws.readyState === WebSocket.CLOSING) {
         this.connect();
+      } else if (this.ws.readyState === WebSocket.OPEN) {
+        try {
+          this.ws.send(JSON.stringify({ 
+            action: 'ping',
+            conversation_id: this.currentConversationId 
+          }));
+        } catch {}
       }
     }
   };
