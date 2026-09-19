@@ -97,24 +97,35 @@ class PersistentTerminalSession:
         if not HAS_PTY:
             raise RuntimeError("Le terminal persistant requiert les modules POSIX pty/fcntl/termios.")
         master_fd, slave_fd = pty.openpty()
-        flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
-        fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        try:
+            flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
+            fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
-        shell = os.environ.get("SHELL", "/bin/bash")
-        env = os.environ.copy()
-        env["TERM"] = "xterm-256color"
-        env["COLORTERM"] = "truecolor"
+            shell = os.environ.get("SHELL", "/bin/bash")
+            env = os.environ.copy()
+            env["TERM"] = "xterm-256color"
+            env["COLORTERM"] = "truecolor"
 
-        proc = await asyncio.create_subprocess_exec(
-            shell,
-            stdin=slave_fd,
-            stdout=slave_fd,
-            stderr=slave_fd,
-            cwd=self.cwd,
-            env=env,
-            **spawn_group_kwargs()
-        )
-        os.close(slave_fd)
+            proc = await asyncio.create_subprocess_exec(
+                shell,
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                cwd=self.cwd,
+                env=env,
+                **spawn_group_kwargs()
+            )
+        except Exception:
+            try:
+                os.close(master_fd)
+            except Exception:
+                pass
+            raise
+        finally:
+            try:
+                os.close(slave_fd)
+            except Exception:
+                pass
 
         self.master_fd = master_fd
         self.proc = proc

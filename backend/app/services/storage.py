@@ -620,6 +620,23 @@ def _safe_copy_artifacts(source_dir: Path, target_dir: Path) -> None:
     """
     if not source_dir.exists() or not source_dir.is_dir():
         return
+
+    def _ignore_unsafe(dir_path: str, names: list[str]) -> set[str]:
+        ignored = set()
+        for name in names:
+            p = Path(dir_path) / name
+            try:
+                if (
+                    p.is_symlink()
+                    or name in (".system_generated", "scratch")
+                    or name.startswith((".", ".tmp", ".lock"))
+                    or is_blocked_sensitive_path(p)
+                ):
+                    ignored.add(name)
+            except Exception:
+                ignored.add(name)
+        return ignored
+
     for item in source_dir.iterdir():
         if item.name in (".system_generated", "scratch") or item.name.startswith((".", ".tmp", ".lock")):
             continue
@@ -635,7 +652,7 @@ def _safe_copy_artifacts(source_dir: Path, target_dir: Path) -> None:
             if item.is_file():
                 shutil.copy2(item, target, follow_symlinks=False)
             elif item.is_dir():
-                shutil.copytree(item, target, dirs_exist_ok=True, symlinks=False)
+                shutil.copytree(item, target, dirs_exist_ok=True, symlinks=False, ignore=_ignore_unsafe)
         except Exception as e:
             logger.warning(f"Failed to copy artifact {item.name}: {e}")
             if target is not None and target.exists() and item.is_file():
@@ -1267,6 +1284,14 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         "usage": usage
     }
 
+def _sanitize_snippet(snippet: Any) -> str:
+    """Nettoie une chaîne d'aperçu de recherche en supprimant les caractères de contrôle et null bytes."""
+    if not snippet:
+        return ""
+    cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", str(snippet))
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
 def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
     if not query.strip():
         return list_conversations(limit=limit)
@@ -1308,7 +1333,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
             meta = all_meta.get(cid, {})
             c = _build_conversation_dict(r, meta)
             c["match_type"] = "metadata"
-            c["match_snippet"] = r["preview"] or c["title"]
+            c["match_snippet"] = _sanitize_snippet(r["preview"] or c["title"])
             matched.append(c)
             seen_ids.add(cid)
 
@@ -1360,7 +1385,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                         meta = all_meta.get(cid, {})
                         c_item = _build_conversation_dict(r, meta)
                         c_item["match_type"] = "metadata"
-                        c_item["match_snippet"] = meta.get("customTitle") or meta.get("project") or c_item.get("preview")
+                        c_item["match_snippet"] = _sanitize_snippet(meta.get("customTitle") or meta.get("project") or c_item.get("preview"))
                         matched.append(c_item)
                         seen_ids.add(cid)
     finally:
@@ -1442,12 +1467,9 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                                 end = min(len(raw_thinking), idx + 80)
                                 snippet = "[Raisonnement] " + ("..." if start > 0 else "") + raw_thinking[start:end] + ("..." if end < len(raw_thinking) else "")
 
-                            cleaned_snippet = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", snippet)
-                            cleaned_snippet = re.sub(r"\s+", " ", cleaned_snippet).strip()
-
                             c_copy = dict(c)
                             c_copy["match_type"] = "transcript"
-                            c_copy["match_snippet"] = cleaned_snippet
+                            c_copy["match_snippet"] = _sanitize_snippet(snippet)
                             matched.append(c_copy)
                             seen_ids.add(cid)
                             break
@@ -1667,6 +1689,17 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
     flush_asst()
     return turns
 
+def _safe_json_dumps(val: Any) -> str:
+    """Sérialise un objet en JSON avec repli robuste si référence circulaire ou type non géré."""
+    try:
+        return json.dumps(val, indent=2, ensure_ascii=False, default=str)
+    except Exception:
+        try:
+            return repr(val)
+        except Exception:
+            return "<unrepresentable object>"
+
+
 def export_conversation_markdown(conversation_id: str) -> str:
     steps = get_conversation_transcript(conversation_id)
     conv = get_conversation_by_id(conversation_id)
@@ -1733,7 +1766,7 @@ def export_conversation_markdown(conversation_id: str) -> str:
                 tname = act.get("name", "tool")
                 raw_args = act.get("args")
                 if isinstance(raw_args, (dict, list)):
-                    targs = json.dumps(raw_args, indent=2, ensure_ascii=False, default=str)
+                    targs = _safe_json_dumps(raw_args)
                 elif isinstance(raw_args, str):
                     targs = raw_args
                 elif raw_args is None:
@@ -1745,7 +1778,7 @@ def export_conversation_markdown(conversation_id: str) -> str:
                 md_lines.append(f"```json\n{targs}\n```")
                 if res is not None and (res or res == 0):
                     if isinstance(res, (dict, list)):
-                        res_str = json.dumps(res, indent=2, ensure_ascii=False, default=str)
+                        res_str = _safe_json_dumps(res)
                     else:
                         res_str = str(res)
                     if res_str:
@@ -1835,7 +1868,7 @@ def export_conversation_html(conversation_id: str) -> str:
                 tname = _clean_html_text(act.get("name") or "tool")
                 raw_args = act.get("args")
                 if isinstance(raw_args, (dict, list)):
-                    targs_str = json.dumps(raw_args, indent=2, ensure_ascii=False, default=str)
+                    targs_str = _safe_json_dumps(raw_args)
                 elif raw_args is None:
                     targs_str = "{}"
                 else:
@@ -1845,7 +1878,7 @@ def export_conversation_html(conversation_id: str) -> str:
                 res_html = ""
                 if res is not None and (res or res == 0):
                     if isinstance(res, (dict, list)):
-                        res_str = json.dumps(res, indent=2, ensure_ascii=False, default=str)
+                        res_str = _safe_json_dumps(res)
                     else:
                         res_str = str(res)
                     if res_str:

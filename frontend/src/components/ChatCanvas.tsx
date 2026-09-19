@@ -506,10 +506,12 @@ const ToolItemCard: React.FC<{ tool: ToolCallItem }> = ({ tool }) => {
                 ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
                 : tool.status === 'error'
                 ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                : tool.status === 'cancelled'
+                ? 'bg-neutral-500/10 text-neutral-400 border-neutral-500/20'
                 : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
             }`}
           >
-            {tool.status === 'running' ? t('status_running', 'Running...') : tool.status === 'error' ? t('status_error', 'Error') : t('status_done', 'Done')}
+            {tool.status === 'running' ? t('status_running', 'Running...') : tool.status === 'error' ? t('status_error', 'Error') : tool.status === 'cancelled' ? t('status_cancelled', 'Cancelled') : t('status_done', 'Done')}
           </span>
 
           {tool.result && (

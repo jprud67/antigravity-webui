@@ -253,6 +253,7 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
             "webui_password.txt",
             "google_accounts.json",
             "credentials",
+            "credentials.json",
             "client_secret.json",
             ".bash_history",
             ".zsh_history",
@@ -261,6 +262,8 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
         if name.startswith("client_secret") and name.endswith(".json"):
             return True
         if name in ("id_rsa", "id_ed25519", "id_dsa", "id_ecdsa") or name.startswith(("id_rsa.", "id_ed25519.")):
+            return True
+        if name in ("privkey.pem", "server.key", "server.pem", "private.key", "cert.key"):
             return True
         if name == ".env" or name.startswith(".env."):
             return True

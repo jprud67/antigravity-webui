@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/git", tags=["git"])
 
 GIT_TIMEOUT = 12
 _COAUTHOR_RE = re.compile(
-    r"(?:co[-_ \t]*author(?:ed)?[-_ \t]*by|co[-_ \t]*author:?|co[-_ \t]*committ(?:er|ed):?|signed[-_ \t]*off[-_ \t]*by|assisted[-_ \t]*by|help[-_ \t]*from|generated[-_ \t]*by|ai[-_ \t]*assisted|claude|anthropic|chatgpt|openai|copilot|github-actions)",
+    r"(?:co[-_ \t]*author(?:ed)?(?:[-_ \t]*by)?|co[-_ \t]*committ(?:er|ed)?(?:[-_ \t]*by)?|signed[-_ \t]*off[-_ \t]*by|assisted[-_ \t]*by|help[-_ \t]*from|generated[-_ \t]*by|ai[-_ \t]*assisted|claude|anthropic|chatgpt|openai|copilot|github[-_]actions)",
     re.IGNORECASE
 )
 _URL_CRED_RE = re.compile(r"https?://([^/@:]+):([^/@:]+)@", re.IGNORECASE)
@@ -362,7 +362,11 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
                 f_clean = f.strip().strip('"')
                 if not f_clean:
                     continue
-                if re.search(r'(^|/)(?:\.env|\.env\.[a-zA-Z0-9_\-]+|id_rsa|id_ed25519)$', f_clean, re.IGNORECASE):
+                if re.search(
+                    r'(^|/)(?:\.env(?:\.[a-zA-Z0-9_\-]+)?|id_rsa[a-zA-Z0-9_\-]*|id_ed25519[a-zA-Z0-9_\-]*|webui_auth\.json|antigravity-oauth-token.*|google_accounts\.json|credentials\.json|client_secret.*\.json|.*\.pem|.*\.key)$',
+                    f_clean,
+                    re.IGNORECASE
+                ):
                     check_head = run_git(["rev-parse", "--verify", f"HEAD:{f_clean}"], target)
                     if check_head.returncode != 0:
                         run_git(["reset", "HEAD", "--", f_clean], target)

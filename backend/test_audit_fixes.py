@@ -5414,7 +5414,185 @@ def test_terminal_cwd_sensitive_path_guard():
     # Safe workspace paths
     assert is_blocked_sensitive_path("/root/antigravity-webui") is False
     assert is_blocked_sensitive_path("/home/user/workspace/project") is False
-    print("✓ test_terminal_cwd_sensitive_path_guard passed")
+def test_git_extended_coauthor_and_secret_unstaging():
+    import re
+
+    from app.api.git import _COAUTHOR_RE, _sanitize_git_message
+
+    coauthor_samples = [
+        "Co-authored-by: Claude <noreply@anthropic.com>",
+        "Co-authored by someone",
+        "co-committer: Jane Doe",
+        "coauthor: Bob",
+        "signed-off-by: Eve",
+        "assisted-by: AI Assistant",
+        "help-from: ChatGPT",
+        "generated-by: Copilot",
+        "Co-Authored: someone",
+        "cocommitter: dev",
+    ]
+    for s in coauthor_samples:
+        assert _COAUTHOR_RE.search(s) is not None, f"Expected match for '{s}'"
+
+    msg = (
+        "feat: add awesome feature\n\n"
+        "Detailed explanation here.\n\n"
+        "Co-authored-by: Claude <noreply@anthropic.com>\n"
+        "Signed-off-by: Developer <dev@example.com>\n"
+    )
+    sanitized = _sanitize_git_message(msg)
+    assert "Claude" not in sanitized
+    assert "Co-authored-by" not in sanitized
+    assert "Signed-off-by" not in sanitized
+    assert "feat: add awesome feature" in sanitized
+    assert "Detailed explanation here." in sanitized
+
+    # Check sensitive files regex pattern
+    sens_re = re.compile(
+        r'(^|/)(?:\.env(?:\.[a-zA-Z0-9_\-]+)?|id_rsa[a-zA-Z0-9_\-]*|id_ed25519[a-zA-Z0-9_\-]*|webui_auth\.json|antigravity-oauth-token.*|google_accounts\.json|credentials\.json|client_secret.*\.json|.*\.pem|.*\.key)$',
+        re.IGNORECASE
+    )
+    assert sens_re.search(".env") is not None
+    assert sens_re.search(".env.production") is not None
+    assert sens_re.search("webui_auth.json") is not None
+    assert sens_re.search("google_accounts.json") is not None
+    assert sens_re.search("credentials.json") is not None
+    assert sens_re.search("client_secret_123.json") is not None
+    assert sens_re.search("server.key") is not None
+    assert sens_re.search("privkey.pem") is not None
+    assert sens_re.search("safe_code.py") is None
+    print("✓ test_git_extended_coauthor_and_secret_unstaging passed")
+
+
+def test_is_blocked_sensitive_path_keys_and_credentials():
+    from app.platform_utils import is_blocked_sensitive_path
+
+    assert is_blocked_sensitive_path("/root/antigravity-webui/credentials.json") is True
+    assert is_blocked_sensitive_path("/root/antigravity-webui/privkey.pem") is True
+    assert is_blocked_sensitive_path("/root/antigravity-webui/server.key") is True
+    assert is_blocked_sensitive_path("/root/antigravity-webui/private.key") is True
+    assert is_blocked_sensitive_path("/root/antigravity-webui/cert.key") is True
+    assert is_blocked_sensitive_path("/root/antigravity-webui/normal.py") is False
+    print("✓ test_is_blocked_sensitive_path_keys_and_credentials passed")
+
+
+def test_storage_export_safe_json_dumps_and_circular_refs():
+    from app.services.storage import _safe_json_dumps
+
+    normal = {"a": 1, "b": "hello"}
+    assert "hello" in _safe_json_dumps(normal)
+
+    # Circular reference
+    circ: dict = {"key": "val"}
+    circ["self"] = circ
+    res = _safe_json_dumps(circ)
+    assert isinstance(res, str)
+    assert len(res) > 0
+    print("✓ test_storage_export_safe_json_dumps_and_circular_refs passed")
+
+
+def test_storage_safe_copy_artifacts_ignores_nested_symlinks():
+    import tempfile
+
+    from app.services.storage import _safe_copy_artifacts
+
+    with tempfile.TemporaryDirectory() as src_td, tempfile.TemporaryDirectory() as dst_td:
+        src = Path(src_td)
+        dst = Path(dst_td)
+
+        nested_dir = src / "nested"
+        nested_dir.mkdir()
+
+        good_file = nested_dir / "report.txt"
+        good_file.write_text("All is good")
+
+        tmp_file = nested_dir / ".tmp_cache"
+        tmp_file.write_text("temp")
+
+        # Create symlink inside nested dir
+        try:
+            link = nested_dir / "escape_link"
+            link.symlink_to("/etc/issue")
+        except OSError:
+            pass
+
+        _safe_copy_artifacts(src, dst)
+
+        dst_nested = dst / "nested"
+        assert dst_nested.exists()
+        assert (dst_nested / "report.txt").exists()
+        assert (dst_nested / "report.txt").read_text() == "All is good"
+        assert not (dst_nested / ".tmp_cache").exists()
+        assert not (dst_nested / "escape_link").exists()
+    print("✓ test_storage_safe_copy_artifacts_ignores_nested_symlinks passed")
+
+
+def test_storage_search_conversations_metadata_snippet_sanitization():
+    from app.services.storage import _sanitize_snippet
+
+    dirty = "Line 1\x00\x07with\tcontrol\x1b[31mcolors\x1b[0m and \n spaces"
+    cleaned = _sanitize_snippet(dirty)
+    assert "\x00" not in cleaned
+    assert "\x07" not in cleaned
+    assert "\x1b" not in cleaned
+    assert "Line 1with control[31mcolors[0m and spaces" == cleaned
+    assert _sanitize_snippet(None) == ""
+    print("✓ test_storage_search_conversations_metadata_snippet_sanitization passed")
+
+
+def test_execution_manager_update_live_state_error_and_cancelled():
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession(conversation_id="test-cid", workspace_path="/root")
+    
+    # 1. Error state
+    session._update_live_state({
+        "event": "step_update",
+        "step_update": {
+            "step_type": "tool",
+            "tool_id": "tool-1",
+            "tool_name": "run_command",
+            "state": "ERROR",
+            "tool_info": {"output": "Command failed with code 1"}
+        }
+    })
+    assert len(session.live_tool_calls) == 1
+    assert session.live_tool_calls[0]["status"] == "error"
+    assert session.live_tool_calls[0]["result"] == "Command failed with code 1"
+
+    # 2. Cancelled state
+    session._update_live_state({
+        "event": "step_update",
+        "step_update": {
+            "step_type": "tool",
+            "tool_id": "tool-2",
+            "tool_name": "replace_file_content",
+            "state": "CANCELLED"
+        }
+    })
+    assert len(session.live_tool_calls) == 2
+    assert session.live_tool_calls[1]["status"] == "cancelled"
+    print("✓ test_execution_manager_update_live_state_error_and_cancelled passed")
+
+
+def test_files_validate_path_access_localhost_and_empty_guards():
+    from fastapi import HTTPException
+
+    from app.api.files import _validate_path_access
+
+    # Test file://localhost/
+    valid_path = Path("file://localhost/root/antigravity-webui/backend/app/main.py")
+    resolved = _validate_path_access(valid_path)
+    assert resolved == Path("/root/antigravity-webui/backend/app/main.py").resolve()
+
+    # Test empty scheme guards
+    for empty_p in ["workspace://", "file:///", "file://localhost/"]:
+        try:
+            _validate_path_access(Path(empty_p))
+            assert False, f"Expected HTTPException for {empty_p}"
+        except HTTPException as e:
+            assert e.status_code in (400, 403)
+    print("✓ test_files_validate_path_access_localhost_and_empty_guards passed")
 
 
 if __name__ == "__main__":
@@ -5623,6 +5801,13 @@ if __name__ == "__main__":
     test_execution_manager_register_session_cid_sanitization()
     test_agy_driver_cached_empty_data_truthiness()
     test_terminal_cwd_sensitive_path_guard()
+    test_git_extended_coauthor_and_secret_unstaging()
+    test_is_blocked_sensitive_path_keys_and_credentials()
+    test_storage_export_safe_json_dumps_and_circular_refs()
+    test_storage_safe_copy_artifacts_ignores_nested_symlinks()
+    test_storage_search_conversations_metadata_snippet_sanitization()
+    test_execution_manager_update_live_state_error_and_cancelled()
+    test_files_validate_path_access_localhost_and_empty_guards()
     print("\nAll unit tests passed successfully!")
 
 

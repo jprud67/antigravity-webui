@@ -25,7 +25,7 @@ export interface ToolCallItem {
   name: string;
   args?: any;
   result?: any;
-  status?: 'running' | 'done' | 'error';
+  status?: 'running' | 'done' | 'error' | 'cancelled';
 }
 
 export interface ChatMessage {

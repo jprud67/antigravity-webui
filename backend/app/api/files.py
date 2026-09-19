@@ -97,27 +97,54 @@ def _validate_path_access(file_path: Path) -> Path:
         if "?" in p_str:
             p_str = p_str.split("?", 1)[0]
         p_str = p_str.strip()
-        if not p_str:
+        if not p_str or p_str in ("workspace:", "workspace:/", "workspace://", "file:", "file:/", "file://", "file:///", "file:/localhost", "file://localhost", "file://localhost/"):
             raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
         if os.name == "posix" and re.match(r'^[a-zA-Z]:[/\\]', p_str):
             raise HTTPException(status_code=400, detail="Chemin de style Windows non valide sur ce système d'exploitation.")
         if p_str.startswith("workspace://"):
             p_str = p_str[12:].lstrip("/")
+            if not p_str:
+                raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
             file_path = Path(DEFAULT_WORKSPACE) / p_str
-        elif p_str.startswith("file:///"):
-            p_clean = p_str[8:]
+        elif p_str.startswith("workspace:/"):
+            p_str = p_str[11:].lstrip("/")
+            if not p_str:
+                raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
+            file_path = Path(DEFAULT_WORKSPACE) / p_str
+        elif p_str.startswith("file://localhost/"):
+            p_clean = p_str[17:].lstrip("/")
+            if not p_clean:
+                raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
             if not (len(p_clean) > 1 and p_clean[1] == ":"):
-                p_clean = "/" + p_clean.lstrip("/")
+                p_clean = "/" + p_clean
+            file_path = Path(p_clean)
+        elif p_str.startswith("file:/localhost/"):
+            p_clean = p_str[16:].lstrip("/")
+            if not p_clean:
+                raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
+            if not (len(p_clean) > 1 and p_clean[1] == ":"):
+                p_clean = "/" + p_clean
+            file_path = Path(p_clean)
+        elif p_str.startswith("file:///"):
+            p_clean = p_str[8:].lstrip("/")
+            if not p_clean:
+                raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
+            if not (len(p_clean) > 1 and p_clean[1] == ":"):
+                p_clean = "/" + p_clean
             file_path = Path(p_clean)
         elif p_str.startswith("file://"):
-            p_clean = p_str[7:]
+            p_clean = p_str[7:].lstrip("/")
+            if not p_clean:
+                raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
             if not (len(p_clean) > 1 and p_clean[1] == ":"):
-                p_clean = "/" + p_clean.lstrip("/")
+                p_clean = "/" + p_clean
             file_path = Path(p_clean)
         elif p_str.startswith("file:/"):
-            p_clean = p_str[6:]
+            p_clean = p_str[6:].lstrip("/")
+            if not p_clean:
+                raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
             if not (len(p_clean) > 1 and p_clean[1] == ":"):
-                p_clean = "/" + p_clean.lstrip("/")
+                p_clean = "/" + p_clean
             file_path = Path(p_clean)
         else:
             file_path = Path(p_str)

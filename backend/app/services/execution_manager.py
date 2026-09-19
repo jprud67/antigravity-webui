@@ -157,7 +157,10 @@ class ExecutionSession:
                 tool_name = update.get("tool_name") or update.get("tool_info", {}).get("name") or "tool"
                 tool_args = update.get("tool_info", {}).get("parameters") or update.get("parameters")
                 tool_output = update.get("tool_info", {}).get("output")
-                is_done = update.get("state") == "DONE"
+                state_val = str(update.get("state") or "").upper()
+                is_done = state_val == "DONE"
+                is_error = state_val in ("ERROR", "FAILED")
+                is_cancelled = state_val == "CANCELLED"
 
                 found = False
                 if tool_id:
@@ -169,6 +172,10 @@ class ExecutionSession:
                                 t["result"] = tool_output
                             if is_done:
                                 t["status"] = "done"
+                            elif is_error:
+                                t["status"] = "error"
+                            elif is_cancelled:
+                                t["status"] = "cancelled"
                             found = True
                             break
                     if not found:
@@ -181,8 +188,12 @@ class ExecutionSession:
                                     t["result"] = tool_output
                                 if is_done:
                                     t["status"] = "done"
-                                    if tool_output is not None:
-                                        t["result"] = tool_output
+                                elif is_error:
+                                    t["status"] = "error"
+                                elif is_cancelled:
+                                    t["status"] = "cancelled"
+                                if tool_output is not None:
+                                    t["result"] = tool_output
                                 found = True
                                 break
                 else:
@@ -194,17 +205,22 @@ class ExecutionSession:
                                 t["result"] = tool_output
                             if is_done:
                                 t["status"] = "done"
-                                if tool_output is not None:
-                                    t["result"] = tool_output
+                            elif is_error:
+                                t["status"] = "error"
+                            elif is_cancelled:
+                                t["status"] = "cancelled"
+                            if tool_output is not None:
+                                t["result"] = tool_output
                             found = True
                             break
 
                 if not found:
+                    new_status = "done" if is_done else ("error" if is_error else ("cancelled" if is_cancelled else "running"))
                     new_tool_call = {
                         "name": tool_name,
                         "args": tool_args,
                         "result": tool_output,
-                        "status": "done" if is_done else "running"
+                        "status": new_status
                     }
                     if tool_id:
                         new_tool_call["id"] = tool_id
@@ -520,6 +536,11 @@ class ExecutionSession:
             })
 
         finally:
+            if self.active_proc and self.active_proc.returncode is None:
+                try:
+                    await terminate_process_group_async(self.active_proc, grace=0.5)
+                except Exception as e:
+                    logger.debug(f"Error terminating active_proc in finally: {e}")
             self.active_proc = None
             self.is_running = False
             self.pending_approval = None
