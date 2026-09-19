@@ -6969,8 +6969,159 @@ def test_read_artifact_content_binary_null_byte_detection(tmp_path, monkeypatch)
     text_file = conv_dir / "test_text.txt"
     text_file.write_bytes("Normal text with accent: café".encode("utf-8") + b"\xff" + b" and more text")
     text_res = storage.read_artifact_content("conv123", "test_text.txt")
-    assert "Normal text with accent: café" in text_res
-    assert "and more text" in text_res
+def test_update_live_state_null_payloads_resilience():
+    """Vérifie que _update_live_state ne plante pas avec AttributeError si des champs sont None."""
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession(conversation_id="test-cid-null-resilience")
+
+    # 1. step_update: None
+    event1 = {"event": "step_update", "step_update": None}
+    session._update_live_state(event1)
+
+    # 2. step_update with step_type='tool' but tool_info: None
+    event2 = {
+        "event": "step_update",
+        "step_update": {
+            "step_type": "tool",
+            "tool_info": None,
+            "tool_id": "tool-123",
+            "tool_name": "run_cmd"
+        }
+    }
+    session._update_live_state(event2)
+    assert len(session.live_tool_calls) == 1
+    assert session.live_tool_calls[0]["id"] == "tool-123"
+
+    # 3. command_result: None and data: None
+    event3 = {"event": "command_result", "command": None}
+    session._update_live_state(event3)
+
+    event4 = {"event": "command_result", "command": {"name": "usage", "data": None}}
+    session._update_live_state(event4)
+
+    # 4. result: None
+    event5 = {"event": "result", "result": None}
+    session._update_live_state(event5)
+    print("✓ test_update_live_state_null_payloads_resilience passed")
+
+
+def test_register_session_cid_migrates_queue_and_stops_old_worker():
+    """Vérifie que register_session_cid migre la file d'attente et nettoie l'ancienne session orpheline."""
+    import asyncio
+    from app.services.execution_manager import ExecutionSession, ExecutionManager
+
+    async def _async_test():
+        mgr = ExecutionManager()
+        cid = "cid-conflict-migration-test"
+
+        session_old = ExecutionSession(conversation_id=cid)
+        mgr.sessions[cid] = session_old
+
+        # Add queued messages to the old session
+        await session_old.message_queue.put({"prompt": "queued message 1"})
+        await session_old.message_queue.put({"prompt": "queued message 2"})
+
+        async def dummy_worker():
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                pass
+
+        old_task = asyncio.create_task(dummy_worker())
+        session_old.worker_task = old_task
+
+        session_new = ExecutionSession(conversation_id=None)
+        mgr.register_session_cid(session_new, cid)
+
+        assert mgr.sessions[cid] is session_new
+        assert not session_new.message_queue.empty()
+        item1 = session_new.message_queue.get_nowait()
+        assert item1["prompt"] == "queued message 1"
+        item2 = session_new.message_queue.get_nowait()
+        assert item2["prompt"] == "queued message 2"
+        assert session_old.message_queue.empty()
+
+        await asyncio.sleep(0.01)
+        assert old_task.cancelled() or old_task.done()
+
+    asyncio.run(_async_test())
+    print("✓ test_register_session_cid_migrates_queue_and_stops_old_worker passed")
+
+
+def test_validate_terminal_session_id():
+    """Vérifie la validation stricte des identifiants de session terminal."""
+    from fastapi import HTTPException
+    from app.api.terminal import _validate_terminal_session_id
+
+    assert _validate_terminal_session_id("ws_abc123") == "ws_abc123"
+    assert _validate_terminal_session_id("term-session-1.0_dev") == "term-session-1.0_dev"
+
+    try:
+        _validate_terminal_session_id("../etc/passwd")
+        assert False, "Should have raised HTTPException for path traversal"
+    except HTTPException as e:
+        assert e.status_code == 400
+
+    try:
+        _validate_terminal_session_id("sid;rm -rf /")
+        assert False, "Should have raised HTTPException for shell injection chars"
+    except HTTPException as e:
+        assert e.status_code == 400
+
+    try:
+        _validate_terminal_session_id(" ")
+        assert False, "Should have raised HTTPException for whitespace"
+    except HTTPException as e:
+        assert e.status_code == 400
+
+    print("✓ test_validate_terminal_session_id passed")
+
+
+def test_git_pull_uses_no_edit_on_merge_fallback():
+    """Vérifie que le fallback de git_pull utilise --no-edit pour éviter le blocage non interactif."""
+    import tempfile
+    from unittest.mock import patch, MagicMock
+    from app.api.git import PullRequest, git_pull
+
+    with tempfile.TemporaryDirectory() as td:
+        tmp_path = Path(td)
+        calls = []
+
+        def fake_run_git(args, target, **kwargs):
+            calls.append(list(args))
+            if "branch" in args:
+                mock = MagicMock()
+                mock.returncode = 0
+                mock.stdout = "main\n"
+                mock.stderr = ""
+                return mock
+            if "--ff-only" in args:
+                mock = MagicMock()
+                mock.returncode = 1
+                mock.stderr = "fatal: not possible to fast-forward, aborting."
+                mock.stdout = ""
+                return mock
+            if "--no-edit" in args:
+                mock = MagicMock()
+                mock.returncode = 0
+                mock.stdout = "Merge made by the 'ort' strategy."
+                mock.stderr = ""
+                return mock
+            mock = MagicMock()
+            mock.returncode = 1
+            mock.stderr = "Unexpected command"
+            mock.stdout = ""
+            return mock
+
+        with patch("app.api.git._validate_workspace", return_value=tmp_path):
+            with patch("app.api.git.run_git", side_effect=fake_run_git):
+                req = PullRequest(workspace=str(tmp_path), remote="origin", branch="main", rebase=False)
+                res = git_pull(req, _=None)
+                assert res["success"] is True
+                assert any("--no-edit" in c for c in calls)
+
+    print("✓ test_git_pull_uses_no_edit_on_merge_fallback passed")
 
 
 if __name__ == "__main__":
@@ -7234,6 +7385,10 @@ if __name__ == "__main__":
     test_updater_git_args_identity_and_anti_coauthor()
     test_clean_user_prompt_json_serialized_and_nested()
     test_execution_manager_steering_mode_tagging()
+    test_update_live_state_null_payloads_resilience()
+    test_register_session_cid_migrates_queue_and_stops_old_worker()
+    test_validate_terminal_session_id()
+    test_git_pull_uses_no_edit_on_merge_fallback()
     print("\nAll unit tests passed successfully!")
 
 

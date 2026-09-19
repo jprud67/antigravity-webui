@@ -138,7 +138,8 @@ class ExecutionSession:
                 execution_manager.register_session_cid(self, cid)
 
         elif evt_type == "step_update":
-            update = event.get("step_update", {})
+            raw_update = event.get("step_update")
+            update = raw_update if isinstance(raw_update, dict) else {}
             cid = _clean_cid(update.get("conversation_id"))
             if cid:
                 self.conversation_id = cid
@@ -167,10 +168,12 @@ class ExecutionSession:
                 }
 
             if update.get("step_type") == "tool":
-                tool_id = update.get("tool_id") or update.get("tool_info", {}).get("id") or update.get("id")
-                tool_name = update.get("tool_name") or update.get("tool_info", {}).get("name") or "tool"
-                tool_args = update.get("tool_info", {}).get("parameters") or update.get("parameters")
-                tool_output = update.get("tool_info", {}).get("output")
+                raw_info = update.get("tool_info")
+                tool_info = raw_info if isinstance(raw_info, dict) else {}
+                tool_id = update.get("tool_id") or tool_info.get("id") or update.get("id")
+                tool_name = update.get("tool_name") or tool_info.get("name") or "tool"
+                tool_args = tool_info.get("parameters") or update.get("parameters")
+                tool_output = tool_info.get("output")
                 state_val = str(update.get("state") or "").upper()
                 is_done = state_val == "DONE"
                 is_error = state_val in ("ERROR", "FAILED")
@@ -246,9 +249,11 @@ class ExecutionSession:
                         self.live_tool_calls = (running_calls + done_calls[-keep_done:])[-100:]
 
         elif evt_type == "command_result":
-            cmd = event.get("command", {})
+            raw_cmd = event.get("command")
+            cmd = raw_cmd if isinstance(raw_cmd, dict) else {}
             c_name = cmd.get("name")
-            c_data = cmd.get("data", {})
+            raw_data = cmd.get("data")
+            c_data = raw_data if isinstance(raw_data, dict) else {}
             if c_name == "usage":
                 lines = ["### 📊 Quotas & Limites Antigravity (Google Cloud)\n"]
                 desc = c_data.get("description")
@@ -271,7 +276,8 @@ class ExecutionSession:
                 self.live_content = f"### 💳 Crédits Antigravity G1\n\n- **Crédits restants :** `{rem}`\n- **Recharge / Souscription :** [{uri}]({uri})"
 
         elif evt_type == "result":
-            res = event.get("result", {})
+            raw_res = event.get("result")
+            res = raw_res if isinstance(raw_res, dict) else {}
             resp = res.get("response")
             if resp:
                 if not self.live_content:
@@ -734,6 +740,25 @@ class ExecutionManager:
                     session.add_subscriber(sub)
                 if not session.workspace_path and existing.workspace_path:
                     session.workspace_path = existing.workspace_path
+                # Migrate pending queue messages from existing to session
+                while not existing.message_queue.empty():
+                    try:
+                        item = existing.message_queue.get_nowait()
+                        session.message_queue.put_nowait(item)
+                        existing.message_queue.task_done()
+                    except (asyncio.QueueEmpty, ValueError):
+                        break
+                if existing.active_proc and existing.active_proc.returncode is None:
+                    try:
+                        task = asyncio.create_task(terminate_process_group_async(existing.active_proc, grace=0.5))
+                        self._background_tasks.add(task)
+                        task.add_done_callback(self._background_tasks.discard)
+                    except RuntimeError:
+                        terminate_process_group_sync(existing.active_proc, force=True)
+                if existing.worker_task and not existing.worker_task.done():
+                    existing.worker_task.cancel()
+                existing.is_running = False
+                existing.active_proc = None
             session.conversation_id = clean
             self.sessions[clean] = session
 

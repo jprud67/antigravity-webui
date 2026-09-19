@@ -924,6 +924,8 @@ def fork_conversation(
             "tags": inherited_tags,
             "project": source_meta.get("project", ""),
             "projectColor": source_meta.get("projectColor", ""),
+            "project_id": source_meta.get("project_id") or source_project_id or "",
+            "group_id": source_meta.get("group_id") or source_group_id or "",
             "pinned": False,
             "customTitle": ""
         })
@@ -1124,6 +1126,8 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
         "tags": new_tags,
         "project": source_meta.get("project", ""),
         "projectColor": source_meta.get("projectColor", ""),
+        "project_id": source_meta.get("project_id") or source_project_id or "",
+        "group_id": source_meta.get("group_id") or source_group_id or "",
         "pinned": False,
         "customTitle": ""
     })

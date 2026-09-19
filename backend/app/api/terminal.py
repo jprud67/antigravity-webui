@@ -3,13 +3,14 @@ import hashlib
 import json
 import logging
 import os
+import re
 import struct
 import threading
 import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.api.auth import require_auth
 from app.platform_utils import (
@@ -39,6 +40,16 @@ except ImportError:
 
 logger = logging.getLogger("antigravity.terminal")
 router = APIRouter(tags=["terminal"])
+
+_SAFE_SESSION_ID_RE = re.compile(r"^[a-zA-Z0-9_\-\.]{1,128}$")
+
+
+def _validate_terminal_session_id(sid: str) -> str:
+    clean = (sid or "").strip()
+    if not clean or not _SAFE_SESSION_ID_RE.match(clean) or ".." in clean:
+        raise HTTPException(status_code=400, detail="Identifiant de session terminal invalide.")
+    return clean
+
 
 
 def set_winsize(fd: int, rows: int, cols: int):
@@ -449,7 +460,14 @@ async def terminal_websocket(
             cwd = default_home
     # Identify session (default to global persistent session for workspace)
     # hash() est non-déterministe entre redémarrages (PYTHONHASHSEED) → utiliser hashlib pour un ID stable
-    sid = session_id or f"ws_{hashlib.sha256(cwd.encode()).hexdigest()[:8]}"
+    if session_id:
+        clean_sid = session_id.strip()
+        if not _SAFE_SESSION_ID_RE.match(clean_sid) or ".." in clean_sid:
+            await websocket.close(code=1008, reason="Invalid session ID")
+            return
+        sid = clean_sid
+    else:
+        sid = f"ws_{hashlib.sha256(cwd.encode()).hexdigest()[:8]}"
 
     session: PersistentTerminalSession | None = None
     try:
@@ -548,5 +566,6 @@ async def list_terminal_sessions(_ = Depends(require_auth)):
 @router.post("/api/terminal/sessions/{session_id}/restart")
 async def restart_terminal_session(session_id: str, _ = Depends(require_auth)):
     """Explicitly kill and restart a terminal session"""
-    await kill_session(session_id)
-    return {"success": True, "session_id": session_id}
+    valid_sid = _validate_terminal_session_id(session_id)
+    await kill_session(valid_sid)
+    return {"success": True, "session_id": valid_sid}

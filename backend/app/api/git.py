@@ -468,7 +468,7 @@ def git_pull(req: PullRequest, _ = Depends(require_auth)):
         err_out = pull_res.stderr or pull_res.stdout or ""
         # If fast-forward only failed and user did not request rebase, fallback to standard merge pull
         if "--ff-only" in pull_args and ("not possible to fast-forward" in err_out.lower() or "fatal: not possible to fast-forward" in err_out.lower()):
-            pull_res = run_git(["pull", remote, branch], target, timeout=35, env=git_env)
+            pull_res = run_git(["pull", "--no-edit", remote, branch], target, timeout=35, env=git_env)
 
         if pull_res.returncode != 0:
             err_msg = pull_res.stderr or pull_res.stdout or "Erreur inconnue lors du pull"
