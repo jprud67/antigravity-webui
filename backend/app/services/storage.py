@@ -141,7 +141,6 @@ _ALLOWED_CONVERSATION_SUMMARY_COLUMNS: frozenset[str] = frozenset({
     "step_count",
     "last_modified_time",
     "workspace_uris",
-    "workspace_path",
     "status",
     "source",
     "project_id",

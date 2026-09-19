@@ -840,7 +840,8 @@ class ExecutionManager:
                         session.message_queue.task_done()
                     except (asyncio.QueueEmpty, ValueError):
                         break
-                data["prompt"] = f"[Instruction Prioritaire de Guidage] : {prompt}"
+                steering_prefix = "[Instruction Prioritaire de Guidage] : "
+                data["prompt"] = prompt if prompt.startswith(steering_prefix) else f"{steering_prefix}{prompt}"
                 await session.message_queue.put(data)
                 await session.broadcast({
                     "event": "steered",

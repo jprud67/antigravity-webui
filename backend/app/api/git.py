@@ -355,6 +355,18 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
         add_res = run_git(["add", "-A"], target)
         if add_res.returncode != 0:
             raise HTTPException(status_code=500, detail=f"Échec du git add : {add_res.stderr}")
+        # Protection automatique contre l'indexation accidentelle de fichiers sensibles non suivis (.env, clés privées)
+        staged_files_res = run_git(["diff", "--name-only", "--cached"], target)
+        if staged_files_res.returncode == 0 and staged_files_res.stdout:
+            for f in staged_files_res.stdout.splitlines():
+                f_clean = f.strip().strip('"')
+                if not f_clean:
+                    continue
+                if re.search(r'(^|/)(?:\.env|\.env\.[a-zA-Z0-9_\-]+|id_rsa|id_ed25519)$', f_clean, re.IGNORECASE):
+                    check_head = run_git(["rev-parse", "--verify", f"HEAD:{f_clean}"], target)
+                    if check_head.returncode != 0:
+                        run_git(["reset", "HEAD", "--", f_clean], target)
+                        logger.warning(f"Fichier sensible désindexé automatiquement du commit : {f_clean}")
 
     commit_res = run_git(["commit", "--no-signoff", "--author=jprud67 <jprud67@gmail.com>", "-m", clean_msg], target)
     if commit_res.returncode != 0:
@@ -378,7 +390,7 @@ def git_push(req: PushRequest, _ = Depends(require_auth)):
     import os as _os
     target = _validate_workspace(req.workspace)
     remote = req.remote.strip() if req.remote else "origin"
-    if remote.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote):
+    if remote.startswith("-") or "--" in remote or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote):
         raise HTTPException(status_code=400, detail="Nom de remote Git invalide.")
 
     branch = req.branch.strip() if req.branch else None
@@ -386,7 +398,7 @@ def git_push(req: PushRequest, _ = Depends(require_auth)):
         res_br = run_git(["branch", "--show-current"], target)
         branch = res_br.stdout.strip() or "main"
 
-    if branch.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
+    if branch.startswith("-") or "--" in branch or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
         raise HTTPException(status_code=400, detail="Nom de branche Git invalide.")
 
     # Préparer l'environnement avec désactivation du prompt interactif
@@ -423,7 +435,7 @@ def git_pull(req: PullRequest, _ = Depends(require_auth)):
     import os as _os
     target = _validate_workspace(req.workspace)
     remote = req.remote.strip() if req.remote else "origin"
-    if remote.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote):
+    if remote.startswith("-") or "--" in remote or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote):
         raise HTTPException(status_code=400, detail="Nom de remote Git invalide.")
 
     branch = req.branch.strip() if req.branch else None
@@ -431,7 +443,7 @@ def git_pull(req: PullRequest, _ = Depends(require_auth)):
         res_br = run_git(["branch", "--show-current"], target)
         branch = res_br.stdout.strip() or "main"
 
-    if branch.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
+    if branch.startswith("-") or "--" in branch or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
         raise HTTPException(status_code=400, detail="Nom de branche Git invalide.")
 
     git_env = _os.environ.copy()
@@ -489,11 +501,11 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
     tag_name = req.tag.strip()
     if not tag_name:
         raise HTTPException(status_code=400, detail="Le nom du tag ne peut être vide.")
-    if tag_name.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./+]+$', tag_name):
+    if tag_name.startswith("-") or "--" in tag_name or not re.match(r'^[a-zA-Z0-9_\-\./+]+$', tag_name):
         raise HTTPException(status_code=400, detail="Nom de tag Git invalide.")
 
     remote = req.remote.strip() if req.remote else "origin"
-    if remote.startswith("-") or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote):
+    if remote.startswith("-") or "--" in remote or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote):
         raise HTTPException(status_code=400, detail="Nom de remote Git invalide.")
 
     raw_tag_msg = req.message.strip() if req.message else tag_name

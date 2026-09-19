@@ -98,32 +98,40 @@ export class ChatWebSocketClient {
       }
 
       this.ws.onopen = () => {
-        console.log('[WS] Connected to Antigravity WebUI chat socket');
-        this.reconnectAttempts = 0;
-        this.setStatus('connected');
-        this.startHeartbeat();
-        if (this.currentConversationId) {
-          this.sendAttach(this.currentConversationId);
-        }
-        while (this.pendingPayloads.length > 0) {
-          if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            break;
+        try {
+          console.log('[WS] Connected to Antigravity WebUI chat socket');
+          this.reconnectAttempts = 0;
+          this.setStatus('connected');
+          this.startHeartbeat();
+          if (this.currentConversationId) {
+            this.sendAttach(this.currentConversationId);
           }
-          const item = this.pendingPayloads.shift();
-          if (!item) continue;
-          if (!item.conversation_id && this.currentConversationId) {
-            item.conversation_id = this.currentConversationId;
-          }
-          try {
-            this.ws.send(JSON.stringify(item));
-          } catch (e) {
-            console.error('[WS] Failed to flush queued payload:', e);
-            this.pendingPayloads.unshift(item);
-            if (this.pendingPayloads.length > 20) {
-              this.pendingPayloads.length = 20;
+          while (this.pendingPayloads.length > 0) {
+            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+              break;
             }
-            break;
+            const item = this.pendingPayloads.shift();
+            if (!item) continue;
+            // Skip redundant attach payload if we already sent attach
+            if (item.action === 'attach' && (item.conversation_id === this.currentConversationId || (!item.conversation_id && !this.currentConversationId))) {
+              continue;
+            }
+            if (!item.conversation_id && this.currentConversationId) {
+              item.conversation_id = this.currentConversationId;
+            }
+            try {
+              this.ws.send(JSON.stringify(item));
+            } catch (e) {
+              console.error('[WS] Failed to flush queued payload:', e);
+              this.pendingPayloads.unshift(item);
+              if (this.pendingPayloads.length > 20) {
+                this.pendingPayloads.length = 20;
+              }
+              break;
+            }
           }
+        } catch (openErr) {
+          console.error('[WS] Error in onopen handler:', openErr);
         }
       };
 

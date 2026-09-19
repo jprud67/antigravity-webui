@@ -5147,6 +5147,7 @@ def test_import_single_conversation_deepcopy_isolation():
 def test_git_commit_enforces_author_flag():
     import subprocess
     from unittest.mock import MagicMock, patch
+
     from app.api.git import CommitRequest, git_commit
 
     mock_run = MagicMock()
@@ -5165,6 +5166,7 @@ def test_git_commit_enforces_author_flag():
 
 def test_kill_task_string_pid_resilience():
     from unittest.mock import patch
+
     from app.api.tasks import KillTaskRequest, kill_task
 
     # Test string PID
@@ -5184,6 +5186,7 @@ def test_kill_task_string_pid_resilience():
 
 def test_export_conversation_markdown_tool_only_turn():
     from unittest.mock import patch
+
     from app.services.storage import export_conversation_markdown
 
     mock_steps = [
@@ -5197,6 +5200,128 @@ def test_export_conversation_markdown_tool_only_turn():
         assert "Exécution d'outils terminée" in md
         assert "test_cmd" in md
     print("✓ test_export_conversation_markdown_tool_only_turn passed")
+
+
+def test_storage_allowed_columns_strict_schema():
+    from app.services.storage import (
+        _ALLOWED_CONVERSATION_SUMMARY_COLUMNS,
+        get_db_connection,
+    )
+
+    assert "workspace_path" not in _ALLOWED_CONVERSATION_SUMMARY_COLUMNS
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(conversation_summaries)")
+    db_cols = {row[1] for row in cursor.fetchall()}
+    conn.close()
+
+    # All allowed columns must exist in the real database schema
+    for col in _ALLOWED_CONVERSATION_SUMMARY_COLUMNS:
+        assert col in db_cols, f"Column {col} not found in actual SQLite table schema"
+    print("✓ test_storage_allowed_columns_strict_schema passed")
+
+
+def test_execution_manager_steering_prefix_idempotence():
+    import asyncio
+
+    from app.services.execution_manager import ExecutionManager
+
+    async def _run():
+        mgr = ExecutionManager()
+        session = mgr.get_or_create_session("test-conv-steer")
+        session.is_running = True  # force session to appear busy
+
+        data1 = {"prompt": "First steer command", "mode": "steer"}
+        await mgr.submit_prompt(None, data1)
+
+        queued_item1 = session.message_queue.get_nowait()
+        assert queued_item1["prompt"] == "[Instruction Prioritaire de Guidage] : First steer command"
+
+        session.is_running = True
+        data2 = {"prompt": "[Instruction Prioritaire de Guidage] : Second steer command", "mode": "steer"}
+        await mgr.submit_prompt(None, data2)
+
+        queued_item2 = session.message_queue.get_nowait()
+        assert queued_item2["prompt"] == "[Instruction Prioritaire de Guidage] : Second steer command"
+        assert not queued_item2["prompt"].startswith("[Instruction Prioritaire de Guidage] : [Instruction Prioritaire de Guidage] : ")
+        mgr.remove_session("test-conv-steer")
+
+    asyncio.run(_run())
+    print("✓ test_execution_manager_steering_prefix_idempotence passed")
+
+
+def test_git_push_and_pull_disallow_option_injection():
+    from unittest.mock import patch
+
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.git import PullRequest, PushRequest, git_pull, git_push
+
+    with patch("app.api.git._validate_workspace", return_value=Path("/tmp")):
+        with pytest.raises(HTTPException) as exc_push1:
+            git_push(PushRequest(remote="--force", branch="main"))
+        assert exc_push1.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_push2:
+            git_push(PushRequest(remote="origin", branch="--all"))
+        assert exc_push2.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_pull1:
+            git_pull(PullRequest(remote="--upload-pack=evil", branch="main"))
+        assert exc_pull1.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_pull2:
+            git_pull(PullRequest(remote="origin", branch="--rebase"))
+        assert exc_pull2.value.status_code == 400
+    print("✓ test_git_push_and_pull_disallow_option_injection passed")
+
+
+def test_git_tag_disallows_option_injection():
+    from unittest.mock import patch
+
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.git import TagRequest, create_git_tag
+
+    with patch("app.api.git._validate_workspace", return_value=Path("/tmp")):
+        with pytest.raises(HTTPException) as exc_tag1:
+            create_git_tag(TagRequest(tag="--delete", remote="origin"))
+        assert exc_tag1.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_tag2:
+            create_git_tag(TagRequest(tag="v1.0.0", remote="--mirror"))
+        assert exc_tag2.value.status_code == 400
+    print("✓ test_git_tag_disallows_option_injection passed")
+
+
+def test_git_commit_unstages_sensitive_env_file():
+    import subprocess
+    from unittest.mock import MagicMock, patch
+
+    from app.api.git import CommitRequest, git_commit
+
+    mock_run = MagicMock()
+
+    def run_side_effect(args, cwd, timeout=None, env=None):
+        if args[0:2] == ["diff", "--name-only"]:
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout=".env\nsrc/index.ts\n", stderr="")
+        if args[0:2] == ["rev-parse", "--verify"] and "HEAD:.env" in args[2]:
+            # .env is not in HEAD (untracked sensitive file)
+            return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="fatal: path '.env' does not exist in 'HEAD'")
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="[main 12345] success", stderr="")
+
+    mock_run.side_effect = run_side_effect
+
+    with patch("app.api.git._validate_workspace", return_value=Path("/tmp")), patch("app.api.git.run_git", mock_run):
+        res = git_commit(CommitRequest(message="feat: test commit", stage_all=True))
+        assert res["success"] is True
+        # Check that reset HEAD -- .env was called
+        reset_calls = [call for call in mock_run.call_args_list if call[0][0] == ["reset", "HEAD", "--", ".env"]]
+        assert len(reset_calls) == 1
+    print("✓ test_git_commit_unstages_sensitive_env_file passed")
 
 
 if __name__ == "__main__":
@@ -5396,6 +5521,11 @@ if __name__ == "__main__":
     test_git_commit_enforces_author_flag()
     test_kill_task_string_pid_resilience()
     test_export_conversation_markdown_tool_only_turn()
+    test_storage_allowed_columns_strict_schema()
+    test_execution_manager_steering_prefix_idempotence()
+    test_git_push_and_pull_disallow_option_injection()
+    test_git_tag_disallows_option_injection()
+    test_git_commit_unstages_sensitive_env_file()
     print("\nAll unit tests passed successfully!")
 
 

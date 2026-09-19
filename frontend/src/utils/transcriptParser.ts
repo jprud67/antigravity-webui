@@ -311,10 +311,31 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
       const outputText = content || (s.error ? String(s.error) : '');
       const tools = currentAssistantMsg.toolCalls || [];
       const toolCallId = s.tool_call_id || s.call_id;
-      // Appairer prioritairement par ID, puis avec un outil anonyme en attente
-      const targetTool = toolCallId
-        ? tools.find((t) => t.id === toolCallId && t.result === undefined) || tools.find((t) => !t.id && t.result === undefined)
-        : tools.find((t) => t.result === undefined);
+      const cleanType = (stype || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+      const isMatchingToolName = (toolName?: string) => {
+        if (!toolName || !cleanType) return false;
+        const normName = toolName.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        return normName.includes(cleanType) || cleanType.includes(normName);
+      };
+
+      const isGenericStepType = ['GENERIC', 'TOOLOUTPUT', 'TOOLRESULT', 'SYSTEM', ''].includes(cleanType);
+
+      // Appairer prioritairement par ID, puis par concordance de nom, puis avec un outil anonyme en attente
+      let targetTool = toolCallId
+        ? tools.find((t) => t.id === toolCallId && t.result === undefined)
+        : undefined;
+
+      if (!targetTool && !isGenericStepType) {
+        targetTool = tools.find((t) => t.result === undefined && isMatchingToolName(t.name));
+      }
+
+      if (!targetTool) {
+        targetTool = toolCallId
+          ? tools.find((t) => !t.id && t.result === undefined)
+          : tools.find((t) => t.result === undefined);
+      }
+
       if (targetTool) {
         if (!targetTool.id && toolCallId) {
           targetTool.id = toolCallId;
