@@ -6391,6 +6391,73 @@ def test_execution_manager_submit_prompt_data_purity():
     print("✓ test_execution_manager_submit_prompt_data_purity passed")
 
 
+def test_openai_compat_streaming_fallback_first_chunk_flag():
+    import asyncio
+    import json
+    from unittest.mock import patch
+    from app.api.openai_compat import create_chat_completion, ChatCompletionRequest
+
+    async def _mock_stream_turn(*args, **kwargs):
+        # Yield result without any prior step_update text_delta
+        yield {"event": "result", "result": {"response": "Hello world from result"}}
+
+    async def _run():
+        req = ChatCompletionRequest(
+            model="gemini-3.8-flash",
+            messages=[{"role": "user", "content": "hello"}],
+            stream=True
+        )
+        with patch("app.api.openai_compat.stream_turn", side_effect=_mock_stream_turn):
+            response = await create_chat_completion(req, x_conversation_id=None, _=True)
+            chunks = []
+            async for chunk_bytes in response.body_iterator:
+                for line in chunk_bytes.split("\n"):
+                    if line.startswith("data: ") and line.strip() != "data: [DONE]":
+                        chunks.append(json.loads(line[6:]))
+            assert len(chunks) >= 2
+            # First chunk must have role: assistant and content
+            assert chunks[0]["choices"][0]["delta"].get("role") == "assistant"
+            assert chunks[0]["choices"][0]["delta"].get("content") == "Hello world from result"
+            # Stop chunk must have finish_reason: stop
+            assert chunks[-1]["choices"][0]["finish_reason"] == "stop"
+
+    asyncio.run(_run())
+    print("✓ test_openai_compat_streaming_fallback_first_chunk_flag passed")
+
+
+def test_execution_manager_stdin_safe_closing():
+    import asyncio
+    from unittest.mock import MagicMock, AsyncMock
+    from app.services.execution_manager import ExecutionManager
+
+    async def _run():
+        em = ExecutionManager()
+        session = em.get_or_create_session("safe_closing_test")
+        
+        # Test mock proc without callable is_closing (should not raise)
+        mock_proc = MagicMock()
+        mock_proc.returncode = None
+        mock_proc.stdin = MagicMock()
+        mock_proc.stdin.is_closing = False  # boolean, not callable!
+        mock_proc.stdin.write = MagicMock()
+        mock_proc.stdin.drain = AsyncMock()
+        session.active_proc = mock_proc
+
+        await em.handle_approval("safe_closing_test", "allow-once", rule=None)
+        assert mock_proc.stdin.write.called
+
+        mock_proc.stdin.write.reset_mock()
+        await em.handle_stdin_input("safe_closing_test", "user input text")
+        assert mock_proc.stdin.write.called
+
+        if session.worker_task:
+            session.worker_task.cancel()
+
+    asyncio.run(_run())
+    print("✓ test_execution_manager_stdin_safe_closing passed")
+
+
+
 if __name__ == "__main__":
     test_agy_driver_resolve_external_and_unlisted_models()
     test_execution_manager_register_session_cid_migration()

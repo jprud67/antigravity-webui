@@ -290,11 +290,17 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
       const isStepError = s.status === 'ERROR' || Boolean(s.error);
       for (const tc of toolCallsRaw) {
         if (!tc || typeof tc !== 'object') continue;
+        let rawArgs = tc.args || tc.parameters || tc.function?.arguments || {};
+        if (typeof rawArgs === 'string') {
+          try {
+            rawArgs = JSON.parse(rawArgs);
+          } catch {}
+        }
         currentAssistantMsg.toolCalls = currentAssistantMsg.toolCalls || [];
         currentAssistantMsg.toolCalls.push({
           id: tc.id || tc.tool_call_id || tc.call_id || undefined,
-          name: tc.name || tc.tool_name || tc.toolAction || 'tool',
-          args: tc.args || tc.parameters || {},
+          name: tc.name || tc.tool_name || tc.toolAction || tc.function?.name || 'tool',
+          args: rawArgs,
           result: undefined,
           status: isStepError ? 'error' : (s.status === 'DONE' ? 'done' : 'running')
         });

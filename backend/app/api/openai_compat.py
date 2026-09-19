@@ -383,6 +383,7 @@ async def create_chat_completion(
                                     }
                                 ]
                             }
+                            first_chunk_sent = True
                             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
 
                         if res.get("usage"):
@@ -553,7 +554,7 @@ def _tool_choice_disables_tools(tool_choice: Any) -> bool:
     return isinstance(tool_choice, str) and tool_choice.strip().lower() == "none"
 
 
-async def _tool_mode_response(req: ChatCompletionRequest, tool_list: list[dict[str, Any]]):
+async def _tool_mode_response(req: ChatCompletionRequest, tool_list_or_outcome: list[dict[str, Any]] | dict[str, Any]):
     """
     Produit la réponse OpenAI (tool_calls ou texte) via le pont tool_bridge.
 
@@ -564,13 +565,16 @@ async def _tool_mode_response(req: ChatCompletionRequest, tool_list: list[dict[s
     completion_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
     created_ts = int(time.time())
 
-    outcome = await tool_bridge.run_turn(
-        messages=[message.model_dump() for message in req.messages],
-        tools=tool_list,
-        tool_choice=req.tool_choice,
-        model=req.model,
-        effort=req.effort,
-    )
+    if isinstance(tool_list_or_outcome, dict) and "kind" in tool_list_or_outcome:
+        outcome = tool_list_or_outcome
+    else:
+        outcome = await tool_bridge.run_turn(
+            messages=[message.model_dump() for message in req.messages],
+            tools=tool_list_or_outcome if isinstance(tool_list_or_outcome, list) else [],
+            tool_choice=req.tool_choice,
+            model=req.model,
+            effort=req.effort,
+        )
 
     if outcome.get("kind") == "error":
         _raise_http_for_error(
