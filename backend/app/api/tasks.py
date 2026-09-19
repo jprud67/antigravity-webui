@@ -159,9 +159,11 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
 
 def _mark_task_cancelled(task_id: str) -> bool:
     """Marks task log file in BRAIN_DIR as cancelled if found."""
-    if not BRAIN_DIR.exists():
+    if not BRAIN_DIR.exists() or not task_id:
         return False
     clean_tid = task_id.strip()
+    if not clean_tid or "\x00" in clean_tid:
+        return False
     cid_part = None
     if "/" in clean_tid:
         parts = clean_tid.split("/")
@@ -169,6 +171,11 @@ def _mark_task_cancelled(task_id: str) -> bool:
         pure_tid = parts[-1].strip()
     else:
         pure_tid = clean_tid
+
+    if cid_part and not is_safe_conversation_id(cid_part):
+        return False
+    if not pure_tid or ".." in pure_tid or "/" in pure_tid or "\\" in pure_tid:
+        return False
 
     cands = [pure_tid]
     if not pure_tid.endswith(".log"):
@@ -179,6 +186,8 @@ def _mark_task_cancelled(task_id: str) -> bool:
         candidate_dirs = [BRAIN_DIR / cid_part] if cid_part and (BRAIN_DIR / cid_part).is_dir() else BRAIN_DIR.iterdir()
         for cdir in candidate_dirs:
             if not cdir.is_dir():
+                continue
+            if not is_safe_conversation_id(cdir.name):
                 continue
             for cand in cands:
                 tfile = cdir / ".system_generated" / "tasks" / cand

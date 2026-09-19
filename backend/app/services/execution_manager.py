@@ -474,6 +474,11 @@ class ExecutionSession:
                                     self.live_content = ""
                                     self.live_tool_calls = []
                                     await self._clear_pending_approval(reason="failover")
+                                    if self.active_proc and self.active_proc.returncode is None:
+                                        try:
+                                            await terminate_process_group_async(self.active_proc, grace=0.5)
+                                        except Exception as e:
+                                            logger.debug(f"Error terminating previous proc on model failover: {e}")
                                     self.active_proc = None
                                     await self.broadcast({
                                         "event": "model_failover",
@@ -507,6 +512,11 @@ class ExecutionSession:
                         self.live_content = ""
                         self.live_tool_calls = []
                         await self._clear_pending_approval(reason="failover")
+                        if self.active_proc and self.active_proc.returncode is None:
+                            try:
+                                await terminate_process_group_async(self.active_proc, grace=0.5)
+                            except Exception as e:
+                                logger.debug(f"Error terminating previous proc on account failover: {e}")
                         self.active_proc = None
                         await self.broadcast({
                             "event": "account_failover",

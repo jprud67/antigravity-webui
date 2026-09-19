@@ -200,6 +200,18 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
             safe_lmt = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
         except (OverflowError, ValueError, OSError):
             safe_lmt = str(raw_lmt)
+    elif isinstance(raw_lmt, str) and raw_lmt.strip():
+        stripped_lmt = raw_lmt.strip()
+        if stripped_lmt.replace(".", "", 1).isdigit():
+            try:
+                ts = float(stripped_lmt)
+                if ts > 100_000_000_000:
+                    ts /= 1000.0
+                safe_lmt = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+            except (OverflowError, ValueError, OSError):
+                safe_lmt = stripped_lmt
+        else:
+            safe_lmt = stripped_lmt
     else:
         safe_lmt = str(raw_lmt) if raw_lmt is not None else ""
 
@@ -420,10 +432,38 @@ def clean_user_prompt(raw: Any) -> str:
     if not raw:
         return ""
     if not isinstance(raw, str):
-        try:
-            raw = str(raw)
-        except Exception:
-            return ""
+        if isinstance(raw, list):
+            parts: list[str] = []
+            for item in raw:
+                if isinstance(item, str):
+                    parts.append(item)
+                elif isinstance(item, dict):
+                    if "text" in item and isinstance(item["text"], str):
+                        parts.append(item["text"])
+                    elif "content" in item and isinstance(item["content"], str):
+                        parts.append(item["content"])
+            if parts:
+                raw = "\n".join(parts)
+            else:
+                try:
+                    raw = str(raw)
+                except Exception:
+                    return ""
+        elif isinstance(raw, dict):
+            if "text" in raw and isinstance(raw["text"], str):
+                raw = raw["text"]
+            elif "content" in raw and isinstance(raw["content"], str):
+                raw = raw["content"]
+            else:
+                try:
+                    raw = str(raw)
+                except Exception:
+                    return ""
+        else:
+            try:
+                raw = str(raw)
+            except Exception:
+                return ""
     # Strip metadata XML blocks first (e.g. CONTEXT_SUMMARY, SKILLS, SYSTEM_MESSAGE, etc.)
     text = _XML_BLOCKS_RE.sub('', raw)
     matches = _USER_REQUEST_RE.findall(text)

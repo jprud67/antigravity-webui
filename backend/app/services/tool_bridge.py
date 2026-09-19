@@ -251,19 +251,31 @@ def _find_json_object(text: str) -> dict[str, Any] | None:
     if not text:
         return None
 
-    # 1. Tentative rapide par bloc de code markdown ```json ... ```
-    m = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text, re.IGNORECASE)
-    if m:
+    # 1. Tentative directe si la réponse est déjà un objet JSON pur
+    stripped = text.strip()
+    if stripped.startswith("{") and stripped.endswith("}"):
         try:
-            cand = json.loads(m.group(1))
+            direct = json.loads(stripped)
+            if isinstance(direct, dict):
+                return direct
+        except Exception:
+            pass
+
+    decoder = json.JSONDecoder()
+
+    # 2. Tentative rapide par bloc de code markdown ```json ... ```
+    m = re.search(r"```(?:json)?\s*(\{)", text, re.IGNORECASE)
+    if m:
+        brace_pos = m.start(1)
+        try:
+            cand, _ = decoder.raw_decode(text, brace_pos)
             if isinstance(cand, dict):
                 if "action" in cand:
                     return cand
         except Exception:
             pass
 
-    # 2. Décodage progressif des objets JSON dans le texte
-    decoder = json.JSONDecoder()
+    # 3. Décodage progressif des objets JSON dans le texte
     best: dict[str, Any] | None = None
     index = 0
     iterations = 0

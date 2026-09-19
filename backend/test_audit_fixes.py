@@ -6182,6 +6182,108 @@ def test_files_save_file_content_exception_cleanup():
     print("✓ test_files_save_file_content_exception_cleanup passed")
 
 
+def test_clean_user_prompt_multipart_and_dict():
+    from app.services.storage import clean_user_prompt
+
+    # Test list of text blocks
+    blocks = [
+        {"type": "text", "text": "Bonjour,"},
+        " voici ma question :",
+        {"type": "text", "text": " <USER_REQUEST>Explique ce code</USER_REQUEST>"},
+    ]
+    assert clean_user_prompt(blocks) == "Explique ce code"
+
+    # Test dict input
+    dict_content = {"type": "text", "text": "Bonjour le monde"}
+    assert clean_user_prompt(dict_content) == "Bonjour le monde"
+
+    # Test dict with content key
+    dict_content2 = {"content": "Autre test"}
+    assert clean_user_prompt(dict_content2) == "Autre test"
+    print("✓ test_clean_user_prompt_multipart_and_dict passed")
+
+
+def test_build_conversation_dict_string_numeric_timestamp():
+    import sqlite3
+
+    from app.services.storage import _build_conversation_dict
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE test_conv (
+            conversation_id TEXT,
+            title TEXT,
+            preview TEXT,
+            step_count INTEGER,
+            last_modified_time TEXT,
+            workspace_uris TEXT,
+            status TEXT,
+            agent_name TEXT,
+            parent_conversation_id TEXT,
+            project_id TEXT,
+            group_id TEXT
+        )
+    """)
+    # Insert with numeric timestamp stored as text string
+    cursor.execute(
+        "INSERT INTO test_conv VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("conv-num-str", "Test Title", "Preview", 1, "1726742461.0", "[]", "idle", "default", None, "", "")
+    )
+    cursor.execute("SELECT * FROM test_conv WHERE conversation_id = 'conv-num-str'")
+    row = cursor.fetchone()
+    res = _build_conversation_dict(row, {})
+    assert "T" in res["last_modified_time"]
+    assert res["last_modified_time"].startswith("202")
+    print("✓ test_build_conversation_dict_string_numeric_timestamp passed")
+
+
+def test_tool_bridge_find_json_nested_markdown():
+    from app.services.tool_bridge import _find_json_object
+
+    # Direct JSON
+    direct_json = '{"action": "final", "content": "Direct reply"}'
+    res_direct = _find_json_object(direct_json)
+    assert res_direct is not None
+    assert res_direct.get("action") == "final"
+    assert res_direct.get("content") == "Direct reply"
+
+    # Nested JSON inside markdown code fence
+    markdown_with_nested = '''Here is the requested tool call:
+```json
+{
+  "action": "tool_call",
+  "tool": "execute_code",
+  "arguments": {
+    "language": "python",
+    "options": {"strict": true, "timeout": 30}
+  },
+  "content": ""
+}
+```
+Done!'''
+    res_nested = _find_json_object(markdown_with_nested)
+    assert res_nested is not None
+    assert res_nested.get("action") == "tool_call"
+    assert res_nested.get("tool") == "execute_code"
+    assert isinstance(res_nested.get("arguments"), dict)
+    assert res_nested["arguments"].get("options", {}).get("strict") is True
+    print("✓ test_tool_bridge_find_json_nested_markdown passed")
+
+
+def test_tasks_mark_cancelled_path_traversal():
+    from app.api.tasks import _mark_task_cancelled
+
+    # Null byte or traversal attempt should immediately return False
+    assert _mark_task_cancelled("") is False
+    assert _mark_task_cancelled("test\x00malicious") is False
+    assert _mark_task_cancelled("../../etc/passwd") is False
+    assert _mark_task_cancelled("valid-cid/../../etc/passwd") is False
+    assert _mark_task_cancelled("../unsafe_cid/task1") is False
+    print("✓ test_tasks_mark_cancelled_path_traversal passed")
+
+
 if __name__ == "__main__":
     test_agy_driver_resolve_external_and_unlisted_models()
     test_execution_manager_register_session_cid_migration()
@@ -6420,6 +6522,10 @@ if __name__ == "__main__":
     test_storage_notification_helpers()
     test_execution_session_clear_pending_approval()
     test_files_save_file_content_exception_cleanup()
+    test_clean_user_prompt_multipart_and_dict()
+    test_build_conversation_dict_string_numeric_timestamp()
+    test_tool_bridge_find_json_nested_markdown()
+    test_tasks_mark_cancelled_path_traversal()
     print("\nAll unit tests passed successfully!")
 
 
