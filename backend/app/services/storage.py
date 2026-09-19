@@ -374,11 +374,12 @@ def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
     legacy_file = conv_dir / "transcript.jsonl"
 
     target_file = None
+    has_canonical = transcript_full_file.exists() or transcript_file.exists()
     if transcript_full_file.exists() and transcript_full_file.stat().st_size > 0:
         target_file = transcript_full_file
     elif transcript_file.exists() and transcript_file.stat().st_size > 0:
         target_file = transcript_file
-    elif legacy_file.exists() and legacy_file.stat().st_size > 0:
+    elif not has_canonical and legacy_file.exists() and legacy_file.stat().st_size > 0:
         target_file = legacy_file
     elif transcript_full_file.exists():
         target_file = transcript_full_file
@@ -1273,11 +1274,21 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
     # Persist updated compact transcript file atomically
     if transcript_file.exists():
         atomic_write_jsonl(transcript_file, remaining_steps)
+        if legacy_file.exists():
+            try:
+                legacy_file.unlink(missing_ok=True)
+            except OSError as unl_err:
+                logger.debug(f"Ignored legacy transcript removal error: {unl_err}")
     elif not transcript_full_file.exists() and legacy_file.exists():
         atomic_write_jsonl(legacy_file, remaining_steps)
     else:
         transcript_file.parent.mkdir(parents=True, exist_ok=True)
         atomic_write_jsonl(transcript_file, remaining_steps)
+        if legacy_file.exists():
+            try:
+                legacy_file.unlink(missing_ok=True)
+            except OSError as unl_err:
+                logger.debug(f"Ignored legacy transcript removal error: {unl_err}")
 
     # Persist updated full transcript file independently to avoid degrading unabridged history
     remaining_full_steps = remaining_steps  # valeur de repli sûre si le fichier est absent

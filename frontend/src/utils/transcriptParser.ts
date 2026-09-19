@@ -3,7 +3,7 @@ import type { ChatMessage } from '../types';
 const REQUEST_REGEX = /<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/gi;
 const XML_BLOCKS_REGEX = /<(ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?<\/\1>/gi;
 const XML_TAGS_REGEX = /<\/?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>/gi;
-const STEERING_PREFIX_REGEX = /^(?:⚡\s*\[(?:Guidage|Steering)\]\s*|📥\s*\[(?:En attente|Queued)\]\s*|\[(?:Instruction Prioritaire de Guidage|Priority Steering Instruction)\]\s*:?\s*)+/gi;
+const STEERING_PREFIX_REGEX = /^(?:⚡\s*\[(?:Guidage|Steering)\]\s*|📥\s*\[(?:En attente|Queued)\]\s*|\[(?:Instruction Prioritaire de Guidage|Priority Steering Instruction)\]\s*:?\s*)+/i;
 const TASK_NOTIFY_REGEX = /Task id "([^"]+)" finished with result:\s*([\s\S]*)/i;
 const SYSTEM_MESSAGE_TAG_REGEX = /<SYSTEM_MESSAGE>([\s\S]*?)<\/SYSTEM_MESSAGE>/i;
 const USER_METADATA_CHECK_REGEX = /<(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY)>/i;
@@ -51,6 +51,7 @@ export function cleanUserPrompt(raw: any): string {
   let cleaned = str.replace(XML_BLOCKS_REGEX, '');
 
   // 2. Extraire le contenu spécifique de <USER_REQUEST> s'il est présent
+  REQUEST_REGEX.lastIndex = 0;
   const requestMatches = [...cleaned.matchAll(REQUEST_REGEX)];
   if (requestMatches.length > 0) {
     cleaned = requestMatches[requestMatches.length - 1][1];

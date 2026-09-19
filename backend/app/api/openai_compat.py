@@ -584,12 +584,17 @@ async def _tool_mode_response(req: ChatCompletionRequest, tool_list: list[dict[s
 
     tool_call_payload: dict[str, Any] | None = None
     if outcome.get("kind") == "tool_call":
+        raw_args = outcome.get("arguments")
+        if isinstance(raw_args, str):
+            formatted_args = raw_args
+        else:
+            formatted_args = json.dumps(raw_args or {}, ensure_ascii=False)
         tool_call_payload = {
             "id": outcome.get("id") or f"call_{uuid.uuid4().hex[:24]}",
             "type": "function",
             "function": {
                 "name": outcome.get("name") or "",
-                "arguments": json.dumps(outcome.get("arguments") or {}, ensure_ascii=False),
+                "arguments": formatted_args,
             },
         }
         message: dict[str, Any] = {

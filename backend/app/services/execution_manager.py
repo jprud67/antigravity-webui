@@ -759,20 +759,31 @@ class ExecutionManager:
                     s.workspace_path = workspace_path
                 # Ensure worker task is running
                 if not s.worker_task or s.worker_task.done():
-                    s.worker_task = asyncio.create_task(s.queue_worker())
+                    try:
+                        s.worker_task = asyncio.create_task(s.queue_worker())
+                    except RuntimeError:
+                        s.worker_task = None
                 return s
             if self.active_session and self.active_session.conversation_id == conversation_id:
                 self.sessions[conversation_id] = self.active_session
                 if workspace_path:
                     self.active_session.workspace_path = workspace_path
                 if not self.active_session.worker_task or self.active_session.worker_task.done():
-                    self.active_session.worker_task = asyncio.create_task(self.active_session.queue_worker())
+                    try:
+                        self.active_session.worker_task = asyncio.create_task(self.active_session.queue_worker())
+                    except RuntimeError:
+                        self.active_session.worker_task = None
                 return self.active_session
 
         if not conversation_id and self.active_session and self.active_session.is_busy:
             if ws is None or ws in self.active_session.subscribers or self.active_session.conversation_id is None:
                 if workspace_path and not self.active_session.workspace_path:
                     self.active_session.workspace_path = workspace_path
+                if not self.active_session.worker_task or self.active_session.worker_task.done():
+                    try:
+                        self.active_session.worker_task = asyncio.create_task(self.active_session.queue_worker())
+                    except RuntimeError:
+                        self.active_session.worker_task = None
                 return self.active_session
 
         if self.active_session and (not self.active_session.conversation_id or self.active_session.conversation_id not in self.sessions):
@@ -780,7 +791,10 @@ class ExecutionManager:
                 self.active_session.worker_task.cancel()
 
         session = ExecutionSession(conversation_id=conversation_id, workspace_path=workspace_path)
-        session.worker_task = asyncio.create_task(session.queue_worker())
+        try:
+            session.worker_task = asyncio.create_task(session.queue_worker())
+        except RuntimeError:
+            session.worker_task = None
         if conversation_id:
             self.sessions[conversation_id] = session
         self.active_session = session
@@ -881,6 +895,7 @@ class ExecutionManager:
         session.last_active_at = time.time()
         self.active_session = session
 
+        payload = dict(data)
         if session.is_busy:
             if mode == "steer":
                 logger.info(f"Steering session {session.conversation_id}")
@@ -903,15 +918,15 @@ class ExecutionManager:
                     except (asyncio.QueueEmpty, ValueError):
                         break
                 steering_prefix = "[Instruction Prioritaire de Guidage] : "
-                data["prompt"] = prompt if prompt.startswith(steering_prefix) else f"{steering_prefix}{prompt}"
-                await session.message_queue.put(data)
+                payload["prompt"] = prompt if prompt.startswith(steering_prefix) else f"{steering_prefix}{prompt}"
+                await session.message_queue.put(payload)
                 await session.broadcast({
                     "event": "steered",
                     "conversation_id": session.conversation_id,
                     "message": "Guidage transmis : nouvelle instruction prioritaire en cours d'exécution."
                 })
             else:
-                await session.message_queue.put(data)
+                await session.message_queue.put(payload)
                 qsize = session.message_queue.qsize()
                 logger.info(f"Queued message in session {session.conversation_id} (queue size: {qsize})")
                 await session.broadcast({
@@ -921,7 +936,7 @@ class ExecutionManager:
                     "prompt_preview": prompt[:60]
                 })
         else:
-            await session.message_queue.put(data)
+            await session.message_queue.put(payload)
 
     async def interrupt(self, conversation_id: str | None = None):
         session = self.get_session(conversation_id)

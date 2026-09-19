@@ -6281,7 +6281,114 @@ def test_tasks_mark_cancelled_path_traversal():
     assert _mark_task_cancelled("../../etc/passwd") is False
     assert _mark_task_cancelled("valid-cid/../../etc/passwd") is False
     assert _mark_task_cancelled("../unsafe_cid/task1") is False
-    print("✓ test_tasks_mark_cancelled_path_traversal passed")
+def test_storage_canonical_transcript_precedence_over_legacy():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services.storage import get_conversation_transcript, undo_conversation_turn
+
+    with tempfile.TemporaryDirectory() as td:
+        brain_dir = Path(td)
+        cid = "conv_trans_precedence"
+        conv_dir = brain_dir / cid
+        conv_dir.mkdir(parents=True, exist_ok=True)
+        logs_dir = conv_dir / ".system_generated" / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+
+        legacy_file = conv_dir / "transcript.jsonl"
+        canonical_file = logs_dir / "transcript.jsonl"
+
+        # Legacy file has obsolete data
+        legacy_file.write_text('{"type": "USER_INPUT", "content": "legacy old"}\n', encoding="utf-8")
+        # Canonical file exists but is 0 bytes (e.g. freshly cleared / truncated)
+        canonical_file.write_text('', encoding="utf-8")
+
+        with patch("app.services.storage.BRAIN_DIR", brain_dir):
+            # Because canonical files exist, legacy file must not resurrect obsolete data!
+            steps = get_conversation_transcript(cid)
+            assert steps == [], f"Expected empty list for canonical empty transcript, got {steps}"
+
+            # If canonical has data and legacy also exists
+            canonical_file.write_text(
+                '{"type": "USER_INPUT", "content": "hello 1"}\n'
+                '{"type": "PLANNER_RESPONSE", "content": "reply 1"}\n'
+                '{"type": "USER_INPUT", "content": "hello 2"}\n'
+                '{"type": "PLANNER_RESPONSE", "content": "reply 2"}\n',
+                encoding="utf-8"
+            )
+            # When undoing, canonical is updated and obsolete legacy file is cleaned up
+            undo_conversation_turn(cid)
+            assert not legacy_file.exists(), "Obsolete legacy_file should have been removed on undo"
+            updated_steps = get_conversation_transcript(cid)
+            assert len(updated_steps) == 2
+            assert updated_steps[-1]["content"] == "reply 1"
+
+    print("✓ test_storage_canonical_transcript_precedence_over_legacy passed")
+
+
+def test_openai_compat_tool_mode_string_and_dict_arguments():
+    import asyncio
+    import json
+    from app.api.openai_compat import _tool_mode_response, ChatCompletionRequest
+
+    req = ChatCompletionRequest(
+        model="gemini-2.5-flash",
+        messages=[{"role": "user", "content": "test"}],
+        stream=False
+    )
+
+    async def _run():
+        # 1. Outcome with dict arguments
+        outcome_dict = {
+            "kind": "tool_call",
+            "name": "get_weather",
+            "arguments": {"location": "Paris"}
+        }
+        res1 = await _tool_mode_response(req, outcome_dict)
+        call1 = res1["choices"][0]["message"]["tool_calls"][0]
+        assert call1["function"]["name"] == "get_weather"
+        assert json.loads(call1["function"]["arguments"]) == {"location": "Paris"}
+
+        # 2. Outcome with pre-serialized string arguments
+        outcome_str = {
+            "kind": "tool_call",
+            "name": "search_code",
+            "arguments": '{"query": "def run"}'
+        }
+        res2 = await _tool_mode_response(req, outcome_str)
+        call2 = res2["choices"][0]["message"]["tool_calls"][0]
+        assert call2["function"]["name"] == "search_code"
+        # Must NOT be double JSON-encoded (e.g. "\"{\\\"query\\\"...}\"")
+        assert call2["function"]["arguments"] == '{"query": "def run"}'
+        assert json.loads(call2["function"]["arguments"]) == {"query": "def run"}
+
+    asyncio.run(_run())
+    print("✓ test_openai_compat_tool_mode_string_and_dict_arguments passed")
+
+
+def test_execution_manager_submit_prompt_data_purity():
+    import asyncio
+    from app.services.execution_manager import ExecutionManager
+
+    async def run_test():
+        em = ExecutionManager()
+        session = em.get_or_create_session("conv_purity_test")
+        session.is_running = True  # busy session
+
+        original_input = {"conversation_id": "conv_purity_test", "prompt": "Original prompt", "mode": "steer"}
+        input_copy = dict(original_input)
+
+        await em.submit_prompt(ws=None, data=original_input)
+        # Verify original_input dictionary was not mutated in-place
+        assert original_input["prompt"] == input_copy["prompt"], "original input dict should not be mutated"
+        # Verify message queued has the steering prefix
+        queued_item = await session.message_queue.get()
+        assert queued_item["prompt"].startswith("[Instruction Prioritaire de Guidage] : ")
+        if session.worker_task:
+            session.worker_task.cancel()
+
+    asyncio.run(run_test())
+    print("✓ test_execution_manager_submit_prompt_data_purity passed")
 
 
 if __name__ == "__main__":
@@ -6526,6 +6633,9 @@ if __name__ == "__main__":
     test_build_conversation_dict_string_numeric_timestamp()
     test_tool_bridge_find_json_nested_markdown()
     test_tasks_mark_cancelled_path_traversal()
+    test_storage_canonical_transcript_precedence_over_legacy()
+    test_openai_compat_tool_mode_string_and_dict_arguments()
+    test_execution_manager_submit_prompt_data_purity()
     print("\nAll unit tests passed successfully!")
 
 

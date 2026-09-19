@@ -297,13 +297,13 @@ def update_metadata(conversation_id: str, req: MetadataUpdateRequest, _ = Depend
     title_val = updates.get("customTitle")
     project_val = updates.get("project_id") if "project_id" in updates else (updates.get("projectId") if "projectId" in updates else updates.get("project"))
     group_val = updates.get("group_id") if "group_id" in updates else updates.get("groupId")
-    if title_val is not None or project_val is not None or group_val is not None:
+    if (title_val is not None and str(title_val).strip()) or project_val is not None or group_val is not None:
         try:
             update_conversation_summary_fields(
                 conversation_id,
-                title=title_val,
-                project_id=project_val,
-                group_id=group_val,
+                title=str(title_val).strip() if (title_val is not None and str(title_val).strip()) else None,
+                project_id=str(project_val).strip() if project_val is not None else None,
+                group_id=str(group_val).strip() if group_val is not None else None,
             )
         except Exception as e:
             logger.warning(f"Failed to sync conversation summary metadata for {conversation_id}: {e}")
