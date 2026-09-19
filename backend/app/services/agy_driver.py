@@ -235,8 +235,20 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
         "default", "auto",
         "gpt-4", "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo",
         "o1", "o1-mini", "o1-preview", "o3", "o3-mini",
+        "chatgpt-4o-latest",
     }
-    if norm in openai_generic_models or (norm.startswith("gpt-") and "oss" not in norm) or norm.startswith("text-davinci"):
+    if (
+        norm in openai_generic_models
+        or (norm.startswith("gpt-") and "oss" not in norm)
+        or norm.startswith(("chatgpt", "text-davinci"))
+    ):
+        eff_clean = effort.strip().lower() if (effort and effort.strip()) else "high"
+        if eff_clean not in ["high", "medium", "low"]:
+            eff_clean = "high"
+        return f"gemini-3.8-flash-{eff_clean}", None
+
+    # External unknown models sent through OpenAI compatibility layer (DeepSeek, Llama, Mistral, Qwen)
+    if any(prefix in norm for prefix in ["deepseek", "llama", "qwen", "mistral"]):
         eff_clean = effort.strip().lower() if (effort and effort.strip()) else "high"
         if eff_clean not in ["high", "medium", "low"]:
             eff_clean = "high"
@@ -272,6 +284,11 @@ def resolve_model_and_effort(model: str | None, effort: str | None) -> tuple[str
         m_ver = re.search(r"(\d+\.\d+)", norm)
         if m_ver:
             ver = m_ver.group(1)
+            # Normalize legacy / unlisted versions to supported agy models
+            if tier == "pro" and ver != "3.1":
+                ver = "3.1"
+            elif tier != "pro" and ver not in ["3.8", "3.7", "3.6"]:
+                ver = "3.8"
             return f"gemini-{ver}-{tier}-{eff}", None
         else:
             default_ver = "3.1" if tier == "pro" else "3.8"
@@ -538,6 +555,19 @@ async def stream_turn(
                 await quota_task
             except (asyncio.CancelledError, Exception):
                 logger.debug("Ignored error")
+
+        if proc and proc.stdin:
+            try:
+                is_closing = getattr(proc.stdin, "is_closing", None)
+                closing = is_closing() if callable(is_closing) else False
+                if inspect.isawaitable(closing):
+                    await closing
+                if not closing:
+                    close_fn = getattr(proc.stdin, "close", None)
+                    if callable(close_fn):
+                        close_fn()
+            except Exception as e:
+                logger.debug(f"Ignored error closing proc.stdin: {e}")
 
         # Terminaison robuste du groupe de processus si encore actif
         # (couvre GeneratorExit, break et erreurs) — multiplateforme.

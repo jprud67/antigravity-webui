@@ -5837,7 +5837,103 @@ def test_conversations_api_metadata_project_id_sync():
     print("✓ test_conversations_api_metadata_project_id_sync passed")
 
 
+def test_agy_driver_resolve_external_and_unlisted_models():
+    from app.services.agy_driver import resolve_model_and_effort
+
+    # ChatGPT latest alias
+    m, eff = resolve_model_and_effort("chatgpt-4o-latest", None)
+    assert m == "gemini-3.8-flash-high"
+    assert eff is None
+
+    # DeepSeek reasoning/chat models
+    m, eff = resolve_model_and_effort("deepseek-chat", "medium")
+    assert m == "gemini-3.8-flash-medium"
+    assert eff is None
+
+    # Unsupported Gemini version mapping
+    m, eff = resolve_model_and_effort("gemini-2.5-pro", "high")
+    assert m == "gemini-3.1-pro-high"
+
+    m, eff = resolve_model_and_effort("gemini-1.5-flash", "low")
+    assert m == "gemini-3.8-flash-low"
+    print("✓ test_agy_driver_resolve_external_and_unlisted_models passed")
+
+
+def test_execution_manager_register_session_cid_migration():
+    from app.services.execution_manager import ExecutionSession, execution_manager
+
+    s = ExecutionSession(conversation_id="old_temp_id")
+    execution_manager.sessions["old_temp_id"] = s
+
+    # Re-register with new ID
+    execution_manager.register_session_cid(s, "new_clean_id")
+
+    assert "old_temp_id" not in execution_manager.sessions
+    assert execution_manager.sessions["new_clean_id"] is s
+    assert s.conversation_id == "new_clean_id"
+
+    # Cleanup
+    execution_manager.sessions.pop("new_clean_id", None)
+    print("✓ test_execution_manager_register_session_cid_migration passed")
+
+
+def test_storage_build_conversation_dict_workspace_uris():
+    fake_row = {
+        "conversation_id": "test_cid_uris",
+        "title": "Title",
+        "preview": "Prev",
+        "step_count": 1,
+        "last_modified_time": "2026-01-01T00:00:00Z",
+        "workspace_uris": None,
+        "status": "idle",
+        "agent_name": "agent",
+        "parent_conversation_id": None,
+        "project_id": "",
+        "group_id": "",
+    }
+    res = _build_conversation_dict(fake_row, {})  # type: ignore[arg-type]
+    assert res["workspace_uris"] == "[]"
+    assert isinstance(res["workspace_uris"], str)
+    print("✓ test_storage_build_conversation_dict_workspace_uris passed")
+
+
+def test_crons_api_enabled_and_paused_state():
+    from app.api.crons import CreateCronJobRequest, UpdateCronJobRequest
+
+    req_create = CreateCronJobRequest(
+        name="Test Paused",
+        prompt="Do something",
+        schedule="every 1h",
+        enabled=False,
+    )
+    assert req_create.enabled is False
+
+    req_update = UpdateCronJobRequest(enabled=False)
+    assert req_update.enabled is False
+    print("✓ test_crons_api_enabled_and_paused_state passed")
+
+
+def test_files_validate_path_access_control_chars():
+    from fastapi import HTTPException
+
+    from app.api.files import _validate_path_access
+
+    # Multi-layer URL encoded path with control char (%0a = newline)
+    try:
+        _validate_path_access(Path("/workspace%250a/test"))
+        assert False, "Should have raised HTTPException for control char"
+    except HTTPException as e:
+        assert e.status_code == 400
+        assert "caractère de contrôle" in e.detail
+    print("✓ test_files_validate_path_access_control_chars passed")
+
+
 if __name__ == "__main__":
+    test_agy_driver_resolve_external_and_unlisted_models()
+    test_execution_manager_register_session_cid_migration()
+    test_storage_build_conversation_dict_workspace_uris()
+    test_crons_api_enabled_and_paused_state()
+    test_files_validate_path_access_control_chars()
     test_execution_manager_safe_session_iteration()
     test_openai_compat_error_event_quota_propagation()
     test_openai_compat_streaming_error_is_quota()

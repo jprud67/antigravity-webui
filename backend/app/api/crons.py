@@ -40,6 +40,8 @@ class CreateCronJobRequest(BaseModel):
     skills: list[str] | None = None
     model: str | None = None
     effort: str | None = None
+    state: str | None = "scheduled"  # "scheduled" or "paused"
+    enabled: bool | None = None
 
 
 class UpdateCronJobRequest(BaseModel):
@@ -47,6 +49,7 @@ class UpdateCronJobRequest(BaseModel):
     prompt: str | None = None
     schedule: str | None = None
     state: str | None = None  # "scheduled" or "paused"
+    enabled: bool | None = None
     skills: list[str] | None = None
     model: str | None = None
     effort: str | None = None
@@ -113,12 +116,13 @@ def create_cron_job(req: CreateCronJobRequest, _ = Depends(require_auth)):
         "skills": [s.strip() for s in (req.skills or []) if isinstance(s, str) and s.strip()],
         "model": req.model.strip() if req.model and req.model.strip() else None,
         "effort": req.effort.strip() if req.effort and req.effort.strip() else None,
-        "enabled": True,
-        "state": "scheduled",
+        "enabled": not ((req.state and req.state.lower() in ["paused", "disabled"]) or (req.enabled is False)),
+        "state": "paused" if ((req.state and req.state.lower() in ["paused", "disabled"]) or (req.enabled is False)) else "scheduled",
         "created_at": now_iso(),
-        "next_run_at": next_run,
+        "paused_at": now_iso() if ((req.state and req.state.lower() in ["paused", "disabled"]) or (req.enabled is False)) else None,
+        "next_run_at": None if ((req.state and req.state.lower() in ["paused", "disabled"]) or (req.enabled is False)) else next_run,
         "last_run_at": None,
-        "last_status": None,
+        "last_status": "paused" if ((req.state and req.state.lower() in ["paused", "disabled"]) or (req.enabled is False)) else None,
         "deliver": req.deliver or "local"
     }
 
@@ -172,7 +176,18 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
                     }
                     j["schedule_display"] = sched_raw
                     j["next_run_at"] = next_run
-                if req.state is not None:
+                if req.enabled is not None:
+                    if not req.enabled:
+                        j["enabled"] = False
+                        j["state"] = "paused"
+                        j["paused_at"] = now_iso()
+                        j["next_run_at"] = None
+                    else:
+                        j["enabled"] = True
+                        j["state"] = "scheduled"
+                        j["paused_at"] = None
+                        j["next_run_at"] = compute_next_run(j.get("schedule") or j.get("schedule_display")) or now_iso()
+                elif req.state is not None:
                     new_state = req.state.lower()
                     if new_state in ["paused", "disabled"]:
                         j["enabled"] = False
@@ -191,7 +206,11 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
     if not target:
         raise HTTPException(status_code=404, detail="Job cron introuvable")
 
-    if req.state is not None and req.state.lower() in ["paused", "disabled"]:
+    should_cancel = (
+        (req.enabled is False)
+        or (req.state is not None and req.state.lower() in ["paused", "disabled"])
+    )
+    if should_cancel:
         try:
             from app.services.cron_ticker import cancel_running_job
             cancel_running_job(job_id)

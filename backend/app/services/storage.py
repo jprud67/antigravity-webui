@@ -198,6 +198,17 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     except (IndexError, KeyError):
         group_id = ""
 
+    ws_uris = r["workspace_uris"]
+    if ws_uris is None:
+        safe_ws_uris = "[]"
+    elif isinstance(ws_uris, str):
+        safe_ws_uris = ws_uris
+    else:
+        try:
+            safe_ws_uris = json.dumps(ws_uris)
+        except Exception:
+            safe_ws_uris = "[]"
+
     return {
         "conversation_id": cid,
         "title": display_title,
@@ -205,7 +216,7 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
         "preview": r["preview"],
         "step_count": r["step_count"],
         "last_modified_time": safe_lmt,
-        "workspace_uris": r["workspace_uris"],
+        "workspace_uris": safe_ws_uris,
         "status": r["status"],
         "agent_name": r["agent_name"],
         "parent_conversation_id": parent_id,
@@ -1744,7 +1755,8 @@ def export_conversation_markdown(conversation_id: str) -> str:
         if role == "user":
             md_lines.append(f"## 👤 Utilisateur (Étape #{idx})")
             md_lines.append("")
-            md_lines.append(turn.get("content", "").strip() or "*(Message vide)*")
+            u_content = str(turn.get("content") or "").strip()
+            md_lines.append(u_content or "*(Message vide)*")
             md_lines.append("")
             md_lines.append("---")
             md_lines.append("")
@@ -1769,7 +1781,7 @@ def export_conversation_markdown(conversation_id: str) -> str:
         md_lines.append(f"## ⚡ Assistant Antigravity (Étape #{idx})")
         md_lines.append("")
 
-        thinking = turn.get("thinking", "").strip()
+        thinking = str(turn.get("thinking") or "").strip()
         if thinking:
             md_lines.append("> [!NOTE] Raisonnement Interne")
             for t_line in thinking.splitlines():
@@ -1804,7 +1816,7 @@ def export_conversation_markdown(conversation_id: str) -> str:
                 md_lines.append("")
             md_lines.append("</details>\n")
 
-        content = turn.get("content", "").strip()
+        content = str(turn.get("content") or "").strip()
         if content:
             md_lines.append(content)
             md_lines.append("")

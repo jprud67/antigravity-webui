@@ -88,7 +88,12 @@ def _is_blocked_sensitive_path(resolved: Path) -> bool:
 def _validate_path_access(file_path: Path) -> Path:
     try:
         from urllib.parse import unquote
-        p_str = unquote(str(file_path).strip())
+        p_str = str(file_path).strip()
+        for _ in range(3):
+            next_p = unquote(p_str)
+            if next_p == p_str:
+                break
+            p_str = next_p
         if "\x00" in p_str:
             raise HTTPException(status_code=400, detail="Chemin invalide : octet nul détecté.")
         # Strip URL fragment (#L10-L20) or query string (?...) if present from markdown links
@@ -97,6 +102,8 @@ def _validate_path_access(file_path: Path) -> Path:
         if "?" in p_str:
             p_str = p_str.split("?", 1)[0]
         p_str = p_str.strip()
+        if any(ord(c) < 32 or ord(c) == 127 for c in p_str):
+            raise HTTPException(status_code=400, detail="Chemin invalide : caractère de contrôle interdit détecté.")
         if not p_str or p_str in ("workspace:", "workspace:/", "workspace://", "file:", "file:/", "file://", "file:///", "file:/localhost", "file://localhost", "file://localhost/"):
             raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
         if os.name == "posix" and re.match(r'^[a-zA-Z]:[/\\]', p_str):

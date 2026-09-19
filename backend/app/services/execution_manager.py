@@ -662,6 +662,10 @@ class ExecutionManager:
     def register_session_cid(self, session: ExecutionSession, cid: str | None) -> None:
         clean = _clean_cid(cid)
         if clean:
+            old_cid = getattr(session, "conversation_id", None)
+            if old_cid and old_cid != clean:
+                self.sessions.pop(old_cid, None)
+            session.conversation_id = clean
             self.sessions[clean] = session
 
     def prune_inactive_sessions(self, max_idle_seconds: float = 3600.0):
