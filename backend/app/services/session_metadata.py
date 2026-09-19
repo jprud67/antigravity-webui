@@ -93,11 +93,22 @@ def _normalize_meta(meta: dict[str, Any]) -> dict[str, Any]:
         meta["tags"] = cleaned_tags
     else:
         meta["tags"] = []
-    meta["project"] = str(meta.get("project") or "").strip()
+    if "projectId" in meta:
+        if not meta.get("project_id"):
+            meta["project_id"] = meta["projectId"]
+        del meta["projectId"]
+    if "groupId" in meta:
+        if not meta.get("group_id"):
+            meta["group_id"] = meta["groupId"]
+        del meta["groupId"]
+
+    raw_project = str(meta.get("project") or "").strip()
+    raw_project_id = str(meta.get("project_id") or "").strip()
+    meta["project"] = raw_project or raw_project_id
     meta["projectColor"] = str(meta.get("projectColor") or "").strip()
     meta["customTitle"] = str(meta.get("customTitle") or "").strip()
-    meta["group_id"] = str(meta.get("group_id") or meta.get("groupId") or "").strip()
-    meta["project_id"] = str(meta.get("project_id") or meta.get("projectId") or meta.get("project") or "").strip()
+    meta["group_id"] = str(meta.get("group_id") or "").strip()
+    meta["project_id"] = raw_project_id or raw_project
     return meta
 
 
@@ -148,7 +159,22 @@ def bulk_update_session_meta_batch(updates_per_id: dict[str, dict[str, Any]]) ->
             existing = all_meta.get(clean_cid)
             if isinstance(existing, dict):
                 current.update(existing)
-            current.update(updates)
+            norm_updates = dict(updates)
+            if "projectId" in norm_updates:
+                if "project_id" not in norm_updates:
+                    norm_updates["project_id"] = norm_updates["projectId"]
+                del norm_updates["projectId"]
+            if "groupId" in norm_updates:
+                if "group_id" not in norm_updates:
+                    norm_updates["group_id"] = norm_updates["groupId"]
+                del norm_updates["groupId"]
+
+            if "project" in norm_updates and "project_id" not in norm_updates:
+                norm_updates["project_id"] = norm_updates["project"]
+            elif "project_id" in norm_updates and "project" not in norm_updates:
+                norm_updates["project"] = norm_updates["project_id"]
+
+            current.update(norm_updates)
             current = _normalize_meta(current)
             all_meta[clean_cid] = current
             results[clean_cid] = current

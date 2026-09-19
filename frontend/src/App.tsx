@@ -81,7 +81,7 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
     }
   }
 
-  const pTokens = Math.max(1, Math.ceil(promptChars / 3.8));
+  const pTokens = promptChars > 0 ? Math.max(1, Math.ceil(promptChars / 3.8)) : 0;
   const rTokens = Math.max(0, Math.ceil(responseChars / 3.8));
   const tTokens = Math.max(0, Math.ceil(thinkingChars / 3.8));
 

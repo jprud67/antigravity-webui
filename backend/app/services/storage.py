@@ -233,6 +233,13 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     except (IndexError, KeyError):
         group_id = ""
 
+    meta_project = str(meta.get("project") or "").strip()
+    meta_project_id = str(meta.get("project_id") or meta.get("projectId") or "").strip()
+
+    resolved_project_id = project_id or meta_project_id or meta_project
+    resolved_project = meta_project or meta_project_id or project_id
+    resolved_group = group_id or str(meta.get("group_id") or meta.get("groupId") or "").strip()
+
     ws_uris = r["workspace_uris"]
     if ws_uris is None:
         safe_ws_uris = "[]"
@@ -255,12 +262,12 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
         "status": r["status"],
         "agent_name": r["agent_name"],
         "parent_conversation_id": parent_id,
-        "project_id": project_id,
-        "group_id": group_id,
+        "project_id": resolved_project_id,
+        "group_id": resolved_group,
         "pinned": bool(meta.get("pinned", False)),
         "archived": bool(meta.get("archived", False)),
         "tags": safe_tags,
-        "project": str(meta.get("project") or ""),
+        "project": resolved_project,
         "projectColor": str(meta.get("projectColor") or ""),
         "customTitle": custom_title,
     }
@@ -2584,9 +2591,9 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
 
         meta_raw = payload.get("metadata")
         meta_payload: dict[str, Any] = meta_raw if isinstance(meta_raw, dict) else {}
-        project_val = str(payload.get("project") or meta_payload.get("project") or "")
+        project_val = str(payload.get("project") or payload.get("project_id") or meta_payload.get("project") or meta_payload.get("project_id") or "")
         project_id_val = str(payload.get("project_id") or meta_payload.get("project_id") or project_val)
-        group_val = str(payload.get("group_id") or meta_payload.get("group_id") or "")
+        group_val = str(payload.get("group_id") or payload.get("groupId") or meta_payload.get("group_id") or meta_payload.get("groupId") or "")
         project_color_val = str(payload.get("projectColor") or meta_payload.get("projectColor") or "")
 
         update_session_meta(new_id, {
@@ -2596,6 +2603,7 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
             "archived": bool(meta_payload.get("archived", False)),
             "tags": payload.get("tags") or meta_payload.get("tags") or ["importé"],
             "project": project_val,
+            "project_id": project_id_val,
             "projectColor": project_color_val,
             "group_id": group_val,
         })

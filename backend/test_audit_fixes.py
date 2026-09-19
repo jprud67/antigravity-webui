@@ -5822,6 +5822,7 @@ def test_session_metadata_project_id_and_group_sync():
         "groupId": "group-abc",
     }
     normalized = _normalize_meta(meta)
+    assert normalized["project"] == "proj-xyz"
     assert normalized["project_id"] == "proj-xyz"
     assert normalized["group_id"] == "group-abc"
     print("✓ test_session_metadata_project_id_and_group_sync passed")
@@ -6686,6 +6687,95 @@ def test_files_validate_path_access_unicode_and_workspace_base():
     assert res_base == Path(DEFAULT_WORKSPACE).resolve() / "test.txt"
 
 
+def test_session_metadata_bidirectional_sync_updates():
+    """Verify bidirectional synchronization between project and project_id, and group_id / groupId."""
+    from app.services.session_metadata import bulk_update_session_meta_batch, get_session_meta, delete_session_meta
+
+    cid = "test-sync-cid-audit"
+    try:
+        # Case 1: updating with project_id sets both project and project_id
+        bulk_update_session_meta_batch({cid: {"project_id": "alpha-proj"}})
+        m = get_session_meta(cid)
+        assert m["project_id"] == "alpha-proj"
+        assert m["project"] == "alpha-proj"
+
+        # Case 2: updating with project updates both
+        bulk_update_session_meta_batch({cid: {"project": "beta-proj"}})
+        m = get_session_meta(cid)
+        assert m["project_id"] == "beta-proj"
+        assert m["project"] == "beta-proj"
+
+        # Case 3: updating with projectId updates both
+        bulk_update_session_meta_batch({cid: {"projectId": "gamma-proj"}})
+        m = get_session_meta(cid)
+        assert m["project_id"] == "gamma-proj"
+        assert m["project"] == "gamma-proj"
+
+        # Case 4: clearing project clears both
+        bulk_update_session_meta_batch({cid: {"project": ""}})
+        m = get_session_meta(cid)
+        assert m["project_id"] == ""
+        assert m["project"] == ""
+
+        # Case 5: updating groupId sets group_id
+        bulk_update_session_meta_batch({cid: {"groupId": "group-99"}})
+        m = get_session_meta(cid)
+        assert m["group_id"] == "group-99"
+    finally:
+        delete_session_meta(cid)
+
+
+def test_storage_build_conversation_dict_harmonized_project():
+    """Verify _build_conversation_dict resolves project and project_id symmetrically from DB or meta."""
+    from app.services.storage import _build_conversation_dict
+
+    # Mock DB row where DB has project_id and group_id, meta is empty
+    mock_row_1 = {
+        "conversation_id": "conv-test-1",
+        "title": "Title 1",
+        "preview": "Preview",
+        "step_count": 5,
+        "last_modified_time": "2026-09-19 12:00:00",
+        "workspace_uris": "[]",
+        "status": "DONE",
+        "agent_name": "gemini",
+        "parent_conversation_id": None,
+        "project_id": "db-proj-123",
+        "group_id": "db-group-456",
+    }
+    meta_1 = {"pinned": False, "archived": False, "tags": []}
+    res_1 = _build_conversation_dict(mock_row_1, meta_1)
+    assert res_1["project"] == "db-proj-123"
+    assert res_1["project_id"] == "db-proj-123"
+    assert res_1["group_id"] == "db-group-456"
+
+    # Mock DB row where DB has empty project_id, meta has project and group_id
+    mock_row_2 = {
+        "conversation_id": "conv-test-2",
+        "title": "Title 2",
+        "preview": "Preview",
+        "step_count": 3,
+        "last_modified_time": "2026-09-19 12:00:00",
+        "workspace_uris": "[]",
+        "status": "DONE",
+        "agent_name": "gemini",
+        "parent_conversation_id": None,
+        "project_id": "",
+        "group_id": "",
+    }
+    meta_2 = {
+        "pinned": False,
+        "archived": False,
+        "tags": [],
+        "project": "meta-proj-789",
+        "group_id": "meta-group-000",
+    }
+    res_2 = _build_conversation_dict(mock_row_2, meta_2)
+    assert res_2["project"] == "meta-proj-789"
+    assert res_2["project_id"] == "meta-proj-789"
+    assert res_2["group_id"] == "meta-group-000"
+
+
 
 if __name__ == "__main__":
     test_agy_driver_resolve_external_and_unlisted_models()
@@ -6940,6 +7030,8 @@ if __name__ == "__main__":
     test_execution_manager_empty_string_normalization()
     test_git_sensitive_files_regex_db_and_sqlite()
     test_files_validate_path_access_unicode_and_workspace_base()
+    test_session_metadata_bidirectional_sync_updates()
+    test_storage_build_conversation_dict_harmonized_project()
     print("\nAll unit tests passed successfully!")
 
 
