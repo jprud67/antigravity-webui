@@ -460,7 +460,10 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
           {filename && (
             <button
               type="button"
-              onClick={() => onOpenFile?.(filename)}
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('open-workspace-file', { detail: { path: filename } }));
+                onOpenFile?.(filename);
+              }}
               title={t('open_file_name', 'Open {0}').replace('{0}', filename)}
               className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono border transition-colors truncate max-w-[240px] cursor-pointer"
               style={{

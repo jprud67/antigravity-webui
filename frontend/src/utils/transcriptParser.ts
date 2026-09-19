@@ -33,13 +33,49 @@ const TOOL_STEP_TYPES = new Set([
   'GENERATE_IMAGE',
 ]);
 
+function extractRawTextParts(val: any): string {
+  if (!val) return '';
+  if (typeof val === 'string') return val;
+  if (Array.isArray(val)) {
+    return val.map(extractRawTextParts).filter(Boolean).join('\n');
+  }
+  if (typeof val === 'object') {
+    if (typeof val.text === 'string') return val.text;
+    if (typeof val.content === 'string') return val.content;
+    if (Array.isArray(val.content)) {
+      return val.content.map(extractRawTextParts).filter(Boolean).join('\n');
+    }
+  }
+  return '';
+}
+
 /**
  * Nettoie le texte utilisateur pour extraire la requête réelle en retirant
  * les balises XML internes injectées par agy (<USER_REQUEST>, <ADDITIONAL_METADATA>, etc.)
  */
 export function cleanUserPrompt(raw: any): string {
   if (!raw) return '';
-  const str = typeof raw === 'string' ? raw : (typeof raw === 'object' ? JSON.stringify(raw) : String(raw));
+
+  let str = '';
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        const extracted = extractRawTextParts(parsed);
+        str = extracted || raw;
+      } catch {
+        str = raw;
+      }
+    } else {
+      str = raw;
+    }
+  } else if (typeof raw === 'object') {
+    const extracted = extractRawTextParts(raw);
+    str = extracted || JSON.stringify(raw);
+  } else {
+    str = String(raw);
+  }
 
   const trimmedStart = str.trimStart();
   // Optimisation de performance : court-circuiter si aucun délimiteur XML ou préfixe de guidage

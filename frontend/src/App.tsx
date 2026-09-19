@@ -284,6 +284,26 @@ export function App() {
         setTokenUsage(estimateUsageFromMessages(chatMsgs));
       }
 
+      // Automatically synchronize workspace to active conversation if available
+      const rawWs = (data as any)?.workspace_uris || data.meta?.workspace_uris || activeConv?.workspace_uris;
+      if (rawWs) {
+        try {
+          const parsed = typeof rawWs === 'string' ? JSON.parse(rawWs) : rawWs;
+          const firstUri = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : (typeof parsed === 'string' ? parsed : null);
+          if (firstUri && typeof firstUri === 'string') {
+            const cleanWs = firstUri.replace(/^file:\/\//, '').trim();
+            if (cleanWs && cleanWs.startsWith('/') && cleanWs !== currentWorkspace) {
+              setCurrentWorkspace(cleanWs);
+              try {
+                localStorage.setItem('antigravity_workspace', cleanWs);
+              } catch {}
+            }
+          }
+        } catch {
+          // ignore parsing error
+        }
+      }
+
       // Check if task is actively running in background on server
       if ((data as any).is_running) {
         setIsStreaming(true);
@@ -408,7 +428,7 @@ export function App() {
     }, 30 * 60 * 1000);
 
     return () => clearInterval(updateInterval);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for session expiration or 401 Unauthorized across all API calls
   useEffect(() => {
@@ -480,7 +500,7 @@ export function App() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Synchronize browser tab title with active conversation
   useEffect(() => {

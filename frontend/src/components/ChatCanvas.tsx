@@ -453,17 +453,25 @@ const ToolItemCard: React.FC<{ tool: ToolCallItem }> = ({ tool }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (isDiff && tool.args && typeof tool.args === 'object') {
-    const targetStr = String(tool.args.TargetContent ?? '');
-    const replacementStr = String(tool.args.ReplacementContent ?? '');
-    const diffSnippet = `--- ${tool.args.TargetFile || 'original'}\n+++ ${tool.args.TargetFile || 'modifié'}\n@@ -${tool.args.StartLine || 1} +${tool.args.StartLine || 1} @@\n${targetStr.split('\n').map((l: string) => '-' + l).join('\n')}\n${replacementStr.split('\n').map((l: string) => '+' + l).join('\n')}`;
-    return (
-      <DiffViewer
-        filename={tool.args.TargetFile}
-        title={`Édition : ${tool.args.Instruction || tool.args.Description || tool.args.TargetFile || ''}`}
-        diffText={diffSnippet}
-      />
-    );
+  if (isDiff && tool.args) {
+    let diffArgs = tool.args;
+    if (typeof diffArgs === 'string') {
+      try {
+        diffArgs = JSON.parse(diffArgs);
+      } catch {}
+    }
+    if (diffArgs && typeof diffArgs === 'object') {
+      const targetStr = String(diffArgs.TargetContent ?? '');
+      const replacementStr = String(diffArgs.ReplacementContent ?? '');
+      const diffSnippet = `--- ${diffArgs.TargetFile || 'original'}\n+++ ${diffArgs.TargetFile || 'modifié'}\n@@ -${diffArgs.StartLine || 1} +${diffArgs.StartLine || 1} @@\n${targetStr.split('\n').map((l: string) => '-' + l).join('\n')}\n${replacementStr.split('\n').map((l: string) => '+' + l).join('\n')}`;
+      return (
+        <DiffViewer
+          filename={diffArgs.TargetFile}
+          title={`Édition : ${diffArgs.Instruction || diffArgs.Description || diffArgs.TargetFile || ''}`}
+          diffText={diffSnippet}
+        />
+      );
+    }
   }
 
   return (

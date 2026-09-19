@@ -6891,6 +6891,7 @@ def test_updater_git_args_identity_and_anti_coauthor():
 def test_git_status_commit_subject_with_pipes(monkeypatch):
     """Verify get_git_status correctly parses commit subjects containing pipe '|' characters."""
     import subprocess
+
     from app.api import git as git_api
 
     def mock_run_git(args, cwd, timeout=None, env=None):
@@ -6967,8 +6968,9 @@ def test_read_artifact_content_binary_null_byte_detection(tmp_path, monkeypatch)
 
     # 2. Text file with valid and invalid utf-8 bytes (should be read with errors='replace')
     text_file = conv_dir / "test_text.txt"
-    text_file.write_bytes("Normal text with accent: café".encode("utf-8") + b"\xff" + b" and more text")
+    text_file.write_bytes("Normal text with accent: café".encode() + b"\xff" + b" and more text")
     text_res = storage.read_artifact_content("conv123", "test_text.txt")
+    assert "café" in text_res
 def test_update_live_state_null_payloads_resilience():
     """Vérifie que _update_live_state ne plante pas avec AttributeError si des champs sont None."""
     from app.services.execution_manager import ExecutionSession
@@ -7009,7 +7011,8 @@ def test_update_live_state_null_payloads_resilience():
 def test_register_session_cid_migrates_queue_and_stops_old_worker():
     """Vérifie que register_session_cid migre la file d'attente et nettoie l'ancienne session orpheline."""
     import asyncio
-    from app.services.execution_manager import ExecutionSession, ExecutionManager
+
+    from app.services.execution_manager import ExecutionManager, ExecutionSession
 
     async def _async_test():
         mgr = ExecutionManager()
@@ -7052,6 +7055,7 @@ def test_register_session_cid_migrates_queue_and_stops_old_worker():
 def test_validate_terminal_session_id():
     """Vérifie la validation stricte des identifiants de session terminal."""
     from fastapi import HTTPException
+
     from app.api.terminal import _validate_terminal_session_id
 
     assert _validate_terminal_session_id("ws_abc123") == "ws_abc123"
@@ -7081,7 +7085,8 @@ def test_validate_terminal_session_id():
 def test_git_pull_uses_no_edit_on_merge_fallback():
     """Vérifie que le fallback de git_pull utilise --no-edit pour éviter le blocage non interactif."""
     import tempfile
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
+
     from app.api.git import PullRequest, git_pull
 
     with tempfile.TemporaryDirectory() as td:
@@ -7114,14 +7119,53 @@ def test_git_pull_uses_no_edit_on_merge_fallback():
             mock.stdout = ""
             return mock
 
-        with patch("app.api.git._validate_workspace", return_value=tmp_path):
-            with patch("app.api.git.run_git", side_effect=fake_run_git):
-                req = PullRequest(workspace=str(tmp_path), remote="origin", branch="main", rebase=False)
-                res = git_pull(req, _=None)
-                assert res["success"] is True
-                assert any("--no-edit" in c for c in calls)
+        with (
+            patch("app.api.git._validate_workspace", return_value=tmp_path),
+            patch("app.api.git.run_git", side_effect=fake_run_git),
+        ):
+            req = PullRequest(workspace=str(tmp_path), remote="origin", branch="main", rebase=False)
+            res = git_pull(req, _=None)
+            assert res["success"] is True
+            assert any("--no-edit" in c for c in calls)
 
     print("✓ test_git_pull_uses_no_edit_on_merge_fallback passed")
+
+
+def test_storage_indexes_project_and_group(tmp_path, monkeypatch):
+    """Vérifie que ensure_db_schema crée les index sur project_id et group_id."""
+    import sqlite3
+
+    from app.services import storage
+
+    db_file = tmp_path / "test_summaries.db"
+    monkeypatch.setattr(storage, "CONVERSATION_DB", db_file)
+    monkeypatch.setattr(storage, "_schema_initialized", False)
+
+    conn = sqlite3.connect(str(db_file))
+    storage.ensure_db_schema(conn)
+
+    indexes = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()]
+    assert "idx_conv_project_id" in indexes
+    assert "idx_conv_group_id" in indexes
+    assert "idx_conv_last_modified" in indexes
+    conn.close()
+
+
+def test_files_scan_dir_broken_symlink_resilience(tmp_path):
+    """Vérifie que scan_dir ne plante pas face à des liens symboliques brisés."""
+    from app.api.files import scan_dir
+
+    real_file = tmp_path / "real.txt"
+    real_file.write_text("hello", encoding="utf-8")
+
+    broken_symlink = tmp_path / "broken_link.txt"
+    try:
+        broken_symlink.symlink_to(tmp_path / "non_existent.txt")
+    except OSError:
+        pass
+
+    items = scan_dir(tmp_path)
+    assert any(i["name"] == "real.txt" for i in items)
 
 
 if __name__ == "__main__":
@@ -7389,6 +7433,10 @@ if __name__ == "__main__":
     test_register_session_cid_migrates_queue_and_stops_old_worker()
     test_validate_terminal_session_id()
     test_git_pull_uses_no_edit_on_merge_fallback()
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        test_storage_indexes_project_and_group(Path(td), monkeypatch=pytest.MonkeyPatch())
+        test_files_scan_dir_broken_symlink_resilience(Path(td))
     print("\nAll unit tests passed successfully!")
 
 

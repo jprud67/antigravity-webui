@@ -58,9 +58,13 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2, visited
             try:
                 is_dir = entry.is_dir()
                 stat = entry.stat()
+                try:
+                    resolved_entry_path = str(entry.resolve())
+                except (OSError, RuntimeError):
+                    resolved_entry_path = str(entry)
                 item: dict[str, Any] = {
                     "name": name,
-                    "path": str(entry.resolve()),
+                    "path": resolved_entry_path,
                     "is_dir": is_dir,
                     "size": 0 if is_dir else stat.st_size,
                     "last_modified": stat.st_mtime,

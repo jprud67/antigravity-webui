@@ -149,6 +149,12 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None) -> None:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_conv_parent ON conversation_summaries(parent_conversation_id);"
             )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_conv_project_id ON conversation_summaries(project_id);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_conv_group_id ON conversation_summaries(group_id);"
+            )
             conn.commit()
             _schema_initialized = True
         except Exception as e:
