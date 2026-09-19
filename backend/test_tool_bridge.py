@@ -165,6 +165,56 @@ def test_normalize_decision_final():
     assert decision["thinking"] == "un peu de réflexion"
 
 
+def test_content_to_text_summarizes_data_uris_and_multimodal_blocks():
+    from app.services.tool_bridge import _content_to_text
+
+    # String with large base64 data URI
+    dummy_b64 = "A" * 200
+    text_with_data_uri = f"Regarde cette image: data:image/png;base64,{dummy_b64} fin."
+    result = _content_to_text(text_with_data_uri)
+    assert "[Image attachment: image/png" in result
+    assert dummy_b64 not in result
+
+    # Multimodal parts list with text, image_url (data URI and remote URI), audio
+    multi_part = [
+        {"type": "text", "text": "Décris ce document :"},
+        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{dummy_b64}"}},
+        {"type": "image_url", "image_url": "https://example.com/photo.png"},
+        {"type": "input_audio", "input_audio": {"data": dummy_b64}},
+    ]
+    multi_res = _content_to_text(multi_part)
+    assert "Décris ce document :" in multi_res
+    assert "[Image attachment: image/jpeg" in multi_res
+    assert "[Image attachment: https://example.com/photo.png]" in multi_res
+    assert "[Audio attachment]" in multi_res
+
+
+def test_normalize_decision_fallback_tool_keys():
+    allowed = {"get_weather": "get_weather"}
+    # Model returns "name" instead of "tool"
+    d1 = normalize_decision(
+        {"action": "tool_call", "name": "get_weather", "arguments": {"city": "Marseille"}},
+        allowed,
+        None,
+        None,
+    )
+    assert d1["kind"] == "tool_call"
+    assert d1["name"] == "get_weather"
+    assert d1["arguments"] == {"city": "Marseille"}
+
+    # Model returns "function" dict
+    d2 = normalize_decision(
+        {"action": "tool_call", "function": {"name": "get_weather"}, "arguments": {"city": "Bordeaux"}},
+        allowed,
+        None,
+        None,
+    )
+    assert d2["kind"] == "tool_call"
+    assert d2["name"] == "get_weather"
+    assert d2["arguments"] == {"city": "Bordeaux"}
+
+
+
 def test_find_json_object_prefers_action_key():
     text = 'blabla ```json\n{"foo": 1}\n``` puis {"action": "final", "tool": "", "arguments": {}, "content": "ok"}'
     obj = _find_json_object(text)

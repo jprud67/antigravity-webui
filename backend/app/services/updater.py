@@ -59,6 +59,18 @@ _DEFAULT_GIT_ENV = {
     "GIT_COMMITTER_EMAIL": "jprud67@gmail.com",
 }
 
+_DEFAULT_GIT_ARGS = [
+    "-c", "user.name=jprud67",
+    "-c", "user.email=jprud67@gmail.com",
+    "-c", "author.name=jprud67",
+    "-c", "author.email=jprud67@gmail.com",
+    "-c", "committer.name=jprud67",
+    "-c", "committer.email=jprud67@gmail.com",
+    "-c", "format.signoff=false",
+    "-c", "commit.gpgsign=false",
+    "-c", "trailer.co-authored-by.key=",
+]
+
 
 def _git_cmd(args: list[str], timeout: int = 10, cwd: Path | None = None) -> str | None:
     target_cwd = cwd or REPO_DIR
@@ -68,7 +80,7 @@ def _git_cmd(args: list[str], timeout: int = 10, cwd: Path | None = None) -> str
     }
     try:
         res = subprocess.run(
-            [GIT_BIN, *args],
+            [GIT_BIN, *_DEFAULT_GIT_ARGS, *args],
             cwd=str(target_cwd),
             capture_output=True,
             text=True,
@@ -363,7 +375,7 @@ async def apply_update() -> dict[str, Any]:
         **_DEFAULT_GIT_ENV,
     }
     pull_proc = await asyncio.create_subprocess_exec(
-        GIT_BIN, "pull", "--ff-only", "origin", "main",
+        GIT_BIN, *_DEFAULT_GIT_ARGS, "pull", "--ff-only", "origin", "main",
         cwd=str(REPO_DIR),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -389,7 +401,7 @@ async def apply_update() -> dict[str, Any]:
         if "diverging" in err_msg.lower() or "not possible to fast-forward" in err_msg.lower():
             logger.info("Divergence détectée, tentative de git pull --rebase origin main...")
             rebase_proc = await asyncio.create_subprocess_exec(
-                GIT_BIN, "pull", "--rebase", "origin", "main",
+                GIT_BIN, *_DEFAULT_GIT_ARGS, "pull", "--rebase", "origin", "main",
                 cwd=str(REPO_DIR),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

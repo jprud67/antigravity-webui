@@ -110,6 +110,14 @@ class ExecutionSession:
         # Update live state from event
         self._update_live_state(event)
 
+        # Enrich event with session's conversation_id if omitted
+        if self.conversation_id:
+            if "conversation_id" not in event:
+                event["conversation_id"] = self.conversation_id
+            if event.get("event") == "step_update" and isinstance(event.get("step_update"), dict):
+                if not event["step_update"].get("conversation_id"):
+                    event["step_update"]["conversation_id"] = self.conversation_id
+
         # Broadcast to all connected subscribers with bounded timeout
         dead = set()
         for ws in list(self.subscribers):
@@ -718,6 +726,12 @@ class ExecutionManager:
             old_cid = getattr(session, "conversation_id", None)
             if old_cid and old_cid != clean:
                 self.sessions.pop(old_cid, None)
+            existing = self.sessions.get(clean)
+            if existing and existing is not session:
+                for sub in list(existing.subscribers):
+                    session.add_subscriber(sub)
+                if not session.workspace_path and existing.workspace_path:
+                    session.workspace_path = existing.workspace_path
             session.conversation_id = clean
             self.sessions[clean] = session
 

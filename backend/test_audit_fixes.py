@@ -6689,7 +6689,11 @@ def test_files_validate_path_access_unicode_and_workspace_base():
 
 def test_session_metadata_bidirectional_sync_updates():
     """Verify bidirectional synchronization between project and project_id, and group_id / groupId."""
-    from app.services.session_metadata import bulk_update_session_meta_batch, get_session_meta, delete_session_meta
+    from app.services.session_metadata import (
+        bulk_update_session_meta_batch,
+        delete_session_meta,
+        get_session_meta,
+    )
 
     cid = "test-sync-cid-audit"
     try:
@@ -6775,6 +6779,113 @@ def test_storage_build_conversation_dict_harmonized_project():
     assert res_2["project_id"] == "meta-proj-789"
     assert res_2["group_id"] == "meta-group-000"
 
+
+def test_session_metadata_normalize_meta_is_pinned_and_archived_aliases():
+    """Verify _normalize_meta correctly normalizes isPinned / is_pinned and isArchived / is_archived aliases."""
+    from app.services.session_metadata import _normalize_meta
+
+    # Test isPinned
+    meta1 = {"isPinned": True}
+    res1 = _normalize_meta(meta1)
+    assert res1["pinned"] is True
+
+    # Test is_pinned string truthy
+    meta2 = {"is_pinned": "true"}
+    res2 = _normalize_meta(meta2)
+    assert res2["pinned"] is True
+
+    # Test isArchived
+    meta3 = {"isArchived": True}
+    res3 = _normalize_meta(meta3)
+    assert res3["archived"] is True
+
+    # Test is_archived
+    meta4 = {"is_archived": "1"}
+    res4 = _normalize_meta(meta4)
+    assert res4["archived"] is True
+
+
+def test_execution_manager_broadcast_enriches_conversation_id():
+    """Verify ExecutionSession.broadcast enriches events with session's conversation_id."""
+    import asyncio
+
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession(conversation_id="test-enrich-cid-123")
+    received_events = []
+
+    class DummyWS:
+        async def send_json(self, data):
+            received_events.append(data)
+
+    ws = DummyWS()
+    session.add_subscriber(ws)
+
+    # Event without conversation_id
+    event = {"event": "status", "data": "processing"}
+    asyncio.run(session.broadcast(event))
+
+    assert len(received_events) == 1
+    assert received_events[0]["conversation_id"] == "test-enrich-cid-123"
+
+    # step_update event
+    step_evt = {"event": "step_update", "step_update": {"thinking": "test thought"}}
+    asyncio.run(session.broadcast(step_evt))
+
+    assert len(received_events) == 2
+    assert received_events[1]["conversation_id"] == "test-enrich-cid-123"
+    assert received_events[1]["step_update"]["conversation_id"] == "test-enrich-cid-123"
+
+
+def test_execution_manager_register_session_cid_merges_subscribers():
+    """Verify register_session_cid merges subscribers from existing session instance."""
+    from app.services.execution_manager import ExecutionManager, ExecutionSession
+
+    em = ExecutionManager()
+    cid = "test-merge-sub-cid"
+
+    class DummyWS:
+        pass
+
+    ws1 = DummyWS()
+    ws2 = DummyWS()
+
+    # Old/pre-created session with ws1
+    existing_session = ExecutionSession(conversation_id=cid, workspace_path="/root/test-ws")
+    existing_session.add_subscriber(ws1)
+    em.sessions[cid] = existing_session
+
+    # New active session with ws2
+    new_session = ExecutionSession(conversation_id=None)
+    new_session.add_subscriber(ws2)
+
+    # When CID is registered for new_session
+    em.register_session_cid(new_session, cid)
+
+    assert em.sessions[cid] is new_session
+    assert new_session.conversation_id == cid
+    # Subscribers from existing_session (ws1) must have been merged into new_session
+    assert ws1 in new_session.subscribers
+    assert ws2 in new_session.subscribers
+    assert new_session.workspace_path == "/root/test-ws"
+
+
+def test_updater_git_args_identity_and_anti_coauthor():
+    """Verify updater._DEFAULT_GIT_ARGS and _DEFAULT_GIT_ENV strictly enforce jprud67 and block co-authors."""
+    from app.services.updater import _DEFAULT_GIT_ARGS, _DEFAULT_GIT_ENV
+
+    assert _DEFAULT_GIT_ENV["GIT_AUTHOR_NAME"] == "jprud67"
+    assert _DEFAULT_GIT_ENV["GIT_AUTHOR_EMAIL"] == "jprud67@gmail.com"
+    assert _DEFAULT_GIT_ENV["GIT_COMMITTER_NAME"] == "jprud67"
+    assert _DEFAULT_GIT_ENV["GIT_COMMITTER_EMAIL"] == "jprud67@gmail.com"
+
+    args_str = " ".join(_DEFAULT_GIT_ARGS)
+    assert "user.name=jprud67" in args_str
+    assert "user.email=jprud67@gmail.com" in args_str
+    assert "author.name=jprud67" in args_str
+    assert "author.email=jprud67@gmail.com" in args_str
+    assert "trailer.co-authored-by.key=" in args_str
+    assert "format.signoff=false" in args_str
 
 
 if __name__ == "__main__":
@@ -7032,6 +7143,10 @@ if __name__ == "__main__":
     test_files_validate_path_access_unicode_and_workspace_base()
     test_session_metadata_bidirectional_sync_updates()
     test_storage_build_conversation_dict_harmonized_project()
+    test_session_metadata_normalize_meta_is_pinned_and_archived_aliases()
+    test_execution_manager_broadcast_enriches_conversation_id()
+    test_execution_manager_register_session_cid_merges_subscribers()
+    test_updater_git_args_identity_and_anti_coauthor()
     print("\nAll unit tests passed successfully!")
 
 

@@ -77,6 +77,14 @@ def _to_bool(val: Any) -> bool:
 
 
 def _normalize_meta(meta: dict[str, Any]) -> dict[str, Any]:
+    if "isPinned" in meta and "pinned" not in meta:
+        meta["pinned"] = meta["isPinned"]
+    if "is_pinned" in meta and "pinned" not in meta:
+        meta["pinned"] = meta["is_pinned"]
+    if "isArchived" in meta and "archived" not in meta:
+        meta["archived"] = meta["isArchived"]
+    if "is_archived" in meta and "archived" not in meta:
+        meta["archived"] = meta["is_archived"]
     meta["pinned"] = _to_bool(meta.get("pinned", False))
     meta["archived"] = _to_bool(meta.get("archived", False))
     raw_tags = meta.get("tags")

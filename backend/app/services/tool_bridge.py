@@ -89,25 +89,59 @@ Prefer action="final" whenever the latest tool results (or the conversation) are
 # Rendu du prompt (conversation OpenAI -> texte pour le CLI)
 # ============================================================================
 
+_DATA_URI_IMAGE_RE = re.compile(r"data:(image/[a-zA-Z0-9\.\+-]+);base64,([A-Za-z0-9+/=]{100,})")
+
+
+def _summarize_data_uris(text: str) -> str:
+    """Remplace les volumineuses URLs data:image/...;base64,... par un marqueur compact."""
+    def _repl(m: re.Match) -> str:
+        mime = m.group(1)
+        raw_b64_len = len(m.group(2))
+        est_bytes = (raw_b64_len * 3) // 4
+        return f"[Image attachment: {mime}, ~{est_bytes} bytes]"
+
+    return _DATA_URI_IMAGE_RE.sub(_repl, text)
+
+
 def _content_to_text(content: Any) -> str:
     """Extrait le texte d'un message qu'il soit une chaîne ou une liste de blocs (multi-part)."""
     if isinstance(content, str):
-        return content
+        return _summarize_data_uris(content)
     if isinstance(content, list):
         parts: list[str] = []
         for part in content:
             if isinstance(part, str):
-                parts.append(part)
+                parts.append(_summarize_data_uris(part))
             elif isinstance(part, dict):
+                part_type = str(part.get("type") or "").strip().lower()
                 text = part.get("text")
                 if isinstance(text, str):
-                    parts.append(text)
-                elif part.get("type") == "text" and "text" in part:
-                    parts.append(str(part.get("text", "")))
+                    parts.append(_summarize_data_uris(text))
+                elif part_type == "text" and "text" in part:
+                    parts.append(_summarize_data_uris(str(part.get("text", ""))))
+                elif part_type in ("image_url", "image") or "image_url" in part:
+                    img_val = part.get("image_url") or part.get("image")
+                    url = ""
+                    if isinstance(img_val, dict):
+                        url = str(img_val.get("url") or "")
+                    elif isinstance(img_val, str):
+                        url = img_val
+                    if url.startswith("data:"):
+                        mime_match = re.match(r"^data:([^;]+);base64,", url)
+                        mime = mime_match.group(1) if mime_match else "image"
+                        b64_len = len(url) - (mime_match.end() if mime_match else 5)
+                        est_bytes = max(0, (b64_len * 3) // 4)
+                        parts.append(f"[Image attachment: {mime}, ~{est_bytes} bytes]")
+                    elif url:
+                        parts.append(f"[Image attachment: {url}]")
+                    else:
+                        parts.append("[Image attachment]")
+                elif part_type == "input_audio":
+                    parts.append("[Audio attachment]")
         return "\n".join(parts)
     if content is None:
         return ""
-    return str(content)
+    return _summarize_data_uris(str(content))
 
 
 def _format_tool_arguments(raw_arguments: Any) -> str:
@@ -310,7 +344,15 @@ def normalize_decision(
     content = raw_content if isinstance(raw_content, str) else ("" if raw_content is None else str(raw_content))
 
     if action == "tool_call":
-        raw_name = str(structured.get("tool") or "").strip()
+        raw_name = ""
+        for key in ("tool", "name", "function"):
+            v = structured.get(key)
+            if isinstance(v, str) and v.strip():
+                raw_name = v.strip()
+                break
+            elif isinstance(v, dict) and isinstance(v.get("name"), str) and v["name"].strip():
+                raw_name = v["name"].strip()
+                break
         name = allowed_lower.get(raw_name.lower())
         if not name:
             logger.warning(
