@@ -5992,6 +5992,84 @@ def test_fs_watcher_broadcast_and_notify_sync():
     print("✓ test_fs_watcher_broadcast_and_notify_sync passed")
 
 
+def test_storage_undo_conversation_turn_notification():
+    import tempfile
+    import uuid
+    from pathlib import Path
+    from unittest.mock import MagicMock, patch
+
+    from app.services.storage import atomic_write_jsonl, undo_conversation_turn
+
+    with tempfile.TemporaryDirectory() as td:
+        temp_brain = Path(td)
+        cid = f"test-undo-{uuid.uuid4().hex[:8]}"
+        conv_dir = temp_brain / cid
+        logs_dir = conv_dir / ".system_generated" / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        transcript_file = logs_dir / "transcript.jsonl"
+
+        steps = [
+            {"source": "USER_EXPLICIT", "type": "USER_INPUT", "content": "Question 1", "step_index": 0},
+            {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Answer 1", "step_index": 1},
+            {"source": "USER_EXPLICIT", "type": "USER_INPUT", "content": "Question 2", "step_index": 2},
+            {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Answer 2", "step_index": 3},
+        ]
+        atomic_write_jsonl(transcript_file, steps)
+
+        mock_conn = MagicMock()
+        with (
+            patch("app.services.storage.BRAIN_DIR", temp_brain),
+            patch("app.services.storage.get_conversation_transcript", return_value=steps),
+            patch("app.services.storage.get_db_connection", return_value=mock_conn),
+        ):
+            res = undo_conversation_turn(cid)
+            assert res["conversation_id"] == cid
+            assert res["step_count"] == 2
+            assert len(res["steps"]) == 2
+            assert res["steps"][0]["content"] == "Question 1"
+            assert res["steps"][1]["content"] == "Answer 1"
+
+    print("✓ test_storage_undo_conversation_turn_notification passed")
+
+
+def test_agent_api_steer_empty_instruction():
+    import asyncio
+
+    from fastapi import HTTPException
+
+    from app.api.agent_api import AgentSteerRequest, steer_agent
+
+    req_empty = AgentSteerRequest(conversation_id="conv-test-steer", instruction="   ")
+    try:
+        asyncio.run(steer_agent(req_empty, True))
+        assert False, "Should have raised HTTPException for empty instruction"
+    except HTTPException as e:
+        assert e.status_code == 400
+        assert "vide" in e.detail
+
+    print("✓ test_agent_api_steer_empty_instruction passed")
+
+
+def test_files_save_file_content_temp_handling():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.api.files import SaveFileRequest, save_file_content
+
+    with tempfile.TemporaryDirectory() as td:
+        ws_path = Path(td)
+        target = ws_path / "sub" / "test_file.txt"
+        with patch("app.api.files.DEFAULT_WORKSPACE", str(ws_path)):
+            req = SaveFileRequest(path=str(target), content="Hello World Test Content")
+            res = save_file_content(req, True)
+            assert res["success"] is True
+            assert target.exists()
+            assert target.read_text(encoding="utf-8") == "Hello World Test Content"
+
+    print("✓ test_files_save_file_content_temp_handling passed")
+
+
 if __name__ == "__main__":
     test_agy_driver_resolve_external_and_unlisted_models()
     test_execution_manager_register_session_cid_migration()
@@ -6223,6 +6301,9 @@ if __name__ == "__main__":
     test_openai_compat_prompt_tool_role_formatting()
     test_storage_aggregate_steps_flushes_running_tool_status()
     test_fs_watcher_broadcast_and_notify_sync()
+    test_storage_undo_conversation_turn_notification()
+    test_agent_api_steer_empty_instruction()
+    test_files_save_file_content_temp_handling()
     print("\nAll unit tests passed successfully!")
 
 

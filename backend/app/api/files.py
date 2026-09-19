@@ -252,24 +252,25 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
     try:
         resolved_path.parent.mkdir(parents=True, exist_ok=True)
         existing_mode = resolved_path.stat().st_mode if resolved_path.exists() else None
-        tmp_path = resolved_path.parent / f".{resolved_path.name}.tmp.{uuid.uuid4().hex[:8]}"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        tmp_target: Path = resolved_path.parent / f".{resolved_path.name}.tmp.{uuid.uuid4().hex[:8]}"
+        tmp_path = tmp_target
+        with open(tmp_target, "w", encoding="utf-8") as f:
             f.write(req.content)
         if existing_mode is not None:
             try:
-                tmp_path.chmod(existing_mode)
+                tmp_target.chmod(existing_mode)
             except Exception as e:
                 logger.debug(f"Ignored chmod error: {e}")
         for attempt in range(3):
             try:
-                tmp_path.replace(resolved_path)
+                tmp_target.replace(resolved_path)
                 tmp_path = None
                 break
             except (PermissionError, OSError):
                 if attempt == 2:
                     import shutil
-                    shutil.copy2(tmp_path, resolved_path)
-                    tmp_path.unlink(missing_ok=True)
+                    shutil.copy2(tmp_target, resolved_path)
+                    tmp_target.unlink(missing_ok=True)
                     tmp_path = None
                     break
                 import time

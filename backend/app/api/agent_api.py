@@ -360,6 +360,11 @@ async def steer_agent(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="L'identifiant de conversation (conversation_id) est invalide."
         )
+    if not req.instruction or not req.instruction.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="L'instruction de guidage ne peut pas être vide."
+        )
     session = execution_manager.get_session(req.conversation_id)
     if not session:
         raise HTTPException(
@@ -368,7 +373,7 @@ async def steer_agent(
         )
 
     await execution_manager.submit_prompt(None, {  # type: ignore
-        "prompt": req.instruction,
+        "prompt": req.instruction.strip(),
         "conversation_id": req.conversation_id,
         "mode": "steer"
     })
