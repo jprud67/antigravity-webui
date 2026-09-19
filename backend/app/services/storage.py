@@ -104,10 +104,10 @@ _schema_lock = threading.Lock()
 def ensure_db_schema(conn: sqlite3.Connection | None = None) -> None:
     """Garantit l'existence de la table conversation_summaries dans la base SQLite."""
     global _schema_initialized
-    if _schema_initialized:
+    if _schema_initialized and conn is None:
         return
     with _schema_lock:
-        if _schema_initialized:
+        if _schema_initialized and conn is None:
             return
         close_after = False
         if conn is None:
@@ -143,6 +143,41 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None) -> None:
                 );
                 """
             )
+            # Automatic column migration for older database schemas
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(conversation_summaries)")
+            existing_cols = {row[1] for row in cursor.fetchall()}
+
+            expected_cols: dict[str, str] = {
+                "title": "TEXT NOT NULL DEFAULT ''",
+                "preview": "TEXT NOT NULL DEFAULT ''",
+                "step_count": "INTEGER NOT NULL DEFAULT 0",
+                "last_modified_time": "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+                "workspace_uris": "TEXT NOT NULL DEFAULT '[]'",
+                "status": "TEXT NOT NULL DEFAULT ''",
+                "source": "TEXT NOT NULL DEFAULT ''",
+                "project_id": "TEXT NOT NULL DEFAULT ''",
+                "agent_name": "TEXT NOT NULL DEFAULT ''",
+                "parent_conversation_id": "TEXT NOT NULL DEFAULT ''",
+                "nesting_depth": "INTEGER NOT NULL DEFAULT 0",
+                "battle_id": "TEXT NOT NULL DEFAULT ''",
+                "winning_conversation_id": "TEXT NOT NULL DEFAULT ''",
+                "not_fully_idle": "NUMERIC NOT NULL DEFAULT 0",
+                "killed": "NUMERIC NOT NULL DEFAULT 0",
+                "last_user_input_time": "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+                "last_user_input_step_index": "INTEGER NOT NULL DEFAULT -1",
+                "app_data_dir": "TEXT NOT NULL DEFAULT ''",
+                "raw_summary": "BLOB",
+                "group_id": "TEXT NOT NULL DEFAULT ''",
+            }
+            for col_name, col_def in expected_cols.items():
+                if col_name not in existing_cols:
+                    clean_def = col_def.rstrip(",")
+                    try:
+                        conn.execute(f"ALTER TABLE conversation_summaries ADD COLUMN {col_name} {clean_def}")
+                    except Exception as alter_err:
+                        logger.debug(f"Column {col_name} migration notice: {alter_err}")
+
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_conv_last_modified ON conversation_summaries(last_modified_time DESC);"
             )
@@ -156,7 +191,8 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None) -> None:
                 "CREATE INDEX IF NOT EXISTS idx_conv_group_id ON conversation_summaries(group_id);"
             )
             conn.commit()
-            _schema_initialized = True
+            if close_after:
+                _schema_initialized = True
         except Exception as e:
             logger.warning(f"ensure_db_schema warning: {e}")
         finally:

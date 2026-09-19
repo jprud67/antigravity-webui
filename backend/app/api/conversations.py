@@ -175,7 +175,7 @@ async def bulk_conversations(req: BulkActionRequest, _ = Depends(require_auth)):
 
         try:
             bulk_update_session_meta(ids, updates)
-            proj_val = updates.get("project_id") or updates.get("project")
+            proj_val = updates["project_id"] if "project_id" in updates else updates.get("project")
             grp_val = updates.get("group_id")
             if proj_val is not None or grp_val is not None:
                 for cid in ids:

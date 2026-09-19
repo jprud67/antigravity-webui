@@ -520,6 +520,7 @@ class ExecutionSession:
                                         "previous_model": old_model,
                                         "new_model": current_model,
                                         "account": current_email,
+                                        "reset_turn": True,
                                         "message": f"Quota atteint avec {old_model}. Basculement automatique sur {current_model} et relance de la tâche..."
                                     })
                                     break
@@ -557,6 +558,7 @@ class ExecutionSession:
                             "conversation_id": self.conversation_id,
                             "previous_account": current_email,
                             "new_account": new_account,
+                            "reset_turn": True,
                             "message": f"Quota atteint sur le compte Google {current_email}. Basculement automatique sur {new_account} et relance de la tâche..."
                         })
                         # Brief 1s pause before restarting to ensure token file is cleanly committed and locked

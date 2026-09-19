@@ -135,6 +135,20 @@ def _normalize_status(st: str) -> str:
     return st.lower().strip().replace("-", "_")
 
 
+_ALLOWED_TASK_UPDATE_COLUMNS: frozenset[str] = frozenset({
+    "title",
+    "body",
+    "assignee",
+    "status",
+    "priority",
+    "workspace_path",
+    "project_id",
+    "result",
+    "started_at",
+    "completed_at",
+})
+
+
 @router.get("/tasks")
 def list_tasks(
     status: str | None = Query(None),
@@ -298,6 +312,10 @@ def update_task(task_id: str, req: UpdateTaskRequest, _ = Depends(require_auth))
                         params.append(None)
 
             if updates:
+                for item in updates:
+                    col = item.split()[0]
+                    if col not in _ALLOWED_TASK_UPDATE_COLUMNS:
+                        raise HTTPException(status_code=400, detail=f"Colonne non autorisée pour la mise à jour: {col}")
                 params.append(task_id)
                 cur.execute(f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params)  # nosec B608
                 conn.commit()

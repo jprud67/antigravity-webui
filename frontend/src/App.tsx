@@ -908,6 +908,8 @@ export function App() {
               ...prev.slice(0, -1),
               {
                 ...last,
+                content: '',
+                toolCalls: [],
                 thought: (last.thought || '') + notice,
                 isLive: true
               }
@@ -930,6 +932,8 @@ export function App() {
               ...prev.slice(0, -1),
               {
                 ...last,
+                content: '',
+                toolCalls: [],
                 thought: (last.thought || '') + notice,
                 isLive: true
               }

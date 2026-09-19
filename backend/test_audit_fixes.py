@@ -7208,7 +7208,94 @@ def test_execution_manager_queue_worker_finally_resets_is_running():
     assert session.is_busy is False
 
 
+def test_storage_ensure_db_schema_migrates_missing_columns():
+    """Verify ensure_db_schema automatically adds missing columns to an older schema."""
+    import sqlite3
+    import tempfile
+
+    from app.services.storage import ensure_db_schema
+
+    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+        conn = sqlite3.connect(tmp.name)
+        # Create a legacy table lacking group_id and project_id
+        conn.execute("""
+            CREATE TABLE conversation_summaries (
+                conversation_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL DEFAULT '',
+                preview TEXT NOT NULL DEFAULT ''
+            );
+        """)
+        conn.commit()
+
+        # Run migration on connection
+        ensure_db_schema(conn)
+
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(conversation_summaries)")
+        cols = {row[1] for row in cur.fetchall()}
+        assert "group_id" in cols
+        assert "project_id" in cols
+        assert "last_user_input_time" in cols
+        assert "last_user_input_step_index" in cols
+        conn.close()
+
+
+def test_conversations_api_bulk_clear_project():
+    """Verify bulk_conversations correctly clears project_id when empty string is provided."""
+    import asyncio
+    from unittest import mock
+
+    from app.api.conversations import BulkActionRequest, bulk_conversations
+
+    calls = []
+    def fake_update(cid, **kwargs):
+        calls.append((cid, kwargs))
+        return True
+
+    with mock.patch("app.api.conversations.bulk_update_session_meta"), \
+         mock.patch("app.api.conversations.update_conversation_summary_fields", side_effect=fake_update):
+        req = BulkActionRequest(
+            action="project",
+            conversation_ids=["test-conv-123"],
+            payload={"projectId": ""}
+        )
+        res = asyncio.run(bulk_conversations(req))
+        assert res["success"] is True
+        assert len(calls) == 1
+        cid, kwargs = calls[0]
+        assert cid == "test-conv-123"
+        assert kwargs.get("project_id") == ""
+
+
+def test_kanban_update_task_column_whitelist():
+    """Verify update_task allows valid columns and rejects disallowed column updates."""
+    from app.api.kanban import _ALLOWED_TASK_UPDATE_COLUMNS
+
+    assert "title" in _ALLOWED_TASK_UPDATE_COLUMNS
+    assert "status" in _ALLOWED_TASK_UPDATE_COLUMNS
+    assert "priority" in _ALLOWED_TASK_UPDATE_COLUMNS
+    assert "workspace_path" in _ALLOWED_TASK_UPDATE_COLUMNS
+    assert "password" not in _ALLOWED_TASK_UPDATE_COLUMNS
+    assert "secret" not in _ALLOWED_TASK_UPDATE_COLUMNS
+
+
+def test_execution_manager_failover_broadcasts_reset_turn():
+    """Verify failover events broadcast reset_turn: True for frontend state cleanup."""
+    import inspect
+
+    from app.services.execution_manager import ExecutionSession
+
+    src = inspect.getsource(ExecutionSession.run_turn)
+    assert '"event": "model_failover"' in src
+    assert '"event": "account_failover"' in src
+    assert '"reset_turn": True' in src
+
+
 if __name__ == "__main__":
+    test_storage_ensure_db_schema_migrates_missing_columns()
+    test_conversations_api_bulk_clear_project()
+    test_kanban_update_task_column_whitelist()
+    test_execution_manager_failover_broadcasts_reset_turn()
     test_agy_driver_resolve_external_and_unlisted_models()
     test_execution_manager_register_session_cid_migration()
     test_storage_build_conversation_dict_workspace_uris()
