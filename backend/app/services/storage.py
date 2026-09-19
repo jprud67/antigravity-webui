@@ -439,6 +439,15 @@ _STEERING_PREFIX_RE = re.compile(
 def clean_user_prompt(raw: Any) -> str:
     if not raw:
         return ""
+    if isinstance(raw, str) and (raw.strip().startswith("{") or raw.strip().startswith("[")):
+        try:
+            parsed = json.loads(raw.strip())
+            if isinstance(parsed, (dict, list)):
+                cleaned = clean_user_prompt(parsed)
+                if cleaned:
+                    return cleaned
+        except Exception:
+            pass
     if not isinstance(raw, str):
         if isinstance(raw, list):
             parts: list[str] = []
@@ -450,6 +459,12 @@ def clean_user_prompt(raw: Any) -> str:
                         parts.append(item["text"])
                     elif "content" in item and isinstance(item["content"], str):
                         parts.append(item["content"])
+                    elif "content" in item and isinstance(item["content"], list):
+                        for sub in item["content"]:
+                            if isinstance(sub, str):
+                                parts.append(sub)
+                            elif isinstance(sub, dict) and "text" in sub and isinstance(sub["text"], str):
+                                parts.append(sub["text"])
             if parts:
                 raw = "\n".join(parts)
             else:
@@ -462,6 +477,14 @@ def clean_user_prompt(raw: Any) -> str:
                 raw = raw["text"]
             elif "content" in raw and isinstance(raw["content"], str):
                 raw = raw["content"]
+            elif "content" in raw and isinstance(raw["content"], list):
+                parts = []
+                for sub in raw["content"]:
+                    if isinstance(sub, str):
+                        parts.append(sub)
+                    elif isinstance(sub, dict) and "text" in sub and isinstance(sub["text"], str):
+                        parts.append(sub["text"])
+                raw = "\n".join(parts) if parts else ""
             else:
                 try:
                     raw = str(raw)
@@ -581,7 +604,7 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
         stype = s.get("type") or ""
         
         if src == "USER_EXPLICIT" or stype == "USER_INPUT":
-            clean_p = clean_user_prompt(content)
+            clean_p = clean_user_prompt(raw_c if raw_c is not None else content)
             prompt_chars += len(clean_p) if clean_p else len(content)
         else:
             response_chars += len(content) + len(tool_calls)
@@ -2453,10 +2476,12 @@ def read_artifact_content(conversation_id: str, filename: str) -> str:
             return f"[Fichier binaire ou non lisible : {file_size} octets]"
 
     try:
-        content = target_path.read_text(encoding="utf-8")
+        with open(target_path, "rb") as bf:
+            sample = bf.read(8192)
+            if b"\x00" in sample:
+                return f"[Fichier binaire : {file_size} octets]"
+        content = target_path.read_text(encoding="utf-8", errors="replace")
         return content.lstrip("\ufeff")
-    except UnicodeDecodeError:
-        return f"[Fichier binaire : {file_size} octets]"
     except OSError as e:
         return f"[Erreur de lecture du fichier : {e}]"
 

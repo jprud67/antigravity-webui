@@ -193,10 +193,10 @@ def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth
                 deleted.append(path)
 
     # Last commit
-    res_log = run_git(["log", "-1", "--format=%h|%an|%s|%cr"], target)
+    res_log = run_git(["log", "-1", "--format=%h%x1f%an%x1f%s%x1f%cr"], target)
     last_commit = None
     if res_log.returncode == 0 and res_log.stdout.strip():
-        parts = res_log.stdout.strip().split("|")
+        parts = res_log.stdout.strip().split("\x1f")
         if len(parts) >= 4:
             last_commit = {
                 "hash": parts[0],

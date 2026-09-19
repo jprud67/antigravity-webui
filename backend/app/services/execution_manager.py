@@ -325,6 +325,8 @@ class ExecutionSession:
 
     async def run_turn(self, params: dict[str, Any]):
         self.is_running = True
+        if params.get("mode") == "steer":
+            self.is_steering = True
         self.started_at = time.time()
         self.live_thought = ""
         self.live_content = ""
@@ -613,7 +615,7 @@ class ExecutionSession:
                     item = await self.message_queue.get()
                 except asyncio.CancelledError:
                     break
-                self.is_steering = False
+                self.is_steering = bool(item.get("mode") == "steer")
                 self.is_running = True
                 try:
                     self.active_task = asyncio.create_task(self.run_turn(item))
@@ -953,6 +955,7 @@ class ExecutionManager:
                     except (asyncio.QueueEmpty, ValueError):
                         break
                 steering_prefix = "[Instruction Prioritaire de Guidage] : "
+                payload["mode"] = "steer"
                 payload["prompt"] = prompt if prompt.startswith(steering_prefix) else f"{steering_prefix}{prompt}"
                 await session.message_queue.put(payload)
                 await session.broadcast({

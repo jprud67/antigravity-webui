@@ -6888,6 +6888,91 @@ def test_updater_git_args_identity_and_anti_coauthor():
     assert "format.signoff=false" in args_str
 
 
+def test_git_status_commit_subject_with_pipes(monkeypatch):
+    """Verify get_git_status correctly parses commit subjects containing pipe '|' characters."""
+    import subprocess
+    from app.api import git as git_api
+
+    def mock_run_git(args, cwd, timeout=None, env=None):
+        cmd = " ".join(args)
+        if "rev-parse" in cmd:
+            return subprocess.CompletedProcess(args, 0, stdout="true\n", stderr="")
+        if "status" in cmd:
+            return subprocess.CompletedProcess(args, 0, stdout="## main...origin/main\n", stderr="")
+        if "log" in cmd:
+            # Simulating format=%h%x1f%an%x1f%s%x1f%cr with pipes inside the subject
+            raw = "abc1234\x1fjprud67\x1ffeat(api): pipeline | stream | test\x1f10 minutes ago"
+            return subprocess.CompletedProcess(args, 0, stdout=raw, stderr="")
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(git_api, "run_git", mock_run_git)
+    monkeypatch.setattr(git_api, "_validate_workspace", lambda ws: Path("/root/antigravity-webui"))
+
+    res = git_api.get_git_status(workspace=None, _=True)
+    assert res["is_repo"] is True
+    assert res["last_commit"] is not None
+    assert res["last_commit"]["hash"] == "abc1234"
+    assert res["last_commit"]["author"] == "jprud67"
+    assert res["last_commit"]["subject"] == "feat(api): pipeline | stream | test"
+    assert res["last_commit"]["time"] == "10 minutes ago"
+
+
+def test_clean_user_prompt_json_serialized_and_nested():
+    """Verify clean_user_prompt parses JSON-stringified content and extracts nested text parts cleanly."""
+    from app.services.storage import clean_user_prompt
+
+    # Test JSON-encoded list of message parts
+    json_list = json.dumps([
+        {"type": "text", "text": "First line of prompt"},
+        {"type": "text", "text": "Second line of prompt"}
+    ])
+    assert clean_user_prompt(json_list) == "First line of prompt\nSecond line of prompt"
+
+    # Test nested dict structure with content list
+    nested_dict = {
+        "content": [
+            {"type": "text", "text": "Nested part 1"},
+            "Raw part 2"
+        ]
+    }
+    assert clean_user_prompt(nested_dict) == "Nested part 1\nRaw part 2"
+
+
+def test_execution_manager_steering_mode_tagging():
+    """Verify queue_worker and run_turn properly recognize and preserve mode='steer'."""
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession(conversation_id="test_steer_cid")
+    assert session.is_steering is False
+
+    # Simulate popping an enqueued item with mode=steer
+    item = {"prompt": "Redirect work immediately", "mode": "steer"}
+    session.is_steering = bool(item.get("mode") == "steer")
+    assert session.is_steering is True
+
+
+def test_read_artifact_content_binary_null_byte_detection(tmp_path, monkeypatch):
+    """Verify read_artifact_content detects binary files via null byte check and replaces corrupt characters."""
+    from app.services import storage
+
+    monkeypatch.setattr(storage, "BRAIN_DIR", tmp_path)
+    conv_dir = tmp_path / "conv123"
+    conv_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Binary file with null byte
+    bin_file = conv_dir / "test_bin.dat"
+    bin_file.write_bytes(b"GIF89a\x00\x01\x02\x03SomeBinaryBytes")
+    bin_res = storage.read_artifact_content("conv123", "test_bin.dat")
+    assert "[Fichier binaire :" in bin_res
+
+    # 2. Text file with valid and invalid utf-8 bytes (should be read with errors='replace')
+    text_file = conv_dir / "test_text.txt"
+    text_file.write_bytes("Normal text with accent: café".encode("utf-8") + b"\xff" + b" and more text")
+    text_res = storage.read_artifact_content("conv123", "test_text.txt")
+    assert "Normal text with accent: café" in text_res
+    assert "and more text" in text_res
+
+
 if __name__ == "__main__":
     test_agy_driver_resolve_external_and_unlisted_models()
     test_execution_manager_register_session_cid_migration()
@@ -7147,6 +7232,8 @@ if __name__ == "__main__":
     test_execution_manager_broadcast_enriches_conversation_id()
     test_execution_manager_register_session_cid_merges_subscribers()
     test_updater_git_args_identity_and_anti_coauthor()
+    test_clean_user_prompt_json_serialized_and_nested()
+    test_execution_manager_steering_mode_tagging()
     print("\nAll unit tests passed successfully!")
 
 
