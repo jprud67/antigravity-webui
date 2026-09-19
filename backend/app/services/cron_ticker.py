@@ -225,7 +225,10 @@ async def run_agy_task(
             for t in pumps + [quota_task]:
                 if not t.done():
                     t.cancel()
-            await asyncio.shield(asyncio.gather(*pumps, quota_task, return_exceptions=True))
+            try:
+                await asyncio.wait_for(asyncio.shield(asyncio.gather(*pumps, quota_task, return_exceptions=True)), timeout=2.0)
+            except (asyncio.TimeoutError, Exception):
+                pass
         finally:
             if job_id and _running_job_procs.get(job_id) is proc:
                 _running_job_procs.pop(job_id, None)

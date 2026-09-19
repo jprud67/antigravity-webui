@@ -26,6 +26,11 @@ _GIT_CRED_RE = re.compile(r"(?:git(?:\+https?|\+ssh)?|ssh)://(?:[^/@:]+:[^/@:]+@
 _RAW_TOKEN_RE = re.compile(
     r"\b(?:ghp_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{30,}|glpat-[a-zA-Z0-9\-_]{20,}|AIza[0-9A-Za-z\-_]{30,40}|sk-[a-zA-Z0-9_\-]{20,})\b"
 )
+_SENSITIVE_FILES_RE = re.compile(
+    r'(^|/)(?:\.env(?:\.[a-zA-Z0-9_\-]+)?|id_rsa[a-zA-Z0-9_\-]*|id_ed25519[a-zA-Z0-9_\-]*|webui_auth\.json|antigravity-oauth-token.*|google_accounts\.json|credentials\.json|client_secret.*\.json|session_metadata\.json|.*\.db|.*\.sqlite|.*\.sqlite3|.*\.pem|.*\.key)$',
+    re.IGNORECASE
+)
+
 
 
 def _mask_git_output(text: str) -> str:
@@ -364,11 +369,7 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
                 f_clean = f.strip().strip('"')
                 if not f_clean:
                     continue
-                if re.search(
-                    r'(^|/)(?:\.env(?:\.[a-zA-Z0-9_\-]+)?|id_rsa[a-zA-Z0-9_\-]*|id_ed25519[a-zA-Z0-9_\-]*|webui_auth\.json|antigravity-oauth-token.*|google_accounts\.json|credentials\.json|client_secret.*\.json|.*\.pem|.*\.key)$',
-                    f_clean,
-                    re.IGNORECASE
-                ):
+                if _SENSITIVE_FILES_RE.search(f_clean):
                     check_head = run_git(["rev-parse", "--verify", f"HEAD:{f_clean}"], target)
                     if check_head.returncode != 0:
                         run_git(["reset", "HEAD", "--", f_clean], target)

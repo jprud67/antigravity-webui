@@ -328,9 +328,15 @@ class ExecutionSession:
         conv_id = params.get("conversation_id") or self.conversation_id
         ws_path = params.get("workspace_path") or self.workspace_path
         model = params.get("model")
+        if isinstance(model, str) and not model.strip():
+            model = None
         effort = params.get("effort")
+        if isinstance(effort, str) and not effort.strip():
+            effort = None
         auto_approve = params.get("auto_approve", True)
         agent_mode = params.get("agent_mode")
+        if isinstance(agent_mode, str) and not agent_mode.strip():
+            agent_mode = None
         try:
             settings = get_settings()
             if not agent_mode:
@@ -906,8 +912,11 @@ class ExecutionManager:
             session.add_subscriber(ws)
         session.last_active_at = time.time()
         self.active_session = session
-
         payload = dict(data)
+        for k in ("model", "effort", "agent_mode"):
+            v = payload.get(k)
+            if isinstance(v, str) and not v.strip():
+                payload[k] = None
         if session.is_busy:
             if mode == "steer":
                 logger.info(f"Steering session {session.conversation_id}")

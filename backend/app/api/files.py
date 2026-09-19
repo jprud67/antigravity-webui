@@ -85,8 +85,27 @@ def _is_blocked_sensitive_path(resolved: Path) -> bool:
     return is_blocked_sensitive_path(resolved)
 
 
-def _validate_path_access(file_path: Path) -> Path:
+def _validate_path_access(file_path: Path | str, base_dir: Path | str | None = None) -> Path:
+    settings = get_settings()
+    workspaces = settings.get("trustedWorkspaces", [])
+    allowed_roots = [Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve()]
+    for ws in workspaces:
+        try:
+            allowed_roots.append(Path(ws).resolve())
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
+
+    base_root = Path(DEFAULT_WORKSPACE).resolve()
+    if base_dir:
+        try:
+            cand_base = Path(base_dir).resolve()
+            if is_safe_path(cand_base, allowed_roots) and not _is_blocked_sensitive_path(cand_base):
+                base_root = cand_base
+        except Exception as e:
+            logger.debug(f"Ignored error with candidate base_dir: {e}")
+
     try:
+        import unicodedata
         from urllib.parse import unquote
         p_str = str(file_path).strip()
         for _ in range(3):
@@ -94,6 +113,7 @@ def _validate_path_access(file_path: Path) -> Path:
             if next_p == p_str:
                 break
             p_str = next_p
+        p_str = unicodedata.normalize("NFC", p_str)
         if "\x00" in p_str:
             raise HTTPException(status_code=400, detail="Chemin invalide : octet nul détecté.")
         # Strip URL fragment (#L10-L20) or query string (?...) if present from markdown links
@@ -112,19 +132,19 @@ def _validate_path_access(file_path: Path) -> Path:
             sub = re.sub(r'^workspace:/*', '', p_str, flags=re.IGNORECASE)
             if not sub:
                 raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
-            file_path = Path(DEFAULT_WORKSPACE) / sub
+            target_file_path = base_root / sub
         elif p_str.lower().startswith("file:"):
             sub = re.sub(r'^file:(?:/*localhost)?/*', '', p_str, flags=re.IGNORECASE)
             if not sub:
                 raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
             if not (len(sub) > 1 and sub[1] == ":"):
                 sub = "/" + sub
-            file_path = Path(sub)
+            target_file_path = Path(sub)
         else:
-            file_path = Path(p_str)
-            if not file_path.is_absolute():
-                file_path = Path(DEFAULT_WORKSPACE) / file_path
-        resolved = file_path.resolve()
+            target_file_path = Path(p_str)
+            if not target_file_path.is_absolute():
+                target_file_path = base_root / target_file_path
+        resolved = target_file_path.resolve()
     except HTTPException:
         raise
     except Exception as e:
@@ -132,15 +152,6 @@ def _validate_path_access(file_path: Path) -> Path:
 
     if _is_blocked_sensitive_path(resolved):
         raise HTTPException(status_code=403, detail="Accès refusé : fichier ou répertoire restreint.")
-
-    settings = get_settings()
-    workspaces = settings.get("trustedWorkspaces", [])
-    allowed_roots = [Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve()]
-    for ws in workspaces:
-        try:
-            allowed_roots.append(Path(ws).resolve())
-        except Exception as e:
-            logger.debug(f"Ignored error: {e}")
 
     if not is_safe_path(resolved, allowed_roots):
         raise HTTPException(status_code=403, detail="Accès refusé : chemin en dehors des répertoires de travail autorisés.")
@@ -170,9 +181,9 @@ def get_file_tree(
     }
 
 @router.get("/content")
-def get_file_content(path: str = Query(...), _ = Depends(require_auth)):
+def get_file_content(path: str = Query(...), workspace: str | None = Query(None), _ = Depends(require_auth)):
     file_path = Path(path)
-    resolved_path = _validate_path_access(file_path)
+    resolved_path = _validate_path_access(file_path, base_dir=workspace)
     if not resolved_path.exists() or not resolved_path.is_file():
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
 
@@ -199,6 +210,7 @@ def get_file_content(path: str = Query(...), _ = Depends(require_auth)):
 class SaveFileRequest(BaseModel):
     path: str
     content: str
+    workspace: str | None = None
 
 MAX_FILE_SAVE_BYTES = 5 * 1024 * 1024  # 5 Mo max
 
@@ -211,7 +223,7 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
         )
 
     file_path = Path(req.path)
-    resolved_path = _validate_path_access(file_path)
+    resolved_path = _validate_path_access(file_path, base_dir=req.workspace)
     if resolved_path.exists() and resolved_path.is_dir():
         raise HTTPException(status_code=400, detail="Impossible d'écrire un fichier sur un répertoire existant.")
 
@@ -260,12 +272,12 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement : {e!s}")
 
 @router.get("/download")
-def download_file(path: str = Query(...), _ = Depends(require_auth)):
+def download_file(path: str = Query(...), workspace: str | None = Query(None), _ = Depends(require_auth)):
     import mimetypes
     from urllib.parse import unquote
     clean_p = unquote(path.strip())
     file_path = Path(clean_p)
-    resolved_path = _validate_path_access(file_path)
+    resolved_path = _validate_path_access(file_path, base_dir=workspace)
     if not resolved_path.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
     if not resolved_path.is_file():

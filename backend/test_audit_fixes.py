@@ -6598,6 +6598,94 @@ def test_execution_manager_pending_approval_sanitization():
     assert session.pending_approval["path"] is None
 
 
+def test_agy_driver_stdin_eof_closure():
+    """Verify that _feed_stdin calls write_eof or close on proc.stdin."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.agy_driver import STDIN_PROMPT_THRESHOLD, stream_turn
+
+    async def run_test():
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_proc = AsyncMock()
+            mock_proc.stdout.readline = AsyncMock(side_effect=[b"", b""])
+            mock_proc.stderr.readline = AsyncMock(return_value=b"")
+            mock_proc.wait = AsyncMock(return_value=0)
+            mock_proc.returncode = 0
+            mock_proc.stdin = AsyncMock()
+            mock_proc.stdin.write = AsyncMock()
+            mock_proc.stdin.drain = AsyncMock()
+            mock_proc.stdin.write_eof = AsyncMock()
+            mock_exec.return_value = mock_proc
+
+            big_prompt = "y" * (STDIN_PROMPT_THRESHOLD + 10)
+            async for _ in stream_turn(prompt=big_prompt):
+                pass
+
+            assert mock_proc.stdin.write.called
+            assert mock_proc.stdin.drain.called
+            assert mock_proc.stdin.write_eof.called
+
+    asyncio.run(run_test())
+
+
+def test_execution_manager_empty_string_normalization():
+    """Verify submit_prompt and run_turn normalize empty string model/effort/agent_mode to None."""
+    import asyncio
+    from unittest.mock import patch
+
+    from app.services.execution_manager import ExecutionSession
+
+    session = ExecutionSession(conversation_id="norm_test")
+    async def run_turn_test():
+        with patch("app.services.execution_manager.stream_turn") as mock_stream, \
+             patch("app.services.execution_manager.get_settings", return_value={}):
+            async def fake_stream(*args, **kwargs):
+                assert kwargs.get("model") is None
+                assert kwargs.get("effort") is None
+                assert kwargs.get("agent_mode") is None
+                yield {"event": "done"}
+            mock_stream.side_effect = fake_stream
+            await session.run_turn({
+                "prompt": "hello",
+                "model": "   ",
+                "effort": "",
+                "agent_mode": "\t\n"
+            })
+    asyncio.run(run_turn_test())
+
+
+def test_git_sensitive_files_regex_db_and_sqlite():
+    """Verify _SENSITIVE_FILES_RE catches session_metadata.json, sqlite and db files."""
+    from app.api.git import _SENSITIVE_FILES_RE
+
+    assert _SENSITIVE_FILES_RE.search("session_metadata.json") is not None
+    assert _SENSITIVE_FILES_RE.search("sub/dir/session_metadata.json") is not None
+    assert _SENSITIVE_FILES_RE.search("database.db") is not None
+    assert _SENSITIVE_FILES_RE.search("app.sqlite") is not None
+    assert _SENSITIVE_FILES_RE.search("test.sqlite3") is not None
+    assert _SENSITIVE_FILES_RE.search("normal_file.py") is None
+
+
+def test_files_validate_path_access_unicode_and_workspace_base():
+    """Verify NFC normalization and safe base_dir resolution in _validate_path_access."""
+    from pathlib import Path
+
+    from app.api.files import _validate_path_access
+    from app.config import DEFAULT_WORKSPACE
+
+    # Decomposed e + acute accent (\u0065\u0301) should match composed e acute (\u00e9)
+    decomposed = "test_e\u0301.txt"
+    composed = "test_\u00e9.txt"
+    res1 = _validate_path_access(Path(decomposed))
+    res2 = _validate_path_access(Path(composed))
+    assert res1 == res2
+
+    # Valid base_dir within DEFAULT_WORKSPACE
+    res_base = _validate_path_access("test.txt", base_dir=str(DEFAULT_WORKSPACE))
+    assert res_base == Path(DEFAULT_WORKSPACE).resolve() / "test.txt"
+
+
 
 if __name__ == "__main__":
     test_agy_driver_resolve_external_and_unlisted_models()
@@ -6848,6 +6936,10 @@ if __name__ == "__main__":
     test_storage_aggregate_steps_openai_tool_calls()
     test_files_validate_path_access_schemes()
     test_execution_manager_pending_approval_sanitization()
+    test_agy_driver_stdin_eof_closure()
+    test_execution_manager_empty_string_normalization()
+    test_git_sensitive_files_regex_db_and_sqlite()
+    test_files_validate_path_access_unicode_and_workspace_base()
     print("\nAll unit tests passed successfully!")
 
 

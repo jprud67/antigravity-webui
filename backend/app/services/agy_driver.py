@@ -437,6 +437,24 @@ async def stream_turn(
                     drain = stdin_obj.drain()
                     if inspect.isawaitable(drain):
                         await drain
+                    write_eof_fn = getattr(stdin_obj, "write_eof", None)
+                    if callable(write_eof_fn):
+                        try:
+                            res_eof = write_eof_fn()
+                            if inspect.isawaitable(res_eof):
+                                await res_eof
+                        except Exception:
+                            close_fn = getattr(stdin_obj, "close", None)
+                            if callable(close_fn):
+                                res_c = close_fn()
+                                if inspect.isawaitable(res_c):
+                                    await res_c
+                    else:
+                        close_fn = getattr(stdin_obj, "close", None)
+                        if callable(close_fn):
+                            res_c = close_fn()
+                            if inspect.isawaitable(res_c):
+                                await res_c
                 except (BrokenPipeError, ConnectionResetError):
                     logger.warning("agy a fermé stdin avant réception du prompt.")
                 except Exception as exc:
