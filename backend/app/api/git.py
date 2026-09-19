@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -16,6 +17,7 @@ logger = logging.getLogger("antigravity.git")
 router = APIRouter(prefix="/api/git", tags=["git"])
 
 GIT_TIMEOUT = 12
+GIT_BIN = shutil.which("git") or "git"
 _COAUTHOR_RE = re.compile(
     r"(?:co[-_ \t]*author(?:ed)?(?:[-_ \t]*by)?|co[-_ \t]*committ(?:er|ed)?(?:[-_ \t]*by)?|signed[-_ \t]*off[-_ \t]*by|assisted[-_ \t]*by|help[-_ \t]*from|generated[-_ \t]*by|ai[-_ \t]*assisted|claude|anthropic|chatgpt|openai|copilot|github[-_]actions)",
     re.IGNORECASE
@@ -78,7 +80,7 @@ def _validate_workspace(workspace: str | None) -> Path:
 
 def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | None = None) -> subprocess.CompletedProcess:
     base_args = [
-        "git",
+        GIT_BIN,
         "-c", "user.name=jprud67",
         "-c", "user.email=jprud67@gmail.com",
         "-c", "author.name=jprud67",
@@ -342,6 +344,21 @@ def get_branches(workspace: str | None = Query(None), _ = Depends(require_auth))
         "branches": branches
     }
 
+def _unstage_sensitive_files(target: Path) -> None:
+    """Désindexe automatiquement tout fichier sensible non suivi avant commit."""
+    staged_files_res = run_git(["diff", "--name-only", "--cached"], target)
+    if staged_files_res.returncode == 0 and staged_files_res.stdout:
+        for f in staged_files_res.stdout.splitlines():
+            f_clean = f.strip().strip('"')
+            if not f_clean:
+                continue
+            if _SENSITIVE_FILES_RE.search(f_clean):
+                check_head = run_git(["rev-parse", "--verify", f"HEAD:{f_clean}"], target)
+                if check_head.returncode != 0:
+                    run_git(["reset", "HEAD", "--", f_clean], target)
+                    logger.warning(f"Fichier sensible désindexé automatiquement du commit : {f_clean}")
+
+
 class CommitRequest(BaseModel):
     workspace: str | None = None
     message: str
@@ -362,18 +379,9 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
         add_res = run_git(["add", "-A"], target)
         if add_res.returncode != 0:
             raise HTTPException(status_code=500, detail=f"Échec du git add : {add_res.stderr}")
-        # Protection automatique contre l'indexation accidentelle de fichiers sensibles non suivis (.env, clés privées)
-        staged_files_res = run_git(["diff", "--name-only", "--cached"], target)
-        if staged_files_res.returncode == 0 and staged_files_res.stdout:
-            for f in staged_files_res.stdout.splitlines():
-                f_clean = f.strip().strip('"')
-                if not f_clean:
-                    continue
-                if _SENSITIVE_FILES_RE.search(f_clean):
-                    check_head = run_git(["rev-parse", "--verify", f"HEAD:{f_clean}"], target)
-                    if check_head.returncode != 0:
-                        run_git(["reset", "HEAD", "--", f_clean], target)
-                        logger.warning(f"Fichier sensible désindexé automatiquement du commit : {f_clean}")
+
+    # Protection automatique contre l'indexation accidentelle de fichiers sensibles non suivis (.env, clés privées)
+    _unstage_sensitive_files(target)
 
     commit_res = run_git(["commit", "--no-signoff", "--author=jprud67 <jprud67@gmail.com>", "-m", clean_msg], target)
     if commit_res.returncode != 0:

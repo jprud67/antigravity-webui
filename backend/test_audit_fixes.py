@@ -7291,6 +7291,60 @@ def test_execution_manager_failover_broadcasts_reset_turn():
     assert '"reset_turn": True' in src
 
 
+def test_storage_schema_initialized_flag_set():
+    """Verify that calling ensure_db_schema sets _schema_initialized to True."""
+    import app.services.storage as storage_mod
+
+    storage_mod.ensure_db_schema()
+    assert storage_mod._schema_initialized is True
+
+
+def test_git_bin_and_unstage_sensitive_files(tmp_path):
+    """Verify GIT_BIN is resolved and _unstage_sensitive_files protects credentials."""
+    import subprocess
+    from unittest import mock
+
+    from app.api.git import GIT_BIN, _unstage_sensitive_files
+
+    assert GIT_BIN is not None
+    assert isinstance(GIT_BIN, str)
+    assert len(GIT_BIN) > 0
+
+    # Mock run_git to simulate staged sensitive files
+    fake_staged_output = ".env\nsrc/app.py\ncredentials.json\n"
+    reset_calls = []
+
+    def fake_run_git(args, target, **kwargs):
+        if "diff" in args and "--cached" in args:
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout=fake_staged_output, stderr="")
+        if "rev-parse" in args:
+            # File is NOT in HEAD (returncode 1)
+            return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="fatal")
+        if "reset" in args:
+            reset_calls.append(args[-1])
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    with mock.patch("app.api.git.run_git", side_effect=fake_run_git):
+        _unstage_sensitive_files(tmp_path)
+
+    assert ".env" in reset_calls
+    assert "credentials.json" in reset_calls
+    assert "src/app.py" not in reset_calls
+
+
+def test_cron_store_compute_next_run_microsecond_zero():
+    """Verify compute_next_run normalizes microseconds to zero."""
+    from datetime import datetime
+
+    from app.services.cron_store import compute_next_run
+
+    res = compute_next_run("0 2 * * *")
+    assert res is not None
+    dt = datetime.fromisoformat(res)
+    assert dt.microsecond == 0
+
+
 if __name__ == "__main__":
     test_storage_ensure_db_schema_migrates_missing_columns()
     test_conversations_api_bulk_clear_project()

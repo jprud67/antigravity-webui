@@ -245,7 +245,7 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
             next_dt = iter_cron.get_next(datetime)
             if next_dt.tzinfo is None:
                 next_dt = next_dt.replace(tzinfo=timezone.utc)
-            return next_dt.isoformat()
+            return next_dt.replace(microsecond=0).isoformat()
     except Exception as e:
         logger.warning(f"Expression cron invalide '{expr}': {e}")
     return None

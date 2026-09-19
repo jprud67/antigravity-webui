@@ -191,8 +191,7 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None) -> None:
                 "CREATE INDEX IF NOT EXISTS idx_conv_group_id ON conversation_summaries(group_id);"
             )
             conn.commit()
-            if close_after:
-                _schema_initialized = True
+            _schema_initialized = True
         except Exception as e:
             logger.warning(f"ensure_db_schema warning: {e}")
         finally:

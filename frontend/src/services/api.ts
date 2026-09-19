@@ -263,17 +263,22 @@ export async function bulkConversationAction(data: BulkActionPayload): Promise<a
 }
 
 export function triggerFileDownload(blob: Blob, filename: string): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
   try {
-    a.click();
-  } finally {
-    if (a.parentNode) {
-      a.parentNode.removeChild(a);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    try {
+      a.click();
+    } finally {
+      if (a.parentNode) {
+        a.parentNode.removeChild(a);
+      }
     }
+  } finally {
     setTimeout(() => {
       URL.revokeObjectURL(url);
     }, 2000);
