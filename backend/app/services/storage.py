@@ -110,7 +110,7 @@ def get_db_connection() -> sqlite3.Connection:
 
 _schema_initialized = False
 _initialized_db_paths: set[str] = set()
-_schema_lock = threading.Lock()
+_schema_lock = threading.RLock()
 
 
 def ensure_db_schema(conn: sqlite3.Connection | None = None, force: bool = False) -> None:
@@ -488,6 +488,10 @@ _XML_TAGS_RE = re.compile(
 )
 _STEERING_PREFIX_RE = re.compile(
     r'^(?:⚡\s*\[(?:Guidage|Steering)\]\s*|📥\s*\[(?:En attente|Queued)\]\s*|\[(?:Instruction Prioritaire de Guidage|Priority Steering Instruction)\]\s*:?\s*)+',
+    re.IGNORECASE,
+)
+_THOUGHT_TAGS_RE = re.compile(
+    r'<(?:thinking|thought|think)>([\s\S]*?)</(?:thinking|thought|think)>',
     re.IGNORECASE,
 )
 
@@ -1909,6 +1913,14 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                     "result": None,
                     "status": "done" if s.get("status") == "DONE" else "running"
                 })
+
+        if content:
+            matches = _THOUGHT_TAGS_RE.findall(content)
+            if matches:
+                extracted_thought = "\n\n".join(m.strip() for m in matches if m.strip())
+                if extracted_thought:
+                    thinking = f"{thinking}\n\n{extracted_thought}".strip() if thinking else extracted_thought
+                content = _THOUGHT_TAGS_RE.sub("", content).strip()
 
         if current_asst:
             if thinking:

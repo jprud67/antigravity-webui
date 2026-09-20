@@ -19,7 +19,7 @@ logger = logging.getLogger("antigravity.kanban")
 router = APIRouter(prefix="/api/kanban", tags=["kanban"])
 
 KANBAN_DB_PATH = Path(os.environ.get("ANTIGRAVITY_KANBAN_DB", str(GEMINI_DIR / "webui_kanban.db")))
-_schema_lock = threading.Lock()
+_schema_lock = threading.RLock()
 _schema_initialized = False
 
 

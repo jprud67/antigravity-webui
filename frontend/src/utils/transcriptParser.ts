@@ -423,8 +423,8 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
       // Accumuler le contenu de dialogue de l'assistant
       if (content) {
         let text = content;
-        // Extraire d'éventuelles balises de raisonnement (<thinking>...</thinking> ou <thought>...</thought>)
-        const thoughtRegex = /<(?:thinking|thought)>([\s\S]*?)<\/(?:thinking|thought)>/gi;
+        // Extraire d'éventuelles balises de raisonnement (<thinking>...</thinking>, <thought>...</thought> ou <think>...</think>)
+        const thoughtRegex = /<(?:thinking|thought|think)>([\s\S]*?)<\/(?:thinking|thought|think)>/gi;
         const matches = [...text.matchAll(thoughtRegex)];
         if (matches.length > 0) {
           const thoughts = matches.map((m) => m[1].trim()).filter(Boolean).join('\n\n');

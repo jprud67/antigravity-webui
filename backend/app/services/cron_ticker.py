@@ -576,32 +576,42 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
         logger.warning(f"[Cron] Job {job_id} annulé.")
         duration = round(time.time() - started, 1)
         start_dt = datetime.fromtimestamp(started, tz=timezone.utc)
-        log_file = None
-        if job_id:
-            log_file = await asyncio.to_thread(
-                _write_job_log_entry,
-                job_id,
-                name,
-                start_dt,
-                duration,
-                "interrupted",
-                "[Interrompu] L'exécution de la tâche a été annulée ou interrompue."
-            )
+
+        async def _finalize_interrupted() -> None:
+            log_file = None
+            if job_id:
+                try:
+                    log_file = await asyncio.to_thread(
+                        _write_job_log_entry,
+                        job_id,
+                        name,
+                        start_dt,
+                        duration,
+                        "interrupted",
+                        "[Interrompu] L'exécution de la tâche a été annulée ou interrompue."
+                    )
+                except Exception as log_err:
+                    logger.error(f"[Cron] Impossible d'écrire le log pour {job_id}: {log_err}")
+            try:
+                async with _jobs_write_lock:
+                    def _mark_interrupted(data: dict[str, Any]) -> None:
+                        for j in data.get("jobs", []):
+                            if j.get("id") == job_id:
+                                j["last_status"] = "interrupted"
+                                j["last_run_at"] = now_iso()
+                                j["last_duration_seconds"] = duration
+                                if log_file:
+                                    j["last_log"] = str(log_file)
+                                _recompute_job_next_run(j)
+                                break
+                    update_jobs(_mark_interrupted)
+            except Exception as save_err:
+                logger.error(f"[Cron] Impossible de marquer le job {job_id} comme interrompu: {save_err}")
+
         try:
-            async with _jobs_write_lock:
-                def _mark_interrupted(data: dict[str, Any]) -> None:
-                    for j in data.get("jobs", []):
-                        if j.get("id") == job_id:
-                            j["last_status"] = "interrupted"
-                            j["last_run_at"] = now_iso()
-                            j["last_duration_seconds"] = duration
-                            if log_file:
-                                j["last_log"] = str(log_file)
-                            _recompute_job_next_run(j)
-                            break
-                update_jobs(_mark_interrupted)
-        except Exception as save_err:
-            logger.error(f"[Cron] Impossible de marquer le job {job_id} comme interrompu: {save_err}")
+            await asyncio.shield(_finalize_interrupted())
+        except (asyncio.CancelledError, Exception):
+            pass
         raise
     except Exception as e:
         logger.error(f"[Cron] Erreur pendant l'exécution du job {job_id}: {e}", exc_info=True)

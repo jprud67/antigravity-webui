@@ -7946,10 +7946,70 @@ def test_clean_user_prompt_fast_path_whitespace():
     # Leading and trailing whitespace should both be stripped
     res = clean_user_prompt("   Hello world!   ")
     assert res == "Hello world!"
-    print("✓ test_clean_user_prompt_fast_path_whitespace passed")
+def test_schema_locks_reentrancy():
+    import threading
+    import app.services.storage as storage_mod
+    import app.api.kanban as kanban_mod
+
+    # Both _schema_lock must be reentrant (RLock) to prevent deadlocks
+    # when ensure_db_schema or db initialization is nested or reentered.
+    assert isinstance(storage_mod._schema_lock, type(threading.RLock()))
+    assert isinstance(kanban_mod._schema_lock, type(threading.RLock()))
+
+    # Verify that acquiring twice in same thread does not deadlock
+    with storage_mod._schema_lock:
+        with storage_mod._schema_lock:
+            pass
+
+    with kanban_mod._schema_lock:
+        with kanban_mod._schema_lock:
+            pass
+    print("✓ test_schema_locks_reentrancy passed")
+
+
+def test_storage_aggregate_steps_extracts_thought_tags():
+    from app.services.storage import aggregate_steps_into_turns
+
+    mock_steps = [
+        {
+            "step_index": 0,
+            "source": "USER_EXPLICIT",
+            "type": "USER_INPUT",
+            "content": "Solve this equation",
+            "created_at": "2026-09-20T12:00:00Z"
+        },
+        {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "content": "<think>Let me compute the discriminant.</think>The solution is x = 4.",
+            "created_at": "2026-09-20T12:00:01Z"
+        },
+        {
+            "step_index": 2,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "content": "<thought>Double checking</thought>Confirmed.",
+            "created_at": "2026-09-20T12:00:02Z"
+        }
+    ]
+
+    turns = aggregate_steps_into_turns(mock_steps)
+    assert len(turns) == 2  # user + combined assistant turn
+    asst = turns[1]
+    assert asst["role"] == "assistant"
+    assert "<think>" not in asst["content"]
+    assert "<thought>" not in asst["content"]
+    assert "The solution is x = 4." in asst["content"]
+    assert "Confirmed." in asst["content"]
+    assert "Let me compute the discriminant." in asst["thinking"]
+    assert "Double checking" in asst["thinking"]
+    print("✓ test_storage_aggregate_steps_extracts_thought_tags passed")
 
 
 if __name__ == "__main__":
+    test_schema_locks_reentrancy()
+    test_storage_aggregate_steps_extracts_thought_tags()
     test_storage_ensure_db_schema_double_checked_lock()
     test_fs_watcher_resolve_conv_id_for_artifact(Path("/tmp"))
     test_openai_compat_list_models_deduplication()
