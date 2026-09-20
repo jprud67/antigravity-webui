@@ -19,6 +19,7 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from app.config import AGY_BIN, DEFAULT_WORKSPACE
@@ -456,6 +457,66 @@ def prune_job_logs(job_id: str, keep_latest: int = 20) -> None:
         logger.debug(f"[Cron] Error pruning logs for job {job_id}: {e}")
 
 
+def _recompute_job_next_run(j: dict[str, Any]) -> None:
+    """Recalcule next_run_at si le job est actif et n'est pas déjà planifié dans le futur."""
+    if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
+        j["next_run_at"] = None
+        return
+    current_next = j.get("next_run_at")
+    is_future = False
+    if current_next:
+        try:
+            due = datetime.fromisoformat(str(current_next).replace("Z", "+00:00"))
+            if due.tzinfo is None:
+                due = due.replace(tzinfo=timezone.utc)
+            if due > datetime.now(timezone.utc):
+                is_future = True
+        except (ValueError, TypeError):
+            pass
+    if not is_future:
+        computed_next = compute_next_run(j.get("schedule") or j.get("schedule_display"))
+        if not computed_next:
+            logger.info(f"[Cron] Job {j.get('id')} sans planification récurrente marqué comme 'completed'.")
+            j["next_run_at"] = None
+            j["state"] = "completed"
+        else:
+            j["next_run_at"] = computed_next
+
+
+def _write_job_log_entry(
+    job_id: str,
+    name: str,
+    started_at: datetime,
+    duration: float,
+    status: str,
+    output: str,
+    attempts: int = 1,
+    failovers: list | None = None
+) -> Path | None:
+    """Écrit le fichier journal pour une exécution de tâche cron et applique les restrictions d'accès."""
+    ensure_dirs()
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    log_file = OUTPUT_DIR / f"{job_id}_{stamp}.log"
+    header = (
+        f"Job: {name} ({job_id})\n"
+        f"Début: {started_at.isoformat()}\n"
+        f"Durée: {duration}s — Statut: {status} — Tentatives: {attempts}\n"
+        f"Basculements: {failovers or 'aucun'}\n"
+        f"{'-' * 60}\n"
+    )
+    try:
+        log_file.write_text(header + str(output or ""), encoding="utf-8")
+        restrict_file_permissions(log_file)
+        if job_id:
+            prune_job_logs(job_id, 20)
+        logger.info(f"[Cron] Journal écrit: {log_file}")
+        return log_file
+    except Exception as log_err:
+        logger.warning(f"[Cron] Impossible d'écrire le journal {log_file}: {log_err}")
+        return None
+
+
 async def _execute_job(job: dict[str, Any]) -> None:
     job_id = job.get("id")
     name = job.get("name") or job_id
@@ -464,30 +525,20 @@ async def _execute_job(job: dict[str, Any]) -> None:
 
     result = await run_job_with_failover(job)
     duration = round(time.time() - started, 1)
+    start_dt = datetime.fromtimestamp(started, tz=timezone.utc)
 
     # Journal d'exécution (propre à l'application)
-    ensure_dirs()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    log_file = OUTPUT_DIR / f"{job_id}_{stamp}.log"
-    header = (
-        f"Job: {name} ({job_id})\n"
-        f"Début: {datetime.now(timezone.utc).isoformat()}\n"
-        f"Durée: {duration}s — Statut: {result.get('status', 'failed')} — Tentatives: {result.get('attempts', 1)}\n"
-        f"Basculements: {result.get('failovers') or 'aucun'}\n"
-        f"{'-' * 60}\n"
+    log_file = await asyncio.to_thread(
+        _write_job_log_entry,
+        job_id,
+        name,
+        start_dt,
+        duration,
+        result.get("status", "failed"),
+        result.get("output") or "",
+        result.get("attempts", 1),
+        result.get("failovers")
     )
-    try:
-        def _write_and_restrict(p, content):
-            p.write_text(content, encoding="utf-8")
-            restrict_file_permissions(p)
-
-        await asyncio.to_thread(_write_and_restrict, log_file, header + str(result.get("output") or ""))
-        if job_id:
-            await asyncio.to_thread(prune_job_logs, job_id, 20)
-        logger.info(f"[Cron] Journal écrit: {log_file}")
-    except Exception as log_err:
-        logger.warning(f"[Cron] Impossible d'écrire le journal {log_file}: {log_err}")
 
     # Mise à jour du job (verrou pour éviter les écritures concurrentes)
     async with _jobs_write_lock:
@@ -497,34 +548,12 @@ async def _execute_job(job: dict[str, Any]) -> None:
                     j["last_run_at"] = now_iso()
                     j["last_status"] = result.get("status", "failed")
                     j["last_duration_seconds"] = duration
-                    j["last_log"] = str(log_file)
+                    if log_file:
+                        j["last_log"] = str(log_file)
                     failovers = result.get("failovers")
                     if failovers:
                         j["last_failover"] = failovers[-1]
-                    # Ne recalculer next_run_at QUE si le job est actif (non pausé / non désactivé)
-                    if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
-                        j["next_run_at"] = None
-                    else:
-                        # Ne recalculer next_run_at que s'il n'est pas déjà planifié dans le futur (évite la dérive de timing)
-                        current_next = j.get("next_run_at")
-                        is_future = False
-                        if current_next:
-                            try:
-                                due = datetime.fromisoformat(str(current_next).replace("Z", "+00:00"))
-                                if due.tzinfo is None:
-                                    due = due.replace(tzinfo=timezone.utc)
-                                if due > datetime.now(timezone.utc):
-                                    is_future = True
-                            except (ValueError, TypeError):
-                                logger.debug("Ignored error")
-                        if not is_future:
-                            computed_next = compute_next_run(j.get("schedule") or j.get("schedule_display"))
-                            if not computed_next:
-                                logger.info(f"[Cron] Job {j.get('id')} sans planification récurrente marqué comme 'completed'.")
-                                j["next_run_at"] = None
-                                j["state"] = "completed"
-                            else:
-                                j["next_run_at"] = computed_next
+                    _recompute_job_next_run(j)
                     break
         update_jobs(_update_result)
     logger.info(f"[Cron] Job « {name} » terminé: {result.get('status', 'unknown')} ({duration}s).")
@@ -543,6 +572,18 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
     except asyncio.CancelledError:
         logger.warning(f"[Cron] Job {job_id} annulé.")
         duration = round(time.time() - started, 1)
+        start_dt = datetime.fromtimestamp(started, tz=timezone.utc)
+        log_file = None
+        if job_id:
+            log_file = await asyncio.to_thread(
+                _write_job_log_entry,
+                job_id,
+                job.get("name") or job_id,
+                start_dt,
+                duration,
+                "interrupted",
+                "[Interrompu] L'exécution de la tâche a été annulée ou interrompue."
+            )
         try:
             async with _jobs_write_lock:
                 def _mark_interrupted(data: dict[str, Any]) -> None:
@@ -551,8 +592,9 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
                             j["last_status"] = "interrupted"
                             j["last_run_at"] = now_iso()
                             j["last_duration_seconds"] = duration
-                            if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
-                                j["next_run_at"] = None
+                            if log_file:
+                                j["last_log"] = str(log_file)
+                            _recompute_job_next_run(j)
                             break
                 update_jobs(_mark_interrupted)
         except Exception as save_err:
@@ -561,6 +603,18 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
     except Exception as e:
         logger.error(f"[Cron] Erreur pendant l'exécution du job {job_id}: {e}", exc_info=True)
         duration = round(time.time() - started, 1)
+        start_dt = datetime.fromtimestamp(started, tz=timezone.utc)
+        log_file = None
+        if job_id:
+            log_file = await asyncio.to_thread(
+                _write_job_log_entry,
+                job_id,
+                job.get("name") or job_id,
+                start_dt,
+                duration,
+                "failed",
+                f"[Erreur] Exception pendant l'exécution : {e}"
+            )
         try:
             async with _jobs_write_lock:
                 def _mark_failed(data: dict[str, Any]) -> None:
@@ -569,8 +623,9 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
                             j["last_status"] = "failed"
                             j["last_run_at"] = now_iso()
                             j["last_duration_seconds"] = duration
-                            if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
-                                j["next_run_at"] = None
+                            if log_file:
+                                j["last_log"] = str(log_file)
+                            _recompute_job_next_run(j)
                             break
                 update_jobs(_mark_failed)
         except Exception as save_err:

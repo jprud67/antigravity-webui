@@ -7640,7 +7640,121 @@ def test_git_last_commit_and_push_masking():
     print("✓ test_git_last_commit_and_push_masking passed")
 
 
+def test_cron_ticker_recompute_and_log_entry():
+    import tempfile
+    from datetime import datetime, timezone
+    from unittest.mock import patch
+    from app.services.cron_ticker import _recompute_job_next_run, _write_job_log_entry
+
+    # 1. Active recurring job
+    job = {
+        "id": "job_recur_1",
+        "enabled": True,
+        "state": "scheduled",
+        "schedule": "every 1 hour",
+        "next_run_at": "2020-01-01T00:00:00+00:00"  # past date
+    }
+    _recompute_job_next_run(job)
+    assert job["next_run_at"] is not None
+    dt = datetime.fromisoformat(job["next_run_at"])
+    assert dt > datetime.now(timezone.utc)
+
+    # 2. Disabled job
+    job_disabled = {
+        "id": "job_dis_1",
+        "enabled": False,
+        "state": "disabled",
+        "schedule": "every 1 hour",
+        "next_run_at": "2020-01-01T00:00:00+00:00"
+    }
+    _recompute_job_next_run(job_disabled)
+    assert job_disabled["next_run_at"] is None
+
+    # 3. Log entry writing
+    with tempfile.TemporaryDirectory() as td:
+        with patch("app.services.cron_ticker.OUTPUT_DIR", Path(td)):
+            log_p = _write_job_log_entry(
+                job_id="test_log_job",
+                name="Test Log Job",
+                started_at=datetime.now(timezone.utc),
+                duration=1.5,
+                status="interrupted",
+                output="Log content message"
+            )
+            assert log_p is not None
+            assert log_p.exists()
+            content = log_p.read_text(encoding="utf-8")
+            assert "Job: Test Log Job (test_log_job)" in content
+            assert "Statut: interrupted" in content
+            assert "Log content message" in content
+    print("✓ test_cron_ticker_recompute_and_log_entry passed")
+
+
+def test_git_resolve_relative_git_path():
+    from fastapi import HTTPException
+    from app.api.git import _resolve_relative_git_path
+
+    repo_dir = BACKEND_DIR.parent
+
+    # Valid relative path
+    rel = _resolve_relative_git_path("backend/app/main.py", repo_dir)
+    assert rel == "backend/app/main.py"
+
+    # Slash-prefixed workspace-relative path
+    rel_slash = _resolve_relative_git_path("/backend/app/main.py", repo_dir)
+    assert rel_slash == "backend/app/main.py"
+
+    # Encoded path (e.g. %2f -> /)
+    rel_enc = _resolve_relative_git_path("%2Fbackend%2Fapp%2Fmain.py", repo_dir)
+    assert rel_enc == "backend/app/main.py"
+
+    # Null byte rejection
+    try:
+        _resolve_relative_git_path("backend/app/main.py\x00extra", repo_dir)
+        assert False, "Should have raised 400 for null byte"
+    except HTTPException as e:
+        assert e.status_code == 400
+
+    # Path traversal rejection
+    try:
+        _resolve_relative_git_path("../../etc/passwd", repo_dir)
+        assert False, "Should have raised for path traversal"
+    except HTTPException as e:
+        assert e.status_code in (400, 403)
+    print("✓ test_git_resolve_relative_git_path passed")
+
+
+def test_files_download_file_direct_validation():
+    from fastapi import HTTPException
+    from app.api.files import download_file
+
+    # Non-existent file raises 404
+    try:
+        download_file(path="non_existent_file_test_xyz.txt", workspace=str(BACKEND_DIR.parent), _=None)
+        assert False, "Should have raised 404"
+    except HTTPException as e:
+        assert e.status_code == 404
+
+    # Traversal raises 400 or 403
+    try:
+        download_file(path="../../etc/shadow", workspace=str(BACKEND_DIR.parent), _=None)
+        assert False, "Should have raised for path traversal"
+    except HTTPException as e:
+        assert e.status_code in (400, 403)
+
+    # Null byte raises 400
+    try:
+        download_file(path="backend/app/main.py\x00.png", workspace=str(BACKEND_DIR.parent), _=None)
+        assert False, "Should have raised 400 for null byte"
+    except HTTPException as e:
+        assert e.status_code == 400
+    print("✓ test_files_download_file_direct_validation passed")
+
+
 if __name__ == "__main__":
+    test_cron_ticker_recompute_and_log_entry()
+    test_git_resolve_relative_git_path()
+    test_files_download_file_direct_validation()
     test_is_blocked_sensitive_path_etc_and_tokens()
     test_files_validate_path_access_windows_drive_in_file_uri()
     test_workspaces_path_sanitization()

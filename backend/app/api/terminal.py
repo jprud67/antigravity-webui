@@ -180,6 +180,16 @@ class PersistentTerminalSession:
                 os.close(fd)
             except Exception as e:
                 logger.debug(f"Ignored error: {e}")
+        if self.proc and self.loop and not self.loop.is_closed():
+            async def _reap_proc(proc: asyncio.subprocess.Process):
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=1.0)
+                except Exception:
+                    try:
+                        await terminate_process_group_async(proc, grace=0.2)
+                    except Exception:
+                        pass
+            self.loop.create_task(_reap_proc(self.proc))
         ws = self.active_websocket
         if ws and self.loop and not self.loop.is_closed():
             self.loop.create_task(_safe_send_bytes(ws, b"\r\n\x1b[33m\xe2\x9a\xa1 Session terminal ferm\xc3\xa9e.\x1b[0m\r\n"))

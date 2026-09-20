@@ -78,6 +78,49 @@ def _validate_workspace(workspace: str | None) -> Path:
 
     return resolved
 
+
+def _resolve_relative_git_path(raw_path: str, target: Path) -> str:
+    """Valide et normalise un chemin de fichier relatif à l'espace de travail Git."""
+    from urllib.parse import unquote
+    p_str = str(raw_path).strip()
+    for _ in range(3):
+        next_p = unquote(p_str)
+        if next_p == p_str:
+            break
+        p_str = next_p
+    if "\x00" in p_str:
+        raise HTTPException(status_code=400, detail="Chemin de fichier invalide : octet nul détecté.")
+
+    p = Path(p_str)
+    if p.is_absolute():
+        try:
+            resolved_p = p.resolve()
+            resolved_target = target.resolve()
+            clean_rel = str(resolved_p.relative_to(resolved_target)).replace("\\", "/")
+        except ValueError:
+            clean_str = p_str.replace("\\", "/").removeprefix("/")
+            if not clean_str or ".." in Path(clean_str).parts:
+                raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+            candidate = (target / clean_str).resolve()
+            if is_safe_path(candidate, [target]):
+                clean_rel = clean_str
+            else:
+                raise HTTPException(status_code=403, detail="Chemin de fichier en dehors de l'espace de travail.")
+    else:
+        clean_str = p_str.replace("\\", "/")
+        if ".." in Path(clean_str).parts:
+            raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+        norm_str = os.path.normpath(clean_str).replace("\\", "/")
+        if norm_str == "." or norm_str.startswith(".."):
+            raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+        clean_rel = norm_str.removeprefix("./").removeprefix("/")
+
+    file_candidate = (target / clean_rel).resolve()
+    if not is_safe_path(file_candidate, [target]):
+        raise HTTPException(status_code=403, detail="Chemin de fichier en dehors de l'espace de travail.")
+    return clean_rel
+
+
 def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | None = None) -> subprocess.CompletedProcess:
     base_args = [
         GIT_BIN,
@@ -241,35 +284,7 @@ def get_git_diff(
         args.append("--cached")
     norm_path = None
     if path:
-        p = Path(path.strip())
-        if p.is_absolute():
-            try:
-                resolved_p = p.resolve()
-                resolved_target = target.resolve()
-                clean_rel = str(resolved_p.relative_to(resolved_target)).replace("\\", "/")
-            except ValueError:
-                # Check if it was passed as a slash-prefixed workspace-relative path (e.g. "/backend/app/main.py")
-                clean_str = path.strip().replace("\\", "/").removeprefix("/")
-                if not clean_str or ".." in Path(clean_str).parts:
-                    raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
-                candidate = (target / clean_str).resolve()
-                if is_safe_path(candidate, [target]):
-                    clean_rel = clean_str
-                else:
-                    raise HTTPException(status_code=400, detail="Chemin de fichier en dehors de l'espace de travail.")
-        else:
-            clean_str = path.strip().replace("\\", "/")
-            if ".." in Path(clean_str).parts:
-                raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
-            norm_str = os.path.normpath(clean_str).replace("\\", "/")
-            if norm_str == "." or norm_str.startswith(".."):
-                raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
-            clean_rel = norm_str.removeprefix("./").removeprefix("/")
-
-        file_candidate = (target / clean_rel).resolve()
-        if not is_safe_path(file_candidate, [target]):
-            raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
-        norm_path = clean_rel
+        norm_path = _resolve_relative_git_path(path, target)
         args.extend(["--", norm_path])
 
     res = run_git(args, target)
@@ -285,7 +300,7 @@ def get_git_diff(
         # Si toujours vide, verifier par rapport a HEAD (utile pour les fichiers supprimes ou indexes)
         if not diff_text:
             head_res = run_git(["diff", "HEAD", "--", norm_path], target)
-            if head_res.stdout:
+            if head_res.returncode == 0 and head_res.stdout:
                 diff_text = head_res.stdout
         # Si toujours vide, verifier si c'est un fichier non suivi (untracked) present sur le disque
         if not diff_text:
@@ -589,34 +604,7 @@ def get_git_log(
 
     norm_path = None
     if path:
-        p = Path(path.strip())
-        if p.is_absolute():
-            try:
-                resolved_p = p.resolve()
-                resolved_target = target.resolve()
-                clean_rel = str(resolved_p.relative_to(resolved_target)).replace("\\", "/")
-            except ValueError:
-                clean_str = path.strip().replace("\\", "/").removeprefix("/")
-                if not clean_str or ".." in Path(clean_str).parts:
-                    raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
-                candidate = (target / clean_str).resolve()
-                if is_safe_path(candidate, [target]):
-                    clean_rel = clean_str
-                else:
-                    raise HTTPException(status_code=400, detail="Chemin de fichier en dehors de l'espace de travail.")
-        else:
-            clean_str = path.strip().replace("\\", "/")
-            if ".." in Path(clean_str).parts:
-                raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
-            norm_str = os.path.normpath(clean_str).replace("\\", "/")
-            if norm_str == "." or norm_str.startswith(".."):
-                raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
-            clean_rel = norm_str.removeprefix("./").removeprefix("/")
-
-        file_candidate = (target / clean_rel).resolve()
-        if not is_safe_path(file_candidate, [target]):
-            raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
-        norm_path = clean_rel
+        norm_path = _resolve_relative_git_path(path, target)
         cmd.extend(["--", norm_path])
 
     res = run_git(cmd, target)

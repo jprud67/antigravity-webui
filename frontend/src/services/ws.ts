@@ -334,6 +334,7 @@ export class ChatWebSocketClient {
           (p) => p.action === 'prompt' &&
                  p.conversation_id === payload.conversation_id &&
                  p.prompt === payload.prompt &&
+                 p.mode === payload.mode &&
                  (now - (p._enqueuedAt || 0)) < 1000
         );
         if (isDuplicatePrompt) {
@@ -367,6 +368,7 @@ export class ChatWebSocketClient {
           (p) => p.action === 'prompt' &&
                  p.conversation_id === payload.conversation_id &&
                  p.prompt === payload.prompt &&
+                 p.mode === payload.mode &&
                  (now - (p._enqueuedAt || 0)) < 1000
         );
         if (isDuplicatePrompt) {

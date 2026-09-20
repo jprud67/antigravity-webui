@@ -280,14 +280,16 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
 @router.get("/download")
 def download_file(path: str = Query(...), workspace: str | None = Query(None), _ = Depends(require_auth)):
     import mimetypes
-    from urllib.parse import unquote
-    clean_p = unquote(path.strip())
-    file_path = Path(clean_p)
-    resolved_path = _validate_path_access(file_path, base_dir=workspace)
+    resolved_path = _validate_path_access(path, base_dir=workspace)
     if not resolved_path.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
     if not resolved_path.is_file():
         raise HTTPException(status_code=400, detail="La cible n'est pas un fichier.")
+    try:
+        if isinstance(resolved_path, Path) and not os.access(resolved_path, os.R_OK):
+            raise HTTPException(status_code=403, detail="Permission de lecture refusée sur ce fichier.")
+    except (TypeError, OSError):
+        pass
 
     known_mime_types = {
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
