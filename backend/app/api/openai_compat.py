@@ -212,11 +212,13 @@ async def list_models(_: bool = Depends(require_auth)):
         families = []
 
     model_entries: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
     created_ts = int(time.time())
 
     for f in families:
         fid = f.get("id")
-        if fid:
+        if fid and isinstance(fid, str) and fid not in seen_ids:
+            seen_ids.add(fid)
             model_entries.append({
                 "id": fid,
                 "object": "model",
@@ -226,17 +228,20 @@ async def list_models(_: bool = Depends(require_auth)):
                 "root": fid,
                 "parent": None,
             })
-        for variant_id in (f.get("variants") or {}).values():
-            if variant_id and variant_id != fid:
-                model_entries.append({
-                    "id": variant_id,
-                    "object": "model",
-                    "created": created_ts,
-                    "owned_by": "antigravity",
-                    "permission": [],
-                    "root": fid,
-                    "parent": fid,
-                })
+        variants = f.get("variants")
+        if isinstance(variants, dict):
+            for variant_id in variants.values():
+                if variant_id and isinstance(variant_id, str) and variant_id not in seen_ids:
+                    seen_ids.add(variant_id)
+                    model_entries.append({
+                        "id": variant_id,
+                        "object": "model",
+                        "created": created_ts,
+                        "owned_by": "antigravity",
+                        "permission": [],
+                        "root": fid or variant_id,
+                        "parent": fid,
+                    })
 
     return {
         "object": "list",

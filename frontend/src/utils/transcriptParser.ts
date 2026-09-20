@@ -81,7 +81,7 @@ export function cleanUserPrompt(raw: any): string {
   const trimmedStart = str.trimStart();
   // Optimisation de performance : court-circuiter si aucun délimiteur XML ou préfixe de guidage
   if (!trimmedStart.includes('<') && !trimmedStart.startsWith('⚡') && !trimmedStart.startsWith('📥') && !trimmedStart.startsWith('[')) {
-    return str.trimEnd();
+    return trimmedStart.trimEnd();
   }
 
   // 1. Retirer d'abord les résumés de contexte passés pour ne pas extraire d'anciennes requêtes archivées

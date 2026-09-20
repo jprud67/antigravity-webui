@@ -118,6 +118,16 @@ def extract_conv_id_from_artifact(artifact_path: Path, brain_dir: Path) -> str |
     return None
 
 
+def _resolve_conv_id_for_artifact(p: Path, brain_dir: Path) -> str | None:
+    """Résout et valide strictement l'identifiant de conversation associé à un artefact."""
+    cid = extract_conv_id_from_artifact(p, brain_dir)
+    if not cid:
+        cand = p.parent.name
+        if _UUID_PATTERN.match(cand) or is_safe_conversation_id(cand):
+            cid = cand
+    return cid if (cid and is_safe_conversation_id(cid)) else None
+
+
 async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float = 1.5) -> None:
     """
     Async polling loop that detects changes in:
@@ -265,41 +275,44 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                 prev = artifact_mtimes.get(a_path, 0.0)
                 if a_mtime != prev:
                     p = Path(a_path)
-                    conv_id = extract_conv_id_from_artifact(p, brain_dir) or p.parent.name
-                    logger.debug(f"Artifact changed for conv {conv_id} ({p.name}) → broadcasting artifacts_updated")
-                    await _broadcast({
-                        "type": "artifacts_updated",
-                        "conversation_id": conv_id,
-                        "filename": p.name,
-                        "ts": time.time()
-                    })
-            # Nettoyer les entrées obsolètes (fichiers supprimés) pour éviter une fuite mémoire
-            removed_artifacts = set(artifact_mtimes) - set(cur_artifacts)
-            if removed_artifacts:
-                if len(removed_artifacts) > 10:
-                    # Many files removed at once (e.g. bulk delete): collapse into one event per conv
-                    conv_ids_affected = {
-                        (extract_conv_id_from_artifact(Path(old_p), brain_dir) or Path(old_p).parent.name)
-                        for old_p in removed_artifacts
-                    }
-                    for cid in conv_ids_affected:
-                        await _broadcast({
-                            "type": "artifacts_updated",
-                            "conversation_id": cid,
-                            "filename": None,
-                            "ts": time.time()
-                        })
-                else:
-                    for old_path in removed_artifacts:
-                        p = Path(old_path)
-                        conv_id = extract_conv_id_from_artifact(p, brain_dir) or p.parent.name
-                        logger.debug(f"Artifact supprimé pour conv {conv_id} ({p.name}) → broadcasting artifacts_updated")
+                    conv_id = _resolve_conv_id_for_artifact(p, brain_dir)
+                    if conv_id:
+                        logger.debug(f"Artifact changed for conv {conv_id} ({p.name}) → broadcasting artifacts_updated")
                         await _broadcast({
                             "type": "artifacts_updated",
                             "conversation_id": conv_id,
                             "filename": p.name,
                             "ts": time.time()
                         })
+            # Nettoyer les entrées obsolètes (fichiers supprimés) pour éviter une fuite mémoire
+            removed_artifacts = set(artifact_mtimes) - set(cur_artifacts)
+            if removed_artifacts:
+                if len(removed_artifacts) > 10:
+                    # Many files removed at once (e.g. bulk delete): collapse into one event per conv
+                    conv_ids_affected = {
+                        _resolve_conv_id_for_artifact(Path(old_p), brain_dir)
+                        for old_p in removed_artifacts
+                    }
+                    for cid in conv_ids_affected:
+                        if cid:
+                            await _broadcast({
+                                "type": "artifacts_updated",
+                                "conversation_id": cid,
+                                "filename": None,
+                                "ts": time.time()
+                            })
+                else:
+                    for old_path in removed_artifacts:
+                        p = Path(old_path)
+                        conv_id = _resolve_conv_id_for_artifact(p, brain_dir)
+                        if conv_id:
+                            logger.debug(f"Artifact supprimé pour conv {conv_id} ({p.name}) → broadcasting artifacts_updated")
+                            await _broadcast({
+                                "type": "artifacts_updated",
+                                "conversation_id": conv_id,
+                                "filename": p.name,
+                                "ts": time.time()
+                            })
             artifact_mtimes = cur_artifacts
 
 

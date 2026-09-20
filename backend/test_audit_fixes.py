@@ -7784,7 +7784,143 @@ def test_cron_ticker_job_id_name_none_safety():
     print("✓ test_cron_ticker_job_id_name_none_safety passed")
 
 
+def test_storage_ensure_db_schema_double_checked_lock():
+    import sqlite3
+    import tempfile
+    from unittest.mock import MagicMock
+
+    from app.services import storage
+
+    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+        conn = sqlite3.connect(tmp.name)
+        storage.ensure_db_schema(conn)
+
+        # Ensure calling again without force=True on an initialized schema returns cleanly
+        storage.ensure_db_schema()
+        assert storage._schema_initialized is True
+
+        # Test force=True triggers execution
+        storage.ensure_db_schema(conn, force=True)
+        conn.close()
+    print("✓ test_storage_ensure_db_schema_double_checked_lock passed")
+
+
+def test_fs_watcher_resolve_conv_id_for_artifact(tmp_path):
+    from app.services.fs_watcher import _resolve_conv_id_for_artifact
+
+    brain_dir = tmp_path / "brain"
+    valid_uuid = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
+    conv_dir = brain_dir / valid_uuid
+    conv_dir.mkdir(parents=True, exist_ok=True)
+    artifact_file = conv_dir / "report.pdf"
+    artifact_file.write_text("dummy")
+
+    assert _resolve_conv_id_for_artifact(artifact_file, brain_dir) == valid_uuid
+
+    # Non-conversation path (e.g. system logs / scratch outside conversation)
+    logs_file = brain_dir / "logs" / "audit.log"
+    logs_file.parent.mkdir(parents=True, exist_ok=True)
+    logs_file.write_text("log")
+    assert _resolve_conv_id_for_artifact(logs_file, brain_dir) is None
+
+    # Path traversal attempt
+    traversal_file = brain_dir / ".." / "outside.txt"
+    assert _resolve_conv_id_for_artifact(traversal_file, brain_dir) is None
+    print("✓ test_fs_watcher_resolve_conv_id_for_artifact passed")
+
+
+def test_openai_compat_list_models_deduplication():
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    from app.api.openai_compat import list_models
+
+    mock_families = [
+        {
+            "id": "gemini-3.8-flash",
+            "name": "Gemini 3.8 Flash",
+            "variants": {
+                "high": "gemini-3.8-flash-high",
+                "medium": "gemini-3.8-flash-high",  # Duplicate variant id
+                "same": "gemini-3.8-flash",          # Matches family id
+            }
+        },
+        {
+            "id": "gemini-3.8-flash",  # Duplicate family id
+            "name": "Gemini 3.8 Flash Dup",
+            "variants": {"default": "gemini-3.8-flash"}
+        }
+    ]
+
+    with patch("app.api.openai_compat.get_model_families", new=AsyncMock(return_value=mock_families)):
+        res = asyncio.run(list_models(_=True))
+        ids = [m["id"] for m in res["data"]]
+        assert len(ids) == len(set(ids)), f"Duplicate model IDs found: {ids}"
+        assert ids == ["gemini-3.8-flash", "gemini-3.8-flash-high"]
+    print("✓ test_openai_compat_list_models_deduplication passed")
+
+
+def test_crons_api_job_id_str_int_normalization():
+    from app.api.crons import UpdateCronJobRequest, delete_cron_job, get_cron_job_log, update_cron_job
+    from app.services import cron_store
+
+    # Test database with integer ID
+    test_data = {
+        "jobs": [
+            {
+                "id": 12345,
+                "name": "Numeric ID Job",
+                "prompt": "Test Prompt",
+                "schedule": "every 1h",
+                "enabled": True,
+                "state": "scheduled"
+            }
+        ]
+    }
+
+    original_load = cron_store.load_jobs
+    original_update = cron_store.update_jobs
+
+    try:
+        cron_store.load_jobs = lambda: dict(test_data)
+        def fake_update(fn):
+            return fn(test_data)
+        cron_store.update_jobs = fake_update
+
+        # 1. Update with string job_id "12345"
+        req = UpdateCronJobRequest(name="Updated Name")
+        res = update_cron_job("12345", req, _=True)
+        assert res["job"]["name"] == "Updated Name"
+
+        # 2. Get log with string job_id
+        log_res = get_cron_job_log("12345", _=True)
+        assert log_res["job_id"] == "12345"
+
+        # 3. Delete with string job_id
+        del_res = delete_cron_job("12345", _=True)
+        assert del_res["success"] is True
+        assert len(test_data["jobs"]) == 0
+    finally:
+        cron_store.load_jobs = original_load
+        cron_store.update_jobs = original_update
+    print("✓ test_crons_api_job_id_str_int_normalization passed")
+
+
+def test_clean_user_prompt_fast_path_whitespace():
+    from app.services.storage import clean_user_prompt
+
+    # Leading and trailing whitespace should both be stripped
+    res = clean_user_prompt("   Hello world!   ")
+    assert res == "Hello world!"
+    print("✓ test_clean_user_prompt_fast_path_whitespace passed")
+
+
 if __name__ == "__main__":
+    test_storage_ensure_db_schema_double_checked_lock()
+    test_fs_watcher_resolve_conv_id_for_artifact(Path("/tmp"))
+    test_openai_compat_list_models_deduplication()
+    test_crons_api_job_id_str_int_normalization()
+    test_clean_user_prompt_fast_path_whitespace()
     test_cron_ticker_job_id_name_none_safety()
     test_cron_ticker_recompute_and_log_entry()
     test_git_resolve_relative_git_path()

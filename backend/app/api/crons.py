@@ -156,7 +156,7 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
     def _modify(data):
         jobs = data.get("jobs", [])
         for j in jobs:
-            if j.get("id") == job_id:
+            if str(j.get("id")) == str(job_id):
                 if req.name is not None:
                     j["name"] = req.name.strip()
                 if req.prompt is not None:
@@ -225,7 +225,7 @@ def delete_cron_job(job_id: str, _ = Depends(require_auth)):
     def _delete(data):
         jobs = data.get("jobs", [])
         before_count = len(jobs)
-        data["jobs"] = [j for j in jobs if j.get("id") != job_id]
+        data["jobs"] = [j for j in jobs if str(j.get("id")) != str(job_id)]
         return len(data["jobs"]) < before_count
 
     found = update_jobs(_delete)
@@ -246,7 +246,7 @@ def trigger_cron_job_now(job_id: str, _ = Depends(require_auth)):
     def _trigger(data):
         jobs = data.get("jobs", [])
         for j in jobs:
-            if j.get("id") == job_id:
+            if str(j.get("id")) == str(job_id):
                 j["enabled"] = True
                 j["state"] = "scheduled"
                 j["paused_at"] = None
@@ -272,7 +272,7 @@ def trigger_cron_job_now(job_id: str, _ = Depends(require_auth)):
 def get_cron_job_log(job_id: str, _ = Depends(require_auth)):
     data = load_jobs()
     jobs = data.get("jobs", [])
-    target = next((j for j in jobs if j.get("id") == job_id), None)
+    target = next((j for j in jobs if str(j.get("id")) == str(job_id)), None)
     if not target:
         raise HTTPException(status_code=404, detail="Job cron introuvable")
 

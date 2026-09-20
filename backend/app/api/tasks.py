@@ -116,7 +116,11 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                         or "status: failed" in lower_preview
                         or "command finished" in lower_preview
                     )
-                    is_active_process = any(tid.lower() in cmd for cmd in active_cmdlines) if active_cmdlines else False
+                    is_active_process = (
+                        any(tid.lower() in cmd for cmd in active_cmdlines)
+                        if (active_cmdlines and len(tid) >= 3)
+                        else False
+                    )
                     is_finished = has_finish_marker or ((now_ts - stat_mtime) > 1800 and not is_active_process)
                     tasks.append({
                         "id": f"{cid}/{tid}",
