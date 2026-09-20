@@ -573,6 +573,44 @@ export async function gitCreateTag(tag: string, message?: string, push: boolean 
   return res.json();
 }
 
+export interface GitCommitItem {
+  hash: string;
+  short_hash: string;
+  author: string;
+  email: string;
+  timestamp: number;
+  subject: string;
+  body: string;
+}
+
+export interface GitLogResult {
+  is_repo: boolean;
+  workspace: string;
+  commits: GitCommitItem[];
+  total: number;
+}
+
+export async function fetchGitLog(
+  workspace?: string,
+  limit: number = 25,
+  skip: number = 0,
+  branch?: string,
+  path?: string
+): Promise<GitLogResult> {
+  const params = new URLSearchParams();
+  if (workspace) params.append('workspace', workspace);
+  if (limit) params.append('limit', String(limit));
+  if (skip) params.append('skip', String(skip));
+  if (branch) params.append('branch', branch);
+  if (path) params.append('path', path);
+  const res = await fetch(`${API_BASE}/git/log?${params.toString()}`, { headers: getHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la récupération de l\'historique Git' }));
+    throw new Error(err.detail || 'Erreur lors de la récupération de l\'historique Git');
+  }
+  return res.json();
+}
+
 // Kanban API
 export interface KanbanTask {
   id: string;

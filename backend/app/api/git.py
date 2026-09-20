@@ -552,3 +552,120 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
         "push_output": push_output,
     }
 
+
+@router.get("/log")
+def get_git_log(
+    workspace: str | None = Query(None),
+    limit: int = Query(25, ge=1, le=100),
+    skip: int = Query(0, ge=0),
+    branch: str | None = Query(None),
+    path: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+
+    # Check if git repo
+    res_repo = run_git(["rev-parse", "--is-inside-work-tree"], target)
+    if res_repo.returncode != 0:
+        return {
+            "is_repo": False,
+            "workspace": str(target.resolve()),
+            "commits": [],
+            "total": 0
+        }
+
+    cmd = [
+        "log",
+        f"-n{limit}",
+        f"--skip={skip}",
+        "--format=%H%x1f%h%x1f%an%x1f%ae%x1f%at%x1f%s%x1f%b%x1e",
+    ]
+
+    if branch:
+        clean_branch = branch.strip()
+        if clean_branch.startswith("-") or "--" in clean_branch or not re.match(r'^[a-zA-Z0-9_\-\./]+$', clean_branch):
+            raise HTTPException(status_code=400, detail="Nom de branche Git invalide.")
+        cmd.append(clean_branch)
+
+    norm_path = None
+    if path:
+        p = Path(path.strip())
+        if p.is_absolute():
+            try:
+                resolved_p = p.resolve()
+                resolved_target = target.resolve()
+                clean_rel = str(resolved_p.relative_to(resolved_target)).replace("\\", "/")
+            except ValueError:
+                clean_str = path.strip().replace("\\", "/").removeprefix("/")
+                if not clean_str or ".." in Path(clean_str).parts:
+                    raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+                candidate = (target / clean_str).resolve()
+                if is_safe_path(candidate, [target]):
+                    clean_rel = clean_str
+                else:
+                    raise HTTPException(status_code=400, detail="Chemin de fichier en dehors de l'espace de travail.")
+        else:
+            clean_str = path.strip().replace("\\", "/")
+            if ".." in Path(clean_str).parts:
+                raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+            norm_str = os.path.normpath(clean_str).replace("\\", "/")
+            if norm_str == "." or norm_str.startswith(".."):
+                raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+            clean_rel = norm_str.removeprefix("./").removeprefix("/")
+
+        file_candidate = (target / clean_rel).resolve()
+        if not is_safe_path(file_candidate, [target]):
+            raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+        norm_path = clean_rel
+        cmd.extend(["--", norm_path])
+
+    res = run_git(cmd, target)
+    if res.returncode != 0:
+        err_msg = (res.stderr or "").lower()
+        if "does not have any commits yet" in err_msg or "unknown revision" in err_msg or "bad default revision 'head'" in err_msg:
+            return {
+                "is_repo": True,
+                "workspace": str(target.resolve()),
+                "commits": [],
+                "total": 0
+            }
+        raise HTTPException(status_code=400, detail=f"Erreur lors de la récupération de l'historique Git : {_mask_git_output(res.stderr.strip())}")
+
+    raw_output = res.stdout
+    commits = []
+    if raw_output:
+        raw_entries = raw_output.split("\x1e")
+        for entry in raw_entries:
+            entry_clean = entry.strip()
+            if not entry_clean:
+                continue
+            parts = entry_clean.split("\x1f")
+            if len(parts) >= 6:
+                commit_hash = parts[0].strip()
+                short_hash = parts[1].strip()
+                author_name = _mask_git_output(parts[2].strip())
+                author_email = _mask_git_output(parts[3].strip())
+                try:
+                    timestamp = int(parts[4].strip())
+                except ValueError:
+                    timestamp = 0
+                subject = _mask_git_output(_sanitize_git_message(parts[5].strip()))
+                body = _mask_git_output(_sanitize_git_message(parts[6].strip())) if len(parts) > 6 else ""
+
+                commits.append({
+                    "hash": commit_hash,
+                    "short_hash": short_hash,
+                    "author": author_name,
+                    "email": author_email,
+                    "timestamp": timestamp,
+                    "subject": subject,
+                    "body": body,
+                })
+
+    return {
+        "is_repo": True,
+        "workspace": str(target.resolve()),
+        "commits": commits,
+        "total": len(commits)
+    }
+

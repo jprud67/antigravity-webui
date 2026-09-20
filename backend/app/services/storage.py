@@ -1,4 +1,5 @@
 import copy
+from collections import deque
 import html
 import json
 import logging
@@ -1610,7 +1611,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                         lines = lines[-500:]
                 else:
                     with open(t_file, "r", encoding="utf-8-sig", errors="replace") as f:
-                        lines = f.readlines()[-500:]
+                        lines = list(deque(f, maxlen=500))
 
                 for line in reversed(lines):
                     line_str = line.strip().lstrip("\ufeff")

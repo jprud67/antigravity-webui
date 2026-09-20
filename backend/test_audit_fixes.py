@@ -7427,7 +7427,9 @@ def test_crons_trigger_now_preserves_last_run_at():
 
 
 def test_platform_utils_killpg_does_not_kill_current_pgrp():
-    import os, signal
+    import os
+    import signal
+
     from app.platform_utils import _killpg
 
     called = {}
@@ -7458,7 +7460,11 @@ def test_platform_utils_killpg_does_not_kill_current_pgrp():
 
 def test_platform_utils_stream_close_resilience():
     import asyncio
-    from app.platform_utils import terminate_process_group_async, terminate_process_group_sync
+
+    from app.platform_utils import (
+        terminate_process_group_async,
+        terminate_process_group_sync,
+    )
 
     class DummyStreamReader:
         pass
@@ -7504,9 +7510,9 @@ def test_clean_user_prompt_preserves_internal_xml_tags_in_user_request():
 
 def test_google_auth_exhausted_sorting_by_expiry():
     from app.services.google_auth import (
-        mark_account_exhausted,
         get_account_exhaustion_expiry,
-        is_account_marked_exhausted
+        is_account_marked_exhausted,
+        mark_account_exhausted,
     )
     mark_account_exhausted("exp_earlier@gmail.com", duration_seconds=50.0)
     mark_account_exhausted("exp_later@gmail.com", duration_seconds=500.0)
@@ -7520,6 +7526,7 @@ def test_google_auth_exhausted_sorting_by_expiry():
 
 def test_cron_failover_restores_initial_target_model():
     import asyncio
+
     import app.services.cron_ticker as ticker
     import app.services.google_auth as auth
 
