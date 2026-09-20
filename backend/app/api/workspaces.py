@@ -21,7 +21,16 @@ def list_workspaces(_ = Depends(require_auth)) -> list[str]:
 
 @router.post("")
 def add_workspace(path: str = Query(...), _ = Depends(require_auth)):
-    p = Path(path).resolve()
+    if not path or not path.strip():
+        raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
+    cleaned_path = path.strip()
+    if "\x00" in cleaned_path or any(ord(c) < 32 or ord(c) == 127 for c in cleaned_path):
+        raise HTTPException(status_code=400, detail="Chemin invalide : caractère interdit détecté.")
+    try:
+        p = Path(cleaned_path).resolve()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Chemin invalide : {e}")
+
     if is_blocked_sensitive_path(p):
         raise HTTPException(status_code=403, detail="Accès refusé : répertoire système ou restreint.")
     if not p.is_dir():
@@ -38,7 +47,16 @@ def add_workspace(path: str = Query(...), _ = Depends(require_auth)):
 
 @router.delete("")
 def delete_workspace(path: str = Query(...), _ = Depends(require_auth)):
-    p = str(Path(path).resolve())
+    if not path or not path.strip():
+        raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
+    cleaned_path = path.strip()
+    if "\x00" in cleaned_path or any(ord(c) < 32 or ord(c) == 127 for c in cleaned_path):
+        raise HTTPException(status_code=400, detail="Chemin invalide : caractère interdit détecté.")
+    try:
+        p = str(Path(cleaned_path).resolve())
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Chemin invalide : {e}")
+
     if p == str(Path(DEFAULT_WORKSPACE).resolve()):
         raise HTTPException(status_code=400, detail="Cannot delete default workspace")
     settings = get_settings()
@@ -53,8 +71,13 @@ def delete_workspace(path: str = Query(...), _ = Depends(require_auth)):
 
 @router.get("/explore")
 def explore_dir(path: str = Query(DEFAULT_WORKSPACE), _ = Depends(require_auth)) -> dict[str, Any]:
+    if not path or not path.strip():
+        raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
+    cleaned_path = path.strip()
+    if "\x00" in cleaned_path or any(ord(c) < 32 or ord(c) == 127 for c in cleaned_path):
+        raise HTTPException(status_code=400, detail="Chemin invalide : caractère interdit détecté.")
     try:
-        p = Path(path).resolve()
+        p = Path(cleaned_path).resolve()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Chemin invalide: {e}")
 

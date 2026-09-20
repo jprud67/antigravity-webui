@@ -228,6 +228,8 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
             if first_dir in ("proc", "sys", "dev"):
                 return True
             if first_dir == "etc":
+                if len(parts) == root_offset + 1:
+                    return True
                 if len(parts) > root_offset + 1:
                     second = parts[root_offset + 1].lower()
                     if second in (
@@ -257,6 +259,10 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
             "client_secret.json",
             ".bash_history",
             ".zsh_history",
+            ".netrc",
+            ".npmrc",
+            ".pypirc",
+            ".dockercfg",
         ):
             return True
         if name.startswith("client_secret") and name.endswith(".json"):

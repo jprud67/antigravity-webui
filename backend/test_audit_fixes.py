@@ -7345,7 +7345,92 @@ def test_cron_store_compute_next_run_microsecond_zero():
     assert dt.microsecond == 0
 
 
+def test_is_blocked_sensitive_path_etc_and_tokens():
+    """Verify is_blocked_sensitive_path blocks root /etc directly and credential dotfiles."""
+    from app.platform_utils import is_blocked_sensitive_path
+
+    assert is_blocked_sensitive_path("/etc") is True
+    assert is_blocked_sensitive_path("/home/user/.netrc") is True
+    assert is_blocked_sensitive_path("/home/user/.npmrc") is True
+    assert is_blocked_sensitive_path("/home/user/.pypirc") is True
+    assert is_blocked_sensitive_path("/home/user/.dockercfg") is True
+    print("✓ test_is_blocked_sensitive_path_etc_and_tokens passed")
+
+
+def test_files_validate_path_access_windows_drive_in_file_uri():
+    """Verify _validate_path_access rejects Windows-style drive letters in file: URIs on POSIX."""
+    import os
+
+    from fastapi import HTTPException
+
+    from app.api.files import _validate_path_access
+
+    if os.name == "posix":
+        try:
+            _validate_path_access("file:///C:/secret.txt")
+            assert False, "Should have raised HTTPException 400"
+        except HTTPException as e:
+            assert e.status_code == 400
+            assert "Windows" in e.detail
+    print("✓ test_files_validate_path_access_windows_drive_in_file_uri passed")
+
+
+def test_workspaces_path_sanitization():
+    """Verify add_workspace, delete_workspace, and explore_dir reject empty paths, null bytes, and control chars."""
+    from fastapi import HTTPException
+
+    from app.api.workspaces import add_workspace, delete_workspace, explore_dir
+
+    for fn in (add_workspace, delete_workspace, explore_dir):
+        for bad_p in ("", "   ", "/safe/path\x00extra", "/safe/path\x07bell"):
+            try:
+                fn(path=bad_p, _=None)
+                assert False, f"{fn.__name__} should have rejected {bad_p!r}"
+            except HTTPException as e:
+                assert e.status_code == 400
+                assert "invalide" in e.detail.lower()
+    print("✓ test_workspaces_path_sanitization passed")
+
+
+def test_crons_trigger_now_preserves_last_run_at():
+    """Verify trigger_cron_job_now updates state/next_run_at and records last_triggered_at without overwriting last_run_at."""
+    from unittest.mock import patch
+
+    from app.api.crons import trigger_cron_job_now
+
+    fake_jobs = {
+        "jobs": [
+            {
+                "id": "job123",
+                "name": "Sync job",
+                "enabled": False,
+                "state": "paused",
+                "last_run_at": "2026-09-19T10:00:00+00:00",
+                "last_status": "ok",
+            }
+        ]
+    }
+
+    def fake_update(mutator):
+        return mutator(fake_jobs)
+
+    with patch("app.api.crons.update_jobs", side_effect=fake_update):
+        res = trigger_cron_job_now("job123", _=None)
+        assert res["success"] is True
+        job = fake_jobs["jobs"][0]
+        assert job["enabled"] is True
+        assert job["state"] == "scheduled"
+        assert job["last_status"] == "triggered"
+        assert job["last_run_at"] == "2026-09-19T10:00:00+00:00"
+        assert "last_triggered_at" in job
+    print("✓ test_crons_trigger_now_preserves_last_run_at passed")
+
+
 if __name__ == "__main__":
+    test_is_blocked_sensitive_path_etc_and_tokens()
+    test_files_validate_path_access_windows_drive_in_file_uri()
+    test_workspaces_path_sanitization()
+    test_crons_trigger_now_preserves_last_run_at()
     test_storage_ensure_db_schema_migrates_missing_columns()
     test_conversations_api_bulk_clear_project()
     test_kanban_update_task_column_whitelist()

@@ -251,7 +251,7 @@ def trigger_cron_job_now(job_id: str, _ = Depends(require_auth)):
                 j["state"] = "scheduled"
                 j["paused_at"] = None
                 j["next_run_at"] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
-                j["last_run_at"] = now_iso()
+                j["last_triggered_at"] = now_iso()
                 j["last_status"] = "triggered"
                 return dict(j)
         return None

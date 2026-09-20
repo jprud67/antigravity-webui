@@ -141,6 +141,8 @@ def _validate_path_access(file_path: Path | str, base_dir: Path | str | None = N
             sub = re.sub(r'^file:(?:/*localhost)?/*', '', p_str, flags=re.IGNORECASE)
             if not sub:
                 raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
+            if os.name == "posix" and re.match(r'^[a-zA-Z]:[/\\]', sub):
+                raise HTTPException(status_code=400, detail="Chemin de style Windows non valide sur ce système d'exploitation.")
             if not (len(sub) > 1 and sub[1] == ":"):
                 sub = "/" + sub
             target_file_path = Path(sub)
