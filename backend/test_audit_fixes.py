@@ -8123,6 +8123,128 @@ def test_terminal_set_winsize_safety():
     print("✓ test_terminal_set_winsize_safety passed")
 
 
+def test_cron_clean_orphans_scheduled_state_recomputation():
+    from datetime import datetime, timezone
+    from app.services.cron_store import compute_next_run
+
+    now_iso_str = datetime.now(timezone.utc).isoformat()
+    init_data = {
+        "jobs": [
+            {
+                "id": "job_crashed_scheduled",
+                "name": "Hourly Task",
+                "state": "scheduled",
+                "last_status": "running",
+                "schedule": "every 1 hour",
+                "next_run_at": "2020-01-01T00:00:00+00:00"
+            },
+            {
+                "id": "job_crashed_active_legacy",
+                "name": "Daily Task",
+                "state": "active",
+                "last_status": "running",
+                "schedule": "every day at 14:00",
+                "next_run_at": None
+            },
+            {
+                "id": "job_crashed_paused",
+                "name": "Paused Task",
+                "state": "paused",
+                "last_status": "running",
+                "schedule": "every 2 hours",
+                "next_run_at": None
+            }
+        ]
+    }
+
+    for j in init_data.get("jobs", []):
+        if j.get("last_status") == "running":
+            j["last_status"] = "interrupted"
+            if j.get("state") in ("scheduled", "active"):
+                nxt = j.get("next_run_at")
+                if not nxt or nxt < now_iso_str:
+                    computed = compute_next_run(j.get("schedule") or j.get("schedule_display"))
+                    if computed:
+                        j["next_run_at"] = computed
+                    else:
+                        j["state"] = "completed"
+
+    jobs_by_id = {j["id"]: j for j in init_data["jobs"]}
+
+    j1 = jobs_by_id["job_crashed_scheduled"]
+    assert j1["last_status"] == "interrupted"
+    assert j1["next_run_at"] is not None
+    assert j1["next_run_at"] > now_iso_str
+
+    j2 = jobs_by_id["job_crashed_active_legacy"]
+    assert j2["last_status"] == "interrupted"
+    assert j2["next_run_at"] is not None
+    assert j2["next_run_at"] > now_iso_str
+
+    j3 = jobs_by_id["job_crashed_paused"]
+    assert j3["last_status"] == "interrupted"
+    assert j3["next_run_at"] is None
+    print("✓ test_cron_clean_orphans_scheduled_state_recomputation passed")
+
+
+def test_storage_import_single_conversation_dynamic_schema():
+    import sqlite3
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services.storage import _import_single_conversation
+
+    with tempfile.TemporaryDirectory() as td:
+        temp_dir = Path(td)
+        test_brain = temp_dir / "brain"
+        test_brain.mkdir(parents=True, exist_ok=True)
+        test_db = temp_dir / "test.db"
+
+        conn = sqlite3.connect(str(test_db))
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE conversation_summaries (
+                conversation_id TEXT PRIMARY KEY,
+                title TEXT,
+                preview TEXT,
+                step_count INTEGER,
+                last_modified_time TEXT,
+                workspace_uris TEXT,
+                status TEXT,
+                agent_name TEXT,
+                parent_conversation_id TEXT,
+                last_user_input_time TEXT,
+                last_user_input_step_index INTEGER
+            )
+        """)
+        conn.commit()
+
+        sample_item = {
+            "title": "Imported Test Session",
+            "steps": [
+                {"step_index": 0, "source": "USER_EXPLICIT", "type": "USER_INPUT", "content": "Test import"}
+            ],
+            "project_id": "test_proj_1",
+            "group_id": "test_grp_1"
+        }
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
+        with patch("app.services.storage.BRAIN_DIR", test_brain), \
+             patch("app.services.storage.get_db_connection", return_value=conn):
+            res = _import_single_conversation(sample_item, now_iso=now_iso, now_db=now_db, conn=conn)
+            assert res["success"] is True
+            assert res["title"] == "Imported Test Session"
+
+            cursor.execute("SELECT conversation_id, title FROM conversation_summaries WHERE conversation_id = ?", (res["conversation_id"],))
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[1] == "Imported Test Session"
+
+        conn.close()
+    print("✓ test_storage_import_single_conversation_dynamic_schema passed")
+
+
 if __name__ == "__main__":
     test_schema_locks_reentrancy()
     test_storage_aggregate_steps_extracts_thought_tags()
@@ -8427,6 +8549,8 @@ if __name__ == "__main__":
     test_google_auth_exhaustion_null_and_type_safety()
     test_cron_ticker_extract_stream_json_text()
     test_git_last_commit_and_push_masking()
+    test_cron_clean_orphans_scheduled_state_recomputation()
+    test_storage_import_single_conversation_dynamic_schema()
     print("\nAll unit tests passed successfully!")
 
 

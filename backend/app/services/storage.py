@@ -2794,40 +2794,42 @@ def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: s
                 break
 
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO conversation_summaries (
-                conversation_id,
-                title,
-                preview,
-                step_count,
-                last_modified_time,
-                workspace_uris,
-                status,
-                agent_name,
-                parent_conversation_id,
-                last_user_input_time,
-                last_user_input_step_index,
-                project_id,
-                group_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                new_id,
-                title,
-                preview,
-                len(steps),
-                now_db,
-                stored_uris,
-                "DONE",
-                "import",
-                parent_conv_id,
-                imported_last_user_time or now_db,
-                imported_last_user_idx,
-                project_id_val,
-                group_val
-            )
-        )
+        cursor.execute("PRAGMA table_info(conversation_summaries)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+
+        fields = [
+            "conversation_id", "title", "preview", "step_count",
+            "last_modified_time", "workspace_uris", "status",
+            "agent_name", "parent_conversation_id",
+            "last_user_input_time", "last_user_input_step_index"
+        ]
+        values: list[Any] = [
+            new_id,
+            title,
+            preview,
+            len(steps),
+            now_db,
+            stored_uris,
+            "DONE",
+            "import",
+            parent_conv_id,
+            imported_last_user_time or now_db,
+            imported_last_user_idx
+        ]
+        if "project_id" in existing_cols:
+            fields.append("project_id")
+            values.append(project_id_val)
+        if "group_id" in existing_cols:
+            fields.append("group_id")
+            values.append(group_val)
+
+        for col in fields:
+            if col not in _ALLOWED_CONVERSATION_SUMMARY_COLUMNS:
+                raise ValueError(f"Invalid column name: {col}")
+
+        placeholders = ", ".join(["?"] * len(fields))
+        field_str = ", ".join(fields)
+        cursor.execute(f"INSERT INTO conversation_summaries ({field_str}) VALUES ({placeholders})", tuple(values))  # nosec B608
         if should_close:
             conn.commit()
     except Exception:

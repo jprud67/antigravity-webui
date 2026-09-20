@@ -730,12 +730,13 @@ async def cron_ticker_loop() -> None:
         async with _jobs_write_lock:
             def _clean_orphans(init_data: dict[str, Any]) -> bool:
                 cleaned = False
+                now_iso_str = datetime.now(timezone.utc).isoformat()
                 for j in init_data.get("jobs", []):
                     if j.get("last_status") == "running":
                         j["last_status"] = "interrupted"
-                        if j.get("state") == "active":
+                        if j.get("state") in ("scheduled", "active"):
                             nxt = j.get("next_run_at")
-                            if not nxt:
+                            if not nxt or nxt < now_iso_str:
                                 computed = compute_next_run(j.get("schedule") or j.get("schedule_display"))
                                 if computed:
                                     j["next_run_at"] = computed
