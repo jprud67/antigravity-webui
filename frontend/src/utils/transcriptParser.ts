@@ -1,6 +1,7 @@
 import type { ChatMessage } from '../types';
 
 const REQUEST_REGEX = /<USER_REQUEST(?:\s+[^>]*)?>([\s\S]*?)<\/USER_REQUEST>/gi;
+const CONTEXT_SUMMARY_REGEX = /<CONTEXT_SUMMARY(?:\s+[^>]*)?>[\s\S]*?<\/CONTEXT_SUMMARY>/gi;
 const XML_BLOCKS_REGEX = /<(ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>[\s\S]*?<\/\1>/gi;
 const XML_TAGS_REGEX = /<\/?(?:USER_REQUEST|ADDITIONAL_METADATA|CONTEXT_SUMMARY|USER_SETTINGS_CHANGE|SKILLS|USER_INFORMATION|SYSTEM_MESSAGE|ENVIRONMENT_DETAILS|IDENTITY|SUBAGENTS|MESSAGING|CONVERSATION_TRANSCRIPT|ARTIFACTS|SLASH_COMMANDS|GUIDELINES|COMMUNICATION_STYLE|SKILL_CALL|EXTENSIONS|SYSTEM_PROMPT|PLANNER_RESPONSE|TOOL_CALL|AGENT_MODE)(?:\s+[^>]*)?>/gi;
 const STEERING_PREFIX_REGEX = /^(?:⚡\s*\[(?:Guidage|Steering)\]\s*|📥\s*\[(?:En attente|Queued)\]\s*|\[(?:Instruction Prioritaire de Guidage|Priority Steering Instruction)\]\s*:?\s*)+/i;
@@ -83,16 +84,20 @@ export function cleanUserPrompt(raw: any): string {
     return str.trimEnd();
   }
 
-  // 1. Retirer les blocs de métadonnées, contexte et paramètres système
-  let cleaned = str.replace(XML_BLOCKS_REGEX, '');
+  // 1. Retirer d'abord les résumés de contexte passés pour ne pas extraire d'anciennes requêtes archivées
+  const textWithoutContext = str.replace(CONTEXT_SUMMARY_REGEX, '');
 
-  // 2. Extraire le contenu spécifique de <USER_REQUEST> s'il est présent
+  // 2. Si une balise explicite <USER_REQUEST> existe, extraire son contenu en préservant le code interne
   REQUEST_REGEX.lastIndex = 0;
-  const requestMatches = [...cleaned.matchAll(REQUEST_REGEX)];
+  const requestMatches = [...textWithoutContext.matchAll(REQUEST_REGEX)];
+  let cleaned = '';
   if (requestMatches.length > 0) {
     cleaned = requestMatches[requestMatches.length - 1][1];
+  } else {
+    // Repli pour les invites brutes sans balise <USER_REQUEST>
+    cleaned = str.replace(XML_BLOCKS_REGEX, '');
+    cleaned = cleaned.replace(XML_TAGS_REGEX, '');
   }
-  cleaned = cleaned.replace(XML_TAGS_REGEX, '');
 
   // 3. Retirer les préfixes de guidage/file d'attente
   cleaned = cleaned.replace(STEERING_PREFIX_REGEX, '');

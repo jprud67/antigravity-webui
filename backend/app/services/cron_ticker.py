@@ -268,6 +268,8 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
                 effort = settings.get("effort")
         except Exception as e:
             logger.debug(f"Ignored error: {e}")
+    initial_target_model = model
+    initial_target_effort = effort
     model_switched_on_current_account = False
     
     while attempts < MAX_TASK_FAILOVER:
@@ -334,14 +336,21 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
                 model_switched_on_current_account = True
 
             # 2. Si le modèle a déjà été basculé ou si c'est impossible, basculer le compte Google
-            new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=model)
+            target_check_model = initial_target_model or model
+            new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=target_check_model)
+            if not new_account and target_check_model != model:
+                new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=model)
+                target_check_model = model
+
             if new_account and attempts < MAX_TASK_FAILOVER:
-                # On réinitialise la bascule de modèle pour ce nouveau compte
+                # On réinitialise la bascule de modèle pour ce nouveau compte et on restaure le modèle initial
                 model_switched_on_current_account = False
+                model = target_check_model
+                effort = initial_target_effort or effort
                 
                 failovers.append({"from": current_email, "to": new_account, "attempt": attempts, "type": "account"})
                 logger.warning(
-                    f"[Cron] Quota atteint sur {current_email} — bascule sur le compte {new_account}, "
+                    f"[Cron] Quota atteint sur {current_email} — bascule sur le compte {new_account} avec modèle {model}, "
                     f"relance de la tâche (tentative {attempts + 1}/{MAX_TASK_FAILOVER})..."
                 )
                 await asyncio.sleep(1.0)

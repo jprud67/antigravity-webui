@@ -7426,6 +7426,139 @@ def test_crons_trigger_now_preserves_last_run_at():
     print("✓ test_crons_trigger_now_preserves_last_run_at passed")
 
 
+def test_platform_utils_killpg_does_not_kill_current_pgrp():
+    import os, signal
+    from app.platform_utils import _killpg
+
+    called = {}
+    orig_kill = os.kill
+    orig_killpg = getattr(os, 'killpg', None)
+
+    def fake_kill(p, sig):
+        called['kill'] = (p, sig)
+
+    def fake_killpg(pg, sig):
+        called['killpg'] = (pg, sig)
+
+    os.kill = fake_kill
+    if orig_killpg:
+        os.killpg = fake_killpg
+
+    try:
+        current_pid = os.getpid()
+        _killpg(current_pid, signal.SIGTERM)
+        assert 'kill' in called, "Should call os.kill directly for current process group PID"
+        assert 'killpg' not in called, "Should never broadcast killpg to current process group"
+    finally:
+        os.kill = orig_kill
+        if orig_killpg:
+            os.killpg = orig_killpg
+    print("✓ test_platform_utils_killpg_does_not_kill_current_pgrp passed")
+
+
+def test_platform_utils_stream_close_resilience():
+    import asyncio
+    from app.platform_utils import terminate_process_group_async, terminate_process_group_sync
+
+    class DummyStreamReader:
+        pass
+
+    class DummyProc:
+        pid = 999999
+        returncode = None
+        stdin = None
+        stdout = DummyStreamReader()
+        stderr = DummyStreamReader()
+        async def wait(self):
+            self.returncode = 0
+            return 0
+        def kill(self):
+            self.returncode = 0
+
+    async def _test():
+        proc = DummyProc()
+        await terminate_process_group_async(proc)
+        proc2 = DummyProc()
+        terminate_process_group_sync(proc2)
+
+    asyncio.run(_test())
+    print("✓ test_platform_utils_stream_close_resilience passed")
+
+
+def test_clean_user_prompt_preserves_internal_xml_tags_in_user_request():
+    from app.services.storage import clean_user_prompt
+    raw = (
+        "<CONTEXT_SUMMARY>Old prompt: <USER_REQUEST>Old</USER_REQUEST></CONTEXT_SUMMARY>\n"
+        "<USER_REQUEST>\n"
+        "How do I use <SKILLS>\n- test_skill\n</SKILLS> and <ARTIFACTS>item</ARTIFACTS> in my code?\n"
+        "</USER_REQUEST>"
+    )
+    cleaned = clean_user_prompt(raw)
+    assert "<SKILLS>" in cleaned
+    assert "- test_skill" in cleaned
+    assert "</SKILLS>" in cleaned
+    assert "<ARTIFACTS>item</ARTIFACTS>" in cleaned
+    assert "How do I use" in cleaned
+    print("✓ test_clean_user_prompt_preserves_internal_xml_tags_in_user_request passed")
+
+
+def test_google_auth_exhausted_sorting_by_expiry():
+    from app.services.google_auth import (
+        mark_account_exhausted,
+        get_account_exhaustion_expiry,
+        is_account_marked_exhausted
+    )
+    mark_account_exhausted("exp_earlier@gmail.com", duration_seconds=50.0)
+    mark_account_exhausted("exp_later@gmail.com", duration_seconds=500.0)
+    assert is_account_marked_exhausted("exp_earlier@gmail.com")
+    assert is_account_marked_exhausted("exp_later@gmail.com")
+    exp1 = get_account_exhaustion_expiry("exp_earlier@gmail.com")
+    exp2 = get_account_exhaustion_expiry("exp_later@gmail.com")
+    assert 0 < exp1 < exp2
+    print("✓ test_google_auth_exhausted_sorting_by_expiry passed")
+
+
+def test_cron_failover_restores_initial_target_model():
+    import asyncio
+    import app.services.cron_ticker as ticker
+    import app.services.google_auth as auth
+
+    job = {
+        "id": "job_restore_test",
+        "name": "Restore test",
+        "prompt": "Test prompt",
+        "model": "gemini-3.8-flash",
+        "effort": "high"
+    }
+
+    recorded_runs = []
+    original_run = ticker.run_agy_task
+    orig_switch = auth.switch_to_next_healthy_account
+
+    async def mock_run(prompt, skills=None, model=None, effort=None, *args, **kwargs):
+        recorded_runs.append((model, effort))
+        return "", "[quota] RESOURCE_EXHAUSTED", -1
+
+    def mock_switch(exclude_email=None, model=None):
+        return "next_acc@gmail.com"
+
+    ticker.run_agy_task = mock_run
+    auth.switch_to_next_healthy_account = mock_switch
+
+    try:
+        res = asyncio.run(ticker.run_job_with_failover(job))
+        assert res["status"] == "quota_exhausted"
+        assert recorded_runs[0][0] == "gemini-3.8-flash"
+        account_failovers = [f for f in res.get("failovers", []) if f.get("type") == "account"]
+        assert len(account_failovers) > 0
+        models_used = [r[0] for r in recorded_runs]
+        assert models_used.count("gemini-3.8-flash") >= 2
+    finally:
+        ticker.run_agy_task = original_run
+        auth.switch_to_next_healthy_account = orig_switch
+    print("✓ test_cron_failover_restores_initial_target_model passed")
+
+
 if __name__ == "__main__":
     test_is_blocked_sensitive_path_etc_and_tokens()
     test_files_validate_path_access_windows_drive_in_file_uri()
@@ -7706,6 +7839,11 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as td:
         test_storage_indexes_project_and_group(Path(td), monkeypatch=pytest.MonkeyPatch())
         test_files_scan_dir_broken_symlink_resilience(Path(td))
+    test_platform_utils_killpg_does_not_kill_current_pgrp()
+    test_platform_utils_stream_close_resilience()
+    test_clean_user_prompt_preserves_internal_xml_tags_in_user_request()
+    test_google_auth_exhausted_sorting_by_expiry()
+    test_cron_failover_restores_initial_target_model()
     print("\nAll unit tests passed successfully!")
 
 

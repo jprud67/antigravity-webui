@@ -726,6 +726,18 @@ def is_account_marked_exhausted(email: str) -> bool:
     return now < exp
 
 
+def get_account_exhaustion_expiry(email: str) -> float:
+    """Retourne le timestamp d'expiration de l'épuisement du compte (0.0 si sain)."""
+    norm_email = email.strip().lower()
+    now = time.time()
+    with _exhaustion_lock:
+        expired = [e for e, exp in _account_exhaustion_tracker.items() if exp <= now]
+        for e in expired:
+            _account_exhaustion_tracker.pop(e, None)
+        exp = _account_exhaustion_tracker.get(norm_email, 0.0)
+    return exp if exp > now else 0.0
+
+
 def get_candidate_accounts(exclude_email: str | None = None) -> list[str]:
     ensure_dirs()
     candidates = []
@@ -740,8 +752,9 @@ def get_candidate_accounts(exclude_email: str | None = None) -> list[str]:
             continue
         candidates.append(email)
 
-    # Sort candidates: prioritize accounts that are NOT marked exhausted
-    candidates.sort(key=lambda e: (is_account_marked_exhausted(e), e))
+    # Sort candidates: prioritize accounts that are NOT marked exhausted.
+    # If all accounts are exhausted, prioritize the one whose exhaustion expires earliest.
+    candidates.sort(key=lambda e: (is_account_marked_exhausted(e), get_account_exhaustion_expiry(e), e))
     return candidates
 
 

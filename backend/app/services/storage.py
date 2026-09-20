@@ -463,6 +463,7 @@ _TAGS_PATTERN = (
     r"TOOL_CALL|AGENT_MODE"
 )
 _USER_REQUEST_RE = re.compile(r'<USER_REQUEST(?:\s+[^>]*)?>([\s\S]*?)</USER_REQUEST>', re.IGNORECASE)
+_CONTEXT_SUMMARY_RE = re.compile(r'<CONTEXT_SUMMARY(?:\s+[^>]*)?>[\s\S]*?</CONTEXT_SUMMARY>', re.IGNORECASE)
 _XML_BLOCKS_RE = re.compile(
     rf'<({_TAGS_PATTERN})(?:\s+[^>]*)?>[\s\S]*?</\1>',
     re.IGNORECASE,
@@ -536,13 +537,19 @@ def clean_user_prompt(raw: Any) -> str:
                 raw = str(raw)
             except Exception:
                 return ""
-    # Strip metadata XML blocks first (e.g. CONTEXT_SUMMARY, SKILLS, SYSTEM_MESSAGE, etc.)
-    text = _XML_BLOCKS_RE.sub('', raw)
-    matches = _USER_REQUEST_RE.findall(text)
+    # 1. Retirer d'abord le bloc de résumé de contexte pour éviter d'extraire d'anciennes requêtes archivées
+    text_no_context = _CONTEXT_SUMMARY_RE.sub('', raw)
+
+    # 2. Si une balise explicite <USER_REQUEST> existe, extraire son contenu en préservant le code interne
+    matches = _USER_REQUEST_RE.findall(text_no_context)
     if matches:
         text = matches[-1].strip()
-    text = _XML_TAGS_RE.sub('', text)
-    # Strip steering/queued instruction prefixes so history stays pure and clean
+    else:
+        # Repli pour les invites brutes sans balise <USER_REQUEST>
+        text = _XML_BLOCKS_RE.sub('', raw)
+        text = _XML_TAGS_RE.sub('', text)
+
+    # 3. Retirer les préfixes de guidage/file d'attente
     text = _STEERING_PREFIX_RE.sub('', text)
     return text.strip()
 
@@ -1430,7 +1437,11 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
                 new_last_user_time = s.get("created_at") or s.get("timestamp")
                 break
 
-        effective_user_time = new_last_user_time or now_str
+        if new_last_user_idx != -1:
+            effective_user_time = new_last_user_time or now_str
+        else:
+            meta = get_session_meta(conversation_id)
+            effective_user_time = (meta.get("createdAt") if isinstance(meta, dict) else None) or now_str
         cursor.execute(
             """
             UPDATE conversation_summaries

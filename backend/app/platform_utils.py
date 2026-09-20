@@ -54,7 +54,13 @@ def _killpg(pid: int, sig: int) -> None:
     if IS_WINDOWS:
         return
     try:
-        os.killpg(os.getpgid(pid), sig)
+        pgid = os.getpgid(pid)
+        current_pgid = os.getpgrp()
+        if pgid == current_pgid or pgid <= 1:
+            # Sécurité critique : ne jamais envoyer le signal au groupe parent/serveur
+            os.kill(pid, sig)
+        else:
+            os.killpg(pgid, sig)
     except ProcessLookupError:
         pass  # le processus est déjà terminé
     except Exception as exc:  # pragma: no cover - défensif
@@ -101,10 +107,10 @@ async def terminate_process_group_async(proc, grace: float = 0.8) -> None:
             logger.warning(f"Le processus {proc.pid} ne répond toujours pas après terminaison forcée.")
     finally:
         for stream in (getattr(proc, "stdin", None), getattr(proc, "stdout", None), getattr(proc, "stderr", None)):
-            if stream is not None:
+            if stream is not None and hasattr(stream, "close") and callable(stream.close):
                 try:
                     stream.close()
-                except (OSError, ValueError):
+                except (OSError, ValueError, AttributeError):
                     pass
 
 
@@ -134,10 +140,10 @@ def terminate_process_group_sync(proc, force: bool = True) -> None:
         pass
 
     for stream in (getattr(proc, "stdin", None), getattr(proc, "stdout", None), getattr(proc, "stderr", None)):
-        if stream is not None:
+        if stream is not None and hasattr(stream, "close") and callable(stream.close):
             try:
                 stream.close()
-            except (OSError, ValueError):
+            except (OSError, ValueError, AttributeError):
                 pass
 
 
