@@ -733,6 +733,14 @@ async def cron_ticker_loop() -> None:
                 for j in init_data.get("jobs", []):
                     if j.get("last_status") == "running":
                         j["last_status"] = "interrupted"
+                        if j.get("state") == "active":
+                            nxt = j.get("next_run_at")
+                            if not nxt:
+                                computed = compute_next_run(j.get("schedule") or j.get("schedule_display"))
+                                if computed:
+                                    j["next_run_at"] = computed
+                                else:
+                                    j["state"] = "completed"
                         cleaned = True
                 return cleaned
             if update_jobs(_clean_orphans):

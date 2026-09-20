@@ -1368,6 +1368,17 @@ def update_conversation_summary_fields(
         raise
     finally:
         conn.close()
+    try:
+        from app.services.session_metadata import update_session_meta
+        meta_updates: dict[str, Any] = {}
+        if project_id is not None:
+            meta_updates["project"] = project_id.strip()
+        if title is not None:
+            meta_updates["custom_title"] = title.strip()
+        if meta_updates:
+            update_session_meta(conversation_id, meta_updates)
+    except Exception as e:
+        logger.debug(f"Could not sync summary fields to session_metadata: {e}")
     _notify_conversations_changed()
     return True
 

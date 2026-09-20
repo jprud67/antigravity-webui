@@ -56,7 +56,8 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2, visited
                 continue
 
             try:
-                is_dir = entry.is_dir()
+                is_symlink = entry.is_symlink()
+                is_dir = entry.is_dir() and not is_symlink
                 stat = entry.stat()
                 try:
                     resolved_entry_path = str(entry.resolve())
@@ -71,7 +72,7 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2, visited
                 }
 
                 if is_dir:
-                    if not entry.is_symlink() and current_depth < max_depth:
+                    if current_depth < max_depth:
                         item["children"] = scan_dir(entry, current_depth + 1, max_depth, visited)
                     else:
                         item["children"] = []

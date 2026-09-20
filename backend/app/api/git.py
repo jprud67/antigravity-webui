@@ -290,6 +290,9 @@ def get_git_diff(
     res = run_git(args, target)
     diff_text = res.stdout
 
+    MAX_DIFF_BYTES = 2 * 1024 * 1024  # 2 Mo
+    truncated = False
+
     # Fallback pour fichiers indexes, supprimes ou non suivis si aucun diff standard n'est trouve
     if not diff_text and norm_path:
         if not staged:
@@ -306,19 +309,25 @@ def get_git_diff(
         if not diff_text:
             file_on_disk = (target / norm_path).resolve()
             if is_safe_path(file_on_disk, [target]) and file_on_disk.is_file():
-                devnull_cands = list(dict.fromkeys([os.devnull, "NUL", "/dev/null"]))
-                for null_target in devnull_cands:
-                    try:
-                        untracked_res = run_git(["diff", "--no-index", "--", null_target, norm_path], target)
-                        if untracked_res.stdout:
-                            diff_text = untracked_res.stdout
-                            break
-                    except Exception as e:
-                        logger.debug(f"Git diff untracked fallback error with {null_target}: {_mask_git_output(str(e))}")
+                try:
+                    file_size = file_on_disk.stat().st_size
+                except OSError:
+                    file_size = 0
+                if file_size > MAX_DIFF_BYTES:
+                    diff_text = f"[Fichier volumineux ({file_size} octets) non affiché]"
+                    truncated = True
+                else:
+                    devnull_cands = list(dict.fromkeys([os.devnull, "NUL", "/dev/null"]))
+                    for null_target in devnull_cands:
+                        try:
+                            untracked_res = run_git(["diff", "--no-index", "--", null_target, norm_path], target)
+                            if untracked_res.stdout:
+                                diff_text = untracked_res.stdout
+                                break
+                        except Exception as e:
+                            logger.debug(f"Git diff untracked fallback error with {null_target}: {_mask_git_output(str(e))}")
 
     diff_text = _mask_git_output(diff_text or "")
-    MAX_DIFF_BYTES = 2 * 1024 * 1024  # 2 Mo
-    truncated = False
     if diff_text and len(diff_text) > MAX_DIFF_BYTES:
         diff_text = diff_text[:MAX_DIFF_BYTES] + "\n\n... [Diff tronqué car supérieur à 2 Mo] ..."
         truncated = True

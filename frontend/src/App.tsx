@@ -541,6 +541,7 @@ export function App() {
         if (event.active_turn && event.active_turn.is_running) {
           const turnCid = event.active_turn.conversation_id;
           if (!activeConversationIdRef.current && turnCid) {
+            activeConversationIdRef.current = turnCid;
             setActiveConversationId(turnCid);
             chatSocket.setCurrentConversation(turnCid);
             navigateToConversation(turnCid, true);
@@ -647,6 +648,7 @@ export function App() {
         }
       } else if (event.event === 'init') {
         if (event.conversation_id && !activeConversationIdRef.current) {
+          activeConversationIdRef.current = event.conversation_id;
           setActiveConversationId(event.conversation_id);
           chatSocket.setCurrentConversation(event.conversation_id);
           navigateToConversation(event.conversation_id, true);
@@ -656,6 +658,7 @@ export function App() {
         if (!update) return;
 
         if (update.conversation_id && !activeConversationIdRef.current) {
+          activeConversationIdRef.current = update.conversation_id;
           setActiveConversationId(update.conversation_id);
           chatSocket.setCurrentConversation(update.conversation_id);
           navigateToConversation(update.conversation_id, true);
