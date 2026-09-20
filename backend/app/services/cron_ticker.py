@@ -77,6 +77,52 @@ def cancel_running_job(job_id: str) -> bool:
     return canceled
 
 
+def extract_stream_json_text(raw_text: str) -> str:
+    """Extrait le texte assistant d'un flux stream-json (NDJSON) si présent."""
+    if not raw_text or not raw_text.strip():
+        return raw_text
+    parts: list[str] = []
+    has_json = False
+    for line in raw_text.splitlines():
+        line_s = line.strip()
+        if not line_s:
+            continue
+        if line_s.startswith("{") and line_s.endswith("}"):
+            try:
+                ev = json.loads(line_s)
+                has_json = True
+                if ev.get("type") == "message" and ev.get("role") == "assistant":
+                    content = ev.get("content")
+                    if isinstance(content, list):
+                        for c in content:
+                            if isinstance(c, dict) and c.get("type") == "text":
+                                parts.append(c.get("text", ""))
+                    elif isinstance(content, str):
+                        parts.append(content)
+                elif ev.get("event") == "assistant":
+                    msg = ev.get("message", {})
+                    content = msg.get("content")
+                    if isinstance(content, list):
+                        for c in content:
+                            if isinstance(c, dict) and c.get("type") == "text":
+                                parts.append(c.get("text", ""))
+                    elif isinstance(content, str):
+                        parts.append(content)
+                elif "delta" in ev:
+                    delta = ev.get("delta")
+                    if isinstance(delta, str):
+                        parts.append(delta)
+                    elif isinstance(delta, dict) and "text" in delta:
+                        parts.append(delta["text"])
+            except Exception:
+                parts.append(line)
+        else:
+            parts.append(line)
+    if has_json and parts:
+        return "\n".join(parts).strip()
+    return raw_text
+
+
 async def run_agy_task(
     prompt: str,
     skills: list[str] | None = None,
@@ -185,7 +231,7 @@ async def run_agy_task(
             drain = stdin_obj.drain()
             if inspect.isawaitable(drain):
                 await drain
-        except (BrokenPipeError, ConnectionResetError):
+        except (BrokenPipeError, ConnectionResetError, OSError):
             pass
         finally:
             try:
@@ -235,6 +281,8 @@ async def run_agy_task(
 
     out = "".join(stdout_chunks)
     err = "".join(stderr_chunks)
+    if via_stdin and out:
+        out = extract_stream_json_text(out)
     if quota_seen["line"]:
         err = (err + "\n" if err else "") + f"[quota] {quota_seen['line']}"
     if timed_out:

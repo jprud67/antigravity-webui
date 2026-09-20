@@ -422,9 +422,25 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
     } else if (isModelResponse || (!isToolOutput && content && !isToolOutputContent(content))) {
       // Accumuler le contenu de dialogue de l'assistant
       if (content) {
-        currentAssistantMsg.content = currentAssistantMsg.content
-          ? `${currentAssistantMsg.content}\n\n${content}`.trim()
-          : content.trim();
+        let text = content;
+        // Extraire d'éventuelles balises de raisonnement (<thinking>...</thinking> ou <thought>...</thought>)
+        const thoughtRegex = /<(?:thinking|thought)>([\s\S]*?)<\/(?:thinking|thought)>/gi;
+        const matches = [...text.matchAll(thoughtRegex)];
+        if (matches.length > 0) {
+          const thoughts = matches.map((m) => m[1].trim()).filter(Boolean).join('\n\n');
+          if (thoughts) {
+            currentAssistantMsg.thought = currentAssistantMsg.thought
+              ? `${currentAssistantMsg.thought}\n\n${thoughts}`.trim()
+              : thoughts.trim();
+          }
+          text = text.replace(thoughtRegex, '').trim();
+        }
+
+        if (text) {
+          currentAssistantMsg.content = currentAssistantMsg.content
+            ? `${currentAssistantMsg.content}\n\n${text}`.trim()
+            : text.trim();
+        }
       }
     }
   }

@@ -43,8 +43,12 @@ _exhaustion_lock = threading.Lock()
 _QUOTA_429_RE = re.compile(r"(?:code|status|http|error)[\s:=]+429\b|\b429\s+(?:too many|rate|quota|error)\b")
 
 
-def clear_account_exhaustion(email: str) -> None:
+def clear_account_exhaustion(email: str | None) -> None:
+    if not email or not isinstance(email, str):
+        return
     norm_email = email.strip().lower()
+    if not norm_email:
+        return
     with _exhaustion_lock:
         _account_exhaustion_tracker.pop(norm_email, None)
 
@@ -235,8 +239,7 @@ def delete_google_account(email: str) -> dict[str, Any]:
         raise ValueError("Impossible de supprimer le compte Google actuellement actif. Veuillez d'abord basculer sur un autre compte.")
 
     target_file.unlink(missing_ok=True)
-    with _exhaustion_lock:
-        _account_exhaustion_tracker.pop(email.strip().lower(), None)
+    clear_account_exhaustion(email)
     logger.info(f"Deleted saved Google account {email}")
     return {"success": True, "message": f"Compte {email} supprimé"}
 
@@ -703,9 +706,13 @@ def is_hard_quota_error(message: str) -> bool:
     return any(p in lower for p in _HARD_QUOTA_PATTERNS)
 
 
-def mark_account_exhausted(email: str, duration_seconds: float = 900.0) -> None:
+def mark_account_exhausted(email: str | None, duration_seconds: float = 900.0) -> None:
     """Mark an account as exhausted for a given duration (default 15 minutes)."""
+    if not email or not isinstance(email, str):
+        return
     norm_email = email.strip().lower()
+    if not norm_email:
+        return
     now = time.time()
     with _exhaustion_lock:
         expired = [e for e, exp in _account_exhaustion_tracker.items() if exp <= now]
@@ -715,8 +722,12 @@ def mark_account_exhausted(email: str, duration_seconds: float = 900.0) -> None:
     logger.warning(f"Google account {norm_email} marked as quota-exhausted for {duration_seconds}s")
 
 
-def is_account_marked_exhausted(email: str) -> bool:
+def is_account_marked_exhausted(email: str | None) -> bool:
+    if not email or not isinstance(email, str):
+        return False
     norm_email = email.strip().lower()
+    if not norm_email:
+        return False
     now = time.time()
     with _exhaustion_lock:
         expired = [e for e, exp in _account_exhaustion_tracker.items() if exp <= now]
@@ -726,9 +737,13 @@ def is_account_marked_exhausted(email: str) -> bool:
     return now < exp
 
 
-def get_account_exhaustion_expiry(email: str) -> float:
+def get_account_exhaustion_expiry(email: str | None) -> float:
     """Retourne le timestamp d'expiration de l'épuisement du compte (0.0 si sain)."""
+    if not email or not isinstance(email, str):
+        return 0.0
     norm_email = email.strip().lower()
+    if not norm_email:
+        return 0.0
     now = time.time()
     with _exhaustion_lock:
         expired = [e for e, exp in _account_exhaustion_tracker.items() if exp <= now]

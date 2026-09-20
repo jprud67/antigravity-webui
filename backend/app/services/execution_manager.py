@@ -961,6 +961,12 @@ class ExecutionManager:
             v = payload.get(k)
             if isinstance(v, str) and not v.strip():
                 payload[k] = None
+        if not session.worker_task or session.worker_task.done():
+            try:
+                session.worker_task = asyncio.create_task(session.queue_worker())
+            except RuntimeError:
+                session.worker_task = None
+
         if session.is_busy:
             if mode == "steer":
                 logger.info(f"Steering session {session.conversation_id}")
@@ -968,7 +974,7 @@ class ExecutionManager:
                 if session.active_proc and session.active_proc.returncode is None:
                     await terminate_process_group_async(session.active_proc, grace=0.5)
                 session.active_proc = None
-                session.pending_approval = None
+                await session._clear_pending_approval(decision="cancelled", reason="steered")
                 if session.active_task and not session.active_task.done():
                     session.active_task.cancel()
                     try:
@@ -1035,7 +1041,7 @@ class ExecutionManager:
                 tc["status"] = "cancelled"
         session.is_running = False
         session.active_proc = None
-        session.pending_approval = None
+        await session._clear_pending_approval(decision="cancelled", reason="interrupted")
         await session.broadcast({
             "event": "interrupted",
             "conversation_id": session.conversation_id,

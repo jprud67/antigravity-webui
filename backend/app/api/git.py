@@ -202,8 +202,8 @@ def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth
         if len(parts) >= 4:
             last_commit = {
                 "hash": parts[0],
-                "author": parts[1],
-                "subject": parts[2],
+                "author": _mask_git_output(parts[1]),
+                "subject": _mask_git_output(_sanitize_git_message(parts[2])),
                 "time": parts[3]
             }
 
@@ -434,7 +434,7 @@ def git_push(req: PushRequest, _ = Depends(require_auth)):
 
     return {
         "success": True,
-        "output": push_res.stdout.strip() or push_res.stderr.strip()
+        "output": _mask_git_output(push_res.stdout.strip() or push_res.stderr.strip())
     }
 
 
@@ -548,8 +548,8 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
     return {
         "success": True,
         "tag": tag_name,
-        "output": res_tag.stdout.strip(),
-        "push_output": push_output,
+        "output": _mask_git_output(res_tag.stdout.strip()),
+        "push_output": _mask_git_output(push_output) if push_output else None,
     }
 
 

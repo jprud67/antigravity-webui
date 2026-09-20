@@ -7566,6 +7566,80 @@ def test_cron_failover_restores_initial_target_model():
     print("✓ test_cron_failover_restores_initial_target_model passed")
 
 
+def test_google_auth_exhaustion_null_and_type_safety():
+    from app.services.google_auth import (
+        clear_account_exhaustion,
+        get_account_exhaustion_expiry,
+        is_account_marked_exhausted,
+        mark_account_exhausted,
+    )
+
+    # All these should safely execute without raising AttributeError or TypeError
+    clear_account_exhaustion(None)
+    clear_account_exhaustion("")
+    clear_account_exhaustion(123)  # type: ignore
+
+    mark_account_exhausted(None)
+    mark_account_exhausted("")
+    mark_account_exhausted(456)  # type: ignore
+
+    assert is_account_marked_exhausted(None) is False
+    assert is_account_marked_exhausted("") is False
+    assert is_account_marked_exhausted(789) is False  # type: ignore
+
+    assert get_account_exhaustion_expiry(None) == 0.0
+    assert get_account_exhaustion_expiry("") == 0.0
+    assert get_account_exhaustion_expiry(101) == 0.0  # type: ignore
+
+    # Test valid flow
+    test_email = "safe_test_user@example.com"
+    mark_account_exhausted(test_email, duration_seconds=60.0)
+    assert is_account_marked_exhausted(test_email) is True
+    assert get_account_exhaustion_expiry(test_email) > 0.0
+    clear_account_exhaustion(test_email)
+    assert is_account_marked_exhausted(test_email) is False
+    print("✓ test_google_auth_exhaustion_null_and_type_safety passed")
+
+
+def test_cron_ticker_extract_stream_json_text():
+    from app.services.cron_ticker import extract_stream_json_text
+
+    # 1. Plain text unchanged
+    plain = "This is a simple plain text output."
+    assert extract_stream_json_text(plain) == plain
+    assert extract_stream_json_text("") == ""
+    assert extract_stream_json_text(None) is None
+
+    # 2. NDJSON stream extraction
+    ndjson_sample = (
+        '{"type": "meta", "step": 1}\n'
+        '{"type": "message", "role": "assistant", "content": [{"type": "text", "text": "Bonjour monde!"}]}\n'
+        '{"event": "assistant", "message": {"content": "Deuxième ligne de réponse."}}\n'
+    )
+    res = extract_stream_json_text(ndjson_sample)
+    assert "Bonjour monde!" in res
+    assert "Deuxième ligne de réponse." in res
+    assert "meta" not in res
+    print("✓ test_cron_ticker_extract_stream_json_text passed")
+
+
+def test_git_last_commit_and_push_masking():
+    from app.api.git import _mask_git_output, _sanitize_git_message
+
+    # Test token masking in git output
+    secret_output = "Pushing to https://ghp_abcdef123456789012345678901234@github.com/repo.git\nDone."
+    masked = _mask_git_output(secret_output)
+    assert "ghp_abcdef" not in masked
+    assert "***" in masked
+
+    # Test co-author sanitization in last commit subject
+    clean_subj = _sanitize_git_message("feat: new feature\nCo-Authored-By: Claude <claude@anthropic.com>")
+    assert "Claude" not in clean_subj
+    assert "Co-Authored-By" not in clean_subj
+    assert clean_subj == "feat: new feature"
+    print("✓ test_git_last_commit_and_push_masking passed")
+
+
 if __name__ == "__main__":
     test_is_blocked_sensitive_path_etc_and_tokens()
     test_files_validate_path_access_windows_drive_in_file_uri()
@@ -7851,6 +7925,9 @@ if __name__ == "__main__":
     test_clean_user_prompt_preserves_internal_xml_tags_in_user_request()
     test_google_auth_exhausted_sorting_by_expiry()
     test_cron_failover_restores_initial_target_model()
+    test_google_auth_exhaustion_null_and_type_safety()
+    test_cron_ticker_extract_stream_json_text()
+    test_git_last_commit_and_push_masking()
     print("\nAll unit tests passed successfully!")
 
 
