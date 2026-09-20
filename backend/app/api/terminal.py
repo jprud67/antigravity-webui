@@ -54,7 +54,7 @@ def _validate_terminal_session_id(sid: str) -> str:
 
 def set_winsize(fd: int, rows: int, cols: int):
     """Redimensionne le PTY (POSIX)."""
-    if not HAS_PTY:
+    if not HAS_PTY or not isinstance(fd, int) or fd < 0:
         return
     try:
         rows = max(4, min(int(rows or 24), 200))

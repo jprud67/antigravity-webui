@@ -116,12 +116,34 @@ _schema_lock = threading.RLock()
 def ensure_db_schema(conn: sqlite3.Connection | None = None, force: bool = False) -> None:
     """Garantit l'existence de la table conversation_summaries dans la base SQLite."""
     global _schema_initialized
-    db_path_str = str(CONVERSATION_DB)
-    if _schema_initialized and db_path_str in _initialized_db_paths and not force and conn is None:
-        return
-    with _schema_lock:
-        if _schema_initialized and db_path_str in _initialized_db_paths and not force and conn is None:
+    if conn is not None:
+        try:
+            cur = conn.cursor()
+            cur.execute("PRAGMA database_list")
+            row = cur.fetchone()
+            if row and len(row) >= 3 and row[2]:
+                db_path_str = str(row[2])
+            else:
+                db_path_str = f"conn_{id(conn)}"
+        except Exception:
+            db_path_str = f"conn_{id(conn)}"
+    else:
+        db_path_str = str(CONVERSATION_DB)
+
+    if conn is None:
+        if _schema_initialized and db_path_str in _initialized_db_paths and not force:
             return
+    else:
+        if db_path_str in _initialized_db_paths and not force:
+            return
+
+    with _schema_lock:
+        if conn is None:
+            if _schema_initialized and db_path_str in _initialized_db_paths and not force:
+                return
+        else:
+            if db_path_str in _initialized_db_paths and not force:
+                return
         close_after = False
         if conn is None:
             CONVERSATION_DB.parent.mkdir(parents=True, exist_ok=True)
@@ -204,7 +226,8 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None, force: bool = False
                 "CREATE INDEX IF NOT EXISTS idx_conv_group_id ON conversation_summaries(group_id);"
             )
             conn.commit()
-            _schema_initialized = True
+            if conn is None or db_path_str == str(CONVERSATION_DB):
+                _schema_initialized = True
             _initialized_db_paths.add(db_path_str)
         except Exception as e:
             logger.warning(f"ensure_db_schema warning: {e}")
@@ -491,7 +514,11 @@ _STEERING_PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 _THOUGHT_TAGS_RE = re.compile(
-    r'<(?:thinking|thought|think)>([\s\S]*?)</(?:thinking|thought|think)>',
+    r'<(?:thinking|thought|think|reasoning)>([\s\S]*?)</(?:thinking|thought|think|reasoning)>',
+    re.IGNORECASE,
+)
+_COMMAND_FAILURE_RE = re.compile(
+    r'(?:The command exited with code (?!0\b)\d+|Command exited with code (?!0\b)\d+|Exit code: (?!0\b)\d+|process terminated with exit code)',
     re.IGNORECASE,
 )
 
@@ -756,7 +783,7 @@ TOOL_STEP_TYPES: set[str] = {
 def is_tool_output_content(content: Any) -> bool:
     if not content:
         return False
-    c = content.strip() if isinstance(content, str) else str(content).strip()
+    c = content[:256].lstrip() if isinstance(content, str) else str(content)[:256].lstrip()
     return c.startswith((
         "Created At:",
         "Completed At:",
@@ -1852,7 +1879,14 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                     if act.get("result") is None:
                         pending = act
                         break
-            is_err = s.get("status") == "ERROR" or bool(s.get("error"))
+            is_cmd_failure = (
+                isinstance(content, str)
+                and (
+                    bool(_COMMAND_FAILURE_RE.search(content))
+                    or content.startswith(("Encountered error in tool execution:", "Tool execution failed:"))
+                )
+            )
+            is_err = s.get("status") == "ERROR" or bool(s.get("error")) or is_cmd_failure
             status_val = "error" if is_err else "done"
             out_content = content or (str(s.get("error")) if s.get("error") else "")
             if pending:

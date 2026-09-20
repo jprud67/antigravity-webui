@@ -7828,7 +7828,6 @@ def test_cron_ticker_job_id_name_none_safety():
 def test_storage_ensure_db_schema_double_checked_lock():
     import sqlite3
     import tempfile
-    from unittest.mock import MagicMock
 
     from app.services import storage
 
@@ -7903,7 +7902,13 @@ def test_openai_compat_list_models_deduplication():
 
 def test_crons_api_job_id_str_int_normalization():
     from unittest.mock import patch
-    from app.api.crons import UpdateCronJobRequest, delete_cron_job, get_cron_job_log, update_cron_job
+
+    from app.api.crons import (
+        UpdateCronJobRequest,
+        delete_cron_job,
+        get_cron_job_log,
+        update_cron_job,
+    )
 
     # Test database with integer ID
     test_data = {
@@ -7948,8 +7953,9 @@ def test_clean_user_prompt_fast_path_whitespace():
     assert res == "Hello world!"
 def test_schema_locks_reentrancy():
     import threading
-    import app.services.storage as storage_mod
+
     import app.api.kanban as kanban_mod
+    import app.services.storage as storage_mod
 
     # Both _schema_lock must be reentrant (RLock) to prevent deadlocks
     # when ensure_db_schema or db initialization is nested or reentered.
@@ -7957,13 +7963,11 @@ def test_schema_locks_reentrancy():
     assert isinstance(kanban_mod._schema_lock, type(threading.RLock()))
 
     # Verify that acquiring twice in same thread does not deadlock
-    with storage_mod._schema_lock:
-        with storage_mod._schema_lock:
-            pass
+    with storage_mod._schema_lock, storage_mod._schema_lock:
+        pass
 
-    with kanban_mod._schema_lock:
-        with kanban_mod._schema_lock:
-            pass
+    with kanban_mod._schema_lock, kanban_mod._schema_lock:
+        pass
     print("✓ test_schema_locks_reentrancy passed")
 
 
@@ -7989,9 +7993,9 @@ def test_storage_aggregate_steps_extracts_thought_tags():
             "step_index": 2,
             "source": "MODEL",
             "type": "PLANNER_RESPONSE",
-            "content": "<thought>Double checking</thought>Confirmed.",
-            "created_at": "2026-09-20T12:00:02Z"
-        }
+            "content": "<thought>Double checking</thought><reasoning>Deep thinking</reasoning>Confirmed.",
+            "created_at": "2026-09-20T12:00:02Z",
+        },
     ]
 
     turns = aggregate_steps_into_turns(mock_steps)
@@ -8000,16 +8004,133 @@ def test_storage_aggregate_steps_extracts_thought_tags():
     assert asst["role"] == "assistant"
     assert "<think>" not in asst["content"]
     assert "<thought>" not in asst["content"]
+    assert "<reasoning>" not in asst["content"]
     assert "The solution is x = 4." in asst["content"]
     assert "Confirmed." in asst["content"]
     assert "Let me compute the discriminant." in asst["thinking"]
     assert "Double checking" in asst["thinking"]
+    assert "Deep thinking" in asst["thinking"]
     print("✓ test_storage_aggregate_steps_extracts_thought_tags passed")
+
+
+def test_storage_aggregate_steps_command_failure_status():
+    from app.services.storage import aggregate_steps_into_turns
+
+    steps = [
+        {
+            "step_index": 0,
+            "source": "USER_EXPLICIT",
+            "type": "USER_INPUT",
+            "content": "run tests",
+            "created_at": "2026-09-20T12:00:00Z",
+        },
+        {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "content": "Running test suite...",
+            "tool_calls": [{"id": "call_1", "name": "run_command", "args": {"CommandLine": "pytest"}}],
+            "created_at": "2026-09-20T12:00:01Z",
+        },
+        {
+            "step_index": 2,
+            "source": "SYSTEM",
+            "type": "GENERIC",
+            "call_id": "call_1",
+            "content": "The command exited with code 1.\nOutput: FAILED test_one.py",
+            "status": "DONE",
+            "created_at": "2026-09-20T12:00:02Z",
+        },
+    ]
+
+    turns = aggregate_steps_into_turns(steps)
+    assert len(turns) == 2
+    asst_turn = turns[1]
+    assert asst_turn["role"] == "assistant"
+    assert len(asst_turn["tool_activities"]) == 1
+    act = asst_turn["tool_activities"][0]
+    assert act["status"] == "error"
+    assert "The command exited with code 1" in act["result"]
+    print("✓ test_storage_aggregate_steps_command_failure_status passed")
+
+
+def test_rules_validate_workspace_path_sensitive_and_control_chars():
+    from fastapi import HTTPException
+
+    from app.api.rules import _validate_workspace_path
+
+    # Sensitive path rejection
+    with pytest.raises(HTTPException) as exc_info:
+        _validate_workspace_path("/root/.ssh")
+    assert exc_info.value.status_code in (400, 403)
+
+    # Control chars / null bytes rejection
+    with pytest.raises(HTTPException) as exc_info:
+        _validate_workspace_path("/tmp/test\x00path")
+    assert exc_info.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc_info:
+        _validate_workspace_path("/tmp/test\npath")
+    assert exc_info.value.status_code == 400
+    print("✓ test_rules_validate_workspace_path_sensitive_and_control_chars passed")
+
+
+def test_cron_store_french_daily_at_formats():
+    from app.services.cron_store import compute_next_run
+
+    res1 = compute_next_run("chaque jour à 14h30")
+    assert res1 is not None and "T14:30:00" in res1
+
+    res2 = compute_next_run("chaque jour à 14h")
+    assert res2 is not None and "T14:00:00" in res2
+
+    res3 = compute_next_run("tous les jours à 8H")
+    assert res3 is not None and "T08:00:00" in res3
+
+    res4 = compute_next_run("daily at 9h15")
+    assert res4 is not None and "T09:15:00" in res4
+    print("✓ test_cron_store_french_daily_at_formats passed")
+
+
+def test_auth_and_google_auth_type_safety():
+    from app.services.auth import verify_access_token, verify_api_key
+    from app.services.google_auth import parse_jwt_claims
+
+    # Non-string verify_access_token
+    assert verify_access_token(12345) is False
+    assert verify_access_token({"token": "abc"}) is False
+    assert verify_access_token(None) is False
+
+    # Non-string verify_api_key
+    assert verify_api_key(12345) is False
+    assert verify_api_key(["sk-abc"]) is False
+    assert verify_api_key(None) is False
+
+    # Non-string or malformed parse_jwt_claims
+    assert parse_jwt_claims(None) == {}
+    assert parse_jwt_claims(12345) == {}
+    assert parse_jwt_claims("not-a-jwt") == {}
+    assert parse_jwt_claims("header.singlepart") == {}
+    print("✓ test_auth_and_google_auth_type_safety passed")
+
+
+def test_terminal_set_winsize_safety():
+    from app.api.terminal import set_winsize
+
+    # Negative fd or invalid type should safely early-return
+    set_winsize(-1, 24, 80)
+    set_winsize("invalid_fd", 24, 80)
+    print("✓ test_terminal_set_winsize_safety passed")
 
 
 if __name__ == "__main__":
     test_schema_locks_reentrancy()
     test_storage_aggregate_steps_extracts_thought_tags()
+    test_storage_aggregate_steps_command_failure_status()
+    test_rules_validate_workspace_path_sensitive_and_control_chars()
+    test_cron_store_french_daily_at_formats()
+    test_auth_and_google_auth_type_safety()
+    test_terminal_set_winsize_safety()
     test_storage_ensure_db_schema_double_checked_lock()
     test_fs_watcher_resolve_conv_id_for_artifact(Path("/tmp"))
     test_openai_compat_list_models_deduplication()

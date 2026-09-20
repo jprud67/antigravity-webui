@@ -142,7 +142,7 @@ _SCHEDULE_INTERVAL_RE = re.compile(
     re.IGNORECASE
 )
 _DAILY_AT_RE = re.compile(
-    r"^(?:every\s+day|daily|chaque\s+jour|tous\s+les\s+jours)\s+(?:at|à)\s+(\d{1,2}):(\d{2})$",
+    r"^(?:every\s+day|daily|chaque\s+jour|tous\s+les\s+jours)\s+(?:at|à)\s+(\d{1,2})(?:[:hH](\d{1,2})|[hH])?$",
     re.IGNORECASE
 )
 
@@ -210,7 +210,8 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
     if daily_at_match:
         try:
             h = int(daily_at_match.group(1))
-            m = int(daily_at_match.group(2))
+            m_str = daily_at_match.group(2)
+            m = int(m_str) if m_str is not None else 0
             if 0 <= h < 24 and 0 <= m < 60:
                 target = now.replace(hour=h, minute=m, second=0)
                 if target <= now:

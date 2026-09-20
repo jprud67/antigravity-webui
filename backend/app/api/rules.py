@@ -11,7 +11,11 @@ from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE, HOME, SETTINGS_FILE
-from app.platform_utils import is_safe_path, restrict_file_permissions
+from app.platform_utils import (
+    is_blocked_sensitive_path,
+    is_safe_path,
+    restrict_file_permissions,
+)
 from app.services.storage import get_settings
 
 logger = logging.getLogger(__name__)
@@ -24,10 +28,15 @@ ARCH_STATE_FILE = HERMES_HOME / "memories" / "ARCHITECTURE_STATE.md"
 
 def _validate_workspace_path(workspace_path: str) -> Path:
     """Resolve a workspace path and confine it to the authorized working roots."""
+    if not workspace_path or not isinstance(workspace_path, str) or "\x00" in workspace_path or any(ord(c) < 32 for c in workspace_path):
+        raise HTTPException(status_code=400, detail="Chemin de workspace invalide.")
     try:
         resolved = Path(workspace_path).resolve()
     except Exception:
         raise HTTPException(status_code=400, detail="Chemin de workspace invalide.")
+
+    if is_blocked_sensitive_path(resolved):
+        raise HTTPException(status_code=403, detail="Accès refusé : chemin pointant vers un fichier ou répertoire sensible.")
 
     allowed_roots = [Path(DEFAULT_WORKSPACE).resolve()]
     try:

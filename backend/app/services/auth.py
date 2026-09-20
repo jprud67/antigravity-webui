@@ -204,7 +204,7 @@ def create_access_token(expires_in_days: int = 7) -> str:
     return f"{payload}:{sig}"
 
 def verify_access_token(token: str | None) -> bool:
-    if not token:
+    if not token or not isinstance(token, str):
         return False
     token = token.strip()
     if token.lower().startswith("bearer "):
@@ -336,7 +336,7 @@ def verify_api_key(key: str | None) -> bool:
     Vérifie si la clé passée correspond à l'environnement ANTIGRAVITY_API_KEY
     ou à une des clés enregistrées dans auth_config.
     """
-    if not key:
+    if not key or not isinstance(key, str):
         return False
     key = key.strip()
     if key.lower().startswith("bearer "):

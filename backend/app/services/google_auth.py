@@ -60,9 +60,12 @@ def ensure_dirs():
 
 def parse_jwt_claims(jwt_str: str) -> dict[str, Any]:
     try:
-        if not jwt_str or "." not in jwt_str:
+        if not jwt_str or not isinstance(jwt_str, str) or "." not in jwt_str:
             return {}
-        payload = jwt_str.split(".")[1]
+        parts = jwt_str.split(".")
+        if len(parts) < 2:
+            return {}
+        payload = parts[1]
         payload += "=" * (-len(payload) % 4)
         decoded = base64.urlsafe_b64decode(payload.encode("utf-8"))
         return json.loads(decoded.decode("utf-8"))

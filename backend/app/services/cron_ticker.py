@@ -608,10 +608,14 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
             except Exception as save_err:
                 logger.error(f"[Cron] Impossible de marquer le job {job_id} comme interrompu: {save_err}")
 
-        try:
-            await asyncio.shield(_finalize_interrupted())
-        except (asyncio.CancelledError, Exception):
-            pass
+        finalize_task = asyncio.create_task(_finalize_interrupted())
+        while not finalize_task.done():
+            try:
+                await asyncio.shield(finalize_task)
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                break
         raise
     except Exception as e:
         logger.error(f"[Cron] Erreur pendant l'exécution du job {job_id}: {e}", exc_info=True)
