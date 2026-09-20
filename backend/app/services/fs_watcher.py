@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from app.services.storage import is_safe_conversation_id
+from app.services.storage import RESERVED_CONVERSATION_IDS, is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.fs_watcher")
 
@@ -108,9 +108,15 @@ def extract_conv_id(transcript_path: Path, brain_dir: Path | None = None) -> str
 def extract_conv_id_from_artifact(artifact_path: Path, brain_dir: Path) -> str | None:
     """Extrait l'identifiant de conversation d'un chemin d'artefact confiné dans brain_dir."""
     try:
-        rel = artifact_path.resolve().relative_to(brain_dir.resolve())
-        if rel.parts:
+        resolved_path = artifact_path.resolve()
+        resolved_brain = brain_dir.resolve()
+        if not resolved_path.is_relative_to(resolved_brain) or resolved_path == resolved_brain:
+            return None
+        rel = resolved_path.relative_to(resolved_brain)
+        if rel.parts and len(rel.parts) >= 2:
             cand = rel.parts[0]
+            if cand.lower() in RESERVED_CONVERSATION_IDS:
+                return None
             if _UUID_PATTERN.match(cand) or is_safe_conversation_id(cand):
                 return cand
     except Exception as e:
@@ -120,12 +126,22 @@ def extract_conv_id_from_artifact(artifact_path: Path, brain_dir: Path) -> str |
 
 def _resolve_conv_id_for_artifact(p: Path, brain_dir: Path) -> str | None:
     """Résout et valide strictement l'identifiant de conversation associé à un artefact."""
-    cid = extract_conv_id_from_artifact(p, brain_dir)
-    if not cid:
-        cand = p.parent.name
+    try:
+        resolved_p = p.resolve()
+        resolved_brain = brain_dir.resolve()
+        if not resolved_p.is_relative_to(resolved_brain) or resolved_p == resolved_brain:
+            return None
+        rel = resolved_p.relative_to(resolved_brain)
+        if not rel.parts or len(rel.parts) < 2:
+            return None
+        cand = rel.parts[0]
+        if cand.lower() in RESERVED_CONVERSATION_IDS:
+            return None
         if _UUID_PATTERN.match(cand) or is_safe_conversation_id(cand):
-            cid = cand
-    return cid if (cid and is_safe_conversation_id(cid)) else None
+            return cand
+    except Exception:
+        pass
+    return None
 
 
 async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float = 1.5) -> None:

@@ -177,66 +177,97 @@ def test_aggregate_steps_tool_outputs():
     print("✓ test_aggregate_steps_tool_outputs passed")
 
 
-def test_bulk_import_transaction():
-    import_payload = [
-        {
-            "title": "Batch Session 1",
-            "steps": [
-                {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Hello 1", "created_at": "2026-09-16T10:00:00Z"}
+def test_bulk_import_transaction(tmp_path=None):
+    import shutil
+    import tempfile
+    from unittest.mock import patch
+
+    td = tempfile.mkdtemp()
+    test_db = Path(td) / "test_conv.db"
+    test_brain = Path(td) / "brain"
+    test_brain.mkdir(parents=True, exist_ok=True)
+    try:
+        with patch("app.services.storage.CONVERSATION_DB", test_db), \
+             patch("app.services.storage.BRAIN_DIR", test_brain):
+            import_payload = [
+                {
+                    "title": "Batch Session 1",
+                    "steps": [
+                        {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Hello 1", "created_at": "2026-09-16T10:00:00Z"}
+                    ]
+                },
+                {
+                    "title": "Batch Session 2",
+                    "steps": [
+                        {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Hello 2", "created_at": "2026-09-16T10:00:00Z"}
+                    ]
+                }
             ]
-        },
-        {
-            "title": "Batch Session 2",
-            "steps": [
-                {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Hello 2", "created_at": "2026-09-16T10:00:00Z"}
-            ]
-        }
-    ]
-    res = import_conversation(import_payload)
-    assert res["success"] is True
-    assert res["count"] == 2
-    assert len(res["conversations"]) == 2
-    print("✓ test_bulk_import_transaction passed")
+            res = import_conversation(import_payload)
+            assert res["success"] is True
+            assert res["count"] == 2
+            assert len(res["conversations"]) == 2
+            print("✓ test_bulk_import_transaction passed")
+    finally:
+        shutil.rmtree(td, ignore_errors=True)
 
 
-def test_artifact_read_cap():
+def test_artifact_read_cap(tmp_path=None):
+    import shutil
+    import tempfile
+    from unittest.mock import patch
+
+    td = tempfile.mkdtemp()
+    test_brain = Path(td) / "brain"
     test_cid = "test-artifact-session-cid"
-    cid_dir = BRAIN_DIR / test_cid
+    cid_dir = test_brain / test_cid
     cid_dir.mkdir(parents=True, exist_ok=True)
     try:
-        # Binary test
-        bin_path = cid_dir / "test.bin"
-        bin_path.write_bytes(b"\x00\xff\xfe\x42")
-        res_bin = read_artifact_content(test_cid, "test.bin")
-        assert "[Fichier binaire : 4 octets]" in res_bin, f"Expected binary info, got: {res_bin}"
+        with patch("app.services.storage.BRAIN_DIR", test_brain):
+            # Binary test
+            bin_path = cid_dir / "test.bin"
+            bin_path.write_bytes(b"\x00\xff\xfe\x42")
+            res_bin = read_artifact_content(test_cid, "test.bin")
+            assert "[Fichier binaire : 4 octets]" in res_bin, f"Expected binary info, got: {res_bin}"
 
-        # Large file test (> 5 MB)
-        large_path = cid_dir / "large.txt"
-        with open(large_path, "w", encoding="utf-8") as f:
-            f.write("A" * (5 * 1024 * 1024 + 500))
-        res_large = read_artifact_content(test_cid, "large.txt")
-        assert "[Fichier volumineux" in res_large, f"Expected size warning, got: {res_large[:100]}"
-        print("✓ test_artifact_read_cap passed")
+            # Large file test (> 5 MB)
+            large_path = cid_dir / "large.txt"
+            with open(large_path, "w", encoding="utf-8") as f:
+                f.write("A" * (5 * 1024 * 1024 + 500))
+            res_large = read_artifact_content(test_cid, "large.txt")
+            assert "[Fichier volumineux" in res_large, f"Expected size warning, got: {res_large[:100]}"
+            print("✓ test_artifact_read_cap passed")
     finally:
-        import shutil
-        if cid_dir.exists():
-            shutil.rmtree(cid_dir, ignore_errors=True)
+        shutil.rmtree(td, ignore_errors=True)
 
 
-def test_bulk_import_cleanup_on_error():
-    bad_payload = [
-        {
-            "title": "Batch Session Valid",
-            "steps": [{"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Valid"}]
-        },
-        "not-a-dict-causing-exception"
-    ]
+def test_bulk_import_cleanup_on_error(tmp_path=None):
+    import shutil
+    import tempfile
+    from unittest.mock import patch
+
+    td = tempfile.mkdtemp()
+    test_db = Path(td) / "test_conv.db"
+    test_brain = Path(td) / "brain"
+    test_brain.mkdir(parents=True, exist_ok=True)
     try:
-        import_conversation(bad_payload)
-        assert False, "Should have failed due to invalid payload item"
-    except Exception:
-        pass
-    print("✓ test_bulk_import_cleanup_on_error passed")
+        with patch("app.services.storage.CONVERSATION_DB", test_db), \
+             patch("app.services.storage.BRAIN_DIR", test_brain):
+            bad_payload = [
+                {
+                    "title": "Batch Session Valid",
+                    "steps": [{"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "Valid"}]
+                },
+                "not-a-dict-causing-exception"
+            ]
+            try:
+                import_conversation(bad_payload)
+                assert False, "Should have failed due to invalid payload item"
+            except Exception:
+                pass
+            print("✓ test_bulk_import_cleanup_on_error passed")
+    finally:
+        shutil.rmtree(td, ignore_errors=True)
 
 
 def test_git_diff_sanitization():
@@ -291,21 +322,31 @@ def test_is_tool_output_content_and_clean_prompt():
     print("✓ test_is_tool_output_content_and_clean_prompt passed")
 
 
-def test_session_meta_legacy_defaults():
+def test_session_meta_legacy_defaults(tmp_path=None):
+    import shutil
+    import tempfile
     import uuid
+    from unittest.mock import patch
 
     from app.services.session_metadata import save_all_session_metadata
-    legacy_id = f"legacy_test_{uuid.uuid4().hex[:6]}"
-    # Save sparse metadata missing standard keys
-    save_all_session_metadata({legacy_id: {"pinned": True}})
 
-    meta = get_session_meta(legacy_id)
-    assert meta["pinned"] is True
-    assert meta["archived"] is False
-    assert meta["tags"] == []
-    assert meta["project"] == ""
-    assert meta["customTitle"] == ""
-    print("✓ test_session_meta_legacy_defaults passed")
+    td = tempfile.mkdtemp()
+    test_meta_file = Path(td) / "session_metadata.json"
+    try:
+        with patch("app.services.session_metadata.SESSION_METADATA_FILE", test_meta_file):
+            legacy_id = f"legacy_test_{uuid.uuid4().hex[:6]}"
+            # Save sparse metadata missing standard keys
+            save_all_session_metadata({legacy_id: {"pinned": True}})
+
+            meta = get_session_meta(legacy_id)
+            assert meta["pinned"] is True
+            assert meta["archived"] is False
+            assert meta["tags"] == []
+            assert meta["project"] == ""
+            assert meta["customTitle"] == ""
+            print("✓ test_session_meta_legacy_defaults passed")
+    finally:
+        shutil.rmtree(td, ignore_errors=True)
 
 
 def test_skill_md_utf8_bom(tmp_path=None):
@@ -7861,8 +7902,8 @@ def test_openai_compat_list_models_deduplication():
 
 
 def test_crons_api_job_id_str_int_normalization():
+    from unittest.mock import patch
     from app.api.crons import UpdateCronJobRequest, delete_cron_job, get_cron_job_log, update_cron_job
-    from app.services import cron_store
 
     # Test database with integer ID
     test_data = {
@@ -7878,15 +7919,11 @@ def test_crons_api_job_id_str_int_normalization():
         ]
     }
 
-    original_load = cron_store.load_jobs
-    original_update = cron_store.update_jobs
+    def fake_update(fn):
+        return fn(test_data)
 
-    try:
-        cron_store.load_jobs = lambda: dict(test_data)
-        def fake_update(fn):
-            return fn(test_data)
-        cron_store.update_jobs = fake_update
-
+    with patch("app.api.crons.load_jobs", return_value=test_data), \
+         patch("app.api.crons.update_jobs", side_effect=fake_update):
         # 1. Update with string job_id "12345"
         req = UpdateCronJobRequest(name="Updated Name")
         res = update_cron_job("12345", req, _=True)
@@ -7900,9 +7937,6 @@ def test_crons_api_job_id_str_int_normalization():
         del_res = delete_cron_job("12345", _=True)
         assert del_res["success"] is True
         assert len(test_data["jobs"]) == 0
-    finally:
-        cron_store.load_jobs = original_load
-        cron_store.update_jobs = original_update
     print("✓ test_crons_api_job_id_str_int_normalization passed")
 
 

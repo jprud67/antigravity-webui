@@ -31,12 +31,19 @@ from app.services.session_metadata import (
 logger = logging.getLogger("antigravity.storage")
 
 
+RESERVED_CONVERSATION_IDS: frozenset[str] = frozenset({
+    "null", "undefined", "none", "",
+    "logs", "log", "scratch", ".system_generated",
+    "tmp", "temp", "system"
+})
+
+
 def is_safe_conversation_id(conversation_id: str) -> bool:
     """Verifies conversation_id is safe, contains no directory traversal elements, and stays inside BRAIN_DIR."""
     if not conversation_id or not isinstance(conversation_id, str):
         return False
     clean = conversation_id.strip()
-    if clean.lower() in {"null", "undefined", "none", ""}:
+    if clean.lower() in RESERVED_CONVERSATION_IDS:
         return False
     if clean.startswith(".") or ".." in clean or "/" in clean or "\\" in clean or "\x00" in clean:
         return False
@@ -92,25 +99,28 @@ def get_db_connection() -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA busy_timeout=5000")
     # Double-checked locking: cheap read without lock, then initialize if needed under lock
-    if not _schema_initialized:
+    db_path_str = str(CONVERSATION_DB)
+    if not _schema_initialized or db_path_str not in _initialized_db_paths:
         with _schema_lock:
-            if not _schema_initialized:
+            if not _schema_initialized or db_path_str not in _initialized_db_paths:
                 ensure_db_schema(conn)
     return conn
 
 
 
 _schema_initialized = False
+_initialized_db_paths: set[str] = set()
 _schema_lock = threading.Lock()
 
 
 def ensure_db_schema(conn: sqlite3.Connection | None = None, force: bool = False) -> None:
     """Garantit l'existence de la table conversation_summaries dans la base SQLite."""
     global _schema_initialized
-    if _schema_initialized and not force and conn is None:
+    db_path_str = str(CONVERSATION_DB)
+    if _schema_initialized and db_path_str in _initialized_db_paths and not force and conn is None:
         return
     with _schema_lock:
-        if _schema_initialized and not force and conn is None:
+        if _schema_initialized and db_path_str in _initialized_db_paths and not force and conn is None:
             return
         close_after = False
         if conn is None:
@@ -195,6 +205,7 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None, force: bool = False
             )
             conn.commit()
             _schema_initialized = True
+            _initialized_db_paths.add(db_path_str)
         except Exception as e:
             logger.warning(f"ensure_db_schema warning: {e}")
         finally:
