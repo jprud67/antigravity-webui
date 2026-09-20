@@ -1,5 +1,4 @@
 import copy
-from collections import deque
 import html
 import json
 import logging
@@ -10,6 +9,7 @@ import sqlite3
 import threading
 import time
 import uuid
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any

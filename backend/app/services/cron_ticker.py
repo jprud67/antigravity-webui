@@ -518,8 +518,9 @@ def _write_job_log_entry(
 
 
 async def _execute_job(job: dict[str, Any]) -> None:
-    job_id = job.get("id")
-    name = job.get("name") or job_id
+    raw_job_id = job.get("id")
+    job_id = str(raw_job_id) if raw_job_id is not None else ""
+    name = str(job.get("name") or job_id)
     started = time.time()
     logger.info(f"[Cron] Exécution du job « {name} » ({job_id})...")
 
@@ -560,7 +561,9 @@ async def _execute_job(job: dict[str, Any]) -> None:
 
 
 async def _guarded_execute(job: dict[str, Any]) -> None:
-    job_id = job.get("id")
+    raw_job_id = job.get("id")
+    job_id = str(raw_job_id) if raw_job_id is not None else ""
+    name = str(job.get("name") or job_id)
     if job_id:
         _running_jobs.add(job_id)
         current_task = asyncio.current_task()
@@ -578,7 +581,7 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
             log_file = await asyncio.to_thread(
                 _write_job_log_entry,
                 job_id,
-                job.get("name") or job_id,
+                name,
                 start_dt,
                 duration,
                 "interrupted",
@@ -609,7 +612,7 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
             log_file = await asyncio.to_thread(
                 _write_job_log_entry,
                 job_id,
-                job.get("name") or job_id,
+                name,
                 start_dt,
                 duration,
                 "failed",

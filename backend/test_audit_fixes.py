@@ -7644,6 +7644,7 @@ def test_cron_ticker_recompute_and_log_entry():
     import tempfile
     from datetime import datetime, timezone
     from unittest.mock import patch
+
     from app.services.cron_ticker import _recompute_job_next_run, _write_job_log_entry
 
     # 1. Active recurring job
@@ -7671,27 +7672,27 @@ def test_cron_ticker_recompute_and_log_entry():
     assert job_disabled["next_run_at"] is None
 
     # 3. Log entry writing
-    with tempfile.TemporaryDirectory() as td:
-        with patch("app.services.cron_ticker.OUTPUT_DIR", Path(td)):
-            log_p = _write_job_log_entry(
-                job_id="test_log_job",
-                name="Test Log Job",
-                started_at=datetime.now(timezone.utc),
-                duration=1.5,
-                status="interrupted",
-                output="Log content message"
-            )
-            assert log_p is not None
-            assert log_p.exists()
-            content = log_p.read_text(encoding="utf-8")
-            assert "Job: Test Log Job (test_log_job)" in content
-            assert "Statut: interrupted" in content
-            assert "Log content message" in content
+    with tempfile.TemporaryDirectory() as td, patch("app.services.cron_ticker.OUTPUT_DIR", Path(td)):
+        log_p = _write_job_log_entry(
+            job_id="test_log_job",
+            name="Test Log Job",
+            started_at=datetime.now(timezone.utc),
+            duration=1.5,
+            status="interrupted",
+            output="Log content message"
+        )
+        assert log_p is not None
+        assert log_p.exists()
+        content = log_p.read_text(encoding="utf-8")
+        assert "Job: Test Log Job (test_log_job)" in content
+        assert "Statut: interrupted" in content
+        assert "Log content message" in content
     print("✓ test_cron_ticker_recompute_and_log_entry passed")
 
 
 def test_git_resolve_relative_git_path():
     from fastapi import HTTPException
+
     from app.api.git import _resolve_relative_git_path
 
     repo_dir = BACKEND_DIR.parent
@@ -7726,6 +7727,7 @@ def test_git_resolve_relative_git_path():
 
 def test_files_download_file_direct_validation():
     from fastapi import HTTPException
+
     from app.api.files import download_file
 
     # Non-existent file raises 404
@@ -7751,7 +7753,39 @@ def test_files_download_file_direct_validation():
     print("✓ test_files_download_file_direct_validation passed")
 
 
+def test_cron_ticker_job_id_name_none_safety():
+    import asyncio
+    import tempfile
+    from datetime import datetime, timezone
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.cron_ticker import _execute_job, _write_job_log_entry
+
+    # 1. _write_job_log_entry with empty job_id / name
+    with tempfile.TemporaryDirectory() as td, patch("app.services.cron_ticker.OUTPUT_DIR", Path(td)):
+        log_p = _write_job_log_entry(
+            job_id="",
+            name="",
+            started_at=datetime.now(timezone.utc),
+            duration=0.5,
+            status="ok",
+            output="Empty id output test",
+        )
+        assert log_p is not None
+        assert log_p.exists()
+        txt = log_p.read_text(encoding="utf-8")
+        assert "Statut: ok" in txt
+
+    # 2. _execute_job with id=None and name=None
+    with patch("app.services.cron_ticker.run_job_with_failover", new=AsyncMock(return_value={"status": "ok", "output": "Done", "attempts": 1})), \
+         patch("app.services.cron_ticker._write_job_log_entry", return_value=None), \
+         patch("app.services.cron_ticker.update_jobs", return_value=None):
+        asyncio.run(_execute_job({"id": None, "name": None, "prompt": "test"}))
+    print("✓ test_cron_ticker_job_id_name_none_safety passed")
+
+
 if __name__ == "__main__":
+    test_cron_ticker_job_id_name_none_safety()
     test_cron_ticker_recompute_and_log_entry()
     test_git_resolve_relative_git_path()
     test_files_download_file_direct_validation()
