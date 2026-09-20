@@ -91,7 +91,10 @@ export async function fetchApiKeys(): Promise<{ api_keys: ApiKeyItem[] }> {
   const res = await fetch(`${API_BASE}/auth/api-keys`, {
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error('Impossible de charger les clés d\'API');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Impossible de charger les clés d'API" }));
+    throw new Error(err.detail || "Impossible de charger les clés d'API");
+  }
   return res.json();
 }
 
@@ -189,7 +192,10 @@ export async function updateConversationTitle(conversationId: string, title: str
     headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ title })
   });
-  if (!res.ok) throw new Error('Échec du renommage');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du renommage' }));
+    throw new Error(err.detail || 'Échec du renommage');
+  }
   return res.json();
 }
 
@@ -209,7 +215,10 @@ export async function updateConversationMetadata(
     headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(metadata)
   });
-  if (!res.ok) throw new Error('Échec de la mise à jour des métadonnées');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la mise à jour des métadonnées' }));
+    throw new Error(err.detail || 'Échec de la mise à jour des métadonnées');
+  }
   return res.json();
 }
 
@@ -218,7 +227,10 @@ export async function deleteConversation(conversationId: string): Promise<any> {
     method: 'DELETE',
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error('Échec de suppression de la conversation');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de suppression de la conversation' }));
+    throw new Error(err.detail || 'Échec de suppression de la conversation');
+  }
   return res.json();
 }
 
@@ -894,7 +906,10 @@ export async function fetchGoogleAccounts(): Promise<GoogleAccountsResponse> {
   const res = await fetch(`${API_BASE}/google/accounts`, {
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error('Erreur lors de la récupération des comptes Google');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Erreur lors de la récupération des comptes Google' }));
+    throw new Error(err.detail || 'Erreur lors de la récupération des comptes Google');
+  }
   return res.json();
 }
 

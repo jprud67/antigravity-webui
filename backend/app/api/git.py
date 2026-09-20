@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -317,7 +318,7 @@ def get_git_diff(
                     diff_text = f"[Fichier volumineux ({file_size} octets) non affiché]"
                     truncated = True
                 else:
-                    devnull_cands = list(dict.fromkeys([os.devnull, "NUL", "/dev/null"]))
+                    devnull_cands = [os.devnull, "NUL"] if sys.platform == "win32" else [os.devnull]
                     for null_target in devnull_cands:
                         try:
                             untracked_res = run_git(["diff", "--no-index", "--", null_target, norm_path], target)
@@ -370,9 +371,10 @@ def get_branches(workspace: str | None = Query(None), _ = Depends(require_auth))
 
 def _unstage_sensitive_files(target: Path) -> None:
     """Désindexe automatiquement tout fichier sensible non suivi avant commit."""
-    staged_files_res = run_git(["diff", "--name-only", "--cached"], target)
+    staged_files_res = run_git(["diff", "--name-only", "--cached", "-z"], target)
     if staged_files_res.returncode == 0 and staged_files_res.stdout:
-        for f in staged_files_res.stdout.splitlines():
+        raw_files = staged_files_res.stdout.split("\0") if "\0" in staged_files_res.stdout else staged_files_res.stdout.splitlines()
+        for f in raw_files:
             f_clean = f.strip().strip('"')
             if not f_clean:
                 continue

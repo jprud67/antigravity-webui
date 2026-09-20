@@ -496,8 +496,12 @@ def _write_job_log_entry(
     """Écrit le fichier journal pour une exécution de tâche cron et applique les restrictions d'accès."""
     ensure_dirs()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    now_dt = datetime.now(timezone.utc)
+    stamp = now_dt.strftime("%Y%m%d_%H%M%S")
     log_file = OUTPUT_DIR / f"{job_id}_{stamp}.log"
+    if log_file.exists():
+        stamp_micro = now_dt.strftime("%Y%m%d_%H%M%S_%f")
+        log_file = OUTPUT_DIR / f"{job_id}_{stamp_micro}.log"
     header = (
         f"Job: {name} ({job_id})\n"
         f"Début: {started_at.isoformat()}\n"
@@ -715,9 +719,15 @@ async def tick_once() -> int:
                 _running_jobs.add(job_id)
 
     for job in to_launch:
-        task = asyncio.create_task(_guarded_execute(job))
-        _background_tasks.add(task)
-        task.add_done_callback(_background_tasks.discard)
+        job_id = job.get("id")
+        try:
+            task = asyncio.create_task(_guarded_execute(job))
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
+        except Exception as launch_err:
+            if job_id:
+                _running_jobs.discard(job_id)
+            logger.error(f"[Cron] Échec du lancement de la tâche {job_id}: {launch_err}")
 
     return len(to_launch)
 

@@ -562,6 +562,8 @@ def clean_user_prompt(raw: Any) -> str:
         elif isinstance(raw, dict):
             if "text" in raw and isinstance(raw["text"], str):
                 raw = raw["text"]
+            elif "prompt" in raw and isinstance(raw["prompt"], str):
+                raw = raw["prompt"]
             elif "content" in raw and isinstance(raw["content"], str):
                 raw = raw["content"]
             elif "content" in raw and isinstance(raw["content"], list):
@@ -571,12 +573,17 @@ def clean_user_prompt(raw: Any) -> str:
                         parts.append(sub)
                     elif isinstance(sub, dict) and "text" in sub and isinstance(sub["text"], str):
                         parts.append(sub["text"])
+                    elif isinstance(sub, dict) and "prompt" in sub and isinstance(sub["prompt"], str):
+                        parts.append(sub["prompt"])
                 raw = "\n".join(parts) if parts else ""
             else:
                 try:
-                    raw = str(raw)
+                    raw = json.dumps(raw, ensure_ascii=False)
                 except Exception:
-                    return ""
+                    try:
+                        raw = str(raw)
+                    except Exception:
+                        return ""
         else:
             try:
                 raw = str(raw)
@@ -1936,6 +1943,8 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                 raw_args = tc.get("args")
                 if raw_args is None:
                     raw_args = tc.get("parameters")
+                if raw_args is None:
+                    raw_args = tc.get("arguments")
                 if raw_args is None and "arguments" in fn:
                     raw_args = fn.get("arguments")
                 if raw_args is None:
@@ -1948,15 +1957,17 @@ def aggregate_steps_into_turns(steps: list[dict[str, Any]]) -> list[dict[str, An
                             raw_args = parsed_args
                     except Exception:
                         raw_args = {"raw": raw_args}
-                elif not isinstance(raw_args, dict):
+                elif not isinstance(raw_args, (dict, list)):
                     raw_args = {"raw": raw_args}
+
+                direct_res = tc.get("result") if "result" in tc else tc.get("output")
 
                 mapped_tools.append({
                     "id": tc.get("id") or tc.get("tool_call_id") or tc.get("call_id"),
                     "name": name,
                     "args": raw_args,
-                    "result": None,
-                    "status": "done" if s.get("status") == "DONE" else "running"
+                    "result": direct_res,
+                    "status": "done" if (s.get("status") == "DONE" or direct_res is not None) else "running"
                 })
 
         if content:
@@ -2029,7 +2040,11 @@ def export_conversation_markdown(conversation_id: str) -> str:
         if role == "user":
             md_lines.append(f"## 👤 Utilisateur (Étape #{idx})")
             md_lines.append("")
-            u_content = str(turn.get("content") or "").strip()
+            raw_u = turn.get("content")
+            if isinstance(raw_u, (dict, list)):
+                u_content = _safe_json_dumps(raw_u).strip()
+            else:
+                u_content = str(raw_u or "").strip()
             md_lines.append(u_content or "*(Message vide)*")
             md_lines.append("")
             md_lines.append("---")
@@ -2090,7 +2105,11 @@ def export_conversation_markdown(conversation_id: str) -> str:
                 md_lines.append("")
             md_lines.append("</details>\n")
 
-        content = str(turn.get("content") or "").strip()
+        raw_content = turn.get("content")
+        if isinstance(raw_content, (dict, list)):
+            content = _safe_json_dumps(raw_content).strip()
+        else:
+            content = str(raw_content or "").strip()
         if content:
             md_lines.append(content)
             md_lines.append("")
@@ -2116,7 +2135,11 @@ def export_conversation_html(conversation_id: str) -> str:
     def _clean_html_text(val: Any) -> str:
         if val is None:
             return ""
-        s = str(val).replace("\x00", "")
+        if isinstance(val, (dict, list)):
+            s = _safe_json_dumps(val)
+        else:
+            s = str(val)
+        s = s.replace("\x00", "")
         s = re.sub(r"[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]", "", s)
         return html.escape(s, quote=True)
 
@@ -2126,9 +2149,12 @@ def export_conversation_html(conversation_id: str) -> str:
         idx = turn.get("step_index", 0)
 
         if role == "checkpoint":
+            chk_text = _clean_html_text(turn.get("content", "")).strip()
+            chk_note = f'<div class="checkpoint-note">{chk_text}</div>' if chk_text else ""
             messages_html.append(f"""
             <div class="checkpoint-divider">
                 <span>📌 Point de restauration — Étape #{idx}</span>
+                {chk_note}
             </div>
             """)
             continue
@@ -2305,16 +2331,19 @@ def export_conversation_html(conversation_id: str) -> str:
         .print-btn:hover {{ background: #0369a1; }}
         .checkpoint-divider {{
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             margin: 24px 0;
             position: relative;
+            gap: 4px;
         }}
         .checkpoint-divider::before {{
             content: '';
             position: absolute;
             left: 0;
             right: 0;
+            top: 12px;
             height: 1px;
             background: #1e293b;
         }}
@@ -2327,6 +2356,16 @@ def export_conversation_html(conversation_id: str) -> str:
             color: #64748b;
             border-radius: 9999px;
             border: 1px solid #1e293b;
+        }}
+        .checkpoint-note {{
+            position: relative;
+            background: var(--bg-body);
+            padding: 2px 14px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-style: italic;
+            max-width: 80%;
+            text-align: center;
         }}
         .system-divider {{
             margin: 20px 0;

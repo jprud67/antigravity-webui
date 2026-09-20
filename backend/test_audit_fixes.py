@@ -8125,6 +8125,7 @@ def test_terminal_set_winsize_safety():
 
 def test_cron_clean_orphans_scheduled_state_recomputation():
     from datetime import datetime, timezone
+
     from app.services.cron_store import compute_next_run
 
     now_iso_str = datetime.now(timezone.utc).isoformat()
@@ -8192,6 +8193,7 @@ def test_storage_import_single_conversation_dynamic_schema():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
+
     from app.services.storage import _import_single_conversation
 
     with tempfile.TemporaryDirectory() as td:
@@ -8243,6 +8245,159 @@ def test_storage_import_single_conversation_dynamic_schema():
 
         conn.close()
     print("✓ test_storage_import_single_conversation_dynamic_schema passed")
+
+
+def test_storage_export_markdown_and_html_resilience():
+    from unittest.mock import patch
+
+    from app.services.storage import (
+        export_conversation_html,
+        export_conversation_markdown,
+    )
+
+    fake_steps = [
+        {
+            "step_index": 0,
+            "source": "USER_EXPLICIT",
+            "type": "USER_INPUT",
+            "content": {"prompt": "<Hello & World>", "mode": "debug"}
+        },
+        {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "content": {"response": "<b>Escaped HTML</b>", "status": "ok"},
+            "thinking": "Penser & Analyser",
+            "tool_calls": [
+                {
+                    "name": "run_command",
+                    "arguments": {"command": "echo 'Hello'"},
+                    "output": {"result": "<script>alert(1)</script>"}
+                }
+            ]
+        },
+        {
+            "step_index": 2,
+            "source": "SYSTEM",
+            "type": "CHECKPOINT",
+            "content": "Snapshot pré-refactoring <important>"
+        }
+    ]
+
+    with patch("app.services.storage.get_conversation_transcript", return_value=fake_steps), \
+         patch("app.services.storage.get_conversation_by_id", return_value={"title": "Session <Test & Export>"}):
+        
+        md = export_conversation_markdown("conv_test_123")
+        assert "Session <Test & Export>" in md
+        assert "<Hello & World>" in md
+        assert '"response": "<b>Escaped HTML</b>"' in md
+        assert "Snapshot pré-refactoring <important>" in md
+
+        html_out = export_conversation_html("conv_test_123")
+        assert "Session &lt;Test &amp; Export&gt;" in html_out
+        assert "&lt;Hello &amp; World&gt;" in html_out
+        assert "&lt;b&gt;Escaped HTML&lt;/b&gt;" in html_out
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html_out
+        assert "<script>alert(1)</script>" not in html_out
+        assert "checkpoint-note" in html_out
+    print("✓ test_storage_export_markdown_and_html_resilience passed")
+
+
+def test_git_devnull_platform_and_unstage_robustness():
+    import sys
+    from pathlib import Path
+    from unittest.mock import MagicMock, patch
+
+    from app.api.git import _unstage_sensitive_files, get_git_diff
+
+    with patch("app.api.git._validate_workspace", return_value=Path("/tmp")), \
+         patch("app.api.git.is_safe_path", return_value=True), \
+         patch("pathlib.Path.is_file", return_value=True), \
+         patch("pathlib.Path.stat") as mock_stat, \
+         patch("app.api.git.run_git") as mock_run_git:
+        
+        mock_stat.return_value.st_size = 100
+        mock_run_git.return_value = MagicMock(returncode=0, stdout="diff --git a/test b/test\n+content", stderr="")
+        
+        res = get_git_diff(workspace="/tmp", path="test.txt")
+        assert "+content" in res["diff"]
+        
+        if sys.platform != "win32":
+            for call_args in mock_run_git.call_args_list:
+                args = call_args[0][0]
+                assert "NUL" not in args
+
+    with patch("app.api.git.run_git") as mock_run:
+        def side_effect(cmd, target):
+            if "-z" in cmd:
+                return MagicMock(returncode=0, stdout="config/.env.production\0src/main.py\0", stderr="")
+            if "rev-parse" in cmd:
+                return MagicMock(returncode=1, stdout="", stderr="")
+            if "reset" in cmd:
+                return MagicMock(returncode=0, stdout="", stderr="")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = side_effect
+        _unstage_sensitive_files(Path("/tmp"))
+        
+        reset_calls = [c[0][0] for c in mock_run.call_args_list if "reset" in c[0][0]]
+        assert any("config/.env.production" in c for c in reset_calls)
+    print("✓ test_git_devnull_platform_and_unstage_robustness passed")
+
+
+def test_cron_log_entry_collision_avoidance():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from app.services.cron_ticker import _write_job_log_entry
+
+    with tempfile.TemporaryDirectory() as td:
+        temp_dir = Path(td)
+        with patch("app.services.cron_ticker.OUTPUT_DIR", temp_dir), \
+             patch("app.services.cron_ticker.ensure_dirs"):
+            
+            t0 = datetime.now(timezone.utc)
+            f1 = _write_job_log_entry("job_1", "Test Job", t0, 1.0, "success", "Output 1")
+            assert f1 is not None and f1.exists()
+
+            f2 = _write_job_log_entry("job_1", "Test Job", t0, 1.0, "success", "Output 2")
+            assert f2 is not None and f2.exists()
+            assert f1 != f2
+            assert f1.read_text().endswith("Output 1")
+            assert f2.read_text().endswith("Output 2")
+    print("✓ test_cron_log_entry_collision_avoidance passed")
+
+
+def test_execution_manager_stdin_safe_exception_handling():
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.services.execution_manager import ExecutionManager
+
+    async def _run_test():
+        em = ExecutionManager()
+        session = em.get_or_create_session("conv_exc_test")
+
+        mock_proc = MagicMock()
+        mock_proc.returncode = None
+        mock_stdin = MagicMock()
+        mock_stdin.is_closing.return_value = False
+        mock_stdin.write.side_effect = ValueError("I/O operation on closed pipe")
+        mock_stdin.drain = AsyncMock(side_effect=ValueError("I/O operation on closed pipe"))
+        mock_proc.stdin = mock_stdin
+        session.active_proc = mock_proc
+
+        await em.handle_stdin_input("conv_exc_test", "hello\n")
+
+        session.pending_approval = {"id": "req_1"}
+        await em.handle_approval("conv_exc_test", "req_1", "allow-once")
+        assert session.pending_approval is None
+        await em.close_all_sessions()
+
+    asyncio.run(_run_test())
+    print("✓ test_execution_manager_stdin_safe_exception_handling passed")
 
 
 if __name__ == "__main__":
@@ -8551,6 +8706,10 @@ if __name__ == "__main__":
     test_git_last_commit_and_push_masking()
     test_cron_clean_orphans_scheduled_state_recomputation()
     test_storage_import_single_conversation_dynamic_schema()
+    test_storage_export_markdown_and_html_resilience()
+    test_git_devnull_platform_and_unstage_robustness()
+    test_cron_log_entry_collision_avoidance()
+    test_execution_manager_stdin_safe_exception_handling()
     print("\nAll unit tests passed successfully!")
 
 

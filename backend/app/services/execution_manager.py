@@ -1101,7 +1101,7 @@ class ExecutionManager:
                 input_char = "y\n" if decision in ["allow-once", "allow-session", "always-allow"] else "n\n"
                 proc_stdin.write(input_char.encode())
                 await proc_stdin.drain()
-            except (BrokenPipeError, ConnectionResetError):
+            except (BrokenPipeError, ConnectionResetError, ValueError, RuntimeError, OSError):
                 logger.debug("Proc stdin was closed before approval could be delivered")
             except Exception as e:
                 logger.warning(f"Error writing approval to proc stdin: {e}")
@@ -1132,7 +1132,7 @@ class ExecutionManager:
                 proc_stdin.write(payload.encode("utf-8"))
                 await proc_stdin.drain()
                 logger.info(f"Stdin input routed to active proc in session {session.conversation_id}")
-            except (BrokenPipeError, ConnectionResetError):
+            except (BrokenPipeError, ConnectionResetError, ValueError, RuntimeError, OSError):
                 logger.debug("Proc stdin was closed before stdin input could be delivered")
             except Exception as e:
                 logger.warning(f"Error writing stdin input to proc stdin: {e}")
