@@ -150,4 +150,17 @@ async def watch_agy_log_for_quota(
                 logger.warning(f"quota_watch: quota dur détecté — {line.strip()[:160]}")
                 return line.strip()
 
+    # Drain terminal : détection du quota même si le processus s'est arrêté juste après l'écriture
+    if log_file is not None:
+        try:
+            size = log_file.stat().st_size
+            if size > offset:
+                chunk, _ = await asyncio.to_thread(_read_log_chunk, log_file, offset)
+                for line in chunk.splitlines():
+                    if is_hard_quota_error(line):
+                        logger.warning(f"quota_watch: quota dur détecté (drain terminal) — {line.strip()[:160]}")
+                        return line.strip()
+        except Exception as drain_exc:
+            logger.debug(f"quota_watch: drain terminal impossible ({log_file}): {drain_exc}")
+
     return None

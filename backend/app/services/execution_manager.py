@@ -711,6 +711,7 @@ class ExecutionManager:
                 except (asyncio.QueueEmpty, ValueError):
                     break
             target_session.is_running = False
+            target_session.is_steering = False
             target_session.active_proc = None
             target_session.pending_approval = None
             logger.info(f"Removed execution session for conversation {conversation_id} from memory.")
@@ -1043,6 +1044,7 @@ class ExecutionManager:
             if isinstance(tc, dict) and tc.get("status") == "running":
                 tc["status"] = "cancelled"
         session.is_running = False
+        session.is_steering = False
         session.active_proc = None
         await session._clear_pending_approval(decision="cancelled", reason="interrupted")
         await session.broadcast({

@@ -4,7 +4,9 @@ import re
 import shutil
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
+from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -82,20 +84,50 @@ def _validate_workspace(workspace: str | None) -> Path:
 
 def _resolve_relative_git_path(raw_path: str, target: Path) -> str:
     """Valide et normalise un chemin de fichier relatif à l'espace de travail Git."""
-    from urllib.parse import unquote
     p_str = str(raw_path).strip()
     for _ in range(3):
         next_p = unquote(p_str)
         if next_p == p_str:
             break
         p_str = next_p
+    p_str = unicodedata.normalize("NFC", p_str)
     if "\x00" in p_str:
         raise HTTPException(status_code=400, detail="Chemin de fichier invalide : octet nul détecté.")
 
-    p = Path(p_str)
-    if p.is_absolute():
+    # Supprimer les fragments (#L1-L10) et requêtes (?...) issus de liens markdown ou URLs
+    if "#" in p_str:
+        p_str = p_str.split("#", 1)[0]
+    if "?" in p_str:
+        p_str = p_str.split("?", 1)[0]
+    p_str = p_str.strip()
+
+    if any(ord(c) < 32 or ord(c) == 127 for c in p_str):
+        raise HTTPException(status_code=400, detail="Chemin de fichier invalide : caractère de contrôle interdit détecté.")
+
+    if not p_str or p_str in ("workspace:", "workspace:/", "workspace://", "file:", "file:/", "file://", "file:///"):
+        raise HTTPException(status_code=400, detail="Chemin de fichier invalide : chemin vide.")
+
+    # Normalisation des schémas d'URI file:// ou workspace://
+    if p_str.lower().startswith("workspace:"):
+        sub = re.sub(r'^workspace:/*', '', p_str, flags=re.IGNORECASE)
+        if not sub:
+            raise HTTPException(status_code=400, detail="Chemin de fichier invalide : chemin vide.")
+        candidate_path = target / sub
+    elif p_str.lower().startswith("file:"):
+        sub = re.sub(r'^file:(?:/*localhost)?/*', '', p_str, flags=re.IGNORECASE)
+        if not sub:
+            raise HTTPException(status_code=400, detail="Chemin de fichier invalide : chemin vide.")
+        if os.name == "posix" and re.match(r'^[a-zA-Z]:[/\\]', sub):
+            raise HTTPException(status_code=400, detail="Chemin de style Windows non valide sur ce système d'exploitation.")
+        if not (len(sub) > 1 and sub[1] == ":") and not sub.startswith("/"):
+            sub = "/" + sub
+        candidate_path = Path(sub)
+    else:
+        candidate_path = Path(p_str)
+
+    if candidate_path.is_absolute():
         try:
-            resolved_p = p.resolve()
+            resolved_p = candidate_path.resolve()
             resolved_target = target.resolve()
             clean_rel = str(resolved_p.relative_to(resolved_target)).replace("\\", "/")
         except ValueError:
@@ -327,6 +359,8 @@ def get_git_diff(
                                 break
                         except Exception as e:
                             logger.debug(f"Git diff untracked fallback error with {null_target}: {_mask_git_output(str(e))}")
+                    if not diff_text and file_size == 0:
+                        diff_text = f"--- /dev/null\n+++ b/{norm_path}\n@@ -0,0 +0,0 @@\n[Nouveau fichier vide]"
 
     diff_text = _mask_git_output(diff_text or "")
     if diff_text and len(diff_text) > MAX_DIFF_BYTES:

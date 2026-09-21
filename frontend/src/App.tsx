@@ -129,7 +129,7 @@ export function App() {
     } catch {
       // localStorage may fail in restricted sandboxes
     }
-    return '/root';
+    return '';
   });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -380,8 +380,11 @@ export function App() {
           return null;
         }
       })();
-      if (!savedWorkspace && settings.trustedWorkspaces && settings.trustedWorkspaces.length > 0) {
-        setCurrentWorkspace(settings.trustedWorkspaces[0]);
+      const defaultWs = settings.defaultWorkspace || (settings.trustedWorkspaces && settings.trustedWorkspaces[0]) || '';
+      if (!savedWorkspace && defaultWs) {
+        setCurrentWorkspace(defaultWs);
+      } else if (savedWorkspace) {
+        setCurrentWorkspace(savedWorkspace);
       }
 
       // Check if URL matches a conversation route (/c/:id or /chat/:id)
@@ -1227,7 +1230,7 @@ export function App() {
       `- **ID Session :** \`${activeConversationId || 'Session locale / Active'}\``,
       `- **Modèle actif :** **${currentModelObj?.name || selectedModel}**`,
       `- **Effort de réflexion :** \`${selectedEffort}\``,
-      `- **Workspace actif :** \`${currentWorkspace || '/root'}\``,
+      `- **Workspace actif :** \`${currentWorkspace || 'Défaut serveur'}\``,
       `- **Tokens estimés :** ${tokenUsage?.totalTokens ? tokenUsage.totalTokens.toLocaleString() : '0'} tokens (${tokenUsage?.inputTokens ? tokenUsage.inputTokens.toLocaleString() : 0} in / ${tokenUsage?.outputTokens ? tokenUsage.outputTokens.toLocaleString() : 0} out)`,
       `- **Messages :** ${messages.length}`,
       `- **Statut d'exécution :** ${isStreaming ? '⚡ **En cours de streaming**' : '🟢 **Prêt / En attente**'}`

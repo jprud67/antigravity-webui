@@ -71,6 +71,7 @@ export interface AppSettings {
     deny?: string[];
   };
   trustedWorkspaces?: string[];
+  defaultWorkspace?: string;
 }
 
 export interface WorkspaceFolder {

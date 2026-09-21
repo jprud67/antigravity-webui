@@ -17,6 +17,7 @@ import asyncio
 import inspect
 import json
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -147,7 +148,12 @@ async def run_agy_task(
             skills_list = list(skills)
         else:
             skills_list = []
-        valid_skills = [str(s).strip() for s in skills_list if s and str(s).strip()]
+        valid_skills = [
+            re.sub(r'[\r\n\[\]]', '', str(s)).strip()
+            for s in skills_list
+            if s and str(s).strip()
+        ]
+        valid_skills = [s for s in valid_skills if s]
         if valid_skills:
             skills_prefix = f"[Active skills: {', '.join(valid_skills)}]\n"
             effective_prompt = f"{skills_prefix}{prompt}"

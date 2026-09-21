@@ -2695,7 +2695,8 @@ def get_settings() -> dict[str, Any]:
         "agentMode": "accept-edits",
         "colorScheme": "dark",
         "model": "Gemini 3.8 Flash (High)",
-        "trustedWorkspaces": [DEFAULT_WORKSPACE]
+        "trustedWorkspaces": [DEFAULT_WORKSPACE],
+        "defaultWorkspace": DEFAULT_WORKSPACE
     }
     with _settings_lock:
         if not SETTINGS_FILE.exists():
@@ -2713,7 +2714,9 @@ def get_settings() -> dict[str, Any]:
                 _cached_settings_mtime = mtime
                 return copy.deepcopy(defaults)
             data = json.loads(content)
-            res = data if isinstance(data, dict) else defaults
+            res = data if isinstance(data, dict) else copy.deepcopy(defaults)
+            if not res.get("defaultWorkspace"):
+                res["defaultWorkspace"] = DEFAULT_WORKSPACE
             _cached_settings = copy.deepcopy(res)
             _cached_settings_mtime = mtime
             return copy.deepcopy(res)

@@ -243,7 +243,7 @@ class PersistentTerminalSession:
     # ----------------------------- Entrées / sorties -----------------------------
 
     async def write(self, data: bytes):
-        if not self.is_alive():
+        if not self.is_alive() or self.master_fd <= 0:
             return
         self.last_active = time.time()
         if IS_WINDOWS:
@@ -257,6 +257,8 @@ class PersistentTerminalSession:
         total = len(data)
         retries = 0
         while offset < total and retries < 50:
+            if not self.is_alive() or self.master_fd <= 0:
+                return
             try:
                 written = os.write(self.master_fd, data[offset:])
                 offset += written
@@ -280,7 +282,7 @@ class PersistentTerminalSession:
             self.cols = max(10, min(int(cols or 80), 300))
         except (ValueError, TypeError):
             self.cols = 80
-        if not self.is_alive():
+        if not self.is_alive() or (not IS_WINDOWS and self.master_fd <= 0):
             return
         if IS_WINDOWS:
             if self.win_pty is not None:
