@@ -620,13 +620,13 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
     for s in reversed(steps):
         if not isinstance(s, dict):
             continue
-        u = s.get("usage")
+        u = s.get("usage") or s.get("usage_metadata") or s.get("usageMetadata")
         if not u and isinstance(s.get("result"), dict):
-            u = s["result"].get("usage")
+            u = s["result"].get("usage") or s["result"].get("usage_metadata") or s["result"].get("usageMetadata")
         if not u and isinstance(s.get("step_update"), dict):
-            u = s["step_update"].get("usage")
+            u = s["step_update"].get("usage") or s["step_update"].get("usage_metadata") or s["step_update"].get("usageMetadata")
         if not u and isinstance(s.get("metadata"), dict):
-            u = s["metadata"].get("usage")
+            u = s["metadata"].get("usage") or s["metadata"].get("usage_metadata") or s["metadata"].get("usageMetadata")
         if not u and s.get("token_count"):
             tc = s.get("token_count")
             if isinstance(tc, dict):
@@ -648,14 +648,49 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
                 except (ValueError, TypeError):
                     return 0
 
-            inp_val = u.get("input_tokens") if u.get("input_tokens") is not None else (
-                u.get("prompt_tokens") if u.get("prompt_tokens") is not None else u.get("promptTokenCount")
+            inp_val = (
+                u.get("input_tokens")
+                if u.get("input_tokens") is not None
+                else (
+                    u.get("prompt_tokens")
+                    if u.get("prompt_tokens") is not None
+                    else (
+                        u.get("promptTokenCount")
+                        if u.get("promptTokenCount") is not None
+                        else u.get("prompt_token_count")
+                    )
+                )
             )
-            out_val = u.get("output_tokens") if u.get("output_tokens") is not None else (
-                u.get("completion_tokens") if u.get("completion_tokens") is not None else u.get("candidatesTokenCount")
+            out_val = (
+                u.get("output_tokens")
+                if u.get("output_tokens") is not None
+                else (
+                    u.get("completion_tokens")
+                    if u.get("completion_tokens") is not None
+                    else (
+                        u.get("candidatesTokenCount")
+                        if u.get("candidatesTokenCount") is not None
+                        else u.get("candidates_token_count")
+                    )
+                )
             )
-            thk_val = u.get("thinking_tokens") or u.get("reasoning_tokens") or u.get("thinkingTokenCount") or 0
-            tot_val = u.get("total_tokens") if u.get("total_tokens") is not None else u.get("totalTokenCount")
+            thk_val = (
+                u.get("thinking_tokens")
+                or u.get("reasoning_tokens")
+                or u.get("thinkingTokenCount")
+                or u.get("thoughtsTokenCount")
+                or u.get("thinking_token_count")
+                or 0
+            )
+            tot_val = (
+                u.get("total_tokens")
+                if u.get("total_tokens") is not None
+                else (
+                    u.get("totalTokenCount")
+                    if u.get("totalTokenCount") is not None
+                    else u.get("total_token_count")
+                )
+            )
 
             inp = _to_int(inp_val)
             out = _to_int(out_val)
@@ -1454,22 +1489,23 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
             full_steps = []
 
         if full_steps:
+            cutoff_idx = -1
             if isinstance(last_user_step_index, int):
-                remaining_full_steps = [
-                    s for s in full_steps
-                    if not (isinstance(s.get("step_index"), int) and s["step_index"] >= last_user_step_index)
-                ]
-            else:
-                last_full_user_idx = -1
+                for i, s in enumerate(full_steps):
+                    s_idx = s.get("step_index")
+                    if isinstance(s_idx, int) and s_idx >= last_user_step_index:
+                        cutoff_idx = i
+                        break
+            if cutoff_idx == -1:
                 for i in range(len(full_steps) - 1, -1, -1):
                     s = full_steps[i]
                     if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
-                        last_full_user_idx = i
+                        cutoff_idx = i
                         break
-                if last_full_user_idx != -1:
-                    remaining_full_steps = full_steps[:last_full_user_idx]
-                else:
-                    remaining_full_steps = full_steps[:-1]
+            if cutoff_idx != -1:
+                remaining_full_steps = full_steps[:cutoff_idx]
+            else:
+                remaining_full_steps = full_steps[:-1]
         else:
             remaining_full_steps = remaining_steps
 

@@ -16,14 +16,23 @@ const TOOL_STEP_TYPES = new Set([
   'TOOL_OUTPUT',
   'VIEW_FILE',
   'RUN_COMMAND',
+  'BASH',
+  'EXECUTE',
+  'EXECUTE_COMMAND',
+  'TERMINAL',
+  'SHELL',
+  'READ_FILE',
   'CODE_ACTION',
   'GREP_SEARCH',
   'LIST_DIRECTORY',
   'LIST_DIR',
   'WRITE_TO_FILE',
+  'WRITE_FILE',
   'REPLACE_FILE_CONTENT',
+  'EDIT_FILE',
   'SEARCH_WEB',
   'READ_URL_CONTENT',
+  'FETCH_WEB_PAGE',
   'FIND_BY_NAME',
   'MANAGE_TASK',
   'SCHEDULE',
@@ -33,6 +42,22 @@ const TOOL_STEP_TYPES = new Set([
   'DEFINE_SUBAGENT',
   'GENERATE_IMAGE',
 ]);
+
+const TOOL_ALIASES: Record<string, string> = {
+  BASH: 'RUNCOMMAND',
+  EXECUTE: 'RUNCOMMAND',
+  EXECUTECOMMAND: 'RUNCOMMAND',
+  SHELL: 'RUNCOMMAND',
+  TERMINAL: 'RUNCOMMAND',
+  READFILE: 'VIEWFILE',
+  VIEW: 'VIEWFILE',
+  WRITEFILE: 'WRITETOFILE',
+  CREATEFILE: 'WRITETOFILE',
+  EDITFILE: 'REPLACEFILECONTENT',
+  EDIT: 'REPLACEFILECONTENT',
+  WEBSEARCH: 'SEARCHWEB',
+  FETCHWEBPAGE: 'READURLCONTENT',
+};
 
 function extractRawTextParts(val: any): string {
   if (!val) return '';
@@ -381,8 +406,11 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
 
       const isMatchingToolName = (toolName?: string) => {
         if (!toolName || !cleanType) return false;
-        const normName = toolName.toUpperCase().replace(/[^A-Z0-9]/g, '');
-        return normName.includes(cleanType) || cleanType.includes(normName);
+        let normName = toolName.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        let normType = cleanType;
+        normName = TOOL_ALIASES[normName] || normName;
+        normType = TOOL_ALIASES[normType] || normType;
+        return normName.includes(normType) || normType.includes(normName);
       };
 
       const isGenericStepType = ['GENERIC', 'TOOLOUTPUT', 'TOOLRESULT', 'SYSTEM', ''].includes(cleanType);

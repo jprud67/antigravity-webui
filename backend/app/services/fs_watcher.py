@@ -215,20 +215,20 @@ async def watch_filesystem(brain_dir: Path, conv_db: Path, poll_interval: float 
                 prev_dmtime = dir_mtimes.get(child_str)
                 if prev_dmtime == c_mtime and child_str in dir_artifacts_cache:
                     cached_files = dir_artifacts_cache[child_str]
-                    for f_path in cached_files:
+                    for f_path in list(cached_files.keys()):
                         try:
                             f_mtime = Path(f_path).stat().st_mtime
                             artifacts[f_path] = f_mtime
                             cached_files[f_path] = f_mtime
                         except OSError:
-                            pass
+                            cached_files.pop(f_path, None)
                 else:
                     dir_mtimes[child_str] = c_mtime
                     child_artifacts: dict[str, float] = {}
                     try:
                         for f in child.iterdir():
                             try:
-                                if f.name not in [".system_generated", "scratch"] and f.is_file():
+                                if f.name not in [".system_generated", "scratch"] and not f.name.startswith(".") and not f.name.endswith((".tmp", ".lock")) and f.is_file():
                                     m = f.stat().st_mtime
                                     artifacts[str(f)] = m
                                     child_artifacts[str(f)] = m

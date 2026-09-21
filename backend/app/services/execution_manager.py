@@ -613,6 +613,9 @@ class ExecutionSession:
                     logger.debug(f"Error terminating active_proc in finally: {e}")
             self.active_proc = None
             self.is_running = False
+            for tc in self.live_tool_calls:
+                if isinstance(tc, dict) and tc.get("status") == "running":
+                    tc["status"] = "cancelled" if self.is_steering else "done"
             await self._clear_pending_approval(reason="completed")
             self.last_active_at = time.time()
 

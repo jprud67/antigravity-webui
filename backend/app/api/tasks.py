@@ -97,6 +97,8 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                             if stat_size > 65536 and len(lines) > 1:
                                 lines = lines[1:]
                             preview = "".join(lines[-10:]) if lines else ""
+                            if len(preview) > 2000:
+                                preview = preview[-2000:]
                     except Exception:
                         preview = ""
                         stat_size = 0
@@ -152,6 +154,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
 
     # Sort recent first
     tasks.sort(key=lambda x: float(x.get("last_modified") or 0.0), reverse=True)
+    subagents.sort(key=lambda x: float(x.get("last_modified") or 0.0), reverse=True)
     running_processes.sort(key=lambda p: float(p.get("created_at") or 0.0), reverse=True)
 
 

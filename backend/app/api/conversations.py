@@ -205,12 +205,13 @@ def _do_bulk_export(req: "BulkActionRequest") -> Response:
     for cid in ids:
         try:
             steps = get_conversation_transcript(cid)
-            meta = get_session_meta(cid)
-            conv_record = get_conversation_by_id(cid)
+            meta = get_session_meta(cid) or {}
+            conv_record = get_conversation_by_id(cid) or {}
+            merged_meta = {**meta, **conv_record}
             exported.append({
                 "conversation_id": cid,
-                "title": (conv_record or {}).get("title") or meta.get("customTitle") or cid,
-                "metadata": meta,
+                "title": conv_record.get("title") or meta.get("customTitle") or cid,
+                "metadata": merged_meta,
                 "steps": steps
             })
         except Exception as e:
@@ -369,10 +370,12 @@ def export_json(conversation_id: str, _ = Depends(require_auth)):
     if not is_safe_conversation_id(conversation_id):
         raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
     steps = get_conversation_transcript(conversation_id)
-    meta = get_conversation_by_id(conversation_id) or get_session_meta(conversation_id)
+    session_meta = get_session_meta(conversation_id) or {}
+    conv_meta = get_conversation_by_id(conversation_id) or {}
+    merged_meta = {**session_meta, **conv_meta}
     export_payload = {
         "conversation_id": conversation_id,
-        "metadata": meta,
+        "metadata": merged_meta,
         "steps": steps
     }
     import json
