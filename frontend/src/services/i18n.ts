@@ -50,6 +50,64 @@ if (typeof window !== 'undefined') {
 
 
 export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
+  eco_mode_label: {
+    en: 'Eco Mode',
+    fr: 'Mode Éco',
+    es: 'Modo Eco',
+    de: 'Öko-Modus',
+  },
+  eco_mode_tooltip_on: {
+    en: 'Eco Mode active (minimal effort & token-saving directives)',
+    fr: 'Mode Éco actif (effort minimal et directives d\'économie de tokens)',
+  },
+  eco_mode_tooltip_off: {
+    en: 'Eco Mode off (click to activate)',
+    fr: 'Mode Éco désactivé (cliquer pour activer)',
+  },
+  eco_mode_activated: {
+    en: '🍃 Eco Mode active: minimal thinking effort and token saving rules applied.',
+    fr: '🍃 Mode Éco activé : effort minimal et consignes d\'économie de tokens appliquées.',
+  },
+  eco_mode_deactivated: {
+    en: '⚡ Eco Mode disabled: normal performance restored.',
+    fr: '⚡ Mode Éco désactivé : performances standard rétablies.',
+  },
+  eco_mode_setting_title: {
+    en: 'Default Eco Mode for new sessions',
+    fr: 'Mode Éco par défaut',
+  },
+  eco_mode_setting_desc: {
+    en: 'Automatically apply token-saving directives and minimal thinking effort to conserve quotas.',
+    fr: 'Applique automatiquement les consignes de sobriété de tokens et un effort minimal pour préserver vos quotas.',
+  },
+  heavy_file_warning: {
+    en: '⚠️ Large file ({0} KB / ~{1} tokens). In Eco Mode, consider providing only relevant excerpts.',
+    fr: '⚠️ Fichier lourd ({0} Ko / ~{1} tokens). En mode Éco, pensez à ne transmettre que l\'extrait pertinent.',
+  },
+  loop_warning_banner_title: {
+    en: 'Error Loop Detected',
+    fr: 'Boucle d\'erreurs détectée',
+  },
+  loop_warning_banner_desc: {
+    en: 'The agent encountered {0} consecutive failures without progress. Stop or steer to prevent token inflation.',
+    fr: 'L\'agent a rencontré {0} échecs consécutifs sans progresser. Interrompez ou réorientez pour stopper l\'inflation de tokens.',
+  },
+  btn_stop_loop: {
+    en: 'Stop Agent',
+    fr: 'Stopper',
+  },
+  btn_steer_loop: {
+    en: 'Steer Agent',
+    fr: 'Réorienter',
+  },
+  context_heavy_warning: {
+    en: 'Heavy context: future turns will consume increasing tokens.',
+    fr: 'Contexte lourd : les prochains tours réinjecteront un volume élevé de tokens.',
+  },
+  btn_new_chat_purge: {
+    en: 'New chat (Purge context)',
+    fr: 'Nouvelle conversation (Purger)',
+  },
   new_conversation: {
     en: 'New Conversation',
     fr: 'Nouvelle conversation',

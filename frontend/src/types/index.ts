@@ -72,6 +72,7 @@ export interface AppSettings {
   };
   trustedWorkspaces?: string[];
   defaultWorkspace?: string;
+  ecoMode?: boolean;
 }
 
 export interface WorkspaceFolder {
