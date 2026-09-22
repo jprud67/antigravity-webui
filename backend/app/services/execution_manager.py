@@ -24,6 +24,22 @@ from app.services.storage import get_settings, is_safe_conversation_id, save_set
 
 logger = logging.getLogger("antigravity.execution")
 
+TOKEN_SAVER_DIRECTIVE = (
+    "[CONSIGNE SYSTÈME ÉCONOMIE TOKENS : "
+    "1) Commandes terminal : utiliser systématiquement des modes silencieux (-q, --bail) ou filtrés (grep, head -n 50, git log -n 5). "
+    "2) Fichiers : privilégier strictement replace_file_content à write_to_file pour les modifications, et borner view_file avec StartLine/EndLine. "
+    "3) Réponses : rester concis, ne pas régurgiter le code déjà existant inchangé.]\n\n"
+)
+
+
+def inject_eco_directives(prompt: str) -> str:
+    clean = (prompt or "").strip()
+    return f"{TOKEN_SAVER_DIRECTIVE}{clean}" if clean else TOKEN_SAVER_DIRECTIVE.strip()
+
+
+def should_warn_error_loop(consecutive_errors: int) -> bool:
+    return consecutive_errors == 3
+
 
 def _clean_cid(cid: Any) -> str | None:
     if not cid or not isinstance(cid, str):
@@ -363,6 +379,14 @@ class ExecutionSession:
                 effort = settings.get("effort")
         except Exception as e:
             logger.debug(f"Ignored error: {e}")
+            settings = {}
+
+        eco_mode = params.get("eco_mode")
+        if eco_mode is None:
+            eco_mode = settings.get("ecoMode", False)
+
+        if eco_mode:
+            prompt = inject_eco_directives(prompt)
 
         def on_proc_spawned(p: asyncio.subprocess.Process):
             self.active_proc = p
@@ -376,6 +400,7 @@ class ExecutionSession:
         try:
             while attempt < max_failover_attempts:
                 attempt += 1
+                consecutive_errors = 0
                 quota_error_detected = False
                 self.live_thought = ""
                 self.live_content = ""
@@ -413,11 +438,22 @@ class ExecutionSession:
                         elif event.get("event") == "step_update":
                             su = event.get("step_update", {})
                             if su.get("step_type") in ("error", "ERROR_MESSAGE") or su.get("status") == "ERROR":
+                                consecutive_errors += 1
+                                if should_warn_error_loop(consecutive_errors):
+                                    logger.warning(f"[Session {self.conversation_id}] Consecutive error loop detected ({consecutive_errors} errors).")
+                                    await self.broadcast({
+                                        "event": "loop_warning",
+                                        "conversation_id": self.conversation_id or active_cid,
+                                        "consecutive_errors": consecutive_errors,
+                                        "message": "Boucle d'erreurs détectée (3 échecs consécutifs). Envisagez d'interrompre ou de réorienter l'agent pour préserver vos tokens."
+                                    })
                                 su_msg = su.get("error") or su.get("content") or ""
                                 if is_quota_error(su_msg):
                                     quota_error_detected = True
                                     logger.warning(f"[Session {self.conversation_id}] Quota error detected in step_update: {su_msg}")
                                     break
+                            elif su.get("status") in ("COMPLETED", "DONE", "SUCCESS"):
+                                consecutive_errors = 0
 
                         await self.broadcast(event)
 

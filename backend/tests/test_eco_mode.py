@@ -14,5 +14,19 @@ class TestEcoModeStorage(unittest.TestCase):
         # Restore
         save_settings({"ecoMode": current})
 
+    def test_token_saver_prompt_injection(self):
+        from app.services.execution_manager import inject_eco_directives
+        prompt = "Fais un audit du projet"
+        eco_prompt = inject_eco_directives(prompt)
+        self.assertIn("CONSIGNE SYSTÈME ÉCONOMIE TOKENS", eco_prompt)
+        self.assertTrue(eco_prompt.endswith(prompt))
+
+    def test_consecutive_error_tracking(self):
+        from app.services.execution_manager import should_warn_error_loop
+        self.assertFalse(should_warn_error_loop(1))
+        self.assertFalse(should_warn_error_loop(2))
+        self.assertTrue(should_warn_error_loop(3))
+        self.assertFalse(should_warn_error_loop(4))
+
 if __name__ == "__main__":
     unittest.main()
