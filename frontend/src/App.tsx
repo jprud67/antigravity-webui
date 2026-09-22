@@ -1046,6 +1046,7 @@ export function App() {
       effort?: string;
       autoApprove?: boolean;
       mode?: 'normal' | 'queue' | 'steer';
+      eco_mode?: boolean;
     }
   ) => {
     const mode = options.mode || 'normal';
@@ -1093,7 +1094,8 @@ export function App() {
         model: options.model,
         effort: options.effort,
         autoApprove: options.autoApprove,
-        mode: options.mode
+        mode: options.mode,
+        eco_mode: options.eco_mode
       });
     } catch (e: any) {
       // WebSocket not ready (reconnecting) — inform the user instead of silently losing the prompt

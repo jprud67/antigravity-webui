@@ -294,6 +294,7 @@ export class ChatWebSocketClient {
     effort?: string;
     autoApprove?: boolean;
     mode?: 'normal' | 'queue' | 'steer';
+    eco_mode?: boolean;
   }) {
     const cid = params.conversationId || this.currentConversationId;
     if (cid) {
@@ -309,6 +310,7 @@ export class ChatWebSocketClient {
       effort: params.effort,
       auto_approve: params.autoApprove ?? true,
       mode: params.mode || 'normal',
+      eco_mode: params.eco_mode,
     };
 
     this.queueOrSend(payload);

@@ -18,7 +18,8 @@ import {
   History,
   Trash2,
   Clock,
-  Search
+  Search,
+  Leaf
 } from 'lucide-react';
 import type { ModelOption } from '../types';
 import { ContextRing, type TokenUsageData } from './ContextRing';
@@ -34,6 +35,7 @@ interface ChatInputProps {
       effort?: string;
       autoApprove?: boolean;
       mode?: 'normal' | 'queue' | 'steer';
+      eco_mode?: boolean;
     }
   ) => void;
   isStreaming: boolean;
@@ -129,6 +131,37 @@ export const ChatInput = React.memo<ChatInputProps>(({
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
   const [prompt, setPrompt] = useState(initialPrompt);
   const [autoApprove, setAutoApprove] = useState(true);
+  const [isEcoMode, setIsEcoMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('antigravity_eco_mode') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleEcoMode = useCallback(() => {
+    setIsEcoMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('antigravity_eco_mode', String(next));
+      } catch {}
+
+      if (next) {
+        const currentModelObj = models.find((m) => m.id === selectedModel) || models[0];
+        const isClaude = (currentModelObj?.id || selectedModel || '').toLowerCase().includes('claude');
+        const efforts = isClaude ? [] : (currentModelObj?.supported_efforts ?? []);
+        if (efforts.includes('low')) {
+          onSelectEffort('low');
+        } else if (efforts.includes('medium')) {
+          onSelectEffort('medium');
+        }
+        showToast(t('eco_mode_activated', '🍃 Mode Éco activé : effort minimal et consignes d\'économie de tokens appliquées.'), 'success');
+      } else {
+        showToast(t('eco_mode_deactivated', '⚡ Mode Éco désactivé : performances standard rétablies.'), 'info');
+      }
+      return next;
+    });
+  }, [models, selectedModel, onSelectEffort, showToast, t]);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -1021,6 +1054,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
       effort: resolvedEffort,
       autoApprove,
       mode,
+      eco_mode: isEcoMode,
     });
 
     setPrompt('');
@@ -1329,6 +1363,21 @@ export const ChatInput = React.memo<ChatInputProps>(({
             </div>
           )}
 
+          {/* Heavy Attachment Warning in Eco Mode / Context Guard */}
+          {attachments.some((att) => !att.isImage && (att.content.length > 20000 || att.size > 20480)) && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] animate-fadeIn">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {t(
+                  'heavy_file_warning',
+                  '⚠️ Fichier lourd ({0} Ko / ~{1} tokens). En mode Éco, pensez à ne transmettre que l\'extrait pertinent.'
+                )
+                  .replace('{0}', String(Math.round(attachments.reduce((acc, a) => acc + (a.isImage ? 0 : a.size), 0) / 1024)))
+                  .replace('{1}', String(Math.round(attachments.reduce((acc, a) => acc + (a.isImage ? 0 : a.content.length), 0) / 4)))}
+              </span>
+            </div>
+          )}
+
           <textarea
             ref={textareaRef}
             value={prompt}
@@ -1402,6 +1451,24 @@ export const ChatInput = React.memo<ChatInputProps>(({
             >
               <Zap className="w-3 h-3 fill-current" />
               <span>YOLO</span>
+            </button>
+
+            {/* Mode Éco Pill */}
+            <button
+              type="button"
+              onClick={toggleEcoMode}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer shadow-sm shrink-0 ${
+                isEcoMode ? 'border-emerald-500/50 text-emerald-400' : 'hover:opacity-100 opacity-80'
+              }`}
+              style={{
+                backgroundColor: isEcoMode ? 'rgba(16, 185, 129, 0.15)' : 'var(--surface-subtle)',
+                borderColor: isEcoMode ? 'rgba(16, 185, 129, 0.4)' : 'var(--border)',
+                color: isEcoMode ? '#10B981' : 'var(--muted)'
+              }}
+              title={isEcoMode ? t('eco_mode_tooltip_on', 'Mode Éco actif (effort minimal et directives d\'économie de tokens)') : t('eco_mode_tooltip_off', 'Mode Éco désactivé (cliquer pour activer)')}
+            >
+              <Leaf className="w-3 h-3 fill-current" />
+              <span>{t('eco_mode_label', 'Éco')}</span>
             </button>
 
             {/* Prompt History Button */}
