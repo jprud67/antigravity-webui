@@ -618,6 +618,22 @@ class ExecutionSession:
                     for tc in self.live_tool_calls:
                         if isinstance(tc, dict) and tc.get("status") == "running":
                             tc["status"] = "done"
+
+                    # Auto-truncate large tool outputs in transcript to safeguard tokens for subsequent turns
+                    if self.conversation_id:
+                        try:
+                            from app.services.storage import auto_truncate_transcript, get_settings
+                            st = get_settings()
+                            if st.get("ecoMode", True):
+                                trunc_res = auto_truncate_transcript(self.conversation_id)
+                                if trunc_res.get("truncated_steps_count", 0) > 0:
+                                    logger.info(
+                                        f"[Session {self.conversation_id}] Auto-truncated {trunc_res['truncated_steps_count']} steps in transcript "
+                                        f"({trunc_res['chars_saved']} chars saved)."
+                                    )
+                        except Exception as tr_err:
+                            logger.debug(f"Auto-truncate transcript warning: {tr_err}")
+
                     queue_sz = self.message_queue.qsize()
                     if queue_sz == 0:
                         self.is_running = False

@@ -246,6 +246,31 @@ export async function undoConversationTurn(conversationId: string): Promise<any>
   return res.json();
 }
 
+export interface CompactResult {
+  status: string;
+  conversation_id: string;
+  compacted_steps: number;
+  chars_saved: number;
+  tokens_saved: number;
+  reduction_pct: number;
+}
+
+export async function compactConversation(
+  conversationId: string,
+  preserveLastNTurns: number = 2
+): Promise<CompactResult> {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/compact`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ preserve_last_n_turns: preserveLastNTurns })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du compactage' }));
+    throw new Error(err.detail || 'Impossible de compacter la conversation');
+  }
+  return res.json();
+}
+
 export interface BulkActionPayload {
   action: 'delete' | 'pin' | 'unpin' | 'archive' | 'unarchive' | 'tag' | 'project' | 'export';
   conversation_ids: string[];

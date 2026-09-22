@@ -28,5 +28,23 @@ class TestEcoModeStorage(unittest.TestCase):
         self.assertTrue(should_warn_error_loop(3))
         self.assertFalse(should_warn_error_loop(4))
 
+    def test_truncate_tool_output_large(self):
+        from app.services.storage import truncate_tool_output
+        large_content = "\n".join([f"Step log line {i}" for i in range(200)])
+        truncated, was_trunc = truncate_tool_output(large_content, max_lines=40, max_chars=2000)
+        self.assertTrue(was_trunc)
+        self.assertIn("SORTIE TRONQUÉE", truncated)
+        self.assertTrue(len(truncated.splitlines()) <= 50)
+        self.assertTrue(truncated.startswith("Step log line 0"))
+        self.assertTrue(truncated.strip().endswith("Step log line 199"))
+
+    def test_truncate_tool_output_small(self):
+        from app.services.storage import truncate_tool_output
+        small_content = "Short command output\nAll tests passed\n"
+        result, was_trunc = truncate_tool_output(small_content, max_lines=40, max_chars=2000)
+        self.assertFalse(was_trunc)
+        self.assertEqual(result, small_content)
+
 if __name__ == "__main__":
     unittest.main()
+

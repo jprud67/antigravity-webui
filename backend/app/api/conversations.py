@@ -17,6 +17,7 @@ from app.services.session_metadata import (
 from app.services.storage import (
     bulk_delete_conversations,
     calculate_conversation_tokens,
+    compact_conversation_in_place,
     create_conversation_handoff,
     delete_conversation,
     export_conversation_html,
@@ -396,4 +397,22 @@ def import_session(payload: Any = Body(...), _ = Depends(require_auth)):
         return res
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Échec de l'import : {e!s}")
+
+
+class CompactRequest(BaseModel):
+    preserve_last_n_turns: int = 2
+
+@router.post("/{conversation_id}/compact")
+def compact_session(conversation_id: str, req: CompactRequest = Body(default_factory=CompactRequest), _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
+    try:
+        res = compact_conversation_in_place(conversation_id, preserve_last_n_turns=req.preserve_last_n_turns)
+        return res
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Error compacting conversation {conversation_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Échec du compactage : {e!s}")
+
 

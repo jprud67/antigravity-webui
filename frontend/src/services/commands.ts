@@ -170,6 +170,15 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     isAction: true
   },
   {
+    cmd: '/compact',
+    descKey: 'cmd_desc_compact',
+    desc: 'Compacter le contexte de la conversation (-80% tokens)',
+    category: 'action',
+    icon: Zap,
+    color: 'text-emerald-400',
+    isAction: true
+  },
+  {
     cmd: '/yolo',
     descKey: 'cmd_desc_yolo',
     desc: 'Basculer le mode Auto-Run (exécution autonome sans confirmation)',

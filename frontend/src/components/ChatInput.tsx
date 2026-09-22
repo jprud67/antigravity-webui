@@ -74,6 +74,8 @@ interface ChatInputProps {
   onOpenGoogleAccount?: () => void;
   onOpenUpdates?: () => void;
   onShowUpdateCard?: () => void;
+  onCompact?: () => void;
+  isCompacting?: boolean;
 }
 
 export interface AttachmentItem {
@@ -125,7 +127,9 @@ export const ChatInput = React.memo<ChatInputProps>(({
   onShowUsage,
   onOpenGoogleAccount,
   onOpenUpdates,
-  onShowUpdateCard
+  onShowUpdateCard,
+  onCompact,
+  isCompacting
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -679,13 +683,17 @@ export const ChatInput = React.memo<ChatInputProps>(({
 
       case '/compress':
       case '/compact':
-        handleSubmit(
-          'normal',
-          args
-            ? `[Compactage du contexte - Sujet : ${args}] Veuillez résumer et condenser l'historique de cette session de manière concise.`
-            : `[Compactage du contexte] Veuillez résumer et condenser l'historique de cette conversation de manière concise pour optimiser la fenêtre de contexte.`
-        );
-        showToast(t('toast_compress_sent', '🗜️ Context compression request sent...'), 'info');
+        if (onCompact) {
+          onCompact();
+        } else {
+          handleSubmit(
+            'normal',
+            args
+              ? `[Compactage du contexte - Sujet : ${args}] Veuillez résumer et condenser l'historique de cette session de manière concise.`
+              : `[Compactage du contexte] Veuillez résumer et condenser l'historique de cette conversation de manière concise pour optimiser la fenêtre de contexte.`
+          );
+          showToast(t('toast_compress_sent', '🗜️ Context compression request sent...'), 'info');
+        }
         return true;
 
       case '/usage':
@@ -1581,7 +1589,14 @@ export const ChatInput = React.memo<ChatInputProps>(({
             ) : null}
 
             {/* Circular Context & Token Ring */}
-            <ContextRing usage={usage} modelId={selectedModel} activePrompt={prompt} onNewChat={onNewChat} />
+            <ContextRing
+              usage={usage}
+              modelId={selectedModel}
+              activePrompt={prompt}
+              onNewChat={onNewChat}
+              onCompact={onCompact}
+              isCompacting={isCompacting}
+            />
           </div>
 
           {/* Right Action Controls */}

@@ -853,6 +853,189 @@ def is_tool_output_content(content: Any) -> bool:
     ))
 
 
+def truncate_tool_output(content: Any, max_lines: int = 50, max_chars: int = 3500) -> tuple[str, bool]:
+    """
+    Tronque intelligemment les sorties verbeuses d'outils et de terminal (Head + Tail).
+    Préserve les premières lignes (contexte/lancement) et les dernières lignes (résultat/erreur).
+    Retourne (texte_tronque, a_ete_tronque).
+    """
+    if content is None:
+        return "", False
+    if not isinstance(content, str):
+        try:
+            content = json.dumps(content, ensure_ascii=False, default=str)
+        except Exception:
+            content = str(content)
+
+    lines = content.splitlines(keepends=True)
+    if len(lines) <= max_lines and len(content) <= max_chars:
+        return content, False
+
+    head_n = min(20, max_lines // 2)
+    tail_n = min(20, max_lines // 2)
+
+    if len(lines) > max_lines:
+        head = "".join(lines[:head_n])
+        tail = "".join(lines[-tail_n:])
+        omitted = len(lines) - head_n - tail_n
+        marker = f"\n\n[... SORTIE TRONQUÉE : {omitted} lignes masquées pour préserver les tokens ...]\n\n"
+        return head + marker + tail, True
+
+    half = max_chars // 2
+    omitted_chars = len(content) - max_chars
+    marker = f"\n\n[... SORTIE TRONQUÉE : {omitted_chars} caractères masqués pour préserver les tokens ...]\n\n"
+    return content[:half] + marker + content[-half:], True
+
+
+def auto_truncate_transcript(conversation_id: str, max_lines: int = 50, max_chars: int = 3500) -> dict[str, Any]:
+    """
+    Scanne transcript.jsonl et tronque toute sortie volumineuse d'outil/terminal.
+    Sauvegarde systématiquement l'historique complet dans transcript_full.jsonl.
+    """
+    if not is_safe_conversation_id(conversation_id):
+        return {"truncated_steps_count": 0, "chars_saved": 0}
+
+    conv_dir = BRAIN_DIR / conversation_id
+    logs_dir = conv_dir / ".system_generated" / "logs"
+    transcript_path = logs_dir / "transcript.jsonl"
+    transcript_full_path = logs_dir / "transcript_full.jsonl"
+
+    if not transcript_path.exists() or transcript_path.stat().st_size == 0:
+        return {"truncated_steps_count": 0, "chars_saved": 0}
+
+    raw_lines: list[str] = []
+    try:
+        with open(transcript_path, "r", encoding="utf-8-sig", errors="replace") as f:
+            raw_lines = [l.strip().lstrip("\ufeff") for l in f if l.strip().lstrip("\ufeff")]
+    except Exception as e:
+        logger.debug(f"Failed to read transcript for auto_truncate: {e}")
+        return {"truncated_steps_count": 0, "chars_saved": 0}
+
+    steps: list[dict[str, Any]] = []
+    for l in raw_lines:
+        try:
+            steps.append(json.loads(l))
+        except Exception:
+            continue
+
+    if not steps:
+        return {"truncated_steps_count": 0, "chars_saved": 0}
+
+    # S'assurer que transcript_full.jsonl existe avec la version complète avant troncature
+    if not transcript_full_path.exists() or transcript_full_path.stat().st_size < transcript_path.stat().st_size:
+        atomic_write_jsonl(transcript_full_path, steps)
+
+    truncated_count = 0
+    chars_saved = 0
+    modified = False
+
+    for s in steps:
+        stype = (s.get("type") or "").upper()
+        if stype in TOOL_STEP_TYPES or is_tool_output_content(s.get("content")):
+            cnt = s.get("content")
+            if isinstance(cnt, str) and (len(cnt.splitlines()) > max_lines or len(cnt) > max_chars):
+                old_len = len(cnt)
+                trunc_cnt, was_trunc = truncate_tool_output(cnt, max_lines=max_lines, max_chars=max_chars)
+                if was_trunc:
+                    s["content"] = trunc_cnt
+                    s["is_truncated"] = True
+                    tf = s.get("truncated_fields") or []
+                    if "content" not in tf:
+                        tf.append("content")
+                    s["truncated_fields"] = tf
+                    chars_saved += (old_len - len(trunc_cnt))
+                    truncated_count += 1
+                    modified = True
+
+    if modified:
+        atomic_write_jsonl(transcript_path, steps)
+        _notify_transcript_changed(conversation_id)
+
+    return {
+        "truncated_steps_count": truncated_count,
+        "chars_saved": chars_saved
+    }
+
+
+def compact_conversation_in_place(conversation_id: str, preserve_last_n_turns: int = 2) -> dict[str, Any]:
+    """
+    Compacte directement une conversation existante :
+    - Sauvegarde l'historique complet dans transcript_full.jsonl.
+    - Pour tous les outils antérieurs aux N derniers tours utilisateur, compresse
+      les sorties verbeuses en un résumé concis d'une ligne.
+    - Met à jour transcript.jsonl atomiquement.
+    """
+    if not is_safe_conversation_id(conversation_id):
+        raise ValueError("Identifiant de conversation non valide")
+
+    conv_dir = BRAIN_DIR / conversation_id
+    logs_dir = conv_dir / ".system_generated" / "logs"
+    transcript_path = logs_dir / "transcript.jsonl"
+    transcript_full_path = logs_dir / "transcript_full.jsonl"
+
+    if not transcript_path.exists() or transcript_path.stat().st_size == 0:
+        raise ValueError("Aucun transcript à compacter")
+
+    raw_lines: list[str] = []
+    with open(transcript_path, "r", encoding="utf-8-sig", errors="replace") as f:
+        raw_lines = [l.strip().lstrip("\ufeff") for l in f if l.strip().lstrip("\ufeff")]
+
+    steps: list[dict[str, Any]] = []
+    for l in raw_lines:
+        try:
+            steps.append(json.loads(l))
+        except Exception:
+            continue
+
+    if not steps:
+        raise ValueError("Transcript vide ou corrompu")
+
+    # Sauvegarde complète systématique
+    if not transcript_full_path.exists() or transcript_full_path.stat().st_size < transcript_path.stat().st_size:
+        atomic_write_jsonl(transcript_full_path, steps)
+
+    user_step_indices = [
+        i for i, s in enumerate(steps)
+        if s.get("type") == "USER_INPUT" or s.get("source") == "USER_EXPLICIT"
+    ]
+
+    boundary_idx = 0
+    if len(user_step_indices) > preserve_last_n_turns:
+        boundary_idx = user_step_indices[-preserve_last_n_turns]
+
+    compacted_count = 0
+    chars_before = sum(len(str(s.get("content") or "")) for s in steps)
+
+    for i in range(boundary_idx):
+        s = steps[i]
+        stype = (s.get("type") or "").upper()
+        if stype in TOOL_STEP_TYPES or is_tool_output_content(s.get("content")):
+            cnt = str(s.get("content") or "")
+            if len(cnt) > 200:
+                is_err = s.get("status") == "ERROR" or bool(s.get("error"))
+                status_desc = "Erreur" if is_err else "Succès"
+                s["content"] = f"[✓ {status_desc} — Résultat d'étape archivé dans transcript_full.jsonl pour économie de tokens]"
+                s["is_truncated"] = True
+                s["truncated_fields"] = ["content"]
+                compacted_count += 1
+
+    chars_after = sum(len(str(s.get("content") or "")) for s in steps)
+    chars_saved = max(0, chars_before - chars_after)
+    tokens_saved = int(chars_saved / 3.8)
+
+    atomic_write_jsonl(transcript_path, steps)
+    _notify_transcript_changed(conversation_id)
+
+    return {
+        "status": "ok",
+        "conversation_id": conversation_id,
+        "compacted_steps": compacted_count,
+        "chars_saved": chars_saved,
+        "tokens_saved": tokens_saved,
+        "reduction_pct": round((chars_saved / max(1, chars_before)) * 100, 1)
+    }
+
+
 def _safe_copy_artifacts(source_dir: Path, target_dir: Path) -> None:
     """
     Copie de façon sécurisée les artefacts d'une session source vers une session cible.

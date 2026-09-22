@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Gauge, Coins, BrainCircuit, ArrowDownRight, ArrowUpRight, Sparkles } from 'lucide-react';
+import { Gauge, Coins, BrainCircuit, ArrowDownRight, ArrowUpRight, Sparkles, Zap } from 'lucide-react';
 import { useI18n } from '../services/i18n';
 
 export interface TokenUsageData {
@@ -15,13 +15,17 @@ interface ContextRingProps {
   modelId?: string;
   activePrompt?: string;
   onNewChat?: () => void;
+  onCompact?: () => void;
+  isCompacting?: boolean;
 }
 
 export const ContextRing: React.FC<ContextRingProps> = ({ 
   usage, 
   modelId = 'gemini-3.8-flash',
   activePrompt = '',
-  onNewChat
+  onNewChat,
+  onCompact,
+  isCompacting
 }) => {
   const { t } = useI18n();
   const [showPopover, setShowPopover] = useState(false);
@@ -248,14 +252,32 @@ export const ContextRing: React.FC<ContextRingProps> = ({
             </span>
           </div>
 
-          {/* Heavy Context Alert & Purge Action */}
-          {isContextHeavy && (
+          {/* Context Actions (Compaction & Purge) */}
+          {(isContextHeavy || onCompact) && (
             <div className="pt-2 mt-2 border-t flex flex-col gap-1.5" style={{ borderColor: 'var(--border)' }}>
-              <div className="flex items-start gap-1.5 text-[11px] text-amber-400 font-medium">
-                <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <span>{t('context_heavy_warning', 'Contexte lourd : les prochains tours réinjecteront un volume élevé de tokens.')}</span>
-              </div>
-              {onNewChat && (
+              {isContextHeavy && (
+                <div className="flex items-start gap-1.5 text-[11px] text-amber-400 font-medium mb-1">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{t('context_heavy_warning', 'Contexte lourd : les prochains tours réinjecteront un volume élevé de tokens.')}</span>
+                </div>
+              )}
+              {onCompact && (
+                <button
+                  type="button"
+                  disabled={isCompacting}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowPopover(false);
+                    onCompact();
+                  }}
+                  className="w-full py-1.5 px-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  title="Compresse les sorties d'outils volumineuses des tours passés pour économiser jusqu'à 80% de tokens"
+                >
+                  <Zap className="w-3 h-3 text-emerald-400" />
+                  <span>{isCompacting ? t('compacting', 'Compactage...') : t('btn_compact_context', 'Compacter l\'historique (-80% tokens)')}</span>
+                </button>
+              )}
+              {isContextHeavy && onNewChat && (
                 <button
                   type="button"
                   onClick={(e) => {
