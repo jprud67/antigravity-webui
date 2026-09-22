@@ -2696,7 +2696,8 @@ def get_settings() -> dict[str, Any]:
         "colorScheme": "dark",
         "model": "Gemini 3.8 Flash (High)",
         "trustedWorkspaces": [DEFAULT_WORKSPACE],
-        "defaultWorkspace": DEFAULT_WORKSPACE
+        "defaultWorkspace": DEFAULT_WORKSPACE,
+        "ecoMode": False,
     }
     with _settings_lock:
         if not SETTINGS_FILE.exists():
@@ -2717,6 +2718,8 @@ def get_settings() -> dict[str, Any]:
             res = data if isinstance(data, dict) else copy.deepcopy(defaults)
             if not res.get("defaultWorkspace"):
                 res["defaultWorkspace"] = DEFAULT_WORKSPACE
+            if "ecoMode" not in res:
+                res["ecoMode"] = False
             _cached_settings = copy.deepcopy(res)
             _cached_settings_mtime = mtime
             return copy.deepcopy(res)
