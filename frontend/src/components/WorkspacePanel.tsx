@@ -34,7 +34,7 @@ import type { ArtifactItem } from '../types';
 
 export type RightPanelTab = 'files' | 'artifacts' | 'terminal' | 'git' | 'kanban';
 
-interface WorkspacePanelProps {
+export interface WorkspacePanelProps {
   isOpen: boolean;
   onClose: () => void;
   activeTab: RightPanelTab;
@@ -45,6 +45,9 @@ interface WorkspacePanelProps {
   onExecutePrompt?: (prompt: string) => void;
   initialFilePath?: string | null;
   onClearInitialFilePath?: () => void;
+  agentActivityTimestamp?: number;
+  onGitStatusChanged?: (status: GitStatusResult | null) => void;
+  onArtifactsCountChanged?: (count: number) => void;
 }
 
 export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
@@ -58,9 +61,21 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   onExecutePrompt,
   initialFilePath,
   onClearInitialFilePath,
+  agentActivityTimestamp,
+  onGitStatusChanged,
+  onArtifactsCountChanged,
 }) => {
   const { t } = useI18n();
-  const [panelWidth, setPanelWidth] = useState<number>(540);
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('antigravity_aux_panel_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 360 && parsed <= 1200) return parsed;
+      }
+    } catch {}
+    return 540;
+  });
   const isResizingRef = useRef(false);
 
   // Files Tab State
@@ -97,6 +112,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       const newWidth = window.innerWidth - moveEvent.clientX;
       if (newWidth >= 360 && newWidth <= Math.min(1000, window.innerWidth - 300)) {
         setPanelWidth(newWidth);
+        try {
+          localStorage.setItem('antigravity_aux_panel_width', String(newWidth));
+        } catch {}
       }
     };
 
@@ -268,38 +286,60 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     }
   }, [conversationId, handleSelectArtifact]);
 
+  // Live Artifacts Synchronization
   useEffect(() => {
-    if (!isOpen || activeTab !== 'artifacts') return;
     let active = true;
     fetchArtifacts(conversationId)
       .then((items) => {
-        if (active) {
+        if (!active) return;
+        onArtifactsCountChanged?.(items.length);
+        if (isOpen && activeTab === 'artifacts') {
           setArtifacts(items);
           setLoadingArtifacts(false);
           if (items.length > 0 && !selectedArtifactRef.current) {
             handleSelectArtifact(items[0]);
+          } else if (selectedArtifactRef.current) {
+            // Live refresh active artifact if modified
+            fetchArtifactContent(conversationId, selectedArtifactRef.current.filename)
+              .then((content) => {
+                if (active) setArtifactMarkdown(content);
+              })
+              .catch(() => {});
           }
         }
       })
       .catch((e) => {
         console.error('Failed to load artifacts', e);
-        if (active) setLoadingArtifacts(false);
+        if (active) {
+          setLoadingArtifacts(false);
+          onArtifactsCountChanged?.(0);
+        }
       });
     return () => { active = false; };
-  }, [isOpen, activeTab, conversationId, handleSelectArtifact]);
+  }, [isOpen, activeTab, conversationId, agentActivityTimestamp, handleSelectArtifact, onArtifactsCountChanged]);
 
   // Git status & preview mode state
   const [gitStatus, setGitStatus] = useState<GitStatusResult | null>(null);
   const [showMarkdownPreview, setShowMarkdownPreview] = useState(true);
 
-  // Load git status
+  // Live Git Status Synchronization (always tracked for activity bar badge)
   useEffect(() => {
-    if (isOpen) {
-      fetchGitStatus(currentWorkspace)
-        .then(setGitStatus)
-        .catch(() => setGitStatus(null));
-    }
-  }, [isOpen, currentWorkspace]);
+    let active = true;
+    fetchGitStatus(currentWorkspace)
+      .then((st) => {
+        if (active) {
+          setGitStatus(st);
+          onGitStatusChanged?.(st);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setGitStatus(null);
+          onGitStatusChanged?.(null);
+        }
+      });
+    return () => { active = false; };
+  }, [currentWorkspace, agentActivityTimestamp, onGitStatusChanged]);
 
   useEffect(() => {
     const handleOpenFile = (e: any) => {
