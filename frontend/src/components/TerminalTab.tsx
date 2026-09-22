@@ -229,6 +229,17 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
     };
   }, [connectTerminal]);
 
+  useEffect(() => {
+    const handleRunCommand = (e: any) => {
+      const cmd = e.detail?.command;
+      if (cmd && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(cmd.endsWith('\n') ? cmd : cmd + '\n');
+      }
+    };
+    window.addEventListener('terminal-run-command', handleRunCommand);
+    return () => window.removeEventListener('terminal-run-command', handleRunCommand);
+  }, []);
+
   const handleClear = () => {
     if (xtermRef.current) {
       xtermRef.current.clear();

@@ -49,7 +49,8 @@ import {
   ChevronUp,
   GitBranch,
   BrainCircuit,
-  ExternalLink
+  ExternalLink,
+  Play
 } from 'lucide-react';
 import { DiffViewer } from './DiffViewer';
 import { PreContext, copyText, extractRawText } from '../utils/codeBlockUtils';
@@ -486,6 +487,22 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
 
         {/* Right Side: Adaptive Studio Controls */}
         <div className="flex items-center gap-1 shrink-0">
+          {/* Direct Execute Lens for shell/bash snippets */}
+          {isBash && (
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('terminal-run-command', { detail: { command: cleanedCode } }));
+                if (onOpenTerminal) onOpenTerminal();
+              }}
+              title={t('code_lens_run_terminal', 'Exécuter dans le terminal')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 shadow-xs"
+            >
+              <Play className="w-3 h-3 fill-current" />
+              <span>{t('run', 'Exécuter')}</span>
+            </button>
+          )}
+
           {/* Terminal button for bash snippets */}
           {isBash && onOpenTerminal && (
             <button

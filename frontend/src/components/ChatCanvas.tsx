@@ -17,6 +17,7 @@ import {
   FileCheck, 
   Cpu,
   FileText,
+  FileCode,
   GitBranch,
   PanelRight,
   Download,
@@ -290,12 +291,24 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
       );
     }
 
+    const handleOpenFileInPanel = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.dispatchEvent(new CustomEvent('open-workspace-file', { detail: { path: cleanPath } }));
+      if (onOpenFile) onOpenFile();
+    };
+
     return (
-      <a
-        href={downloadUrl}
-        download={filename}
-        onClick={handleDownload}
-        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl font-mono text-[12.5px] cursor-pointer border transition-all my-1.5 shadow-sm hover:shadow-md group/file no-underline select-none"
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={handleOpenFileInPanel}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            handleOpenFileInPanel(e as any);
+          }
+        }}
+        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl font-mono text-[12.5px] cursor-pointer border transition-all my-1.5 shadow-sm hover:shadow-md group/file select-none"
         style={{
           backgroundColor: 'var(--surface-subtle)',
           borderColor: 'var(--border)',
@@ -309,7 +322,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
           e.currentTarget.style.borderColor = 'var(--border)';
           e.currentTarget.style.backgroundColor = 'var(--surface-subtle)';
         }}
-        title={t("click_download_direct", "Click to download \"{0}\" directly").replace("{0}", filename)}
+        title={t("open_side_panel", "Ouvrir dans l'éditeur : {0}").replace("{0}", filename)}
       >
         <span
           className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 border"
@@ -318,7 +331,7 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
             borderColor: 'var(--accent-bg-strong)',
           }}
         >
-          <Download className="w-3 h-3" style={{ color: 'var(--accent)' }} />
+          <FileCode className="w-3 h-3" style={{ color: 'var(--accent)' }} />
         </span>
         <span className="font-semibold underline decoration-dotted underline-offset-2 truncate max-w-[280px]">
           {displayLabel}
@@ -338,27 +351,24 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
         <span
           className="text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 uppercase tracking-wide flex items-center gap-1 shadow-xs"
           style={{
-            backgroundColor: 'var(--accent)',
+            backgroundColor: 'var(--accent-bg)',
             borderColor: 'var(--accent)',
-            color: '#ffffff',
+            color: 'var(--accent-text)',
           }}
         >
-          <span>{t('download', 'Download')}</span>
-          <Download className="w-2.5 h-2.5" />
+          <span>{t('open', 'Ouvrir')}</span>
+          <ExternalLink className="w-2.5 h-2.5" />
         </span>
-        <span
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            window.dispatchEvent(new CustomEvent('open-workspace-file', { detail: { path: cleanPath } }));
-            if (onOpenFile) onOpenFile();
-          }}
-          title={t("open_side_panel", "Open in side panel")}
-          className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors ml-0.5 opacity-50 hover:opacity-100 shrink-0"
+        <a
+          href={downloadUrl}
+          download={filename}
+          onClick={handleDownload}
+          title={t("download_file", "Télécharger \"{0}\"").replace("{0}", filename)}
+          className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors ml-0.5 opacity-50 hover:opacity-100 shrink-0 text-slate-400 hover:text-slate-100"
         >
-          <ExternalLink className="w-3 h-3" />
-        </span>
-      </a>
+          <Download className="w-3.5 h-3.5" />
+        </a>
+      </div>
     );
   }
 
