@@ -38,7 +38,8 @@ import {
   Menu,
   Plus,
   MoreHorizontal,
-  RotateCcw
+  RotateCcw,
+  X
 } from 'lucide-react';
 import type { ChatMessage, ToolCallItem } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
@@ -80,6 +81,9 @@ interface ChatCanvasProps {
   onForkMessage?: (stepIndex: number) => void;
   onEditSessionMeta?: () => void;
   onRetry?: () => void;
+  loopWarning?: { errorCount: number; message: string } | null;
+  onDismissLoopWarning?: () => void;
+  onStopStreaming?: () => void;
 }
 
 const copyTextToClipboard = async (text: string): Promise<boolean> => {
@@ -777,6 +781,9 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   onForkMessage,
   onEditSessionMeta,
   onRetry,
+  loopWarning,
+  onDismissLoopWarning,
+  onStopStreaming,
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -1781,6 +1788,53 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
               </div>
             );
           })
+        )}
+        {loopWarning && (
+          <div className="max-w-4xl mx-auto my-2.5 p-3 rounded-xl border border-amber-500/40 bg-amber-950/60 backdrop-blur-md flex items-center justify-between gap-3 text-amber-200 text-xs shadow-lg animate-fadeIn">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <div>
+                <div className="font-semibold text-amber-300">{t('loop_warning_banner_title', 'Boucle d\'erreurs détectée')}</div>
+                <div className="text-[11px] text-amber-200/80 line-clamp-1">{loopWarning.message}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {onStopStreaming && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStopStreaming();
+                    onDismissLoopWarning?.();
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 font-medium text-[11px] transition-colors cursor-pointer"
+                >
+                  {t('btn_stop_loop', 'Stopper')}
+                </button>
+              )}
+              {onQuickPrompt && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onQuickPrompt('/steer ');
+                    onDismissLoopWarning?.();
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-medium text-[11px] transition-colors cursor-pointer"
+                >
+                  {t('btn_steer_loop', 'Réorienter')}
+                </button>
+              )}
+              {onDismissLoopWarning && (
+                <button
+                  type="button"
+                  onClick={onDismissLoopWarning}
+                  className="p-1 hover:bg-white/10 rounded-lg text-amber-300/70 hover:text-amber-200 transition-colors cursor-pointer"
+                  title={t('close', 'Close')}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
         )}
         {pendingApproval && (
           <div className="max-w-4xl mx-auto">

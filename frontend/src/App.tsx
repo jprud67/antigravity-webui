@@ -161,6 +161,7 @@ export function App() {
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | undefined>(undefined);
   const [queueCount, setQueueCount] = useState(0);
   const [pendingApproval, setPendingApproval] = useState<{ toolName: string; command?: string; path?: string } | null>(null);
+  const [loopWarning, setLoopWarning] = useState<{ errorCount: number; message: string } | null>(null);
 
   // WebSocket connection status for reconnection banner
   const [wsStatus, setWsStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>(
@@ -952,6 +953,7 @@ export function App() {
         setIsStreaming(false);
         setQueueCount(0);
         setPendingApproval(null);
+        setLoopWarning(null);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last && last.role === 'assistant' && last.isLive) {
@@ -961,6 +963,11 @@ export function App() {
             ];
           }
           return prev;
+        });
+      } else if (event.event === 'loop_warning') {
+        setLoopWarning({
+          errorCount: event.consecutive_errors || 3,
+          message: event.message || "Boucle d'erreurs détectée (3 échecs consécutifs)."
         });
       } else if (event.event === 'queue_cleared') {
         setQueueCount(0);
@@ -1007,6 +1014,7 @@ export function App() {
           setIsStreaming(false);
         }
         setPendingApproval(null);
+        setLoopWarning(null);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last && last.role === 'assistant' && last.isLive) {
@@ -1632,6 +1640,9 @@ export function App() {
           onForkMessage={handleForkMessage}
           onEditSessionMeta={stableEditSessionMeta}
           onRetry={handleRetry}
+          loopWarning={loopWarning}
+          onDismissLoopWarning={() => setLoopWarning(null)}
+          onStopStreaming={handleStopStreaming}
         />
 
         <ChatInput
