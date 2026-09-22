@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from
 import { Sidebar } from './components/Sidebar';
 import { ChatCanvas } from './components/ChatCanvas';
 import { ChatInput } from './components/ChatInput';
+import { AuxiliaryBar } from './components/AuxiliaryBar';
 
 const ArtifactViewer = lazy(() => import('./components/ArtifactViewer').then(m => ({ default: m.ArtifactViewer })));
 const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
@@ -196,26 +197,72 @@ export function App() {
   }, [messages]);
 
   // 3-Panel Demand-Driven Workspace Panel
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(() => {
+    try {
+      return localStorage.getItem('antigravity_aux_panel_open') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('files');
+  const [changedFilesCount, setChangedFilesCount] = useState<number>(0);
+  const [artifactsCount, setArtifactsCount] = useState<number>(0);
+  const [agentActivityTimestamp, setAgentActivityTimestamp] = useState<number>(() => Date.now());
 
   const openRightPanel = React.useCallback((tab: RightPanelTab) => {
     setRightPanelTab(tab);
     setIsRightPanelOpen(true);
+    try {
+      localStorage.setItem('antigravity_aux_panel_open', 'true');
+    } catch {}
   }, []);
+
+  const handleAuxBarToggleTab = React.useCallback((tab: RightPanelTab) => {
+    setIsRightPanelOpen((prevOpen) => {
+      if (!prevOpen) {
+        setRightPanelTab(tab);
+        try {
+          localStorage.setItem('antigravity_aux_panel_open', 'true');
+        } catch {}
+        return true;
+      }
+      if (rightPanelTab === tab) {
+        try {
+          localStorage.setItem('antigravity_aux_panel_open', 'false');
+        } catch {}
+        return false;
+      }
+      setRightPanelTab(tab);
+      return true;
+    });
+  }, [rightPanelTab]);
 
   const [pendingOpenFile, setPendingOpenFile] = useState<string | null>(null);
 
   useEffect(() => {
     const handleOpenFile = (e: any) => {
       setIsRightPanelOpen(true);
+      try {
+        localStorage.setItem('antigravity_aux_panel_open', 'true');
+      } catch {}
       setRightPanelTab('files');
       if (e?.detail?.path) {
         setPendingOpenFile(e.detail.path);
       }
     };
+    const handleRunTerminal = () => {
+      setIsRightPanelOpen(true);
+      try {
+        localStorage.setItem('antigravity_aux_panel_open', 'true');
+      } catch {}
+      setRightPanelTab('terminal');
+    };
     window.addEventListener('open-workspace-file', handleOpenFile);
-    return () => window.removeEventListener('open-workspace-file', handleOpenFile);
+    window.addEventListener('terminal-run-command', handleRunTerminal);
+    return () => {
+      window.removeEventListener('open-workspace-file', handleOpenFile);
+      window.removeEventListener('terminal-run-command', handleRunTerminal);
+    };
   }, []);
 
   // Authentication & Modals State
@@ -660,6 +707,7 @@ export function App() {
       } else if (event.event === 'step_update') {
         const update = event.step_update;
         if (!update) return;
+        setAgentActivityTimestamp(Date.now());
 
         if (update.conversation_id && !activeConversationIdRef.current) {
           activeConversationIdRef.current = update.conversation_id;
@@ -798,6 +846,7 @@ export function App() {
           });
         }
       } else if (event.event === 'result') {
+        setAgentActivityTimestamp(Date.now());
         const res = event.result;
         if (res?.usage) {
           const norm = normalizeUsage(res.usage);
@@ -1185,7 +1234,32 @@ export function App() {
   const handleOpenTerminalPanel = React.useCallback(() => openRightPanel('terminal'), [openRightPanel]);
   const handleOpenGitPanel = React.useCallback(() => openRightPanel('git'), [openRightPanel]);
   const handleOpenKanbanPanel = React.useCallback(() => openRightPanel('kanban'), [openRightPanel]);
-  const handleToggleRightPanel = React.useCallback(() => setIsRightPanelOpen((prev) => !prev), []);
+  const handleToggleRightPanel = React.useCallback(() => {
+    setIsRightPanelOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('antigravity_aux_panel_open', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  // Global shortcut Ctrl+B / Cmd+B to toggle auxiliary panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        const target = e.target as HTMLElement | null;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+          // In input fields, let normal key actions proceed
+        } else {
+          e.preventDefault();
+          handleToggleRightPanel();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleToggleRightPanel]);
   const handleToggleMobileSidebar = React.useCallback(() => setIsMobileSidebarOpen((prev) => !prev), []);
 
   // Phase 3 Session Handlers (Fork, Pin, Tags, Project, Search)
@@ -1701,7 +1775,12 @@ export function App() {
       {/* 3-Panel Demand-Driven Workspace Panel */}
       <WorkspacePanel
         isOpen={isRightPanelOpen}
-        onClose={() => setIsRightPanelOpen(false)}
+        onClose={() => {
+          setIsRightPanelOpen(false);
+          try {
+            localStorage.setItem('antigravity_aux_panel_open', 'false');
+          } catch {}
+        }}
         activeTab={rightPanelTab}
         onTabChange={setRightPanelTab}
         currentWorkspace={currentWorkspace}
@@ -1710,6 +1789,26 @@ export function App() {
         onExecutePrompt={(p) => setQuickPrompt(p)}
         initialFilePath={pendingOpenFile}
         onClearInitialFilePath={() => setPendingOpenFile(null)}
+        agentActivityTimestamp={agentActivityTimestamp}
+        onGitStatusChanged={(st) => {
+          if (!st) setChangedFilesCount(0);
+          else {
+            const cnt = (st.modified?.length || 0) + (st.untracked?.length || 0) + (st.conflicts?.length || 0);
+            setChangedFilesCount(cnt);
+          }
+        }}
+        onArtifactsCountChanged={setArtifactsCount}
+      />
+
+      {/* Auxiliary Activity Bar (Antigravity IDE-style) */}
+      <AuxiliaryBar
+        isOpen={isRightPanelOpen}
+        activeTab={rightPanelTab}
+        onToggleTab={handleAuxBarToggleTab}
+        onToggleOpen={handleToggleRightPanel}
+        changedFilesCount={changedFilesCount}
+        artifactsCount={artifactsCount}
+        isStreaming={isStreaming}
       />
 
       {/* Modals & Panels */}

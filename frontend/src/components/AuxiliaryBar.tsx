@@ -6,8 +6,7 @@ import {
   Terminal as TerminalIcon, 
   Kanban as KanbanIcon,
   PanelRightClose,
-  PanelRightOpen,
-  Sparkles
+  PanelRightOpen
 } from 'lucide-react';
 import { useI18n } from '../services/i18n';
 import type { RightPanelTab } from './WorkspacePanel';
