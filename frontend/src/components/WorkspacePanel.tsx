@@ -300,7 +300,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             handleSelectArtifact(items[0]);
           } else if (selectedArtifactRef.current) {
             // Live refresh active artifact if modified
-            fetchArtifactContent(conversationId, selectedArtifactRef.current.filename)
+            const activeArt = selectedArtifactRef.current;
+            fetchArtifactContent(activeArt.conversation_id, activeArt.relative_path || activeArt.filename)
               .then((content) => {
                 if (active) setArtifactMarkdown(content);
               })

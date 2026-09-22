@@ -131,6 +131,15 @@ export const ChatInput = React.memo<ChatInputProps>(({
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
   const [prompt, setPrompt] = useState(initialPrompt);
   const [autoApprove, setAutoApprove] = useState(true);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'info') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMessage({ text, type });
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), 3000);
+  }, []);
+
   const [isEcoMode, setIsEcoMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem('antigravity_eco_mode') === 'true';
@@ -162,24 +171,16 @@ export const ChatInput = React.memo<ChatInputProps>(({
       return next;
     });
   }, [models, selectedModel, onSelectEffort, showToast, t]);
+
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isListening, setIsListening] = useState(false);
-  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Attachment states
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'info') => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastMessage({ text, type });
-    toastTimerRef.current = setTimeout(() => setToastMessage(null), 3000);
-  }, []);
 
   const handleAddFiles = useCallback(async (files: File[]) => {
     if (!files || files.length === 0) return;
@@ -203,6 +204,16 @@ export const ChatInput = React.memo<ChatInputProps>(({
         continue;
       }
       const isImg = file.type.startsWith('image/');
+      if (!isImg && file.size > 20 * 1024) {
+        const kb = Math.round(file.size / 1024);
+        const approxTokens = Math.round(file.size / 3.8);
+        showToast(
+          t('heavy_file_warning', '⚠️ Fichier lourd ({0} Ko / ~{1} tokens). En mode Éco, pensez à ne transmettre que l\'extrait pertinent.')
+            .replace('{0}', String(kb))
+            .replace('{1}', String(approxTokens)),
+          'info'
+        );
+      }
       const id = createAttachmentId();
 
       try {
@@ -1570,7 +1581,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
             ) : null}
 
             {/* Circular Context & Token Ring */}
-            <ContextRing usage={usage} modelId={selectedModel} activePrompt={prompt} />
+            <ContextRing usage={usage} modelId={selectedModel} activePrompt={prompt} onNewChat={onNewChat} />
           </div>
 
           {/* Right Action Controls */}

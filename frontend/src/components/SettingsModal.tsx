@@ -38,7 +38,8 @@ import {
   Code2,
   Copy,
   Eye,
-  EyeOff
+  EyeOff,
+  Leaf
 } from 'lucide-react';
 import type { AppSettings, ModelOption, Conversation } from '../types';
 import { 
@@ -1468,6 +1469,51 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Eco Mode Token Optimization Settings */}
+              <div
+                className="p-4 rounded-2xl border space-y-3 shadow-xs"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                }}
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+                      <Leaf className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-xs block" style={{ color: 'var(--strong)' }}>
+                        {t('eco_mode_setting_title', 'Mode Éco par défaut')}
+                      </span>
+                      <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'var(--muted)' }}>
+                        {t('eco_mode_setting_desc', 'Applique automatiquement les consignes de sobriété de tokens et un effort minimal pour préserver vos quotas.')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <label className="relative inline-flex items-center cursor-pointer select-none shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(settings.ecoMode)}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setSettings((prev) => ({ ...prev, ecoMode: next }));
+                        saveSettings({ ...settings, ecoMode: next }).catch((err) => {
+                          console.error("Failed to save ecoMode setting:", err);
+                        });
+                        try {
+                          localStorage.setItem('antigravity_eco_mode', String(next));
+                        } catch {}
+                        showToast(next ? t('eco_mode_activated', '🍃 Mode Éco activé...') : t('eco_mode_deactivated', '⚡ Mode Éco désactivé...'), next ? 'success' : 'info');
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+              </div>
             </div>
           )}
 
