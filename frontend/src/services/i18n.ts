@@ -108,6 +108,46 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     en: 'New chat (Purge context)',
     fr: 'Nouvelle conversation (Purger)',
   },
+  aux_bar_files: {
+    en: 'Explorer & Files',
+    fr: 'Explorateur & Fichiers',
+  },
+  aux_bar_changes: {
+    en: 'Changes & Diffs',
+    fr: 'Modifications & Diffs',
+  },
+  aux_bar_artifacts: {
+    en: 'Live Artifacts',
+    fr: 'Artéfacts en direct',
+  },
+  aux_bar_terminal: {
+    en: 'Integrated Terminal',
+    fr: 'Terminal intégré',
+  },
+  aux_bar_kanban: {
+    en: 'Task Kanban',
+    fr: 'Kanban des tâches',
+  },
+  aux_bar_toggle_collapse: {
+    en: 'Toggle auxiliary panel (Ctrl+B)',
+    fr: 'Basculer le volet auxiliaire (Ctrl+B)',
+  },
+  code_lens_run_terminal: {
+    en: 'Run in terminal',
+    fr: 'Exécuter dans le terminal',
+  },
+  code_lens_open_editor: {
+    en: 'Open in editor',
+    fr: 'Ouvrir dans l\'éditeur',
+  },
+  code_lens_copy: {
+    en: 'Copy code',
+    fr: 'Copier',
+  },
+  code_lens_copied: {
+    en: 'Copied!',
+    fr: 'Copié !',
+  },
   new_conversation: {
     en: 'New Conversation',
     fr: 'Nouvelle conversation',
