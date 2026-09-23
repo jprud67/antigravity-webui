@@ -92,7 +92,8 @@ def _is_blocked_sensitive_path(resolved: Path) -> bool:
 
 def _validate_path_access(file_path: Path | str, base_dir: Path | str | None = None) -> Path:
     settings = get_settings()
-    workspaces = settings.get("trustedWorkspaces", [])
+    raw_workspaces = settings.get("trustedWorkspaces", [])
+    workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
     allowed_roots = [Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve()]
     for ws in workspaces:
         try:
@@ -129,22 +130,26 @@ def _validate_path_access(file_path: Path | str, base_dir: Path | str | None = N
         p_str = p_str.strip()
         if any(ord(c) < 32 or ord(c) == 127 for c in p_str):
             raise HTTPException(status_code=400, detail="Chemin invalide : caractère de contrôle interdit détecté.")
-        if not p_str or p_str in ("workspace:", "workspace:/", "workspace://", "file:", "file:/", "file://", "file:///", "file:/localhost", "file://localhost", "file://localhost/"):
+        p_check = p_str.replace("\\", "/")
+        if not p_str or p_check in ("workspace:", "workspace:/", "workspace://", "file:", "file:/", "file://", "file:///", "file:/localhost", "file://localhost", "file://localhost/"):
             raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
         if os.name == "posix" and re.match(r'^[a-zA-Z]:[/\\]', p_str):
             raise HTTPException(status_code=400, detail="Chemin de style Windows non valide sur ce système d'exploitation.")
         if p_str.lower().startswith("workspace:"):
-            sub = re.sub(r'^workspace:/*', '', p_str, flags=re.IGNORECASE)
+            sub = re.sub(r'^workspace:[/\\]*', '', p_str, flags=re.IGNORECASE)
             if not sub:
                 raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
             target_file_path = base_root / sub
         elif p_str.lower().startswith("file:"):
-            sub = re.sub(r'^file:(?:/*localhost)?/*', '', p_str, flags=re.IGNORECASE)
+            sub = re.sub(r'^file:(?:[/\\]*localhost)?[/\\]*', '', p_str, flags=re.IGNORECASE)
             if not sub:
                 raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
             if os.name == "posix" and re.match(r'^[a-zA-Z]:[/\\]', sub):
                 raise HTTPException(status_code=400, detail="Chemin de style Windows non valide sur ce système d'exploitation.")
-            if not (len(sub) > 1 and sub[1] == ":"):
+            win_drive_match = re.match(r'^[/\\]*([a-zA-Z]:.*)', sub)
+            if win_drive_match:
+                sub = win_drive_match.group(1)
+            elif not (len(sub) > 1 and sub[1] == ":") and not sub.startswith(("/", "\\")):
                 sub = "/" + sub
             target_file_path = Path(sub)
         else:

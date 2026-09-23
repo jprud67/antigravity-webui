@@ -1,10 +1,8 @@
 import json
 import shutil
 import unittest
-from pathlib import Path
 
 from app.config import BRAIN_DIR
-from app.services.auth import create_access_token
 from app.services.execution_manager import inject_eco_directives, should_warn_error_loop
 from app.services.storage import (
     auto_truncate_transcript,
@@ -111,8 +109,7 @@ class TestAutoTruncateTranscript(unittest.TestCase):
             {"step_index": 3, "source": "SYSTEM", "type": "SYSTEM", "content": "All done in 2.4s"},
         ]
         with open(self.transcript_path, "w", encoding="utf-8") as f:
-            for s in steps:
-                f.write(json.dumps(s) + "\n")
+            f.writelines(json.dumps(s) + "\n" for s in steps)
 
         res = auto_truncate_transcript(self.test_cid, max_lines=40, max_chars=2000)
         self.assertEqual(res["truncated_steps_count"], 1)
@@ -169,8 +166,7 @@ class TestCompactConversationInPlace(unittest.TestCase):
             {"step_index": 10, "type": "PLANNER_RESPONSE", "content": "Answer 4"},
         ]
         with open(self.transcript_path, "w", encoding="utf-8") as f:
-            for s in steps:
-                f.write(json.dumps(s) + "\n")
+            f.writelines(json.dumps(s) + "\n" for s in steps)
 
         # Compact keeping last 2 turns (Turns 3 and 4)
         result = compact_conversation_in_place(self.test_cid, preserve_last_n_turns=2)
@@ -198,8 +194,9 @@ class TestCompactConversationInPlace(unittest.TestCase):
 
 class TestCompactAPI(unittest.TestCase):
     def setUp(self):
-        from app.api.conversations import compact_session, CompactRequest
         from fastapi import HTTPException
+
+        from app.api.conversations import CompactRequest, compact_session
 
         self.compact_session = compact_session
         self.CompactRequest = CompactRequest
@@ -218,8 +215,7 @@ class TestCompactAPI(unittest.TestCase):
             {"step_index": 3, "type": "PLANNER_RESPONSE", "content": "Ready."},
         ]
         with open(self.transcript_path, "w", encoding="utf-8") as f:
-            for s in steps:
-                f.write(json.dumps(s) + "\n")
+            f.writelines(json.dumps(s) + "\n" for s in steps)
 
     def tearDown(self):
         if self.conv_dir.exists():

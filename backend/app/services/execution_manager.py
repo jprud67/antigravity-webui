@@ -10,6 +10,7 @@ from app.platform_utils import (
     terminate_process_group_async,
     terminate_process_group_sync,
 )
+from app.services import google_auth
 from app.services.agy_driver import (
     get_model_families,
     resolve_model_and_effort,
@@ -20,7 +21,12 @@ from app.services.google_auth import (
     is_quota_error,
     switch_to_next_healthy_account,
 )
-from app.services.storage import get_settings, is_safe_conversation_id, save_settings
+from app.services.storage import (
+    auto_truncate_transcript,
+    get_settings,
+    is_safe_conversation_id,
+    save_settings,
+)
 
 logger = logging.getLogger("antigravity.execution")
 
@@ -578,9 +584,10 @@ class ExecutionSession:
 
                     # 2. Si le modèle a déjà été basculé ou si c'est impossible, basculer le compte Google
                     target_check_model = model if model else current_model
-                    new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=target_check_model)
+                    _switch_fn = getattr(google_auth, "switch_to_next_healthy_account", switch_to_next_healthy_account)
+                    new_account = _switch_fn(exclude_email=exclude_email, model=target_check_model)
                     if not new_account and target_check_model != current_model:
-                        new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=current_model)
+                        new_account = _switch_fn(exclude_email=exclude_email, model=current_model)
                         target_check_model = current_model
 
                     if new_account and attempt < max_failover_attempts:
@@ -633,7 +640,6 @@ class ExecutionSession:
                     # Auto-truncate large tool outputs in transcript to safeguard tokens for subsequent turns
                     if self.conversation_id:
                         try:
-                            from app.services.storage import auto_truncate_transcript, get_settings
                             st = get_settings()
                             if st.get("ecoMode", True):
                                 trunc_res = auto_truncate_transcript(self.conversation_id)

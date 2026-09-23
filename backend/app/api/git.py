@@ -104,22 +104,26 @@ def _resolve_relative_git_path(raw_path: str, target: Path) -> str:
     if any(ord(c) < 32 or ord(c) == 127 for c in p_str):
         raise HTTPException(status_code=400, detail="Chemin de fichier invalide : caractère de contrôle interdit détecté.")
 
-    if not p_str or p_str in ("workspace:", "workspace:/", "workspace://", "file:", "file:/", "file://", "file:///"):
+    p_check = p_str.replace("\\", "/")
+    if not p_str or p_check in ("workspace:", "workspace:/", "workspace://", "file:", "file:/", "file://", "file:///", "file:/localhost", "file://localhost", "file://localhost/"):
         raise HTTPException(status_code=400, detail="Chemin de fichier invalide : chemin vide.")
 
     # Normalisation des schémas d'URI file:// ou workspace://
     if p_str.lower().startswith("workspace:"):
-        sub = re.sub(r'^workspace:/*', '', p_str, flags=re.IGNORECASE)
+        sub = re.sub(r'^workspace:[/\\]*', '', p_str, flags=re.IGNORECASE)
         if not sub:
             raise HTTPException(status_code=400, detail="Chemin de fichier invalide : chemin vide.")
         candidate_path = target / sub
     elif p_str.lower().startswith("file:"):
-        sub = re.sub(r'^file:(?:/*localhost)?/*', '', p_str, flags=re.IGNORECASE)
+        sub = re.sub(r'^file:(?:[/\\]*localhost)?[/\\]*', '', p_str, flags=re.IGNORECASE)
         if not sub:
             raise HTTPException(status_code=400, detail="Chemin de fichier invalide : chemin vide.")
         if os.name == "posix" and re.match(r'^[a-zA-Z]:[/\\]', sub):
             raise HTTPException(status_code=400, detail="Chemin de style Windows non valide sur ce système d'exploitation.")
-        if not (len(sub) > 1 and sub[1] == ":") and not sub.startswith("/"):
+        win_drive_match = re.match(r'^[/\\]*([a-zA-Z]:.*)', sub)
+        if win_drive_match:
+            sub = win_drive_match.group(1)
+        elif not (len(sub) > 1 and sub[1] == ":") and not sub.startswith(("/", "\\")):
             sub = "/" + sub
         candidate_path = Path(sub)
     else:

@@ -92,7 +92,11 @@ async def get_agent_status(_: bool = Depends(require_auth)):
 @router.get("/models")
 async def get_agent_models(_: bool = Depends(require_auth)):
     """Retourne les familles de modèles avec tous leurs efforts et variantes."""
-    families = await get_model_families()
+    try:
+        families = await get_model_families()
+    except Exception as e:
+        logger.warning(f"Erreur lors de la récupération des familles de modèles: {e}")
+        families = []
     return {"models": families}
 
 
@@ -315,7 +319,15 @@ async def run_agent_turn(
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Échec de l'agent Antigravity: {err_msg}"
+            detail={
+                "error": {
+                    "code": "agent_execution_failed",
+                    "message": f"Échec de l'agent Antigravity: {err_msg}",
+                    "type": "internal_error",
+                    "source": "/api/v1/agent/run",
+                    "conversation_id": active_cid,
+                }
+            },
         )
 
     return {

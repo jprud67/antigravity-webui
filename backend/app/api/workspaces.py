@@ -61,8 +61,14 @@ def delete_workspace(path: str = Query(...), _ = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Cannot delete default workspace")
     settings = get_settings()
     raw = settings.get("trustedWorkspaces", [])
-    workspaces = list(raw) if isinstance(raw, list) else []
-    workspaces = [w for w in workspaces if str(Path(w).resolve()) != p]
+    raw_list = list(raw) if isinstance(raw, list) else []
+    def _safe_resolve(w_path: str) -> str:
+        try:
+            return str(Path(w_path).resolve())
+        except Exception:
+            return str(w_path)
+
+    workspaces = [w for w in raw_list if _safe_resolve(w) != p]
     if DEFAULT_WORKSPACE not in workspaces:
         workspaces.insert(0, DEFAULT_WORKSPACE)
     settings["trustedWorkspaces"] = workspaces

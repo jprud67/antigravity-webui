@@ -30,6 +30,7 @@ from app.platform_utils import (
     terminate_process_group_async,
     terminate_process_group_sync,
 )
+from app.services import google_auth
 from app.services.agy_driver import get_model_families, resolve_model_and_effort
 from app.services.cron_store import (
     CRON_DIR,
@@ -392,9 +393,10 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
 
             # 2. Si le modèle a déjà été basculé ou si c'est impossible, basculer le compte Google
             target_check_model = initial_target_model or model
-            new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=target_check_model)
+            _switch_fn = getattr(google_auth, "switch_to_next_healthy_account", switch_to_next_healthy_account)
+            new_account = _switch_fn(exclude_email=exclude_email, model=target_check_model)
             if not new_account and target_check_model != model:
-                new_account = switch_to_next_healthy_account(exclude_email=exclude_email, model=model)
+                new_account = _switch_fn(exclude_email=exclude_email, model=model)
                 target_check_model = model
 
             if new_account and attempts < MAX_TASK_FAILOVER:

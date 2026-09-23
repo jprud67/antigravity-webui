@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import sqlite3
+import sys
 import threading
 import time
 import uuid
@@ -1488,8 +1489,18 @@ def _safe_rmtree(dir_path: Path, root_boundary: Path) -> None:
         resolved = dir_path.resolve()
         root_resolved = root_boundary.resolve()
         if resolved.exists() and resolved.is_relative_to(root_resolved) and resolved != root_resolved:
+            def _remove_readonly(func, path, exc_info=None):
+                try:
+                    os.chmod(path, 0o777)
+                    func(path)
+                except Exception:
+                    pass
+
             try:
-                shutil.rmtree(resolved, ignore_errors=False)
+                if sys.version_info >= (3, 12):
+                    shutil.rmtree(resolved, on_exc=_remove_readonly)
+                else:
+                    shutil.rmtree(resolved, onerror=_remove_readonly)
             except Exception as e:
                 logger.debug(f"Direct rmtree failed for {resolved} ({e}), retrying with ignore_errors")
                 shutil.rmtree(resolved, ignore_errors=True)

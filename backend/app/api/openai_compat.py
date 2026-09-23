@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import time
 import uuid
 from collections.abc import AsyncGenerator
@@ -26,8 +27,22 @@ def _is_quota_error(msg: str) -> bool:
     """Détecte si un message d'erreur correspond à une erreur de quota Google Cloud."""
     return is_quota_error(msg)
 
+_DATA_URI_IMAGE_RE = re.compile(r"data:(image/[a-zA-Z0-9\.\+-]+);base64,([A-Za-z0-9+/=]{100,})")
+
+
+def _summarize_data_uris(text: str) -> str:
+    """Remplace les volumineuses URLs data:image/...;base64,... par un marqueur compact."""
+    def _repl(m: re.Match) -> str:
+        mime = m.group(1)
+        raw_b64_len = len(m.group(2))
+        est_bytes = (raw_b64_len * 3) // 4
+        return f"[Image attachment: {mime}, ~{est_bytes} bytes]"
+
+    return _DATA_URI_IMAGE_RE.sub(_repl, text)
+
+
 def _raise_http_for_error(msg: str, context: str = "", is_quota: bool = False) -> None:
-    """Lève l'HTTPException appropriée selon le type d'erreur CLI."""
+    """Lève l'HTTPException appropriée selon le type d'erreur CLI au format standard OpenAI."""
     if is_quota or _is_quota_error(msg):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -36,14 +51,23 @@ def _raise_http_for_error(msg: str, context: str = "", is_quota: bool = False) -
                     "code": "rate_limit_exceeded",
                     "message": "Quota Google Cloud épuisé. Antigravity bascule automatiquement entre les comptes disponibles. Réessayez dans quelques instants.",
                     "type": "quota_exceeded",
-                    "source": context or "antigravity_cli"
+                    "param": None,
+                    "source": context or "antigravity_cli",
                 }
             },
-            headers={"Retry-After": "60"}
+            headers={"Retry-After": "60"},
         )
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=f"Erreur d'exécution Antigravity: {msg}"
+        detail={
+            "error": {
+                "code": "antigravity_execution_error",
+                "message": f"Erreur d'exécution Antigravity: {msg}",
+                "type": "api_error",
+                "param": None,
+                "source": context or "antigravity_cli",
+            }
+        },
     )
 
 
@@ -61,45 +85,67 @@ class ChatMessage(BaseModel):
 
 
 def _extract_message_content(content: Any) -> str:
-    """Extrait le texte d'un message qu'il soit sous forme de chaîne, de dictionnaire ou de liste de blocs (multi-part)."""
+    """Extrait le texte d'un message qu'il soit sous forme de chaîne, de dictionnaire ou de liste de blocs (multi-part / vision)."""
     if isinstance(content, str):
-        return content
+        return _summarize_data_uris(content)
     if isinstance(content, dict):
         text = content.get("text")
         if isinstance(text, str):
-            return text
+            return _summarize_data_uris(text)
         inner = content.get("content")
         if isinstance(inner, str):
-            return inner
+            return _summarize_data_uris(inner)
         val = content.get("value")
         if isinstance(val, str):
-            return val
+            return _summarize_data_uris(val)
         if text is not None:
-            return str(text)
+            return _summarize_data_uris(str(text))
         if inner is not None:
-            return str(inner)
+            return _summarize_data_uris(str(inner))
         if val is not None:
-            return str(val)
+            return _summarize_data_uris(str(val))
         return ""
     if isinstance(content, list):
         parts: list[str] = []
         for part in content:
             if isinstance(part, str):
-                parts.append(part)
+                parts.append(_summarize_data_uris(part))
             elif isinstance(part, dict):
+                part_type = str(part.get("type") or "").strip().lower()
                 text = part.get("text")
                 if isinstance(text, str):
-                    parts.append(text)
+                    parts.append(_summarize_data_uris(text))
+                elif part_type == "text" and "text" in part:
+                    parts.append(_summarize_data_uris(str(part.get("text", ""))))
+                elif part_type in ("image_url", "image") or "image_url" in part:
+                    img_val = part.get("image_url") or part.get("image")
+                    url = ""
+                    if isinstance(img_val, dict):
+                        url = str(img_val.get("url") or "")
+                    elif isinstance(img_val, str):
+                        url = img_val
+                    if url.startswith("data:"):
+                        mime_match = re.match(r"^data:([^;]+);base64,", url)
+                        mime = mime_match.group(1) if mime_match else "image"
+                        b64_len = len(url) - (mime_match.end() if mime_match else 5)
+                        est_bytes = max(0, (b64_len * 3) // 4)
+                        parts.append(f"[Image attachment: {mime}, ~{est_bytes} bytes]")
+                    elif url:
+                        parts.append(f"[Image attachment: {url}]")
+                    else:
+                        parts.append("[Image attachment]")
+                elif part_type == "input_audio":
+                    parts.append("[Audio attachment]")
                 elif "content" in part and isinstance(part.get("content"), str):
-                    parts.append(str(part.get("content")))
+                    parts.append(_summarize_data_uris(str(part.get("content"))))
                 elif "value" in part and isinstance(part.get("value"), str):
-                    parts.append(str(part.get("value")))
+                    parts.append(_summarize_data_uris(str(part.get("value"))))
                 elif part.get("type") == "text" and "text" in part:
-                    parts.append(str(part.get("text", "")))
+                    parts.append(_summarize_data_uris(str(part.get("text", ""))))
         return "\n".join(parts)
     if content is None:
         return ""
-    return str(content)
+    return _summarize_data_uris(str(content))
 
 
 class ChatCompletionRequest(BaseModel):
@@ -293,7 +339,14 @@ async def create_chat_completion(
     if not prompt:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le message utilisateur ou l'historique ne peut pas être vide."
+            detail={
+                "error": {
+                    "code": "empty_prompt",
+                    "message": "Le message utilisateur ou l'historique ne peut pas être vide.",
+                    "type": "invalid_request_error",
+                    "param": "messages",
+                }
+            },
         )
 
     completion_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
@@ -462,7 +515,7 @@ async def create_chat_completion(
                     "usage": usage_info
                 }
                 yield f"data: {json.dumps(final_chunk, ensure_ascii=False)}\n\n"
-            yield "data: [DONE]\n\n"
+                yield "data: [DONE]\n\n"
 
         return StreamingResponse(
             sse_generator(),
@@ -580,13 +633,17 @@ async def _tool_mode_response(req: ChatCompletionRequest, tool_list_or_outcome: 
     if isinstance(tool_list_or_outcome, dict) and "kind" in tool_list_or_outcome:
         outcome = tool_list_or_outcome
     else:
-        outcome = await tool_bridge.run_turn(
-            messages=[message.model_dump() for message in req.messages],
-            tools=tool_list_or_outcome if isinstance(tool_list_or_outcome, list) else [],
-            tool_choice=req.tool_choice,
-            model=req.model,
-            effort=req.effort,
-        )
+        try:
+            outcome = await tool_bridge.run_turn(
+                messages=[message.model_dump() for message in req.messages],
+                tools=tool_list_or_outcome if isinstance(tool_list_or_outcome, list) else [],
+                tool_choice=req.tool_choice,
+                model=req.model,
+                effort=req.effort,
+            )
+        except Exception as bridge_err:
+            logger.error(f"Erreur du pont tool calling: {bridge_err}")
+            _raise_http_for_error(str(bridge_err), context="/v1/chat/completions (tool bridge)")
 
     if outcome.get("kind") == "error":
         _raise_http_for_error(

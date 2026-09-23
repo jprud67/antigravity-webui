@@ -22,3 +22,5 @@ def get_artifact_detail(conversation_id: str, filename: str, _ = Depends(require
         raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur de lecture de l'artefact: {e}")

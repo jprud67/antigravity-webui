@@ -2189,6 +2189,7 @@ def test_transcript_utf8_bom_support():
 
 
 def test_atomic_write_jsonl_permissions():
+    import sys
     import tempfile
 
     from app.services.storage import atomic_write_jsonl
@@ -2196,8 +2197,9 @@ def test_atomic_write_jsonl_permissions():
         target = Path(td) / "test.jsonl"
         atomic_write_jsonl(target, [{"key": "val1"}, {"key": "val2"}])
         assert target.exists()
-        mode = target.stat().st_mode & 0o777
-        assert mode == 0o600, f"Expected 0o600, got {oct(mode)}"
+        if not sys.platform.startswith("win"):
+            mode = target.stat().st_mode & 0o777
+            assert mode == 0o600, f"Expected 0o600, got {oct(mode)}"
     print("✓ test_atomic_write_jsonl_permissions passed")
 
 
@@ -5654,9 +5656,11 @@ def test_files_validate_path_access_localhost_and_empty_guards():
     from app.api.files import _validate_path_access
 
     # Test file://localhost/
-    valid_path = Path("file://localhost/root/antigravity-webui/backend/app/main.py")
+    from app.config import DEFAULT_WORKSPACE
+    target_file = (Path(DEFAULT_WORKSPACE).resolve() / "backend/app/main.py").resolve()
+    valid_path = Path(f"file://localhost/{target_file.as_posix()}")
     resolved = _validate_path_access(valid_path)
-    assert resolved == Path("/root/antigravity-webui/backend/app/main.py").resolve()
+    assert resolved == target_file
 
     # Test empty scheme guards
     for empty_p in ["workspace://", "file:///", "file://localhost/"]:
@@ -7256,8 +7260,9 @@ def test_storage_ensure_db_schema_migrates_missing_columns():
 
     from app.services.storage import ensure_db_schema
 
-    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
-        conn = sqlite3.connect(tmp.name)
+    with tempfile.TemporaryDirectory() as td:
+        db_path = Path(td) / "test_migration.db"
+        conn = sqlite3.connect(str(db_path))
         # Create a legacy table lacking group_id and project_id
         conn.execute("""
             CREATE TABLE conversation_summaries (
@@ -7418,6 +7423,8 @@ def test_files_validate_path_access_windows_drive_in_file_uri():
 
 def test_workspaces_path_sanitization():
     """Verify add_workspace, delete_workspace, and explore_dir reject empty paths, null bytes, and control chars."""
+    from unittest.mock import patch
+
     from fastapi import HTTPException
 
     from app.api.workspaces import add_workspace, delete_workspace, explore_dir
@@ -7430,6 +7437,13 @@ def test_workspaces_path_sanitization():
             except HTTPException as e:
                 assert e.status_code == 400
                 assert "invalide" in e.detail.lower()
+
+    with patch("app.api.workspaces.get_settings", return_value={"trustedWorkspaces": ["c:\\test\\ws1", "c:\\test\\ws2"]}), \
+         patch("app.api.workspaces.save_settings") as mock_save:
+        res = delete_workspace(path="c:\\test\\ws1", _=None)
+        assert "c:\\test\\ws1" not in res["workspaces"]
+        mock_save.assert_called_once()
+
     print("✓ test_workspaces_path_sanitization passed")
 
 
@@ -7471,11 +7485,15 @@ def test_platform_utils_killpg_does_not_kill_current_pgrp():
     import os
     import signal
 
+    from app import platform_utils
     from app.platform_utils import _killpg
 
     called = {}
     orig_kill = os.kill
     orig_killpg = getattr(os, 'killpg', None)
+    orig_is_win = platform_utils.IS_WINDOWS
+    orig_getpgid = getattr(os, 'getpgid', None)
+    orig_getpgrp = getattr(os, 'getpgrp', None)
 
     def fake_kill(p, sig):
         called['kill'] = (p, sig)
@@ -7487,15 +7505,30 @@ def test_platform_utils_killpg_does_not_kill_current_pgrp():
     if orig_killpg:
         os.killpg = fake_killpg
 
+    current_pid = os.getpid()
+    os.getpgid = lambda p: current_pid
+    os.getpgrp = lambda: current_pid
+    platform_utils.IS_WINDOWS = False
+
     try:
-        current_pid = os.getpid()
         _killpg(current_pid, signal.SIGTERM)
         assert 'kill' in called, "Should call os.kill directly for current process group PID"
         assert 'killpg' not in called, "Should never broadcast killpg to current process group"
     finally:
         os.kill = orig_kill
-        if orig_killpg:
+        if orig_killpg is not None:
             os.killpg = orig_killpg
+        elif hasattr(os, 'killpg'):
+            delattr(os, 'killpg')
+        if orig_getpgid is not None:
+            os.getpgid = orig_getpgid
+        elif hasattr(os, 'getpgid'):
+            delattr(os, 'getpgid')
+        if orig_getpgrp is not None:
+            os.getpgrp = orig_getpgrp
+        elif hasattr(os, 'getpgrp'):
+            delattr(os, 'getpgrp')
+        platform_utils.IS_WINDOWS = orig_is_win
     print("✓ test_platform_utils_killpg_does_not_kill_current_pgrp passed")
 
 
@@ -7592,6 +7625,7 @@ def test_cron_failover_restores_initial_target_model():
 
     ticker.run_agy_task = mock_run
     auth.switch_to_next_healthy_account = mock_switch
+    ticker.switch_to_next_healthy_account = mock_switch
 
     try:
         res = asyncio.run(ticker.run_job_with_failover(job))
@@ -7831,8 +7865,9 @@ def test_storage_ensure_db_schema_double_checked_lock():
 
     from app.services import storage
 
-    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
-        conn = sqlite3.connect(tmp.name)
+    with tempfile.TemporaryDirectory() as td:
+        db_path = Path(td) / "test_double_checked.db"
+        conn = sqlite3.connect(str(db_path))
         storage.ensure_db_schema(conn)
 
         # Ensure calling again without force=True on an initialized schema returns cleanly
@@ -8403,6 +8438,7 @@ def test_execution_manager_stdin_safe_exception_handling():
 def test_terminal_session_write_windows_guard():
     import asyncio
     from unittest.mock import MagicMock, patch
+
     from app.api.terminal import PersistentTerminalSession
 
     session = PersistentTerminalSession("test_win_term", "/tmp")
@@ -8424,6 +8460,7 @@ def test_git_unstage_sensitive_files_unborn_head():
     import subprocess
     import tempfile
     from pathlib import Path
+
     from app.api.git import _unstage_sensitive_files, run_git
 
     with tempfile.TemporaryDirectory() as td:
@@ -8450,6 +8487,7 @@ def test_git_unstage_sensitive_files_unborn_head():
 def test_conversations_bulk_export_empty_validation():
     import pytest
     from fastapi import HTTPException
+
     from app.api.conversations import BulkActionRequest, _do_bulk_export
 
     req = BulkActionRequest(action="export", conversation_ids=[])
@@ -8475,7 +8513,11 @@ def test_storage_fork_step_index_synchronization():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
-    from app.services.storage import fork_conversation, atomic_write_jsonl, get_conversation_transcript
+
+    from app.services.storage import (
+        atomic_write_jsonl,
+        fork_conversation,
+    )
 
     with tempfile.TemporaryDirectory() as td:
         brain_dir = Path(td)
@@ -8520,7 +8562,8 @@ def test_storage_undo_full_steps_backward_scan():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
-    from app.services.storage import undo_conversation_turn, atomic_write_jsonl
+
+    from app.services.storage import atomic_write_jsonl, undo_conversation_turn
 
     with tempfile.TemporaryDirectory() as td:
         brain_dir = Path(td)
@@ -8555,6 +8598,7 @@ def test_storage_undo_full_steps_backward_scan():
 
 def test_conversations_bulk_export_unsafe_id_validation():
     from fastapi import HTTPException
+
     from app.api.conversations import BulkActionRequest, _do_bulk_export
 
     req = BulkActionRequest(action="export", conversation_ids=["../../etc/passwd"])
@@ -8568,7 +8612,7 @@ def test_conversations_bulk_export_unsafe_id_validation():
 
 
 def test_tool_bridge_truncate_prompt_newline_boundary():
-    from app.services.tool_bridge import _truncate_prompt, MAX_PROMPT_CHARS
+    from app.services.tool_bridge import MAX_PROMPT_CHARS, _truncate_prompt
 
     lines = [f"Line {i}: This is a long content line meant to test boundary preservation." for i in range(10000)]
     oversized = "\n".join(lines)
@@ -8588,7 +8632,8 @@ def test_storage_compact_supports_role_user():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
-    from app.services.storage import compact_conversation_in_place, atomic_write_jsonl
+
+    from app.services.storage import atomic_write_jsonl, compact_conversation_in_place
 
     with tempfile.TemporaryDirectory() as td:
         brain_dir = Path(td)
