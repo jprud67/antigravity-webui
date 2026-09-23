@@ -1,4 +1,5 @@
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState, useContext, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Prism from 'prismjs';
 
 // Load Prism Language Grammars
@@ -50,12 +51,15 @@ import {
   GitBranch,
   BrainCircuit,
   ExternalLink,
-  Play
+  Play,
+  Search,
+  X
 } from 'lucide-react';
 import { DiffViewer } from './DiffViewer';
 import { PreContext, copyText, extractRawText } from '../utils/codeBlockUtils';
 import { triggerFileDownload } from '../services/api';
 import { useI18n } from '../services/i18n';
+import { showToast } from '../services/toast';
 
 const MermaidRenderer = React.lazy(() =>
   import('./MermaidRenderer').then((m) => ({ default: m.MermaidRenderer }))
@@ -366,6 +370,50 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
   const [showLineNumbers, setShowLineNumbers] = useState<boolean>(linesCount > 3);
   const [wrapLines, setWrapLines] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(linesCount <= 28);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [codeSearch, setCodeSearch] = useState<string>('');
+
+  // Close fullscreen on Escape key
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+
+  // Direct execution lens command for supported languages (bash, python, node)
+  const runnableCommand = useMemo(() => {
+    const trimmed = cleanedCode.trim();
+    if (!trimmed) return null;
+    if (['bash', 'sh', 'shell', 'zsh'].includes(language)) {
+      return trimmed;
+    }
+    if (['python', 'py'].includes(language)) {
+      const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+      return `python -c "${escaped}"`;
+    }
+    if (['javascript', 'js', 'node'].includes(language)) {
+      const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+      return `node -e "${escaped}"`;
+    }
+    return null;
+  }, [cleanedCode, language]);
+
+  // Intra-code search matching line indexes
+  const matchingLineIndices = useMemo(() => {
+    if (!codeSearch.trim()) return new Set<number>();
+    const query = codeSearch.toLowerCase();
+    const rawLines = cleanedCode.split('\n');
+    const matches = new Set<number>();
+    rawLines.forEach((l, idx) => {
+      if (l.toLowerCase().includes(query)) matches.add(idx);
+    });
+    return matches;
+  }, [cleanedCode, codeSearch]);
 
   // Generate syntax highlighted lines safely (called unconditionally)
   const formattedLines = useMemo(() => {
@@ -417,146 +465,167 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
     triggerFileDownload(blob, name);
   };
 
+  const handleExecute = () => {
+    if (!runnableCommand) return;
+    window.dispatchEvent(new CustomEvent('terminal-run-command', { detail: { command: runnableCommand } }));
+    if (onOpenTerminal) onOpenTerminal();
+    showToast(t('code_sent_to_terminal', 'Code envoyé au terminal'), 'success');
+  };
+
   const LangIcon = langMeta.icon;
   const isBash = language === 'bash';
   const hasCollapseFeature = linesCount > 28;
 
   return (
-    <div
-      className="relative my-4 rounded-2xl border font-mono text-[12px] shadow-sm transition-all overflow-hidden group/code"
-      style={{
-        backgroundColor: 'var(--code-bg)',
-        borderColor: 'var(--border)',
-      }}
-    >
-      {/* Code Header Bar */}
+    <>
       <div
-        className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-b text-xs select-none"
+        className="relative my-4 rounded-2xl border font-mono text-[12px] shadow-sm transition-all overflow-hidden group/code"
         style={{
-          backgroundColor: 'var(--surface-subtle)',
+          backgroundColor: 'var(--code-bg)',
           borderColor: 'var(--border)',
-          color: 'var(--muted)',
         }}
       >
-        {/* Left Side: Window dots, Language Badge, File Pill, Stats */}
-        <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-          <div className="flex items-center gap-1.5 opacity-70 shrink-0">
-            <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-          </div>
+        {/* Code Header Bar */}
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-b text-xs select-none"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)',
+            color: 'var(--muted)',
+          }}
+        >
+          {/* Left Side: Window dots, Language Badge, File Pill, Stats */}
+          <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+            <div className="flex items-center gap-1.5 opacity-70 shrink-0">
+              <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+            </div>
 
-          {/* Language badge */}
-          <div className="flex items-center gap-1.5 pl-1 shrink-0">
-            <LangIcon className="w-3.5 h-3.5" style={{ color: langMeta.color }} />
-            <span
-              className="text-[11px] font-semibold tracking-wider uppercase font-mono"
-              style={{ color: langMeta.color }}
-            >
-              {langMeta.label}
+            {/* Language badge */}
+            <div className="flex items-center gap-1.5 pl-1 shrink-0">
+              <LangIcon className="w-3.5 h-3.5" style={{ color: langMeta.color }} />
+              <span
+                className="text-[11px] font-semibold tracking-wider uppercase font-mono"
+                style={{ color: langMeta.color }}
+              >
+                {langMeta.label}
+              </span>
+            </div>
+
+            {/* Optional detected filename */}
+            {filename && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('open-workspace-file', { detail: { path: filename } }));
+                  onOpenFile?.(filename);
+                }}
+                title={t('open_file_name', 'Open {0}').replace('{0}', filename)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono border transition-colors truncate max-w-[240px] cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text)',
+                }}
+              >
+                <FileCode className="w-3 h-3 text-accent shrink-0" />
+                <span className="truncate">{filename}</span>
+                <ExternalLink className="w-2.5 h-2.5 opacity-50 shrink-0 ml-0.5" />
+              </button>
+            )}
+
+            {/* Line count & size */}
+            <span className="text-[10.5px] opacity-60 font-mono shrink-0 hidden sm:inline">
+              ({t('lines_count', '{0} lines').replace('{0}', String(linesCount))} • {formatBytes(cleanedCode.length)})
             </span>
           </div>
 
-          {/* Optional detected filename */}
-          {filename && (
+          {/* Right Side: Adaptive Studio Controls */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Direct Execute Lens (Bash, Python, Node) */}
+            {runnableCommand && (
+              <button
+                type="button"
+                onClick={handleExecute}
+                title={t('code_lens_run', 'Exécuter dans le terminal ({0})').replace('{0}', langMeta.label)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 shadow-xs"
+              >
+                <Play className="w-3 h-3 fill-current" />
+                <span>{t('run', 'Exécuter')}</span>
+              </button>
+            )}
+
+            {/* Terminal button for bash snippets */}
+            {isBash && onOpenTerminal && (
+              <button
+                type="button"
+                onClick={onOpenTerminal}
+                title={t('open_terminal', 'Open interactive terminal')}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer border hover:text-emerald-400"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--muted)',
+                }}
+              >
+                <Terminal className="w-3 h-3 text-emerald-400" />
+                <span className="hidden md:inline">{t('terminal', 'Terminal')}</span>
+              </button>
+            )}
+
+            {/* Line numbers toggle */}
             <button
               type="button"
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent('open-workspace-file', { detail: { path: filename } }));
-                onOpenFile?.(filename);
-              }}
-              title={t('open_file_name', 'Open {0}').replace('{0}', filename)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono border transition-colors truncate max-w-[240px] cursor-pointer"
+              onClick={() => setShowLineNumbers(!showLineNumbers)}
+              title={showLineNumbers ? t('hide_line_numbers', 'Hide line numbers') : t('show_line_numbers', 'Show line numbers')}
+              className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
               style={{
-                backgroundColor: 'var(--surface)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)',
+                backgroundColor: showLineNumbers ? 'var(--surface-subtle-hover)' : 'var(--surface)',
+                borderColor: showLineNumbers ? 'var(--accent)' : 'var(--border)',
+                color: showLineNumbers ? 'var(--accent)' : 'var(--muted)',
               }}
             >
-              <FileCode className="w-3 h-3 text-accent shrink-0" />
-              <span className="truncate">{filename}</span>
-              <ExternalLink className="w-2.5 h-2.5 opacity-50 shrink-0 ml-0.5" />
+              <Hash className="w-3 h-3" />
             </button>
-          )}
 
-          {/* Line count & size */}
-          <span className="text-[10.5px] opacity-60 font-mono shrink-0 hidden sm:inline">
-            ({t('lines_count', '{0} lines').replace('{0}', String(linesCount))} • {formatBytes(cleanedCode.length)})
-          </span>
-        </div>
-
-        {/* Right Side: Adaptive Studio Controls */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* Direct Execute Lens for shell/bash snippets */}
-          {isBash && (
+            {/* Word-wrap toggle */}
             <button
               type="button"
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent('terminal-run-command', { detail: { command: cleanedCode } }));
-                if (onOpenTerminal) onOpenTerminal();
-              }}
-              title={t('code_lens_run_terminal', 'Exécuter dans le terminal')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 shadow-xs"
-            >
-              <Play className="w-3 h-3 fill-current" />
-              <span>{t('run', 'Exécuter')}</span>
-            </button>
-          )}
-
-          {/* Terminal button for bash snippets */}
-          {isBash && onOpenTerminal && (
-            <button
-              type="button"
-              onClick={onOpenTerminal}
-              title={t('open_terminal', 'Open interactive terminal')}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer border hover:text-emerald-400"
+              onClick={() => setWrapLines(!wrapLines)}
+              title={wrapLines ? t('disable_line_wrap', 'Disable line wrap') : t('enable_line_wrap', 'Enable line wrap')}
+              className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
               style={{
-                backgroundColor: 'var(--surface)',
-                borderColor: 'var(--border)',
-                color: 'var(--muted)',
+                backgroundColor: wrapLines ? 'var(--surface-subtle-hover)' : 'var(--surface)',
+                borderColor: wrapLines ? 'var(--accent)' : 'var(--border)',
+                color: wrapLines ? 'var(--accent)' : 'var(--muted)',
               }}
             >
-              <Terminal className="w-3 h-3 text-emerald-400" />
-              <span className="hidden md:inline">{t('terminal', 'Terminal')}</span>
+              {wrapLines ? <WrapText className="w-3 h-3" /> : <AlignLeft className="w-3 h-3" />}
             </button>
-          )}
 
-          {/* Line numbers toggle */}
-          <button
-            type="button"
-            onClick={() => setShowLineNumbers(!showLineNumbers)}
-            title={showLineNumbers ? t('hide_line_numbers', 'Hide line numbers') : t('show_line_numbers', 'Show line numbers')}
-            className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
-            style={{
-              backgroundColor: showLineNumbers ? 'var(--surface-subtle-hover)' : 'var(--surface)',
-              borderColor: showLineNumbers ? 'var(--accent)' : 'var(--border)',
-              color: showLineNumbers ? 'var(--accent)' : 'var(--muted)',
-            }}
-          >
-            <Hash className="w-3 h-3" />
-          </button>
+            {/* Expand/Collapse toggle for large files */}
+            {hasCollapseFeature && (
+              <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                title={isExpanded ? t('collapse_code_view', 'Collapse code view') : t('expand_code_view', 'Expand full code')}
+                className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--muted)',
+                }}
+              >
+                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+            )}
 
-          {/* Word-wrap toggle */}
-          <button
-            type="button"
-            onClick={() => setWrapLines(!wrapLines)}
-            title={wrapLines ? t('disable_line_wrap', 'Disable line wrap') : t('enable_line_wrap', 'Enable line wrap')}
-            className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
-            style={{
-              backgroundColor: wrapLines ? 'var(--surface-subtle-hover)' : 'var(--surface)',
-              borderColor: wrapLines ? 'var(--accent)' : 'var(--border)',
-              color: wrapLines ? 'var(--accent)' : 'var(--muted)',
-            }}
-          >
-            {wrapLines ? <WrapText className="w-3 h-3" /> : <AlignLeft className="w-3 h-3" />}
-          </button>
-
-          {/* Expand/Collapse toggle for large files */}
-          {hasCollapseFeature && (
+            {/* Immersive Fullscreen Mode */}
             <button
               type="button"
-              onClick={() => setIsExpanded(!isExpanded)}
-              title={isExpanded ? t('collapse_code_view', 'Collapse code view') : t('expand_code_view', 'Expand full code')}
+              onClick={() => setIsFullscreen(true)}
+              title={t('fullscreen_code_reader', 'Mode lecture plein écran')}
               className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
               style={{
                 backgroundColor: 'var(--surface)',
@@ -564,126 +633,378 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
                 color: 'var(--muted)',
               }}
             >
-              {isExpanded ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+              <Maximize2 className="w-3 h-3" />
             </button>
-          )}
 
-          {/* Download snippet */}
-          <button
-            type="button"
-            onClick={handleDownload}
-            title={t('download_snippet', 'Download code snippet')}
-            className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
-            style={{
-              backgroundColor: 'var(--surface)',
-              borderColor: 'var(--border)',
-              color: 'var(--muted)',
-            }}
-          >
-            <Download className="w-3 h-3" />
-          </button>
+            {/* Download snippet */}
+            <button
+              type="button"
+              onClick={handleDownload}
+              title={t('download_snippet', 'Download code snippet')}
+              className="p-1.5 rounded-lg text-[11px] transition-all cursor-pointer border"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border)',
+                color: 'var(--muted)',
+              }}
+            >
+              <Download className="w-3 h-3" />
+            </button>
 
-          {/* Copy button */}
-          <button
-            type="button"
-            onClick={handleCopy}
-            title={t('copy_full_code', 'Copy full code')}
-            className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer border ml-1 shadow-2xs"
-            style={{
-              backgroundColor: copied ? 'rgba(16, 185, 129, 0.1)' : 'var(--surface)',
-              borderColor: copied ? '#10B981' : 'var(--border)',
-              color: copied ? '#10B981' : 'var(--muted)',
-            }}
-          >
-            {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-            <span className="font-sans font-medium">{copied ? t('copied', 'Copied!') : t('copy', 'Copy')}</span>
-          </button>
+            {/* Copy button */}
+            <button
+              type="button"
+              onClick={handleCopy}
+              title={t('copy_full_code', 'Copy full code')}
+              className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer border ml-1 shadow-2xs"
+              style={{
+                backgroundColor: copied ? 'rgba(16, 185, 129, 0.1)' : 'var(--surface)',
+                borderColor: copied ? '#10B981' : 'var(--border)',
+                color: copied ? '#10B981' : 'var(--muted)',
+              }}
+            >
+              {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+              <span className="font-sans font-medium">{copied ? t('copied', 'Copied!') : t('copy', 'Copy')}</span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Code Body Area with synchronized line numbers and responsive wrapping */}
-      <div
-        className={`relative overflow-x-auto scrollbar-thin transition-all ${
-          !isExpanded && hasCollapseFeature ? 'max-h-[440px] overflow-y-auto' : 'max-h-none'
-        }`}
-      >
+        {/* Code Body Area with synchronized line numbers and responsive wrapping */}
         <div
-          className={`table w-full font-mono text-[12px] leading-relaxed py-2.5 select-text ${
-            wrapLines ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'
+          className={`relative overflow-x-auto scrollbar-thin transition-all ${
+            !isExpanded && hasCollapseFeature ? 'max-h-[440px] overflow-y-auto' : 'max-h-none'
           }`}
-          style={{ color: 'var(--code-text)' }}
         >
-          {formattedLines.map((lineHtml, idx) => (
-            <div key={idx} className="table-row hover:bg-white/[0.02] group/row">
-              {/* Synchronized Gutter Line Number */}
-              {showLineNumbers && (
-                <div
-                  className="table-cell select-none text-right pr-3.5 pl-3 py-[1px] text-[11px] font-mono border-r align-top shrink-0 w-[44px]"
-                  style={{
-                    borderColor: 'var(--border-subtle)',
-                    color: 'var(--muted)',
-                    opacity: 0.5,
-                    fontVariantNumeric: 'tabular-nums',
-                  }}
-                >
-                  {isBash && linesCount === 1 ? '$' : idx + 1}
-                </div>
-              )}
+          <div
+            className={`table w-full font-mono text-[12px] leading-relaxed py-2.5 select-text ${
+              wrapLines ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'
+            }`}
+            style={{ color: 'var(--code-text)' }}
+          >
+            {formattedLines.map((lineHtml, idx) => (
+              <div key={idx} className="table-row hover:bg-white/[0.02] group/row">
+                {/* Synchronized Gutter Line Number */}
+                {showLineNumbers && (
+                  <div
+                    className="table-cell select-none text-right pr-3.5 pl-3 py-[1px] text-[11px] font-mono border-r align-top shrink-0 w-[44px]"
+                    style={{
+                      borderColor: 'var(--border-subtle)',
+                      color: 'var(--muted)',
+                      opacity: 0.5,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {isBash && linesCount === 1 ? '$' : idx + 1}
+                  </div>
+                )}
 
-              {/* Code Line Content */}
-              <div
-                className="table-cell pl-4 pr-4 py-[1px] align-top select-text"
-                dangerouslySetInnerHTML={{ __html: lineHtml || '&nbsp;' }}
-              />
+                {/* Code Line Content */}
+                <div
+                  className="table-cell pl-4 pr-4 py-[1px] align-top select-text"
+                  dangerouslySetInnerHTML={{ __html: lineHtml || '&nbsp;' }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Gradient fade overlay and expansion button when capped */}
+          {!isExpanded && hasCollapseFeature && (
+            <div
+              className="sticky bottom-0 inset-x-0 pt-10 pb-3 flex items-center justify-center pointer-events-none"
+              style={{
+                background: 'linear-gradient(to bottom, transparent, var(--code-bg) 80%)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setIsExpanded(true)}
+                className="pointer-events-auto flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-medium border shadow-md transition-all cursor-pointer hover:scale-105"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--accent)',
+                  color: 'var(--accent)',
+                }}
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+                <span>{t('show_remaining_lines', 'Show {0} remaining lines').replace('{0}', String(linesCount - 28))}</span>
+              </button>
             </div>
-          ))}
+          )}
         </div>
 
-        {/* Gradient fade overlay and expansion button when capped */}
-        {!isExpanded && hasCollapseFeature && (
+        {/* Expanded footer collapse bar */}
+        {isExpanded && hasCollapseFeature && (
           <div
-            className="sticky bottom-0 inset-x-0 pt-10 pb-3 flex items-center justify-center pointer-events-none"
+            className="flex items-center justify-center py-2 border-t text-[11px] font-medium select-none"
             style={{
-              background: 'linear-gradient(to bottom, transparent, var(--code-bg) 80%)',
+              backgroundColor: 'var(--surface-subtle)',
+              borderColor: 'var(--border)',
             }}
           >
             <button
               type="button"
-              onClick={() => setIsExpanded(true)}
-              className="pointer-events-auto flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-medium border shadow-md transition-all cursor-pointer hover:scale-105"
-              style={{
-                backgroundColor: 'var(--surface)',
-                borderColor: 'var(--accent)',
-                color: 'var(--accent)',
-              }}
+              onClick={() => setIsExpanded(false)}
+              className="flex items-center gap-1.5 text-muted hover:text-accent cursor-pointer transition-colors"
             >
-              <ChevronDown className="w-3.5 h-3.5" />
-              <span>{t('show_remaining_lines', 'Show {0} remaining lines').replace('{0}', String(linesCount - 28))}</span>
+              <ChevronUp className="w-3.5 h-3.5" />
+              <span>{t('collapse_code_view', 'Collapse code view')}</span>
             </button>
           </div>
         )}
       </div>
 
-      {/* Expanded footer collapse bar */}
-      {isExpanded && hasCollapseFeature && (
-        <div
-          className="flex items-center justify-center py-2 border-t text-[11px] font-medium select-none"
-          style={{
-            backgroundColor: 'var(--surface-subtle)',
-            borderColor: 'var(--border)',
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setIsExpanded(false)}
-            className="flex items-center gap-1.5 text-muted hover:text-accent cursor-pointer transition-colors"
+      {/* Fullscreen Code Reader Modal */}
+      {isFullscreen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 p-2 sm:p-6 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-200 select-none"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setIsFullscreen(false);
+            }}
           >
-            <ChevronUp className="w-3.5 h-3.5" />
-            <span>{t('collapse_code_view', 'Collapse code view')}</span>
-          </button>
-        </div>
-      )}
-    </div>
+            <div
+              className="w-full max-w-6xl h-[92vh] rounded-2xl border flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
+              style={{
+                backgroundColor: 'var(--code-bg)',
+                borderColor: 'var(--border)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Fullscreen Header */}
+              <div
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b text-xs shrink-0 select-none"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--muted)',
+                }}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-1.5 opacity-80 shrink-0">
+                    <div
+                      className="w-3 h-3 rounded-full bg-rose-500/80 cursor-pointer hover:opacity-100"
+                      onClick={() => setIsFullscreen(false)}
+                      title={t('close', 'Fermer')}
+                    />
+                    <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+                    <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+                  </div>
+
+                  <div className="flex items-center gap-1.5 pl-1 shrink-0">
+                    <LangIcon className="w-4 h-4" style={{ color: langMeta.color }} />
+                    <span className="text-[12px] font-bold tracking-wider uppercase font-mono" style={{ color: langMeta.color }}>
+                      {langMeta.label}
+                    </span>
+                  </div>
+
+                  {filename && (
+                    <div
+                      className="flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-mono border truncate max-w-[280px]"
+                      style={{
+                        backgroundColor: 'var(--surface)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--text)',
+                      }}
+                    >
+                      <FileCode className="w-3.5 h-3.5 text-accent shrink-0" />
+                      <span className="truncate">{filename}</span>
+                    </div>
+                  )}
+
+                  <span className="text-xs opacity-60 font-mono hidden sm:inline">
+                    ({linesCount} lines • {formatBytes(cleanedCode.length)})
+                  </span>
+                </div>
+
+                {/* Fullscreen Controls & Search Bar */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Intra-code Search Input */}
+                  <div
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs shadow-2xs"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: codeSearch ? 'var(--accent)' : 'var(--border)',
+                    }}
+                  >
+                    <Search className="w-3.5 h-3.5 text-muted shrink-0" />
+                    <input
+                      type="text"
+                      value={codeSearch}
+                      onChange={(e) => setCodeSearch(e.target.value)}
+                      placeholder={t('search_in_code', 'Filtrer dans le code...')}
+                      className="bg-transparent border-none outline-hidden text-xs font-mono text-strong placeholder:text-muted/60 w-36 sm:w-52"
+                    />
+                    {codeSearch && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-accent/15 text-accent font-semibold">
+                          {matchingLineIndices.size}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCodeSearch('')}
+                          className="text-muted hover:text-strong cursor-pointer p-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {runnableCommand && (
+                    <button
+                      type="button"
+                      onClick={handleExecute}
+                      title={t('code_lens_run', 'Exécuter')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>{t('run', 'Exécuter')}</span>
+                    </button>
+                  )}
+
+                  {/* Line Numbers Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setShowLineNumbers(!showLineNumbers)}
+                    className="p-1.5 rounded-xl text-xs border cursor-pointer transition-colors"
+                    style={{
+                      backgroundColor: showLineNumbers ? 'var(--surface-subtle-hover)' : 'var(--surface)',
+                      borderColor: showLineNumbers ? 'var(--accent)' : 'var(--border)',
+                      color: showLineNumbers ? 'var(--accent)' : 'var(--muted)',
+                    }}
+                    title={showLineNumbers ? t('hide_line_numbers', 'Hide line numbers') : t('show_line_numbers', 'Show line numbers')}
+                  >
+                    <Hash className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Wrap Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setWrapLines(!wrapLines)}
+                    className="p-1.5 rounded-xl text-xs border cursor-pointer transition-colors"
+                    style={{
+                      backgroundColor: wrapLines ? 'var(--surface-subtle-hover)' : 'var(--surface)',
+                      borderColor: wrapLines ? 'var(--accent)' : 'var(--border)',
+                      color: wrapLines ? 'var(--accent)' : 'var(--muted)',
+                    }}
+                    title={wrapLines ? t('disable_line_wrap', 'Disable line wrap') : t('enable_line_wrap', 'Enable line wrap')}
+                  >
+                    {wrapLines ? <WrapText className="w-3.5 h-3.5" /> : <AlignLeft className="w-3.5 h-3.5" />}
+                  </button>
+
+                  {/* Download */}
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="p-1.5 rounded-xl text-xs border cursor-pointer transition-colors"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--muted)',
+                    }}
+                    title={t('download_snippet', 'Download code snippet')}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Copy */}
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border cursor-pointer transition-colors"
+                    style={{
+                      backgroundColor: copied ? 'rgba(16, 185, 129, 0.1)' : 'var(--surface)',
+                      borderColor: copied ? '#10B981' : 'var(--border)',
+                      color: copied ? '#10B981' : 'var(--muted)',
+                    }}
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copied ? t('copied', 'Copied!') : t('copy', 'Copy')}</span>
+                  </button>
+
+                  {/* Close Fullscreen */}
+                  <button
+                    type="button"
+                    onClick={() => setIsFullscreen(false)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20"
+                    title={t('exit_fullscreen', 'Quitter plein écran (Esc)')}
+                  >
+                    <Minimize2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline font-mono text-[10px] opacity-75">Esc</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Fullscreen Code Content */}
+              <div className="flex-1 overflow-auto p-4 select-text">
+                <div
+                  className={`table w-full font-mono text-[13px] leading-relaxed select-text ${
+                    wrapLines ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'
+                  }`}
+                  style={{ color: 'var(--code-text)' }}
+                >
+                  {formattedLines.map((lineHtml, idx) => {
+                    const isMatch = codeSearch.trim() && matchingLineIndices.has(idx);
+                    return (
+                      <div
+                        key={idx}
+                        className={`table-row transition-colors ${
+                          isMatch ? 'bg-amber-500/15' : 'hover:bg-white/[0.02]'
+                        } ${codeSearch.trim() && !isMatch ? 'opacity-40 hover:opacity-100' : ''}`}
+                      >
+                        {showLineNumbers && (
+                          <div
+                            className={`table-cell select-none text-right pr-4 pl-3 py-[2px] text-xs font-mono border-r align-top shrink-0 w-[50px] ${
+                              isMatch ? 'text-amber-400 font-bold' : ''
+                            }`}
+                            style={{
+                              borderColor: 'var(--border-subtle)',
+                              color: isMatch ? '#f59e0b' : 'var(--muted)',
+                              opacity: isMatch ? 1 : 0.5,
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {idx + 1}
+                          </div>
+                        )}
+                        <div
+                          className={`table-cell pl-4 pr-4 py-[2px] align-top select-text ${
+                            isMatch ? 'border-l-2 border-amber-400' : ''
+                          }`}
+                          dangerouslySetInnerHTML={{ __html: lineHtml || '&nbsp;' }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Fullscreen Footer info bar */}
+              <div
+                className="px-4 py-2 border-t text-[11px] font-mono flex items-center justify-between select-none"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--muted)',
+                }}
+              >
+                <span>
+                  {linesCount} {t('lines', 'lignes')} • {formatBytes(cleanedCode.length)} • {langMeta.label}
+                </span>
+                {codeSearch && (
+                  <span className="text-amber-400 font-semibold">
+                    {matchingLineIndices.size} {matchingLineIndices.size > 1 ? t('matching_lines', 'lignes correspondantes') : t('matching_line', 'ligne correspondante')}
+                  </span>
+                )}
+                <span className="opacity-60 hidden sm:inline">
+                  {t('fullscreen_hint', 'Appuyez sur Esc pour quitter le plein écran')}
+                </span>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
   );
 };
 

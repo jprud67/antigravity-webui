@@ -41,12 +41,14 @@ import {
   Plus,
   MoreHorizontal,
   RotateCcw,
-  X
+  X,
+  Search
 } from 'lucide-react';
 import type { ChatMessage, ToolCallItem } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
 import { DiffViewer } from './DiffViewer';
 import { ApprovalCard } from './ApprovalCard';
+import { TranscriptSearchOverlay } from './TranscriptSearchOverlay';
 import { getExportHtmlUrl, getExportMarkdownUrl, getExportJsonUrl, getAuthToken } from '../services/api';
 import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
@@ -810,6 +812,93 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   const [showMobileToolsMenu, setShowMobileToolsMenu] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+
+  // Search matching message IDs
+  const matchingMessageIds = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    const matched: string[] = [];
+    messages.forEach((msg, idx) => {
+      const id = msg.id || String(idx);
+      const toolText = msg.toolCalls?.map((tc: any) => `${tc.displayName || ''} ${tc.output || ''}`).join(' ') || '';
+      const haystack = `${msg.content || ''} ${msg.thought || ''} ${toolText}`.toLowerCase();
+      if (haystack.includes(q)) {
+        matched.push(id);
+      }
+    });
+    return matched;
+  }, [messages, searchQuery]);
+
+  const activeMatchedMessageId = useMemo(() => {
+    if (matchingMessageIds.length === 0) return null;
+    const safeIdx = Math.min(Math.max(0, currentMatchIndex), matchingMessageIds.length - 1);
+    return matchingMessageIds[safeIdx];
+  }, [matchingMessageIds, currentMatchIndex]);
+
+  const scrollToMatchedMessage = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  const handleSearchPrev = () => {
+    if (matchingMessageIds.length === 0) return;
+    const nextIdx = (currentMatchIndex - 1 + matchingMessageIds.length) % matchingMessageIds.length;
+    setCurrentMatchIndex(nextIdx);
+    scrollToMatchedMessage(matchingMessageIds[nextIdx]);
+  };
+
+  const handleSearchNext = () => {
+    if (matchingMessageIds.length === 0) return;
+    const nextIdx = (currentMatchIndex + 1) % matchingMessageIds.length;
+    setCurrentMatchIndex(nextIdx);
+    scrollToMatchedMessage(matchingMessageIds[nextIdx]);
+  };
+
+  const handleQueryChange = (q: string) => {
+    setSearchQuery(q);
+    setCurrentMatchIndex(0);
+    if (q.trim()) {
+      const lowerQ = q.toLowerCase();
+      const firstMatch = messages.find((msg) => {
+        const toolText = msg.toolCalls?.map((tc: any) => `${tc.displayName || ''} ${tc.output || ''}`).join(' ') || '';
+        const haystack = `${msg.content || ''} ${msg.thought || ''} ${toolText}`.toLowerCase();
+        return haystack.includes(lowerQ);
+      });
+      const firstId = firstMatch?.id || (firstMatch ? String(messages.indexOf(firstMatch)) : null);
+      if (firstId) {
+        scrollToMatchedMessage(firstId);
+      }
+    }
+  };
+
+  const handleToggleSearch = () => {
+    if (isSearchOpen) {
+      setIsSearchOpen(false);
+    } else {
+      setIsSearchOpen(true);
+      if (matchingMessageIds.length > 0) {
+        const safeIdx = Math.min(Math.max(0, currentMatchIndex), matchingMessageIds.length - 1);
+        scrollToMatchedMessage(matchingMessageIds[safeIdx]);
+      }
+    }
+  };
+
+  // Global Ctrl+F / Cmd+F shortcut to open search overlay
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   const handleCopyMessage = async (id: string, text: string) => {
     await copyTextToClipboard(text);
@@ -921,7 +1010,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
 
   return (
     <div
-      className="flex-1 flex flex-col min-h-0 overflow-hidden"
+      className="flex-1 flex flex-col min-h-0 overflow-hidden relative"
       style={{ backgroundColor: 'var(--main-bg, var(--bg))' }}
     >
       {/* Top Bar - Responsive Workbench & Mobile First Header */}
@@ -1077,6 +1166,18 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                   borderColor: 'var(--border2)'
                 }}
               >
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleToggleSearch();
+                    setShowMobileToolsMenu(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
+                  style={{ color: 'var(--text)' }}
+                >
+                  <Search className="w-4 h-4 text-accent shrink-0" />
+                  <span className="font-medium">{t("search_conversation", "Rechercher")} (Ctrl+F)</span>
+                </button>
                 {onOpenTerminal && (
                   <button
                     type="button"
@@ -1347,6 +1448,20 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
             </button>
           )}
 
+          {/* Conversation Search Toggle Button */}
+          <button
+            onClick={handleToggleSearch}
+            className="p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border"
+            style={{
+              backgroundColor: isSearchOpen ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+              borderColor: isSearchOpen ? 'var(--accent)' : 'var(--border)',
+              color: isSearchOpen ? 'var(--accent-text)' : 'var(--muted)',
+            }}
+            title={t('search_in_conversation', 'Rechercher dans la conversation (Ctrl+F)')}
+          >
+            <Search className="w-4 h-4" />
+          </button>
+
           {onToggleRightPanel && (
             <button
               onClick={onToggleRightPanel}
@@ -1363,6 +1478,18 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
           )}
         </div>
       </div>
+
+      {/* In-Chat Transcript Search Overlay */}
+      <TranscriptSearchOverlay
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        query={searchQuery}
+        onQueryChange={handleQueryChange}
+        matchCount={matchingMessageIds.length}
+        currentMatchIndex={currentMatchIndex}
+        onPrev={handleSearchPrev}
+        onNext={handleSearchNext}
+      />
 
       {/* Messages Scroll Area */}
       <div
@@ -1472,11 +1599,20 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
           </div>
         ) : (
           messages.map((msg, msgIdx) => {
+            const msgKey = msg.id || String(msgIdx);
+            const isMatched = activeMatchedMessageId === msgKey;
+
             // 1. Checkpoint / System events / Task notifications
             if (msg.role === 'system') {
               if (msg.subtype === 'task') {
                 return (
-                  <div key={msg.id} className="my-3 max-w-4xl mx-auto w-full animate-fadeIn">
+                  <div
+                    key={msgKey}
+                    id={`msg-${msgKey}`}
+                    className={`my-3 max-w-4xl mx-auto w-full animate-fadeIn transition-all duration-300 ${
+                      isMatched ? 'ring-2 ring-accent ring-offset-2 ring-offset-black/40 scale-[1.01]' : ''
+                    }`}
+                  >
                     <div
                       className="p-3 rounded-xl border text-xs flex items-center justify-between gap-3 shadow-xs"
                       style={{
@@ -1513,7 +1649,13 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
               }
               if (msg.subtype === 'context_summary') {
                 return (
-                  <div key={msg.id} className="my-3 max-w-4xl mx-auto w-full animate-fadeIn">
+                  <div
+                    key={msgKey}
+                    id={`msg-${msgKey}`}
+                    className={`my-3 max-w-4xl mx-auto w-full animate-fadeIn transition-all duration-300 ${
+                      isMatched ? 'ring-2 ring-accent ring-offset-2 ring-offset-black/40 scale-[1.01]' : ''
+                    }`}
+                  >
                     <div
                       className="p-3.5 rounded-xl border text-xs shadow-xs"
                       style={{
@@ -1541,13 +1683,29 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                   </div>
                 );
               }
-              return <CheckpointDivider key={msg.id} content={msg.content} stepIndex={msg.stepIndex} />;
+              return (
+                <div
+                  key={msgKey}
+                  id={`msg-${msgKey}`}
+                  className={`transition-all duration-300 ${
+                    isMatched ? 'ring-2 ring-accent ring-offset-2 ring-offset-black/40' : ''
+                  }`}
+                >
+                  <CheckpointDivider content={msg.content} stepIndex={msg.stepIndex} />
+                </div>
+              );
             }
 
             // 2. User Message
             if (msg.role === 'user') {
               return (
-                <div key={msg.id} className="flex justify-end max-w-4xl mx-auto w-full mb-4 sm:mb-6 group animate-fadeIn">
+                <div
+                  key={msgKey}
+                  id={`msg-${msgKey}`}
+                  className={`flex justify-end max-w-4xl mx-auto w-full mb-4 sm:mb-6 group animate-fadeIn transition-all duration-300 ${
+                    isMatched ? 'ring-2 ring-accent ring-offset-2 ring-offset-black/40 rounded-2xl scale-[1.01]' : ''
+                  }`}
+                >
                   <div className="max-w-[92%] sm:max-w-[80%] hermes-user-bubble rounded-2xl rounded-tr-xs p-3 sm:p-4 shadow-sm border transition-all">
                     <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-white/10 text-xs opacity-75 select-none">
                       <div className="flex items-center gap-1.5 font-semibold text-[11px] uppercase tracking-wider">
@@ -1585,8 +1743,11 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
 
             return (
               <div
-                key={msg.id}
-                className="w-full max-w-4xl mx-auto hermes-assistant-card rounded-2xl border p-3.5 sm:p-5 shadow-xs transition-all mb-4 sm:mb-6 group relative animate-fadeIn"
+                key={msgKey}
+                id={`msg-${msgKey}`}
+                className={`w-full max-w-4xl mx-auto hermes-assistant-card rounded-2xl border p-3.5 sm:p-5 shadow-xs transition-all duration-300 mb-4 sm:mb-6 group relative animate-fadeIn ${
+                  isMatched ? 'ring-2 ring-accent ring-offset-2 ring-offset-black/40 scale-[1.005]' : ''
+                }`}
                 style={{
                   backgroundColor: 'var(--surface)',
                   borderColor: 'var(--border)',
