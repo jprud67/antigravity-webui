@@ -1254,11 +1254,15 @@ export function App() {
       setIsCompacting(true);
       const res = await compactConversation(activeConversationId);
       showToast(`Contexte compacté : -${res.tokens_saved.toLocaleString()} tokens (-${res.reduction_pct}%) !`, 'success');
-      const freshSteps = await fetchConversationTranscript(activeConversationId);
-      const parsed = parseStepsToMessages(freshSteps);
+      const freshData = await fetchConversationTranscript(activeConversationId);
+      const parsed = parseStepsToMessages(freshData?.steps || []);
       setMessages(parsed);
-      const est = estimateUsageFromMessages(parsed);
-      setTokenUsage(est);
+      const normUsage = normalizeUsage(freshData?.usage);
+      if (normUsage && normUsage.totalTokens > 0) {
+        setTokenUsage(normUsage);
+      } else {
+        setTokenUsage(estimateUsageFromMessages(parsed));
+      }
     } catch (e: any) {
       showToast(e.message || 'Échec du compactage', 'error');
     } finally {

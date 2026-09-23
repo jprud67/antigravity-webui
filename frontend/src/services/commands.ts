@@ -354,16 +354,6 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     isAction: true
   },
   {
-    cmd: '/compact',
-    descKey: 'cmd_desc_compact',
-    desc: 'Alias de /compress pour compacter le contexte',
-    arg: '[sujet]',
-    category: 'action',
-    icon: Minimize2,
-    color: 'text-cyan-400',
-    isAction: true
-  },
-  {
     cmd: '/export',
     descKey: 'cmd_desc_export',
     desc: 'Exporter la session (HTML, Markdown, JSON)',
