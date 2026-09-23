@@ -78,6 +78,11 @@ class SaveRuleRequest(BaseModel):
     content: str
     workspace_path: str | None = None
 
+MAX_RULE_SAVE_BYTES = 5 * 1024 * 1024
+
+def _is_hermes_read_only() -> bool:
+    return os.environ.get("ENABLE_HERMES_WRITE", "0").lower() not in ("1", "true")
+
 def _safe_stat(p: Path) -> tuple[bool, int, float]:
     try:
         if p.exists():
@@ -96,6 +101,7 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
     sc_exists, sc_size, sc_mtime = _safe_stat(SETTINGS_FILE)
     ha_exists, ha_size, ha_mtime = _safe_stat(ARCH_STATE_FILE)
     hj_exists, hj_size, hj_mtime = _safe_stat(journal_path)
+    hermes_read_only = _is_hermes_read_only()
 
     files = [
         {
@@ -107,6 +113,7 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
             "exists": ag_exists,
             "size": ag_size,
             "last_modified": ag_mtime,
+            "read_only": False,
         },
         {
             "id": "settings_cli",
@@ -117,6 +124,7 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
             "exists": sc_exists,
             "size": sc_size,
             "last_modified": sc_mtime,
+            "read_only": False,
         },
         {
             "id": "hermes_arch",
@@ -127,6 +135,7 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
             "exists": ha_exists,
             "size": ha_size,
             "last_modified": ha_mtime,
+            "read_only": hermes_read_only,
         },
         {
             "id": "hermes_journal",
@@ -137,6 +146,7 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
             "exists": hj_exists,
             "size": hj_size,
             "last_modified": hj_mtime,
+            "read_only": hermes_read_only,
         }
     ]
 
@@ -163,6 +173,7 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
                 "exists": wa_exists,
                 "size": wa_size,
                 "last_modified": wa_mtime,
+                "read_only": False,
             })
 
             files.append({
@@ -174,6 +185,7 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
                 "exists": wg_exists,
                 "size": wg_size,
                 "last_modified": wg_mtime,
+                "read_only": False,
             })
 
     return {"files": files}
@@ -188,13 +200,16 @@ def get_rule_content(
     if not target_path:
         raise HTTPException(status_code=400, detail="Identifiant de fichier inconnu")
 
+    is_ro = _is_hermes_read_only() if file_id in ("hermes_arch", "hermes_journal") else False
+
     if not target_path.exists():
         return {
             "file_id": file_id,
             "path": str(target_path),
             "content": "",
             "exists": False,
-            "syntax": "json" if target_path.suffix == ".json" else "markdown"
+            "syntax": "json" if target_path.suffix == ".json" else "markdown",
+            "read_only": is_ro
         }
 
     try:
@@ -207,7 +222,8 @@ def get_rule_content(
             "exists": True,
             "syntax": "json" if target_path.suffix == ".json" else "markdown",
             "size": target_path.stat().st_size,
-            "last_modified": target_path.stat().st_mtime
+            "last_modified": target_path.stat().st_mtime,
+            "read_only": is_ro
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lors de la lecture du fichier: {e}")
@@ -218,9 +234,15 @@ def save_rule_content(req: SaveRuleRequest, _ = Depends(require_auth)):
     if not target_path:
         raise HTTPException(status_code=400, detail="Identifiant de fichier inconnu")
 
+    if len(req.content.encode("utf-8")) > MAX_RULE_SAVE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Taille de contenu trop volumineuse (max {MAX_RULE_SAVE_BYTES // (1024 * 1024)} Mo)."
+        )
+
     # Guard against modifying external Hermes system memory without explicit authorization
     if req.file_id in ("hermes_arch", "hermes_journal"):
-        if os.environ.get("ENABLE_HERMES_WRITE", "0").lower() not in ("1", "true"):
+        if _is_hermes_read_only():
             raise HTTPException(
                 status_code=403,
                 detail="La modification directe des mémoires Hermes est désactivée par mesure de sécurité."

@@ -12,7 +12,8 @@ import {
   History,
   FileCheck2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Lock
 } from 'lucide-react';
 import type { RuleFileItem } from '../services/api';
 import { 
@@ -337,6 +338,14 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
                   {jsonError ? t('json_invalid', 'Invalid JSON') : t('json_valid', 'Valid JSON')}
                 </span>
               )}
+              {currentFileMeta?.read_only && (
+                <span
+                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-amber-500/20 text-amber-500 border-amber-500/40 flex items-center gap-1"
+                >
+                  <Lock className="w-3 h-3" />
+                  {t('read_only', 'Read-Only')}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -394,6 +403,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
                   }
                 }}
                 disabled={loadingContent}
+                readOnly={Boolean(currentFileMeta?.read_only)}
                 spellCheck={false}
                 wrap="off"
                 className="w-full h-full bg-transparent font-mono text-[11px] focus:outline-none resize-none leading-6 py-3 px-4 overflow-auto whitespace-pre"
@@ -412,8 +422,17 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
           }}
         >
           <div className="flex items-center gap-2 text-[11px] text-slate-400">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>{t('rules_backup_notice', 'Backup copy (.bak) created automatically before saving')}</span>
+            {currentFileMeta?.read_only ? (
+              <>
+                <Lock className="w-4 h-4 text-amber-400" />
+                <span className="text-amber-400/90">{t('hermes_read_only_notice', 'This memory file is protected and read-only. Direct modification is restricted.')}</span>
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>{t('rules_backup_notice', 'Backup copy (.bak) created automatically before saving')}</span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2.5">
@@ -426,9 +445,9 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
 
             <button
               onClick={handleSave}
-              disabled={saving || !hasUnsavedChanges || !!jsonError}
+              disabled={saving || !hasUnsavedChanges || !!jsonError || Boolean(currentFileMeta?.read_only)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-lg transition-all cursor-pointer ${
-                hasUnsavedChanges && !jsonError
+                hasUnsavedChanges && !jsonError && !currentFileMeta?.read_only
                   ? 'bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-sky-600/30'
                   : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/60'
               }`}

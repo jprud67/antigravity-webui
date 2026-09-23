@@ -48,9 +48,24 @@ def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
         try:
             SESSION_METADATA_FILE.parent.mkdir(parents=True, exist_ok=True)
             tmp_file = SESSION_METADATA_FILE.parent / f"{SESSION_METADATA_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
-            tmp_file.write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
+            serialized = json.dumps(metadata, indent=2, ensure_ascii=False)
+            tmp_file.write_text(serialized, encoding="utf-8")
             restrict_file_permissions(tmp_file)
-            tmp_file.replace(SESSION_METADATA_FILE)
+
+            replace_ok = False
+            last_err = None
+            for attempt in range(5):
+                try:
+                    tmp_file.replace(SESSION_METADATA_FILE)
+                    replace_ok = True
+                    break
+                except (PermissionError, OSError) as pe:
+                    last_err = pe
+                    time.sleep(0.02 * (attempt + 1))
+
+            if not replace_ok and last_err:
+                raise last_err
+
             restrict_file_permissions(SESSION_METADATA_FILE)
             _cached_meta = copy.deepcopy(metadata)
             _cached_mtime = SESSION_METADATA_FILE.stat().st_mtime

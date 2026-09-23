@@ -17,6 +17,61 @@ from app.services.storage import is_safe_conversation_id
 logger = logging.getLogger("antigravity.tasks")
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
+_EXIT_CODE_PAT = re.compile(r"exited with code (\d+)", re.IGNORECASE)
+_TASK_OUTCOME_PAT = re.compile(r"Task id [\"\\]*([^\"\\\s]+)[\"\\]* (finished with result|was cancelled)", re.IGNORECASE)
+
+def _parse_transcript_task_outcomes(transcript_path: Path) -> dict[str, dict[str, Any]]:
+    """Extracts completion outcomes, exit codes, and cancellation events from transcript.jsonl."""
+    outcomes: dict[str, dict[str, Any]] = {}
+    if not transcript_path.exists():
+        return outcomes
+    try:
+        with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if "Task id" not in line or ("finished with result" not in line and "was cancelled" not in line):
+                    continue
+                for m in _TASK_OUTCOME_PAT.finditer(line):
+                    raw_id = m.group(1).split("/")[-1].replace(".log", "").strip()
+                    action = m.group(2).lower()
+                    if "cancel" in action:
+                        outcomes[raw_id] = {"status": "cancelled", "exit_code": None}
+                    else:
+                        c_match = _EXIT_CODE_PAT.search(line)
+                        if c_match:
+                            exit_code = int(c_match.group(1))
+                            outcomes[raw_id] = {
+                                "status": "completed" if exit_code == 0 else "failed",
+                                "exit_code": exit_code
+                            }
+                        else:
+                            outcomes[raw_id] = {"status": "completed", "exit_code": 0}
+    except Exception as e:
+        logger.debug(f"Error reading transcript {transcript_path}: {e}")
+    return outcomes
+
+def _find_pid_for_task_log(log_path: Path) -> int | None:
+    """Finds the PID of an active process holding log_path open."""
+    try:
+        resolved_target = str(log_path.resolve())
+    except Exception:
+        resolved_target = str(log_path)
+
+    for proc in psutil.process_iter(['pid']):
+        try:
+            p_info = proc.info
+            pid = p_info.get('pid')
+            if not pid or pid <= 100:
+                continue
+            for f in proc.open_files():
+                try:
+                    if os.path.abspath(f.path) == resolved_target:
+                        return pid
+                except Exception:
+                    continue
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError, KeyError):
+            continue
+    return None
+
 class KillTaskRequest(BaseModel):
     pid: int | str | None = None
     task_id: str | None = None
@@ -83,6 +138,8 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
             # Tasks
             tasks_dir = cdir / ".system_generated" / "tasks"
             if tasks_dir.exists() and tasks_dir.is_dir():
+                transcript_file = cdir / ".system_generated" / "logs" / "transcript.jsonl"
+                transcript_outcomes = _parse_transcript_task_outcomes(transcript_file)
                 for tfile in tasks_dir.glob("*.log"):
                     tid = tfile.stem
                     try:
@@ -123,7 +180,28 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                         if (active_cmdlines and len(tid) >= 3)
                         else False
                     )
-                    is_finished = has_finish_marker or ((now_ts - stat_mtime) > 1800 and not is_active_process)
+
+                    outcome = transcript_outcomes.get(tid)
+                    if outcome:
+                        status = outcome["status"]
+                        exit_code = outcome.get("exit_code")
+                    else:
+                        if "[task cancelled by user]" in lower_preview or "task cancelled" in lower_preview:
+                            status = "cancelled"
+                            exit_code = None
+                        elif "status: failed" in lower_preview or "the command exited with code 1" in lower_preview:
+                            status = "failed"
+                            exit_code = 1
+                        elif has_finish_marker:
+                            status = "completed"
+                            exit_code = 0
+                        elif (now_ts - stat_mtime) > 300 and not is_active_process:
+                            status = "completed"
+                            exit_code = 0
+                        else:
+                            status = "running"
+                            exit_code = None
+
                     tasks.append({
                         "id": f"{cid}/{tid}",
                         "task_id": tid,
@@ -132,7 +210,8 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                         "size": stat_size,
                         "last_modified": stat_mtime,
                         "preview": preview,
-                        "status": "completed" if is_finished else "running"
+                        "status": status,
+                        "exit_code": exit_code
                     })
 
             # Subagents
@@ -239,60 +318,88 @@ def kill_task(req: KillTaskRequest, _ = Depends(require_auth)):
         if req.task_id:
             try:
                 clean_tid = str(req.task_id).strip()
-                pure_tid = clean_tid.split("/")[-1].strip() if "/" in clean_tid else clean_tid
-                raw_cands = [clean_tid]
-                if pure_tid and pure_tid != clean_tid:
-                    raw_cands.append(pure_tid)
-                excluded_tokens = {
-                    "bash", "sh", "zsh", "node", "npm", "python", "python3", "uvicorn",
-                    "git", "cat", "grep", "root", "systemd", "task", "tasks", "subagent",
-                    "subagents", "process", "worker", "service", "start", "stop", "test", "run",
-                    "bin", "usr", "opt", "etc", "dev", "api", "pid", "app", "web", "kill", "ps"
-                }
-                candidate_tids = [
-                    c for c in raw_cands
-                    if len(c) >= 3 and c.lower() not in excluded_tokens
-                ]
+                pure_tid = clean_tid.split("/")[-1].strip().replace(".log", "")
+                cid_part = clean_tid.split("/")[0].strip() if "/" in clean_tid else None
 
-                if candidate_tids:
-                    for p in psutil.process_iter(['pid', 'cmdline', 'name']):
-                        try:
-                            p_info = p.info
-                            if not p_info:
-                                continue
-                            candidate_pid = p_info.get('pid')
-                            if not candidate_pid or candidate_pid <= 100:
-                                continue
-                            if candidate_pid in (current_pid, parent_pid) or (current_pgid and candidate_pid == current_pgid):
-                                continue
-
-                            cmdline_list = p_info.get('cmdline') or []
-                            cmd_str = " ".join(cmdline_list)
-                            cmd_lower = cmd_str.lower()
-                            p_name = (p_info.get('name') or '').lower()
-
-                            # Disallow matching server or uvicorn
-                            if ("uvicorn" in cmd_lower and "backend" in cmd_lower) or ("antigravity-webui" in cmd_lower and "run.py" in cmd_lower):
-                                continue
-
-                            matches_task = False
-                            for tid_cand in candidate_tids:
-                                escaped_tid = re.escape(tid_cand)
-                                tid_regex = re.compile(rf"(?:^|[\s\"'=/]){escaped_tid}(?:[\s\"'/]|$)")
-                                if (
-                                    tid_cand in cmdline_list
-                                    or any(tid_cand in arg.split("=") for arg in cmdline_list)
-                                    or bool(tid_regex.search(cmd_str))
-                                    or (len(tid_cand) >= 4 and tid_cand.lower() == p_name)
-                                ):
-                                    matches_task = True
-                                    break
-
-                            if matches_task:
-                                target_pid = candidate_pid
+                # 1. First priority: look for an active process writing to the task's log file
+                log_cands: list[Path] = []
+                if cid_part and is_safe_conversation_id(cid_part) and BRAIN_DIR.exists():
+                    c_path = BRAIN_DIR / cid_part / ".system_generated" / "tasks" / f"{pure_tid}.log"
+                    if c_path.exists():
+                        log_cands.append(c_path)
+                elif BRAIN_DIR.exists():
+                    for cdir in BRAIN_DIR.iterdir():
+                        if cdir.is_dir() and not cdir.name.startswith("."):
+                            c_path = cdir / ".system_generated" / "tasks" / f"{pure_tid}.log"
+                            if c_path.exists():
+                                log_cands.append(c_path)
                                 break
-                        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError, KeyError):
-                            continue
+
+                for lpath in log_cands:
+                    found_pid = _find_pid_for_task_log(lpath)
+                    if (
+                        found_pid
+                        and found_pid > 100
+                        and found_pid not in (current_pid, parent_pid)
+                        and (not current_pgid or found_pid != current_pgid)
+                    ):
+                        target_pid = found_pid
+                        break
+
+                if not target_pid:
+                    raw_cands = [clean_tid]
+                    if pure_tid and pure_tid != clean_tid:
+                        raw_cands.append(pure_tid)
+                    excluded_tokens = {
+                        "bash", "sh", "zsh", "node", "npm", "python", "python3", "uvicorn",
+                        "git", "cat", "grep", "root", "systemd", "task", "tasks", "subagent",
+                        "subagents", "process", "worker", "service", "start", "stop", "test", "run",
+                        "bin", "usr", "opt", "etc", "dev", "api", "pid", "app", "web", "kill", "ps"
+                    }
+                    candidate_tids = [
+                        c for c in raw_cands
+                        if len(c) >= 3 and c.lower() not in excluded_tokens
+                    ]
+
+                    if candidate_tids:
+                        for p in psutil.process_iter(['pid', 'cmdline', 'name']):
+                            try:
+                                p_info = p.info
+                                if not p_info:
+                                    continue
+                                candidate_pid = p_info.get('pid')
+                                if not candidate_pid or candidate_pid <= 100:
+                                    continue
+                                if candidate_pid in (current_pid, parent_pid) or (current_pgid and candidate_pid == current_pgid):
+                                    continue
+
+                                cmdline_list = p_info.get('cmdline') or []
+                                cmd_str = " ".join(cmdline_list)
+                                cmd_lower = cmd_str.lower()
+                                p_name = (p_info.get('name') or '').lower()
+
+                                # Disallow matching server or uvicorn
+                                if ("uvicorn" in cmd_lower and "backend" in cmd_lower) or ("antigravity-webui" in cmd_lower and "run.py" in cmd_lower):
+                                    continue
+
+                                matches_task = False
+                                for tid_cand in candidate_tids:
+                                    escaped_tid = re.escape(tid_cand)
+                                    tid_regex = re.compile(rf"(?:^|[\s\"'=/]){escaped_tid}(?:[\s\"'/]|$)")
+                                    if (
+                                        tid_cand in cmdline_list
+                                        or any(tid_cand in arg.split("=") for arg in cmdline_list)
+                                        or bool(tid_regex.search(cmd_str))
+                                        or (len(tid_cand) >= 4 and tid_cand.lower() == p_name)
+                                    ):
+                                        matches_task = True
+                                        break
+
+                                if matches_task:
+                                    target_pid = candidate_pid
+                                    break
+                            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError, KeyError):
+                                continue
             except Exception as e:
                 logger.warning(f"Error resolving task_id to pid: {e}")
         if not target_pid:

@@ -8663,7 +8663,102 @@ def test_storage_compact_supports_role_user():
     print("✓ test_storage_compact_supports_role_user passed")
 
 
+def test_tasks_transcript_outcomes_and_exit_code(tmp_path):
+    """Test that _parse_transcript_task_outcomes correctly extracts completed, failed, and cancelled tasks."""
+    from app.api.tasks import _parse_transcript_task_outcomes, list_active_tasks
+    import json
+    from unittest.mock import patch
+
+    logs_dir = tmp_path / "test-conv" / ".system_generated" / "logs"
+    logs_dir.mkdir(parents=True)
+    tasks_dir = tmp_path / "test-conv" / ".system_generated" / "tasks"
+    tasks_dir.mkdir(parents=True)
+
+    transcript = logs_dir / "transcript.jsonl"
+    lines = [
+        {"content": 'Task id "test-conv/task-10" finished with result:\n\nThe command exited with code 0.\nOutput:\nOK'},
+        {"content": 'Task id "task-20" finished with result:\n\nThe command exited with code 2.\nOutput:\nError'},
+        {"content": 'Task id "test-conv/task-30" was cancelled by user'},
+    ]
+    transcript.write_text("\n".join(json.dumps(l) for l in lines), encoding="utf-8")
+
+    outcomes = _parse_transcript_task_outcomes(transcript)
+    assert outcomes["task-10"]["status"] == "completed"
+    assert outcomes["task-10"]["exit_code"] == 0
+    assert outcomes["task-20"]["status"] == "failed"
+    assert outcomes["task-20"]["exit_code"] == 2
+    assert outcomes["task-30"]["status"] == "cancelled"
+    assert outcomes["task-30"]["exit_code"] is None
+
+    # Create dummy log files
+    (tasks_dir / "task-10.log").write_text("All tests passed", encoding="utf-8")
+    (tasks_dir / "task-20.log").write_text("Build error", encoding="utf-8")
+    (tasks_dir / "task-30.log").write_text("Interrupted", encoding="utf-8")
+
+    with patch("app.api.tasks.BRAIN_DIR", tmp_path):
+        res = list_active_tasks(conversation_id="test-conv")
+        task_map = {t["task_id"]: t for t in res["tasks"]}
+        assert task_map["task-10"]["status"] == "completed"
+        assert task_map["task-10"]["exit_code"] == 0
+        assert task_map["task-20"]["status"] == "failed"
+        assert task_map["task-20"]["exit_code"] == 2
+        assert task_map["task-30"]["status"] == "cancelled"
+    print("✓ test_tasks_transcript_outcomes_and_exit_code passed")
+
+
+def test_tasks_kill_task_open_file_and_fallback(tmp_path):
+    """Test that kill_task finds process by open file descriptor or marks task cancelled."""
+    from app.api.tasks import kill_task, KillTaskRequest
+    from unittest.mock import patch
+
+    tasks_dir = tmp_path / "conv-kill" / ".system_generated" / "tasks"
+    tasks_dir.mkdir(parents=True)
+    log_file = tasks_dir / "task-999.log"
+    log_file.write_text("Running...", encoding="utf-8")
+
+    with patch("app.api.tasks.BRAIN_DIR", tmp_path), \
+         patch("app.api.tasks._find_pid_for_task_log", return_value=None):
+        res = kill_task(KillTaskRequest(task_id="conv-kill/task-999"))
+        assert res["success"] is True
+        assert "annulée" in res["message"] or "terminée" in res["message"]
+        content = log_file.read_text(encoding="utf-8")
+        assert "cancelled by user" in content.lower()
+    print("✓ test_tasks_kill_task_open_file_and_fallback passed")
+
+
+def test_rules_payload_limit_and_read_only_flags():
+    """Test that rules API enforces payload size limits and exposes read_only flags."""
+    from fastapi import HTTPException
+    import pytest
+    from app.api.rules import save_rule_content, SaveRuleRequest, list_rules_files, get_rule_content
+
+    # Payload limit test
+    big_content = "x" * (6 * 1024 * 1024)
+    req = SaveRuleRequest(file_id="settings_cli", content=big_content)
+    with pytest.raises(HTTPException) as exc_info:
+        save_rule_content(req)
+    assert exc_info.value.status_code == 413
+
+    # Read-only flag tests
+    files_res = list_rules_files()
+    files_map = {f["id"]: f for f in files_res["files"]}
+    assert files_map["agents_global"]["read_only"] is False
+    assert files_map["settings_cli"]["read_only"] is False
+    assert files_map["hermes_arch"]["read_only"] is True
+    assert files_map["hermes_journal"]["read_only"] is True
+
+    arch_res = get_rule_content(file_id="hermes_arch")
+    assert arch_res["read_only"] is True
+
+    agents_res = get_rule_content(file_id="agents_global")
+    assert agents_res["read_only"] is False
+    print("✓ test_rules_payload_limit_and_read_only_flags passed")
+
+
 if __name__ == "__main__":
+    test_tasks_transcript_outcomes_and_exit_code(Path(tempfile.mkdtemp()))
+    test_tasks_kill_task_open_file_and_fallback(Path(tempfile.mkdtemp()))
+    test_rules_payload_limit_and_read_only_flags()
     test_storage_fork_step_index_synchronization()
     test_storage_undo_full_steps_backward_scan()
     test_conversations_bulk_export_unsafe_id_validation()

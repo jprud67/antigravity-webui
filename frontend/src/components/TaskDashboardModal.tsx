@@ -8,7 +8,8 @@ import {
   RefreshCw, 
   Square, 
   CheckCircle2, 
-  Clock 
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { fetchTasksList, killTask } from '../services/api';
 import { showToast } from '../services/toast';
@@ -230,6 +231,16 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
                           <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                             <CheckCircle2 className="w-3 h-3" />
                             {t('done', 'Done')}
+                          </span>
+                        ) : task.status === 'failed' ? (
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">
+                            <AlertCircle className="w-3 h-3" />
+                            {t('failed', 'Failed')} {task.exit_code !== undefined && task.exit_code !== null ? `(${task.exit_code})` : ''}
+                          </span>
+                        ) : task.status === 'cancelled' ? (
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-500/10 border border-slate-500/20 px-2 py-0.5 rounded-full">
+                            <Square className="w-2.5 h-2.5 fill-slate-400" />
+                            {t('cancelled', 'Cancelled')}
                           </span>
                         ) : (
                           <div className="flex items-center gap-1.5">

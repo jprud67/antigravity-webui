@@ -402,7 +402,10 @@ export async function fetchWorkspaces(): Promise<string[]> {
   const res = await fetch(`${API_BASE}/workspaces`, {
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error(`Failed to load workspaces: ${res.statusText}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || err?.message || `Failed to load workspaces: ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -411,7 +414,10 @@ export async function addWorkspace(path: string): Promise<any> {
     method: 'POST',
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error(`Failed to add workspace: ${res.statusText}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || err?.message || `Failed to add workspace: ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -420,7 +426,10 @@ export async function deleteWorkspace(path: string): Promise<any> {
     method: 'DELETE',
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error(`Failed to delete workspace: ${res.statusText}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || err?.message || `Failed to delete workspace: ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -429,7 +438,10 @@ export async function exploreDirectory(path?: string): Promise<WorkspaceFolder> 
   const res = await fetch(url, {
     headers: getHeaders()
   });
-  if (!res.ok) throw new Error(`Failed to explore directory: ${res.statusText}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || err?.message || `Failed to explore directory: ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -470,7 +482,10 @@ export async function fetchTasksList(conversationId?: string): Promise<{ tasks: 
     ? `${API_BASE}/tasks/list?conversation_id=${encodeURIComponent(conversationId)}`
     : `${API_BASE}/tasks/list`;
   const res = await fetch(url, { headers: getHeaders() });
-  if (!res.ok) throw new Error(`Failed to load tasks: ${res.statusText}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || err?.message || `Failed to load tasks: ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -480,7 +495,10 @@ export async function killTask(pid?: number, taskId?: string): Promise<any> {
     headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ pid, task_id: taskId })
   });
-  if (!res.ok) throw new Error(`Failed to kill task: ${res.statusText}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || err?.message || `Failed to kill task: ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -873,23 +891,30 @@ export interface RuleFileItem {
   exists: boolean;
   size: number;
   last_modified: number;
+  read_only?: boolean;
 }
 
 export async function fetchRulesFiles(workspacePath?: string): Promise<{ files: RuleFileItem[] }> {
   const params = workspacePath ? `?workspace_path=${encodeURIComponent(workspacePath)}` : '';
   const res = await fetch(`${API_BASE}/rules/files${params}`, { headers: getHeaders() });
-  if (!res.ok) throw new Error(`Failed to fetch rules files: ${res.statusText}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || err?.message || `Failed to fetch rules files: ${res.statusText}`);
+  }
   return res.json();
 }
 
 export async function fetchRuleContent(
   fileId: string,
   workspacePath?: string
-): Promise<{ file_id: string; path: string; content: string; exists: boolean; syntax: 'markdown' | 'json'; size?: number; last_modified?: number }> {
+): Promise<{ file_id: string; path: string; content: string; exists: boolean; syntax: 'markdown' | 'json'; size?: number; last_modified?: number; read_only?: boolean }> {
   const params = new URLSearchParams({ file_id: fileId });
   if (workspacePath) params.append('workspace_path', workspacePath);
   const res = await fetch(`${API_BASE}/rules/content?${params.toString()}`, { headers: getHeaders() });
-  if (!res.ok) throw new Error(`Failed to fetch rule content: ${res.statusText}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || err?.message || `Failed to fetch rule content: ${res.statusText}`);
+  }
   return res.json();
 }
 
