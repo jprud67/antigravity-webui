@@ -134,16 +134,27 @@ class ExecutionSession:
                 if not event["step_update"].get("conversation_id"):
                     event["step_update"]["conversation_id"] = self.conversation_id
 
-        # Broadcast to all connected subscribers with bounded timeout
-        dead = set()
-        for ws in list(self.subscribers):
-            try:
-                await asyncio.wait_for(ws.send_json(event), timeout=2.0)
-            except Exception:
-                dead.add(ws)
-        for ws in dead:
-            self.subscribers.discard(ws)
-            execution_manager.unregister_socket(ws, prune=False)
+        # Broadcast to all connected subscribers concurrently with bounded timeout
+        subs = list(self.subscribers)
+        if subs:
+            async def _safe_send(ws: Any) -> tuple[bool, Any]:
+                try:
+                    await asyncio.wait_for(ws.send_json(event), timeout=2.0)
+                    return True, ws
+                except Exception:
+                    return False, ws
+
+            results = await asyncio.gather(*[_safe_send(ws) for ws in subs], return_exceptions=True)
+            dead = set()
+            for idx, res in enumerate(results):
+                if isinstance(res, tuple) and not res[0]:
+                    dead.add(res[1])
+                elif isinstance(res, Exception):
+                    dead.add(subs[idx])
+
+            for ws in dead:
+                self.subscribers.discard(ws)
+                execution_manager.unregister_socket(ws, prune=False)
 
     def _update_live_state(self, event: dict[str, Any]):
         evt_type = event.get("event")

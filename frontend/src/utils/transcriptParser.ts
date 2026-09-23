@@ -120,7 +120,7 @@ export function cleanUserPrompt(raw: any): string {
     cleaned = requestMatches[requestMatches.length - 1][1];
   } else {
     // Repli pour les invites brutes sans balise <USER_REQUEST>
-    cleaned = str.replace(XML_BLOCKS_REGEX, '');
+    cleaned = textWithoutContext.replace(XML_BLOCKS_REGEX, '');
     cleaned = cleaned.replace(XML_TAGS_REGEX, '');
   }
 

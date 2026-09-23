@@ -189,6 +189,10 @@ class PersistentTerminalSession:
                         await terminate_process_group_async(proc, grace=0.2)
                     except Exception:
                         pass
+                try:
+                    await prune_dead_sessions()
+                except Exception:
+                    pass
             self.loop.create_task(_reap_proc(self.proc))
         ws = self.active_websocket
         if ws and self.loop and not self.loop.is_closed():
