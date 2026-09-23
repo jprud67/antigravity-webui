@@ -147,18 +147,26 @@ if FRONTEND_DIST.is_dir():
             raise HTTPException(status_code=404, detail="API route not found")
         
         index_file = FRONTEND_DIST / "index.html"
+        no_cache_headers = {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
         if not full_path or full_path == "/":
             if index_file.is_file():
-                return FileResponse(index_file)
+                return FileResponse(index_file, headers=no_cache_headers)
             raise HTTPException(status_code=404, detail="Index file not found")
 
         try:
             dist_resolved = FRONTEND_DIST.resolve()
             file_candidate = (dist_resolved / full_path).resolve()
             if file_candidate.is_relative_to(dist_resolved) and file_candidate.is_file():
-                return FileResponse(file_candidate)
+                headers = {}
+                if full_path.startswith("assets/"):
+                    headers["Cache-Control"] = "public, max-age=31536000, immutable"
+                return FileResponse(file_candidate, headers=headers)
         except (ValueError, TypeError, OSError):
             pass
         if index_file.is_file():
-            return FileResponse(index_file)
+            return FileResponse(index_file, headers=no_cache_headers)
         raise HTTPException(status_code=404, detail="Resource not found")

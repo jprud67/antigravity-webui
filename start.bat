@@ -33,7 +33,9 @@ if not exist "%~dp0frontend\dist\index.html" (
 
 set "PYTHONPATH=%~dp0backend"
 echo.
-echo [*] Serveur disponible sur http://%HOST%:%PORT%
+echo [*] Serveur disponible sur :
+echo     - Local  : http://localhost:%PORT% (ou http://127.0.0.1:%PORT%)
+echo     - Reseau : http://%HOST%:%PORT%
 echo     (Ctrl+C pour arreter proprement)
 echo.
 "%VENV_PY%" -m uvicorn app.main:app --host %HOST% --port %PORT%

@@ -30,9 +30,6 @@ export default defineConfig({
           if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
             return 'vendor';
           }
-          if (id.includes('node_modules/prismjs')) {
-            return 'prismjs';
-          }
           if (id.includes('node_modules/katex')) {
             return 'katex';
           }
