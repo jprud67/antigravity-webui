@@ -259,8 +259,19 @@ def _truncate_prompt(prompt: str) -> str:
     marker = "\n\n[... CONVERSATION TRONQUÉE — contexte intermédiaire omis ...]\n\n"
     head_len = int(MAX_PROMPT_CHARS * 0.35)
     tail_len = MAX_PROMPT_CHARS - head_len - len(marker)
-    logger.warning(f"Prompt tool bridge tronqué ({len(prompt)} → {MAX_PROMPT_CHARS} chars).")
-    return prompt[:head_len] + marker + prompt[-tail_len:]
+
+    head = prompt[:head_len]
+    last_nl = head.rfind("\n")
+    if last_nl != -1 and last_nl > head_len // 2:
+        head = head[:last_nl]
+
+    tail = prompt[-tail_len:]
+    first_nl = tail.find("\n")
+    if first_nl != -1 and first_nl < tail_len // 2:
+        tail = tail[first_nl + 1:]
+
+    logger.warning(f"Prompt tool bridge tronqué ({len(prompt)} → {len(head) + len(marker) + len(tail)} chars).")
+    return head + marker + tail
 
 
 def _allowed_function_names(tools: list[dict[str, Any]]) -> list[str]:

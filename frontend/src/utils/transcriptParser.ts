@@ -183,7 +183,7 @@ export function parseStepsToMessages(steps: any[]): ChatMessage[] {
       if (currentAssistantMsg.toolCalls) {
         for (const tc of currentAssistantMsg.toolCalls) {
           if (tc.status === 'running') {
-            tc.status = currentAssistantMsg.error ? 'error' : 'done';
+            tc.status = tc.result !== undefined ? 'done' : (currentAssistantMsg.error ? 'error' : 'cancelled');
           }
         }
       }

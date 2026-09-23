@@ -8471,7 +8471,159 @@ def test_openai_compat_extract_message_content_value_field():
     print("✓ test_openai_compat_extract_message_content_value_field passed")
 
 
+def test_storage_fork_step_index_synchronization():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services.storage import fork_conversation, atomic_write_jsonl, get_conversation_transcript
+
+    with tempfile.TemporaryDirectory() as td:
+        brain_dir = Path(td)
+        src_cid = "test-fork-sync-source"
+        src_dir = brain_dir / src_cid
+        src_logs = src_dir / ".system_generated" / "logs"
+        src_logs.mkdir(parents=True, exist_ok=True)
+
+        compact_steps = [
+            {"step_index": 0, "type": "USER_INPUT", "content": "turn 0"},
+            {"step_index": 4, "type": "TOOL_RESULT", "content": "tool 4"},
+            {"step_index": 5, "type": "PLANNER_RESPONSE", "content": "reply 5"}
+        ]
+        full_steps = [
+            {"step_index": 0, "type": "USER_INPUT", "content": "turn 0"},
+            {"step_index": 1, "type": "TOOL_CALL", "content": "call 1"},
+            {"step_index": 2, "type": "TOOL_OUTPUT", "content": "out 2"},
+            {"step_index": 3, "type": "TOOL_CALL", "content": "call 3"},
+            {"step_index": 4, "type": "TOOL_RESULT", "content": "tool 4"},
+            {"step_index": 5, "type": "PLANNER_RESPONSE", "content": "reply 5"}
+        ]
+        atomic_write_jsonl(src_logs / "transcript.jsonl", compact_steps)
+        atomic_write_jsonl(src_logs / "transcript_full.jsonl", full_steps)
+
+        with patch("app.services.storage.BRAIN_DIR", brain_dir):
+            res = fork_conversation(src_cid, up_to_step_index=4)
+            forked_cid = res["conversation_id"]
+            import json
+            forked_logs = brain_dir / forked_cid / ".system_generated" / "logs"
+            compact = [json.loads(l) for l in (forked_logs / "transcript.jsonl").read_text().splitlines() if l.strip()]
+            full = [json.loads(l) for l in (forked_logs / "transcript_full.jsonl").read_text().splitlines() if l.strip()]
+            assert len(compact) == 2
+            assert compact[0]["step_index"] == 0
+            assert compact[1]["step_index"] == 4
+            assert len(full) == 5
+            assert full[4]["step_index"] == 4
+            assert compact[1]["step_index"] == full[4]["step_index"]
+    print("✓ test_storage_fork_step_index_synchronization passed")
+
+
+def test_storage_undo_full_steps_backward_scan():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services.storage import undo_conversation_turn, atomic_write_jsonl
+
+    with tempfile.TemporaryDirectory() as td:
+        brain_dir = Path(td)
+        cid = "test-undo-backward-scan"
+        logs = brain_dir / cid / ".system_generated" / "logs"
+        logs.mkdir(parents=True, exist_ok=True)
+
+        full_steps = [
+            {"step_index": 0, "type": "USER_INPUT", "content": "first"},
+            {"step_index": 1, "type": "PLANNER_RESPONSE", "content": "rep 1"},
+            {"step_index": 10, "type": "USER_INPUT", "content": "second turn"},
+            {"step_index": 11, "type": "PLANNER_RESPONSE", "content": "rep 2"}
+        ]
+        compact_steps = [
+            {"step_index": 0, "type": "USER_INPUT", "content": "first"},
+            {"step_index": 1, "type": "PLANNER_RESPONSE", "content": "rep 1"},
+            {"step_index": 10, "type": "USER_INPUT", "content": "second turn"},
+            {"step_index": 11, "type": "PLANNER_RESPONSE", "content": "rep 2"}
+        ]
+        atomic_write_jsonl(logs / "transcript.jsonl", compact_steps)
+        atomic_write_jsonl(logs / "transcript_full.jsonl", full_steps)
+
+        with patch("app.services.storage.BRAIN_DIR", brain_dir):
+            undo_conversation_turn(cid)
+            import json
+            remaining_full = [json.loads(l) for l in (logs / "transcript_full.jsonl").read_text().splitlines() if l.strip()]
+            assert len(remaining_full) == 2
+            assert remaining_full[0]["content"] == "first"
+            assert remaining_full[1]["content"] == "rep 1"
+    print("✓ test_storage_undo_full_steps_backward_scan passed")
+
+
+def test_conversations_bulk_export_unsafe_id_validation():
+    from fastapi import HTTPException
+    from app.api.conversations import BulkActionRequest, _do_bulk_export
+
+    req = BulkActionRequest(action="export", conversation_ids=["../../etc/passwd"])
+    try:
+        _do_bulk_export(req)
+        assert False, "Should raise HTTPException 400 on unsafe conversation id"
+    except HTTPException as e:
+        assert e.status_code == 400
+        assert "Identifiant de conversation non valide" in e.detail
+    print("✓ test_conversations_bulk_export_unsafe_id_validation passed")
+
+
+def test_tool_bridge_truncate_prompt_newline_boundary():
+    from app.services.tool_bridge import _truncate_prompt, MAX_PROMPT_CHARS
+
+    lines = [f"Line {i}: This is a long content line meant to test boundary preservation." for i in range(10000)]
+    oversized = "\n".join(lines)
+    assert len(oversized) > MAX_PROMPT_CHARS
+
+    truncated = _truncate_prompt(oversized)
+    assert "[... CONVERSATION TRONQUÉE" in truncated
+    assert len(truncated) <= MAX_PROMPT_CHARS + 200
+    marker = "\n\n[... CONVERSATION TRONQUÉE — contexte intermédiaire omis ...]\n\n"
+    head, tail = truncated.split(marker)
+    assert head.endswith(".") or "\n" in head
+    assert tail.startswith("Line ")
+    print("✓ test_tool_bridge_truncate_prompt_newline_boundary passed")
+
+
+def test_storage_compact_supports_role_user():
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.services.storage import compact_conversation_in_place, atomic_write_jsonl
+
+    with tempfile.TemporaryDirectory() as td:
+        brain_dir = Path(td)
+        cid = "test-compact-role-user"
+        logs = brain_dir / cid / ".system_generated" / "logs"
+        logs.mkdir(parents=True, exist_ok=True)
+
+        steps = [
+            {"step_index": 0, "role": "user", "content": "Question 1"},
+            {"step_index": 1, "type": "GENERIC", "content": "A" * 300},
+            {"step_index": 2, "role": "user", "content": "Question 2"},
+            {"step_index": 3, "type": "GENERIC", "content": "B" * 300},
+            {"step_index": 4, "role": "user", "content": "Question 3"},
+            {"step_index": 5, "type": "GENERIC", "content": "C" * 300},
+        ]
+        atomic_write_jsonl(logs / "transcript.jsonl", steps)
+
+        with patch("app.services.storage.BRAIN_DIR", brain_dir):
+            res = compact_conversation_in_place(cid, preserve_last_n_turns=1)
+            assert res["status"] == "ok"
+            assert res["compacted_steps"] >= 1
+            import json
+            updated = [json.loads(l) for l in (logs / "transcript.jsonl").read_text().splitlines() if l.strip()]
+            assert updated[1]["is_truncated"] is True
+            assert updated[3]["is_truncated"] is True
+            assert updated[5].get("is_truncated") is not True
+    print("✓ test_storage_compact_supports_role_user passed")
+
+
 if __name__ == "__main__":
+    test_storage_fork_step_index_synchronization()
+    test_storage_undo_full_steps_backward_scan()
+    test_conversations_bulk_export_unsafe_id_validation()
+    test_tool_bridge_truncate_prompt_newline_boundary()
+    test_storage_compact_supports_role_user()
     test_terminal_session_write_windows_guard()
     test_git_unstage_sensitive_files_unborn_head()
     test_conversations_bulk_export_empty_validation()

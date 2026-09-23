@@ -996,7 +996,11 @@ def compact_conversation_in_place(conversation_id: str, preserve_last_n_turns: i
 
     user_step_indices = [
         i for i, s in enumerate(steps)
-        if s.get("type") == "USER_INPUT" or s.get("source") == "USER_EXPLICIT"
+        if (
+            (s.get("type") or "").upper() == "USER_INPUT"
+            or (s.get("source") or "").upper() == "USER_EXPLICIT"
+            or (s.get("role") or "").lower() == "user"
+        )
     ]
 
     boundary_idx = 0
@@ -1092,7 +1096,24 @@ def fork_conversation(
 ) -> dict[str, Any]:
     if not is_safe_conversation_id(source_conversation_id):
         raise ValueError("Identifiant de conversation source non valide")
-    source_steps = get_conversation_transcript(source_conversation_id)
+    source_compact_file = BRAIN_DIR / source_conversation_id / ".system_generated" / "logs" / "transcript.jsonl"
+    source_steps = []
+    if source_compact_file.exists() and source_compact_file.stat().st_size > 0:
+        try:
+            with open(source_compact_file, "r", encoding="utf-8-sig", errors="replace") as cf:
+                for line in cf:
+                    line_str = line.strip().lstrip("\ufeff")
+                    if not line_str:
+                        continue
+                    try:
+                        source_steps.append(json.loads(line_str))
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as e:
+            logger.debug(f"Failed reading source_compact_file: {e}")
+            source_steps = []
+    if not source_steps:
+        source_steps = get_conversation_transcript(source_conversation_id)
     if not source_steps:
         raise ValueError(f"Aucun historique trouvé pour la conversation {source_conversation_id}")
 
@@ -1137,7 +1158,7 @@ def fork_conversation(
         cloned = copy.deepcopy(step)
         if "conversation_id" in cloned:
             cloned["conversation_id"] = new_id
-        cloned["step_index"] = idx
+        cloned["step_index"] = step.get("step_index", idx)
         forked_transcripts.append(cloned)
     atomic_write_jsonl(transcript_path, forked_transcripts)
 
@@ -1146,7 +1167,7 @@ def fork_conversation(
         cloned = copy.deepcopy(step)
         if "conversation_id" in cloned:
             cloned["conversation_id"] = new_id
-        cloned["step_index"] = idx
+        cloned["step_index"] = step.get("step_index", idx)
         forked_full_transcripts.append(cloned)
     atomic_write_jsonl(transcript_full_path, forked_full_transcripts)
 
@@ -1635,23 +1656,13 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         remaining_steps = steps[:-1]
 
     # Persist updated compact transcript file atomically
-    if transcript_file.exists():
-        atomic_write_jsonl(transcript_file, remaining_steps)
-        if legacy_file.exists():
-            try:
-                legacy_file.unlink(missing_ok=True)
-            except OSError as unl_err:
-                logger.debug(f"Ignored legacy transcript removal error: {unl_err}")
-    elif not transcript_full_file.exists() and legacy_file.exists():
-        atomic_write_jsonl(legacy_file, remaining_steps)
-    else:
-        transcript_file.parent.mkdir(parents=True, exist_ok=True)
-        atomic_write_jsonl(transcript_file, remaining_steps)
-        if legacy_file.exists():
-            try:
-                legacy_file.unlink(missing_ok=True)
-            except OSError as unl_err:
-                logger.debug(f"Ignored legacy transcript removal error: {unl_err}")
+    transcript_file.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_jsonl(transcript_file, remaining_steps)
+    if legacy_file.exists():
+        try:
+            legacy_file.unlink(missing_ok=True)
+        except OSError as unl_err:
+            logger.debug(f"Ignored legacy transcript removal error: {unl_err}")
 
     # Persist updated full transcript file independently to avoid degrading unabridged history
     remaining_full_steps = remaining_steps  # valeur de repli sûre si le fichier est absent
@@ -1674,15 +1685,25 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         if full_steps:
             cutoff_idx = -1
             if isinstance(last_user_step_index, int):
-                for i, s in enumerate(full_steps):
+                for i in range(len(full_steps) - 1, -1, -1):
+                    s = full_steps[i]
                     s_idx = s.get("step_index")
-                    if isinstance(s_idx, int) and s_idx >= last_user_step_index:
+                    if isinstance(s_idx, int) and s_idx == last_user_step_index and (
+                        s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT" or s.get("role") == "user"
+                    ):
+                        cutoff_idx = i
+                        break
+            if cutoff_idx == -1 and isinstance(last_user_step_index, int):
+                for i in range(len(full_steps) - 1, -1, -1):
+                    s = full_steps[i]
+                    s_idx = s.get("step_index")
+                    if isinstance(s_idx, int) and s_idx == last_user_step_index:
                         cutoff_idx = i
                         break
             if cutoff_idx == -1:
                 for i in range(len(full_steps) - 1, -1, -1):
                     s = full_steps[i]
-                    if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
+                    if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT" or s.get("role") == "user":
                         cutoff_idx = i
                         break
             if cutoff_idx != -1:
@@ -1857,6 +1878,19 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                         seen_ids.add(cid)
                         if len(matched) >= limit:
                             break
+                    if len(matched) < limit:
+                        for cid in chunk:
+                            if cid not in seen_ids:
+                                meta = all_meta.get(cid, {})
+                                conv = get_conversation_by_id(cid)
+                                if conv:
+                                    c_item = dict(conv)
+                                    c_item["match_type"] = "metadata"
+                                    c_item["match_snippet"] = _sanitize_snippet(meta.get("customTitle") or meta.get("project") or c_item.get("preview"))
+                                    matched.append(c_item)
+                                    seen_ids.add(cid)
+                                    if len(matched) >= limit:
+                                        break
                     if len(matched) >= limit:
                         break
     finally:

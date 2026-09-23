@@ -203,7 +203,10 @@ def _do_bulk_export(req: "BulkActionRequest") -> Response:
         raise HTTPException(status_code=400, detail="Aucun identifiant de conversation fourni pour l'export.")
     if len(req.conversation_ids) > 500:
         raise HTTPException(status_code=400, detail="Nombre maximal de conversations dépassé pour un export groupé (max 500).")
-    ids = [cid for cid in req.conversation_ids if is_safe_conversation_id(cid)]
+    for cid in req.conversation_ids:
+        if not is_safe_conversation_id(cid):
+            raise HTTPException(status_code=400, detail=f"Identifiant de conversation non valide : {cid}")
+    ids = list(dict.fromkeys(req.conversation_ids))
     exported = []
     for cid in ids:
         try:

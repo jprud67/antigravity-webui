@@ -255,8 +255,10 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
             except (PermissionError, OSError):
                 if attempt == 2:
                     import shutil
-                    shutil.copy2(tmp_target, resolved_path)
-                    tmp_target.unlink(missing_ok=True)
+                    try:
+                        shutil.copy2(tmp_target, resolved_path)
+                    finally:
+                        tmp_target.unlink(missing_ok=True)
                     tmp_path = None
                     break
                 import time
