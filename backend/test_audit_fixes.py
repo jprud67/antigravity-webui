@@ -8400,7 +8400,82 @@ def test_execution_manager_stdin_safe_exception_handling():
     print("✓ test_execution_manager_stdin_safe_exception_handling passed")
 
 
+def test_terminal_session_write_windows_guard():
+    import asyncio
+    from unittest.mock import MagicMock, patch
+    from app.api.terminal import PersistentTerminalSession
+
+    session = PersistentTerminalSession("test_win_term", "/tmp")
+    session.master_fd = -1  # Windows state where master_fd is -1
+    mock_winpty = MagicMock()
+    mock_winpty.isalive.return_value = True
+    session.win_pty = mock_winpty
+
+    # When IS_WINDOWS is True, write should call winpty.write without returning early
+    with patch("app.api.terminal.IS_WINDOWS", True):
+        assert session.is_alive() is True
+        asyncio.run(session.write(b"dir\r\n"))
+        mock_winpty.write.assert_called_once_with("dir\r\n")
+
+    print("✓ test_terminal_session_write_windows_guard passed")
+
+
+def test_git_unstage_sensitive_files_unborn_head():
+    import subprocess
+    import tempfile
+    from pathlib import Path
+    from app.api.git import _unstage_sensitive_files, run_git
+
+    with tempfile.TemporaryDirectory() as td:
+        repo_dir = Path(td)
+        subprocess.run(["git", "init"], cwd=str(repo_dir), check=True, capture_output=True)
+
+        # Stage a sensitive file without committing (unborn HEAD branch)
+        env_file = repo_dir / ".env"
+        env_file.write_text("SECRET_KEY=12345")
+        subprocess.run(["git", "add", ".env"], cwd=str(repo_dir), check=True, capture_output=True)
+
+        staged_before = run_git(["diff", "--name-only", "--cached"], repo_dir).stdout.strip()
+        assert ".env" in staged_before
+
+        # Should unstage using rm --cached without crashing due to missing HEAD
+        _unstage_sensitive_files(repo_dir)
+
+        staged_after = run_git(["diff", "--name-only", "--cached"], repo_dir).stdout.strip()
+        assert ".env" not in staged_after
+
+    print("✓ test_git_unstage_sensitive_files_unborn_head passed")
+
+
+def test_conversations_bulk_export_empty_validation():
+    import pytest
+    from fastapi import HTTPException
+    from app.api.conversations import BulkActionRequest, _do_bulk_export
+
+    req = BulkActionRequest(action="export", conversation_ids=[])
+    with pytest.raises(HTTPException) as exc_info:
+        _do_bulk_export(req)
+    assert exc_info.value.status_code == 400
+    assert "Aucun identifiant" in exc_info.value.detail
+
+    print("✓ test_conversations_bulk_export_empty_validation passed")
+
+
+def test_openai_compat_extract_message_content_value_field():
+    from app.api.openai_compat import _extract_message_content
+
+    assert _extract_message_content({"value": "custom text value"}) == "custom text value"
+    assert _extract_message_content([{"value": "part1"}, {"value": "part2"}]) == "part1\npart2"
+    assert _extract_message_content({"text": "primary", "value": "fallback"}) == "primary"
+
+    print("✓ test_openai_compat_extract_message_content_value_field passed")
+
+
 if __name__ == "__main__":
+    test_terminal_session_write_windows_guard()
+    test_git_unstage_sensitive_files_unborn_head()
+    test_conversations_bulk_export_empty_validation()
+    test_openai_compat_extract_message_content_value_field()
     test_schema_locks_reentrancy()
     test_storage_aggregate_steps_extracts_thought_tags()
     test_storage_aggregate_steps_command_failure_status()

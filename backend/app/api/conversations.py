@@ -199,6 +199,8 @@ def _do_bulk_export(req: "BulkActionRequest") -> Response:
     """Internal bulk export logic (auth already verified by caller)."""
     import json
     import time
+    if not req.conversation_ids:
+        raise HTTPException(status_code=400, detail="Aucun identifiant de conversation fourni pour l'export.")
     if len(req.conversation_ids) > 500:
         raise HTTPException(status_code=400, detail="Nombre maximal de conversations dépassé pour un export groupé (max 500).")
     ids = [cid for cid in req.conversation_ids if is_safe_conversation_id(cid)]

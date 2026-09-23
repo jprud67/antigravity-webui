@@ -415,7 +415,9 @@ def _unstage_sensitive_files(target: Path) -> None:
             if _SENSITIVE_FILES_RE.search(f_clean):
                 check_head = run_git(["rev-parse", "--verify", f"HEAD:{f_clean}"], target)
                 if check_head.returncode != 0:
-                    run_git(["reset", "HEAD", "--", f_clean], target)
+                    reset_res = run_git(["reset", "HEAD", "--", f_clean], target)
+                    if reset_res.returncode != 0:
+                        run_git(["rm", "--cached", "-f", "--", f_clean], target)
                     logger.warning(f"Fichier sensible désindexé automatiquement du commit : {f_clean}")
 
 
@@ -431,7 +433,7 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Le message de commit ne peut être vide.")
 
     # Never allow Co-Authored-By
-    clean_msg = _sanitize_git_message(req.message)
+    clean_msg = _sanitize_git_message(req.message).strip()
     if not clean_msg:
         raise HTTPException(status_code=400, detail="Le message de commit ne peut être vide après nettoyage.")
 

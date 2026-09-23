@@ -71,10 +71,15 @@ def _extract_message_content(content: Any) -> str:
         inner = content.get("content")
         if isinstance(inner, str):
             return inner
+        val = content.get("value")
+        if isinstance(val, str):
+            return val
         if text is not None:
             return str(text)
         if inner is not None:
             return str(inner)
+        if val is not None:
+            return str(val)
         return ""
     if isinstance(content, list):
         parts: list[str] = []
@@ -87,6 +92,8 @@ def _extract_message_content(content: Any) -> str:
                     parts.append(text)
                 elif "content" in part and isinstance(part.get("content"), str):
                     parts.append(str(part.get("content")))
+                elif "value" in part and isinstance(part.get("value"), str):
+                    parts.append(str(part.get("value")))
                 elif part.get("type") == "text" and "text" in part:
                     parts.append(str(part.get("text", "")))
         return "\n".join(parts)

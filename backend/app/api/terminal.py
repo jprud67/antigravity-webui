@@ -243,7 +243,7 @@ class PersistentTerminalSession:
     # ----------------------------- Entrées / sorties -----------------------------
 
     async def write(self, data: bytes):
-        if not self.is_alive() or self.master_fd <= 0:
+        if not self.is_alive() or (not IS_WINDOWS and self.master_fd <= 0):
             return
         self.last_active = time.time()
         if IS_WINDOWS:
