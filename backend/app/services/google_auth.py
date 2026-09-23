@@ -30,6 +30,109 @@ from app.platform_utils import IS_WINDOWS, restrict_file_permissions
 
 logger = logging.getLogger("antigravity.google_auth")
 
+if IS_WINDOWS:
+    import ctypes
+    from ctypes import wintypes
+
+    CRED_TYPE_GENERIC = 1
+    CRED_PERSIST_LOCAL_MACHINE = 2
+
+    class _WIN_CREDENTIAL_WRITE(ctypes.Structure):
+        _fields_ = [
+            ("Flags", wintypes.DWORD),
+            ("Type", wintypes.DWORD),
+            ("TargetName", wintypes.LPWSTR),
+            ("Comment", wintypes.LPWSTR),
+            ("LastWritten", wintypes.FILETIME),
+            ("CredentialBlobSize", wintypes.DWORD),
+            ("CredentialBlob", ctypes.c_char_p),
+            ("Persist", wintypes.DWORD),
+            ("AttributeCount", wintypes.DWORD),
+            ("Attributes", ctypes.c_void_p),
+            ("TargetAlias", wintypes.LPWSTR),
+            ("UserName", wintypes.LPWSTR),
+        ]
+
+    class _WIN_CREDENTIAL_READ(ctypes.Structure):
+        _fields_ = [
+            ("Flags", wintypes.DWORD),
+            ("Type", wintypes.DWORD),
+            ("TargetName", wintypes.LPWSTR),
+            ("Comment", wintypes.LPWSTR),
+            ("LastWritten", wintypes.FILETIME),
+            ("CredentialBlobSize", wintypes.DWORD),
+            ("CredentialBlob", ctypes.POINTER(ctypes.c_byte)),
+            ("Persist", wintypes.DWORD),
+            ("AttributeCount", wintypes.DWORD),
+            ("Attributes", ctypes.c_void_p),
+            ("TargetAlias", wintypes.LPWSTR),
+            ("UserName", wintypes.LPWSTR),
+        ]
+
+    _advapi32 = ctypes.WinDLL("Advapi32.dll")
+    _CredReadW = _advapi32.CredReadW
+    _CredReadW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.POINTER(ctypes.POINTER(_WIN_CREDENTIAL_READ))]
+    _CredReadW.restype = wintypes.BOOL
+
+    _CredWriteW = _advapi32.CredWriteW
+    _CredWriteW.argtypes = [ctypes.POINTER(_WIN_CREDENTIAL_WRITE), wintypes.DWORD]
+    _CredWriteW.restype = wintypes.BOOL
+
+    _CredDeleteW = _advapi32.CredDeleteW
+    _CredDeleteW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD]
+    _CredDeleteW.restype = wintypes.BOOL
+
+    _CredFree = _advapi32.CredFree
+    _CredFree.argtypes = [ctypes.c_void_p]
+
+
+def _read_windows_keyring_token() -> dict[str, Any] | None:
+    if not IS_WINDOWS:
+        return None
+    try:
+        pcred = ctypes.POINTER(_WIN_CREDENTIAL_READ)()
+        if _CredReadW("gemini:antigravity", CRED_TYPE_GENERIC, 0, ctypes.byref(pcred)):
+            cred = pcred.contents
+            blob = bytes(cred.CredentialBlob[:cred.CredentialBlobSize])
+            _CredFree(pcred)
+            return json.loads(blob.decode("utf-8"))
+    except Exception as e:
+        logger.debug(f"Failed to read from Windows keyring: {e}")
+    return None
+
+
+def _write_windows_keyring_token(token_data: dict[str, Any]) -> bool:
+    if not IS_WINDOWS:
+        return False
+    try:
+        raw_bytes = json.dumps(token_data).encode("utf-8")
+        c = _WIN_CREDENTIAL_WRITE()
+        c.Flags = 0
+        c.Type = CRED_TYPE_GENERIC
+        c.TargetName = "gemini:antigravity"
+        c.Comment = None
+        c.CredentialBlobSize = len(raw_bytes)
+        c.CredentialBlob = raw_bytes
+        c.Persist = CRED_PERSIST_LOCAL_MACHINE
+        c.AttributeCount = 0
+        c.Attributes = None
+        c.TargetAlias = None
+        c.UserName = "antigravity"
+        return bool(_CredWriteW(ctypes.byref(c), 0))
+    except Exception as e:
+        logger.warning(f"Failed to write to Windows keyring: {e}")
+        return False
+
+
+def _delete_windows_keyring_token() -> bool:
+    if not IS_WINDOWS:
+        return False
+    try:
+        return bool(_CredDeleteW("gemini:antigravity", CRED_TYPE_GENERIC, 0))
+    except Exception as e:
+        logger.debug(f"Failed to delete Windows keyring token: {e}")
+        return False
+
 
 TOKEN_FILE = GEMINI_DIR / "antigravity-oauth-token"
 ACCOUNTS_DIR = GEMINI_DIR / "accounts"
@@ -98,6 +201,21 @@ def get_account_meta_from_token_data(data: dict[str, Any]) -> dict[str, Any]:
 
 def sync_active_account_to_store():
     ensure_dirs()
+    # Si le fichier token n'existe pas, tente de le récupérer depuis le Credential Manager Windows
+    if not TOKEN_FILE.exists() and IS_WINDOWS:
+        keyring_data = _read_windows_keyring_token()
+        if keyring_data and isinstance(keyring_data, dict):
+            try:
+                temp = TOKEN_FILE.parent / f".{TOKEN_FILE.name}.tmp.{uuid.uuid4().hex[:8]}"
+                with open(temp, "w", encoding="utf-8") as f:
+                    json.dump(keyring_data, f, indent=2)
+                restrict_file_permissions(temp)
+                temp.replace(TOKEN_FILE)
+                restrict_file_permissions(TOKEN_FILE)
+                logger.info("Synchronisé le token Google depuis le gestionnaire d'identifiants Windows (gemini:antigravity).")
+            except Exception as e:
+                logger.warning(f"Failed to sync Windows keyring token to {TOKEN_FILE}: {e}")
+
     if not TOKEN_FILE.exists():
         return
     try:
@@ -127,6 +245,8 @@ def sync_active_account_to_store():
 
 def get_active_account() -> dict[str, Any] | None:
     ensure_dirs()
+    if not TOKEN_FILE.exists():
+        sync_active_account_to_store()
     if not TOKEN_FILE.exists():
         return None
     try:
@@ -222,6 +342,16 @@ def switch_google_account(target_email: str) -> dict[str, Any]:
                 logger.debug(f"Ignored error: {e}")
 
     clear_account_exhaustion(target_email)
+
+    # Sync to Windows keyring as well so agy uses the switched account!
+    if IS_WINDOWS:
+        try:
+            with open(target_file, "r", encoding="utf-8") as f:
+                target_data = json.load(f)
+            _write_windows_keyring_token(target_data)
+        except Exception as e:
+            logger.warning(f"Failed to sync Windows keyring on switch: {e}")
+
     active_meta = get_active_account()
     logger.info(f"Switched Google account to {target_email}")
     return {
@@ -301,13 +431,16 @@ def _spawn_login_process(env):
     POSIX : pty.openpty() ; Windows : pywinpty.
     Retourne (proc, master_fd, win_pty).
     """
+    # Utilise un répertoire temporaire neutre pour éviter de charger des MCP lents configurés localement
+    spawn_cwd = os.environ.get("TEMP") or str(HOME)
+
     if IS_WINDOWS:
         if not HAS_WINPTY:
             raise RuntimeError(
                 "La connexion Google nécessite le paquet « pywinpty » sous Windows "
                 "(pip install pywinpty)."
             )
-        win_pty = winpty.PtyProcess.spawn([AGY_BIN, "-p", "auth_login_init"], cwd=str(HOME), env=env)
+        win_pty = winpty.PtyProcess.spawn([AGY_BIN, "-p", "auth_login_init"], cwd=str(spawn_cwd), env=env)
         return win_pty, None, win_pty
 
     if not HAS_PTY:
@@ -320,7 +453,7 @@ def _spawn_login_process(env):
         stderr=slave_fd,
         close_fds=True,
         env=env,
-        cwd=str(HOME)
+        cwd=str(spawn_cwd)
     )  # nosec B603
     os.close(slave_fd)
     return proc, master_fd, None
@@ -335,7 +468,7 @@ def _clean_auth_url(raw_url: str) -> str:
     return cleaned.rstrip("'\"`>)];.,")
 
 
-def _read_auth_url(proc, master_fd, win_pty, timeout: float = 12.0):
+def _read_auth_url(proc, master_fd, win_pty, timeout: float = 25.0):
     """Lit la sortie du CLI jusqu'à capturer l'URL OAuth Google."""
     import queue
     import threading
@@ -405,10 +538,25 @@ def start_google_login_flow() -> dict[str, Any]:
 
     session_id = f"gauth_{int(time.time())}_{os.urandom(4).hex()}"
     stash_path = GEMINI_DIR / f"antigravity-oauth-token.stash_{session_id}"
+    keyring_stash_path = GEMINI_DIR / f"gemini-keyring.stash_{session_id}"
 
     # Stash current token temporarily so agy is forced to initiate OAuth
     if TOKEN_FILE.exists():
         shutil.move(TOKEN_FILE, stash_path)
+
+    # Stash current Windows keyring token temporarily if present
+    stashed_keyring = False
+    if IS_WINDOWS:
+        kw_token = _read_windows_keyring_token()
+        if kw_token:
+            try:
+                with open(keyring_stash_path, "w", encoding="utf-8") as f:
+                    json.dump(kw_token, f, indent=2)
+                restrict_file_permissions(keyring_stash_path)
+                _delete_windows_keyring_token()
+                stashed_keyring = True
+            except Exception as e:
+                logger.warning(f"Failed to stash Windows keyring: {e}")
 
     proc = None
     master_fd = None
@@ -418,7 +566,7 @@ def start_google_login_flow() -> dict[str, Any]:
         env["HOME"] = str(HOME)
 
         proc, master_fd, win_pty = _spawn_login_process(env)
-        auth_url, output = _read_auth_url(proc, master_fd, win_pty, timeout=12.0)
+        auth_url, output = _read_auth_url(proc, master_fd, win_pty, timeout=25.0)
 
         if not auth_url:
             logger.error(f"Failed to capture Google auth URL. agy output: {output!r}")
@@ -431,6 +579,7 @@ def start_google_login_flow() -> dict[str, Any]:
                 "win_pty": win_pty is not None,
                 "started_at": time.time(),
                 "stash_path": str(stash_path),
+                "keyring_stash_path": str(keyring_stash_path) if stashed_keyring else None,
                 "auth_url": auth_url
             }
 
@@ -443,6 +592,14 @@ def start_google_login_flow() -> dict[str, Any]:
     except Exception:
         _close_login_resources(master_fd, proc)
         _restore_stash(stash_path)
+        if stashed_keyring and keyring_stash_path.exists():
+            try:
+                with open(keyring_stash_path, "r", encoding="utf-8") as f:
+                    rest_data = json.load(f)
+                _write_windows_keyring_token(rest_data)
+                keyring_stash_path.unlink(missing_ok=True)
+            except Exception as e:
+                logger.warning(f"Failed to restore keyring from stash: {e}")
         raise
 
 
@@ -455,6 +612,8 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
     proc = session["proc"]
     master_fd = session.get("master_fd")
     stash_path = Path(session["stash_path"])
+    keyring_stash_str = session.get("keyring_stash_path")
+    keyring_stash_path = Path(keyring_stash_str) if keyring_stash_str else None
 
     code = raw_input.strip()
     # If the user pasted the entire redirect URL e.g. https://...?code=... or fragment or code=...
@@ -519,17 +678,36 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
         _close_login_resources(master_fd, proc)
 
         if not token_ready or not TOKEN_FILE.exists():
-            # Auth failed, restore previous token
+            # Auth failed, restore previous tokens
             _restore_stash(stash_path)
+            if keyring_stash_path and keyring_stash_path.exists():
+                try:
+                    with open(keyring_stash_path, "r", encoding="utf-8") as f:
+                        kdata = json.load(f)
+                    _write_windows_keyring_token(kdata)
+                    keyring_stash_path.unlink(missing_ok=True)
+                except Exception as e:
+                    logger.warning(f"Failed to restore keyring from stash: {e}")
             raise RuntimeError("Échec de l'échange du jeton avec Google: le token n'a pas été généré ou est invalide.")
 
-        # Auth succeeded! Clean up stash
+        # Auth succeeded! Clean up stashes
         if stash_path.exists():
             stash_path.unlink(missing_ok=True)
+        if keyring_stash_path and keyring_stash_path.exists():
+            keyring_stash_path.unlink(missing_ok=True)
 
         restrict_file_permissions(TOKEN_FILE)
         sync_active_account_to_store()
         active_meta = get_active_account()
+
+        # Update Windows keyring with new token so agy CLI uses it directly
+        if IS_WINDOWS:
+            try:
+                with open(TOKEN_FILE, "r", encoding="utf-8") as f:
+                    new_token_data = json.load(f)
+                _write_windows_keyring_token(new_token_data)
+            except Exception as e:
+                logger.warning(f"Failed to update Windows keyring after login: {e}")
 
         with _login_lock:
             _LOGIN_SESSIONS.pop(session_id, None)
@@ -543,6 +721,14 @@ def submit_google_auth_code(session_id: str, raw_input: str) -> dict[str, Any]:
     except Exception:
         _close_login_resources(master_fd, proc)
         _restore_stash(stash_path)
+        if keyring_stash_path and keyring_stash_path.exists():
+            try:
+                with open(keyring_stash_path, "r", encoding="utf-8") as f:
+                    kdata = json.load(f)
+                _write_windows_keyring_token(kdata)
+                keyring_stash_path.unlink(missing_ok=True)
+            except Exception as e:
+                logger.warning(f"Failed to restore keyring from stash: {e}")
         with _login_lock:
             _LOGIN_SESSIONS.pop(session_id, None)
         raise
@@ -555,6 +741,16 @@ def cancel_google_login_flow(session_id: str) -> dict[str, Any]:
         _close_login_resources(session.get("master_fd"), session.get("proc"))
         stash_path = Path(session["stash_path"])
         _restore_stash(stash_path)
+        keyring_stash_str = session.get("keyring_stash_path")
+        if keyring_stash_str and Path(keyring_stash_str).exists():
+            try:
+                p = Path(keyring_stash_str)
+                with open(p, "r", encoding="utf-8") as f:
+                    kdata = json.load(f)
+                _write_windows_keyring_token(kdata)
+                p.unlink(missing_ok=True)
+            except Exception as e:
+                logger.warning(f"Failed to restore keyring on cancel: {e}")
     return {"success": True, "message": "Session annulée"}
 
 
@@ -580,20 +776,36 @@ def restore_stashed_token_if_needed() -> None:
                     logger.info(f"Orphan token stash supprimé : {p.name}")
                 except Exception as e:
                     logger.debug(f"Impossible de supprimer l'orphan stash {p}: {e}")
-            return
+        else:
+            stashes = sorted(
+                GEMINI_DIR.glob("antigravity-oauth-token.stash_*"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            if stashes:
+                latest_stash = stashes[0]
+                shutil.move(latest_stash, TOKEN_FILE)
+                restrict_file_permissions(TOKEN_FILE)
+                logger.info(f"Token OAuth restauré depuis le stash orphelin : {latest_stash.name}")
+                for remaining in stashes[1:]:
+                    remaining.unlink(missing_ok=True)
 
-        stashes = sorted(
-            GEMINI_DIR.glob("antigravity-oauth-token.stash_*"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        if stashes:
-            latest_stash = stashes[0]
-            shutil.move(latest_stash, TOKEN_FILE)
-            restrict_file_permissions(TOKEN_FILE)
-            logger.info(f"Token OAuth restauré depuis le stash orphelin : {latest_stash.name}")
-            for remaining in stashes[1:]:
-                remaining.unlink(missing_ok=True)
+        if IS_WINDOWS:
+            keyring_stashes = sorted(
+                GEMINI_DIR.glob("gemini-keyring.stash_*"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            if keyring_stashes:
+                try:
+                    with open(keyring_stashes[0], "r", encoding="utf-8") as f:
+                        kdata = json.load(f)
+                    _write_windows_keyring_token(kdata)
+                    logger.info(f"Keyring Windows restauré depuis le stash orphelin : {keyring_stashes[0].name}")
+                except Exception as e:
+                    logger.warning(f"Erreur restauration keyring orphan: {e}")
+                for kp in keyring_stashes:
+                    kp.unlink(missing_ok=True)
     except Exception as e:
         logger.warning(f"Erreur lors de la vérification des stashes orphelins : {e}")
 
@@ -635,6 +847,13 @@ def import_raw_token(token_data: dict[str, Any]) -> dict[str, Any]:
                 logger.debug(f"Ignored error: {e}")
 
     clear_account_exhaustion(email)
+
+    if IS_WINDOWS:
+        try:
+            _write_windows_keyring_token(token_data)
+        except Exception as e:
+            logger.warning(f"Failed to sync Windows keyring on import: {e}")
+
     return {
         "success": True,
         "active_account": get_active_account(),
