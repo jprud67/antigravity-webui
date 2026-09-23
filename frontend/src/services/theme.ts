@@ -174,13 +174,50 @@ export const AVAILABLE_SKINS: SkinOption[] = [
   }
 ];
 
+export interface AccentPreset {
+  id: string;
+  name: string;
+  hex: string;
+}
+
+export const ACCENT_PRESETS: AccentPreset[] = [
+  { id: 'sky', name: 'Bleu Ciel', hex: '#38BDF8' },
+  { id: 'cyan', name: 'Néon Cyan', hex: '#06B6D4' },
+  { id: 'purple', name: 'Cyber Violet', hex: '#A855F7' },
+  { id: 'emerald', name: 'Émeraude', hex: '#10B981' },
+  { id: 'gold', name: 'Or Solaire', hex: '#FACC15' },
+  { id: 'orange', name: 'Ambre Cuivré', hex: '#F97316' },
+  { id: 'rose', name: 'Sunset Rose', hex: '#EC4899' },
+  { id: 'crimson', name: 'Rouge Crimson', hex: '#EF4444' },
+  { id: 'indigo', name: 'Indigo Profond', hex: '#6366F1' },
+];
+
 export type FontSizeOption = 'small' | 'default' | 'large' | 'xlarge';
 
 const THEME_KEY = 'antigravity_theme';
 const SKIN_KEY = 'antigravity_skin';
 const FONT_SIZE_KEY = 'antigravity_font_size';
+const CUSTOM_ACCENT_KEY = 'antigravity_custom_accent';
+const OLED_MODE_KEY = 'antigravity_oled_mode';
 
 let systemMediaListener: ((e: MediaQueryListEvent) => void) | null = null;
+
+export function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const clean = hex.replace('#', '').trim();
+  if (clean.length === 3) {
+    const r = parseInt(clean[0] + clean[0], 16);
+    const g = parseInt(clean[1] + clean[1], 16);
+    const b = parseInt(clean[2] + clean[2], 16);
+    return { r, g, b };
+  }
+  if (clean.length === 6) {
+    const r = parseInt(clean.substring(0, 2), 16);
+    const g = parseInt(clean.substring(2, 4), 16);
+    const b = parseInt(clean.substring(4, 6), 16);
+    return { r, g, b };
+  }
+  return null;
+}
 
 export function getStoredTheme(): ThemeMode {
   const t = localStorage.getItem(THEME_KEY) || localStorage.getItem('hermes-theme');
@@ -199,6 +236,28 @@ export function getStoredSkin(): string {
   return 'default';
 }
 
+export function getStoredCustomAccent(): string | null {
+  return localStorage.getItem(CUSTOM_ACCENT_KEY) || null;
+}
+
+export function setCustomAccent(hex: string | null) {
+  if (hex) {
+    localStorage.setItem(CUSTOM_ACCENT_KEY, hex);
+  } else {
+    localStorage.removeItem(CUSTOM_ACCENT_KEY);
+  }
+  applyAppearance();
+}
+
+export function getStoredOledMode(): boolean {
+  return localStorage.getItem(OLED_MODE_KEY) === 'true';
+}
+
+export function setOledMode(enabled: boolean) {
+  localStorage.setItem(OLED_MODE_KEY, enabled ? 'true' : 'false');
+  applyAppearance();
+}
+
 export function getStoredFontSize(): FontSizeOption {
   const f = localStorage.getItem(FONT_SIZE_KEY) || localStorage.getItem('hermes-font-size');
   if (f === 'small' || f === 'default' || f === 'large' || f === 'xlarge') {
@@ -213,14 +272,28 @@ export function setFontSize(size: FontSizeOption) {
   window.dispatchEvent(new CustomEvent('antigravity-font-size-change', { detail: { fontSize: size } }));
 }
 
-export function applyAppearance(themeMode?: ThemeMode, skinName?: string, fontSize?: FontSizeOption) {
+export function applyAppearance(
+  themeMode?: ThemeMode, 
+  skinName?: string, 
+  fontSize?: FontSizeOption,
+  customAccentHex?: string | null,
+  oledMode?: boolean
+) {
   const targetTheme = themeMode || getStoredTheme();
   const targetSkin = skinName !== undefined ? skinName : getStoredSkin();
   const targetFontSize = fontSize || getStoredFontSize();
+  const targetCustomAccent = customAccentHex !== undefined ? customAccentHex : getStoredCustomAccent();
+  const targetOled = oledMode !== undefined ? oledMode : getStoredOledMode();
 
   localStorage.setItem(THEME_KEY, targetTheme);
   localStorage.setItem(SKIN_KEY, targetSkin);
   localStorage.setItem(FONT_SIZE_KEY, targetFontSize);
+  if (targetCustomAccent) {
+    localStorage.setItem(CUSTOM_ACCENT_KEY, targetCustomAccent);
+  } else {
+    localStorage.removeItem(CUSTOM_ACCENT_KEY);
+  }
+  localStorage.setItem(OLED_MODE_KEY, targetOled ? 'true' : 'false');
 
   const root = document.documentElement;
   root.setAttribute('data-font-size', targetFontSize);
@@ -261,9 +334,15 @@ export function applyAppearance(themeMode?: ThemeMode, skinName?: string, fontSi
   if (isDark) {
     root.classList.add('dark');
     root.setAttribute('color-scheme', 'dark');
+    if (targetOled) {
+      root.setAttribute('data-oled', 'true');
+    } else {
+      root.removeAttribute('data-oled');
+    }
   } else {
     root.classList.remove('dark');
     root.setAttribute('color-scheme', 'light');
+    root.removeAttribute('data-oled');
   }
 
   // Set Skin attribute
@@ -273,12 +352,40 @@ export function applyAppearance(themeMode?: ThemeMode, skinName?: string, fontSi
     root.setAttribute('data-skin', targetSkin);
   }
 
+  // Apply custom accent if set, otherwise clean inline overrides
+  if (targetCustomAccent) {
+    const rgb = hexToRgb(targetCustomAccent);
+    if (rgb) {
+      root.style.setProperty('--accent', targetCustomAccent);
+      root.style.setProperty('--accent-hover', targetCustomAccent);
+      root.style.setProperty('--accent-text', targetCustomAccent);
+      root.style.setProperty('--accent-bg', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12)`);
+      root.style.setProperty('--accent-bg-strong', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.22)`);
+      root.style.setProperty('--focus-ring', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35)`);
+      root.style.setProperty('--focus-glow', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12)`);
+    }
+  } else {
+    root.style.removeProperty('--accent');
+    root.style.removeProperty('--accent-hover');
+    root.style.removeProperty('--accent-text');
+    root.style.removeProperty('--accent-bg');
+    root.style.removeProperty('--accent-bg-strong');
+    root.style.removeProperty('--focus-ring');
+    root.style.removeProperty('--focus-glow');
+  }
+
   root.setAttribute('data-theme', targetTheme);
 
   // Dispatch custom event for all components
   window.dispatchEvent(
     new CustomEvent('antigravity-appearance-change', {
-      detail: { theme: targetTheme, skin: targetSkin, isDark }
+      detail: { 
+        theme: targetTheme, 
+        skin: targetSkin, 
+        isDark,
+        oled: targetOled && isDark,
+        customAccent: targetCustomAccent
+      }
     })
   );
 }

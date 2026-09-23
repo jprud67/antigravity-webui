@@ -96,6 +96,25 @@
   color-scheme: dark;
 }
 
+/* ── OLED Pure Black Mode ── */
+:root.dark[data-oled="true"] {
+  --bg: #000000;
+  --sidebar: #050505;
+  --surface: #0a0a0a;
+  --main-bg: #000000;
+  --code-bg: #000000;
+  --topbar-bg: rgba(0, 0, 0, 0.95);
+  --surface-subtle: #111111;
+  --surface-subtle-hover: #181818;
+  --border: #1f1f1f;
+  --border2: #2a2a2a;
+  --border-subtle: #171717;
+  --border-muted: #262626;
+  --input-bg: #0d0d0d;
+  --user-bubble-bg: #121212;
+  --user-bubble-border: #222222;
+}
+
 /* ── Skin: Ares (red) ── */
 :root[data-skin="ares"] { --accent: #C0392B; --accent-hover: #A93226; --accent-bg: rgba(192,57,43,0.08); --accent-bg-strong: rgba(192,57,43,0.15); --accent-text: #922B21; }
 :root.dark[data-skin="ares"] { --accent: #FF4444; --accent-hover: #CC3333; --accent-bg: rgba(255,68,68,0.08); --accent-bg-strong: rgba(255,68,68,0.15); --accent-text: #FF4444; }

@@ -32,16 +32,18 @@ import {
   ArrowUpDown,
   BarChart3,
   RotateCcw,
-  FileArchive
+  FileArchive,
+  BookmarkPlus,
+  Star
 } from 'lucide-react';
 import type { Conversation } from '../types';
-import { getStoredTheme, applyAppearance, type ThemeMode } from '../services/theme';
 import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 import type { GoogleAccountInfo } from '../services/api';
 import { bulkConversationAction, bulkConversationExport, exportConversationsZip, importConversation } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
+import { QuickThemePopover } from './QuickThemePopover';
 
 function parseSafeDate(dateVal: any): Date {
   if (!dateVal) return new Date();
@@ -57,6 +59,36 @@ function parseSafeDate(dateVal: any): Date {
     return new Date(s.replace(' ', 'T'));
   }
   return new Date(dateVal);
+}
+
+export interface SavedFilterView {
+  id: string;
+  name: string;
+  tags: string[];
+  dateFilter: 'all' | 'today' | '7d' | '30d';
+  project: string | null;
+  sortOrder: 'recent' | 'oldest' | 'alpha_asc' | 'alpha_desc';
+  search?: string;
+  createdAt: number;
+}
+
+const SAVED_VIEWS_STORAGE_KEY = 'antigravity_saved_views';
+
+function loadStoredSavedViews(): SavedFilterView[] {
+  try {
+    const raw = localStorage.getItem(SAVED_VIEWS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+function persistSavedViews(views: SavedFilterView[]) {
+  try {
+    localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, JSON.stringify(views));
+  } catch {}
 }
 
 interface SidebarProps {
@@ -120,12 +152,21 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
   const [searchFilter, setSearchFilter] = useState('');
   
+  // Theme quick popover
+  const [isThemePopoverOpen, setIsThemePopoverOpen] = useState(false);
+
   // Advanced filters & sorting states
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'recent' | 'oldest' | 'alpha_asc' | 'alpha_desc'>('recent');
+
+  // Saved Filter Views
+  const [savedViews, setSavedViews] = useState<SavedFilterView[]>(loadStoredSavedViews);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [showSaveViewModal, setShowSaveViewModal] = useState(false);
+  const [newViewName, setNewViewName] = useState('');
 
   // Bulk mode states
   const [isBulkMode, setIsBulkMode] = useState(false);
@@ -195,7 +236,55 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     setProjectFilter(null);
     setSortOrder('recent');
     setSearchFilter('');
+    setActiveViewId(null);
   }, []);
+
+  const handleApplySavedView = (view: SavedFilterView) => {
+    if (activeViewId === view.id) {
+      setActiveViewId(null);
+      handleResetFilters();
+    } else {
+      setActiveViewId(view.id);
+      setSelectedTags(view.tags || []);
+      setDateFilter(view.dateFilter || 'all');
+      setProjectFilter(view.project || null);
+      setSortOrder(view.sortOrder || 'recent');
+      if (view.search) {
+        setSearchFilter(view.search);
+        onSearchQuery?.(view.search);
+      }
+    }
+  };
+
+  const handleSaveCurrentView = () => {
+    if (!newViewName.trim()) return;
+    const newView: SavedFilterView = {
+      id: 'view_' + Date.now(),
+      name: newViewName.trim(),
+      tags: selectedTags,
+      dateFilter,
+      project: projectFilter,
+      sortOrder,
+      search: searchFilter || undefined,
+      createdAt: Date.now(),
+    };
+    const updated = [...savedViews, newView];
+    setSavedViews(updated);
+    persistSavedViews(updated);
+    setActiveViewId(newView.id);
+    setNewViewName('');
+    setShowSaveViewModal(false);
+    showToast(t('toast_view_saved', 'Vue de filtre enregistrée : {0}').replace('{0}', newView.name), 'success');
+  };
+
+  const handleDeleteSavedView = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = savedViews.filter((v) => v.id !== id);
+    setSavedViews(updated);
+    persistSavedViews(updated);
+    if (activeViewId === id) setActiveViewId(null);
+    showToast(t('toast_view_deleted', 'Vue supprimée'), 'info');
+  };
 
   const handleToggleTag = useCallback((tag: string) => {
     const lower = tag.toLowerCase();
@@ -1011,7 +1100,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               </div>
             )}
 
-            {/* Filter Drawer Footer: count, reset button, and export filtered ZIP */}
+            {/* Filter Drawer Footer: count, reset button, save view, and export filtered ZIP */}
             <div className="pt-2 border-t flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
               <div className="flex items-center gap-1.5 text-[11px] font-mono" style={{ color: 'var(--muted)' }}>
                 <span>{filtered.length} session(s)</span>
@@ -1028,21 +1117,78 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={handleExportFilteredZip}
-                disabled={filtered.length === 0}
-                className="px-2 py-1 rounded-lg text-[10px] font-medium border flex items-center gap-1 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40"
-                style={{
-                  borderColor: 'var(--border)',
-                  color: 'var(--accent)',
-                }}
-                title={t('export_filtered_zip', 'Exporter ces sessions en archive ZIP')}
-              >
-                <FileArchive className="w-3 h-3 text-amber-500" />
-                <span>ZIP ({filtered.length})</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                {(activeFilterCount > 0 || searchFilter.trim()) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewViewName('');
+                      setShowSaveViewModal(true);
+                    }}
+                    className="px-2 py-1 rounded-lg text-[10px] font-medium border flex items-center gap-1 transition-colors cursor-pointer text-amber-500 hover:bg-amber-500/10"
+                    style={{
+                      borderColor: 'rgba(245, 158, 11, 0.3)',
+                    }}
+                    title="Sauvegarder cette combinaison de filtres"
+                  >
+                    <BookmarkPlus className="w-3 h-3" />
+                    <span>Sauvegarder</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleExportFilteredZip}
+                  disabled={filtered.length === 0}
+                  className="px-2 py-1 rounded-lg text-[10px] font-medium border flex items-center gap-1 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40"
+                  style={{
+                    borderColor: 'var(--border)',
+                    color: 'var(--accent)',
+                  }}
+                  title={t('export_filtered_zip', 'Exporter ces sessions en archive ZIP')}
+                >
+                  <FileArchive className="w-3 h-3 text-amber-500" />
+                  <span>ZIP ({filtered.length})</span>
+                </button>
+              </div>
             </div>
+          </div>
+        )}
+
+        {/* Saved Filter Views Chips Bar */}
+        {savedViews.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[10px] font-sans">
+            <span className="text-[9px] uppercase font-bold tracking-wider opacity-60 flex items-center gap-0.5 shrink-0 pl-0.5 text-amber-500">
+              <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+              Vues :
+            </span>
+            {savedViews.map((v) => {
+              const active = activeViewId === v.id;
+              return (
+                <div
+                  key={v.id}
+                  onClick={() => handleApplySavedView(v)}
+                  className="group flex items-center gap-1 px-2 py-0.5 rounded-full border cursor-pointer whitespace-nowrap transition-all shadow-xs"
+                  style={{
+                    backgroundColor: active ? 'rgba(245, 158, 11, 0.15)' : 'var(--surface)',
+                    borderColor: active ? '#F59E0B' : 'var(--border)',
+                    color: active ? '#F59E0B' : 'var(--text)',
+                    fontWeight: active ? 600 : 400,
+                  }}
+                  title={`Vue: ${v.name}`}
+                >
+                  <span>{v.name}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteSavedView(v.id, e)}
+                    className="opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-opacity ml-0.5 cursor-pointer"
+                    title="Supprimer cette vue"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -1729,14 +1875,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             )}
 
             <button
-              onClick={() => {
-                const modes: ThemeMode[] = ['dark', 'light', 'system'];
-                const current = getStoredTheme();
-                const nextIdx = (modes.indexOf(current) + 1) % modes.length;
-                applyAppearance(modes[nextIdx], undefined);
-              }}
-              className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
-              style={{ color: 'var(--muted)' }}
+              onClick={() => setIsThemePopoverOpen((prev) => !prev)}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                isThemePopoverOpen ? 'bg-amber-500/20 text-amber-400' : 'hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+              style={{ color: isThemePopoverOpen ? 'var(--accent)' : 'var(--muted)' }}
               title={t("change_visual_theme", "Quickly change visual theme")}
             >
               <Palette className="w-4 h-4" />
@@ -2013,6 +2156,135 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                   <span>Appliquer</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Theme Popover */}
+      <QuickThemePopover
+        isOpen={isThemePopoverOpen}
+        onClose={() => setIsThemePopoverOpen(false)}
+      />
+
+      {/* Save Filter View Modal */}
+      {showSaveViewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div
+            className="w-full max-w-sm rounded-2xl p-5 shadow-2xl border space-y-4 animate-scaleUp"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border)',
+              color: 'var(--text)',
+            }}
+          >
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border)' }}>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                  <BookmarkPlus className="w-4 h-4 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm" style={{ color: 'var(--strong)' }}>
+                    Sauvegarder la vue
+                  </h3>
+                  <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                    {filtered.length} session(s) correspondent
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSaveViewModal(false)}
+                className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text)' }}>
+                  Nom de la vue :
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Bugs Frontend, Projet Alpha, 7 derniers jours..."
+                  value={newViewName}
+                  onChange={(e) => setNewViewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveCurrentView();
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-xl text-xs focus:outline-none transition-colors"
+                  style={{
+                    backgroundColor: 'var(--input-bg)',
+                    borderColor: 'var(--border)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text)',
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              {/* Suggestions */}
+              <div>
+                <span className="text-[10px] uppercase font-semibold tracking-wider block mb-1" style={{ color: 'var(--muted)' }}>
+                  Idées rapides :
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {['Tâches récentes', 'Bugs & Fixes', 'Projet actif', 'Revue de code', 'Favoris'].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setNewViewName(preset)}
+                      className="px-2 py-0.5 rounded-full text-[10px] border transition-colors cursor-pointer"
+                      style={{
+                        backgroundColor: 'var(--surface-subtle)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--text)',
+                      }}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Active criteria summary */}
+              <div className="p-2.5 rounded-xl border space-y-1 text-[11px]" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface-subtle)' }}>
+                <div className="text-[10px] uppercase font-semibold" style={{ color: 'var(--muted)' }}>Critères enregistrés :</div>
+                {selectedTags.length > 0 && <div>Tags : <span className="font-mono text-emerald-400">{selectedTags.map(t => `#${t}`).join(', ')}</span></div>}
+                {projectFilter && <div>Projet : <span className="font-medium text-sky-400">{projectFilter}</span></div>}
+                {dateFilter !== 'all' && <div>Période : <span className="font-medium">{dateFilter}</span></div>}
+                {sortOrder !== 'recent' && <div>Tri : <span className="font-medium">{sortOrder}</span></div>}
+                {searchFilter && <div>Recherche : <span className="italic">"{searchFilter}"</span></div>}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
+              <button
+                type="button"
+                onClick={() => setShowSaveViewModal(false)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-medium border hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={!newViewName.trim()}
+                onClick={handleSaveCurrentView}
+                className="px-4 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--accent)',
+                  color: '#ffffff',
+                }}
+              >
+                <BookmarkPlus className="w-3.5 h-3.5" />
+                <span>Enregistrer</span>
+              </button>
             </div>
           </div>
         </div>
