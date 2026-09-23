@@ -313,22 +313,48 @@ def get_git_diff(
     workspace: str | None = Query(None),
     path: str | None = Query(None),
     staged: bool = Query(False),
+    commit: str | None = Query(None),
     _ = Depends(require_auth)
 ):
     target = _validate_workspace(workspace)
-    args = ["diff"]
-    if staged:
-        args.append("--cached")
+    MAX_DIFF_BYTES = 2 * 1024 * 1024  # 2 Mo
+    truncated = False
+
     norm_path = None
     if path:
         norm_path = _resolve_relative_git_path(path, target)
+
+    # Si un commit est spécifié, afficher le diff de ce commit (git show)
+    if commit:
+        clean_commit = commit.strip()
+        if clean_commit.startswith("-") or "--" in clean_commit or not re.match(r'^[a-zA-Z0-9_\-\./~^]+$', clean_commit):
+            raise HTTPException(status_code=400, detail="Identifiant de commit Git invalide.")
+        show_args = ["show", "--format=", clean_commit]
+        if norm_path:
+            show_args.extend(["--", norm_path])
+        show_res = run_git(show_args, target)
+        diff_text = show_res.stdout
+        if show_res.returncode != 0 and not diff_text:
+            raise HTTPException(status_code=400, detail=f"Impossible d'afficher le diff pour le commit {clean_commit}: {_mask_git_output(show_res.stderr)}")
+        if len(diff_text.encode("utf-8", errors="replace")) > MAX_DIFF_BYTES:
+            diff_text = diff_text[:MAX_DIFF_BYTES] + "\n\n[Diff volumineux tronqué à 2 Mo]"
+            truncated = True
+        return {
+            "workspace": str(target.resolve()),
+            "path": norm_path or path,
+            "commit": clean_commit,
+            "diff": _mask_git_output(diff_text),
+            "truncated": truncated
+        }
+
+    args = ["diff"]
+    if staged:
+        args.append("--cached")
+    if norm_path:
         args.extend(["--", norm_path])
 
     res = run_git(args, target)
     diff_text = res.stdout
-
-    MAX_DIFF_BYTES = 2 * 1024 * 1024  # 2 Mo
-    truncated = False
 
     # Fallback pour fichiers indexes, supprimes ou non suivis si aucun diff standard n'est trouve
     if not diff_text and norm_path:

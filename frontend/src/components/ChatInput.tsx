@@ -79,6 +79,7 @@ interface ChatInputProps {
   onOpenUpdates?: () => void;
   onShowUpdateCard?: () => void;
   onCompact?: () => void;
+  onOpenCompactor?: () => void;
   isCompacting?: boolean;
 }
 
@@ -134,6 +135,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
   onOpenUpdates,
   onShowUpdateCard,
   onCompact,
+  onOpenCompactor,
   isCompacting
 }) => {
   const { lang, t } = useI18n();
@@ -748,6 +750,17 @@ export const ChatInput = React.memo<ChatInputProps>(({
               : `[Compactage du contexte] Veuillez résumer et condenser l'historique de cette conversation de manière concise pour optimiser la fenêtre de contexte.`
           );
           showToast(t('toast_compress_sent', '🗜️ Context compression request sent...'), 'info');
+        }
+        return true;
+
+      case '/prune':
+      case '/elague':
+        if (onOpenCompactor) {
+          onOpenCompactor();
+        } else if (onCompact) {
+          onCompact();
+        } else {
+          showToast('Assistant d\'élagage non disponible.', 'info');
         }
         return true;
 
@@ -1750,6 +1763,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
               activePrompt={prompt}
               onNewChat={onNewChat}
               onCompact={onCompact}
+              onOpenCompactor={onOpenCompactor}
               isCompacting={isCompacting}
             />
           </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Gauge, Coins, BrainCircuit, ArrowDownRight, ArrowUpRight, Sparkles, Zap } from 'lucide-react';
+import { Gauge, Coins, BrainCircuit, ArrowDownRight, ArrowUpRight, Sparkles, Zap, Scissors } from 'lucide-react';
 import { useI18n } from '../services/i18n';
 
 export interface TokenUsageData {
@@ -16,6 +16,7 @@ interface ContextRingProps {
   activePrompt?: string;
   onNewChat?: () => void;
   onCompact?: () => void;
+  onOpenCompactor?: () => void;
   isCompacting?: boolean;
 }
 
@@ -25,6 +26,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
   activePrompt = '',
   onNewChat,
   onCompact,
+  onOpenCompactor,
   isCompacting
 }) => {
   const { t } = useI18n();
@@ -252,14 +254,29 @@ export const ContextRing: React.FC<ContextRingProps> = ({
             </span>
           </div>
 
-          {/* Context Actions (Compaction & Purge) */}
-          {(isContextHeavy || onCompact) && (
+          {/* Context Actions (Compaction, Pruning & Purge) */}
+          {(isContextHeavy || onCompact || onOpenCompactor) && (
             <div className="pt-2 mt-2 border-t flex flex-col gap-1.5" style={{ borderColor: 'var(--border)' }}>
               {isContextHeavy && (
                 <div className="flex items-start gap-1.5 text-[11px] text-amber-400 font-medium mb-1">
                   <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   <span>{t('context_heavy_warning', 'Contexte lourd : les prochains tours réinjecteront un volume élevé de tokens.')}</span>
                 </div>
+              )}
+              {onOpenCompactor && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowPopover(false);
+                    onOpenCompactor();
+                  }}
+                  className="w-full py-1.5 px-2 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  title="Studio d'élagage chirurgical et de réduction des tokens"
+                >
+                  <Scissors className="w-3 h-3 text-sky-400" />
+                  <span>{t('btn_prune_studio', "Studio d'élagage chirurgical...")}</span>
+                </button>
               )}
               {onCompact && (
                 <button

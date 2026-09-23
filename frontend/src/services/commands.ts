@@ -42,7 +42,8 @@ import {
   Coins,
   History,
   RefreshCw,
-  FileCode2
+  FileCode2,
+  Scissors
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -178,6 +179,15 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'action',
     icon: Zap,
     color: 'text-emerald-400',
+    isAction: true
+  },
+  {
+    cmd: '/prune',
+    descKey: 'cmd_desc_prune',
+    desc: 'Assistant et studio d\'élagage chirurgical du contexte',
+    category: 'action',
+    icon: Scissors,
+    color: 'text-cyan-400',
     isAction: true
   },
   {

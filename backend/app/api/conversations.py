@@ -19,6 +19,7 @@ from app.services.storage import (
     calculate_conversation_tokens,
     compact_conversation_in_place,
     create_conversation_handoff,
+    prune_conversation_steps,
     delete_conversation,
     export_conversation_html,
     export_conversation_markdown,
@@ -484,5 +485,27 @@ def compact_session(conversation_id: str, req: CompactRequest = Body(default_fac
     except Exception as e:
         logger.error(f"Error compacting conversation {conversation_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Échec du compactage : {e!s}")
+
+
+class PruneRequest(BaseModel):
+    step_indices: list[int] | None = None
+    preserve_last_n_turns: int = 2
+
+@router.post("/{conversation_id}/prune")
+def prune_session(conversation_id: str, req: PruneRequest = Body(default_factory=PruneRequest), _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
+    try:
+        res = prune_conversation_steps(
+            conversation_id,
+            step_indices=req.step_indices,
+            preserve_last_n_turns=req.preserve_last_n_turns
+        )
+        return res
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Error pruning conversation {conversation_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Échec de l'élagage : {e!s}")
 
 

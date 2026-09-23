@@ -271,6 +271,32 @@ export async function compactConversation(
   return res.json();
 }
 
+export interface PruneResult {
+  status: string;
+  conversation_id: string;
+  pruned_steps: number;
+  chars_saved: number;
+  tokens_saved: number;
+  reduction_pct: number;
+}
+
+export async function pruneConversation(
+  conversationId: string,
+  stepIndices?: number[],
+  preserveLastNTurns: number = 2
+): Promise<PruneResult> {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/prune`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ step_indices: stepIndices, preserve_last_n_turns: preserveLastNTurns })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'élagage" }));
+    throw new Error(err.detail || "Impossible d'élaguer la conversation");
+  }
+  return res.json();
+}
+
 export interface BulkActionPayload {
   action: 'delete' | 'pin' | 'unpin' | 'archive' | 'unarchive' | 'tag' | 'project' | 'export';
   conversation_ids: string[];
@@ -552,11 +578,17 @@ export async function fetchGitStatus(workspace?: string): Promise<GitStatusResul
   return res.json();
 }
 
-export async function fetchGitDiff(workspace?: string, path?: string, staged: boolean = false): Promise<{ workspace: string; path?: string; diff: string }> {
+export async function fetchGitDiff(
+  workspace?: string,
+  path?: string,
+  staged: boolean = false,
+  commit?: string
+): Promise<{ workspace: string; path?: string; commit?: string; diff: string; truncated?: boolean }> {
   const params = new URLSearchParams();
   if (workspace) params.append('workspace', workspace);
   if (path) params.append('path', path);
   if (staged) params.append('staged', 'true');
+  if (commit) params.append('commit', commit);
   const res = await fetch(`${API_BASE}/git/diff?${params.toString()}`, { headers: getHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch Git diff: ${res.statusText}`);
   return res.json();

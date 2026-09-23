@@ -17,6 +17,7 @@ const CronSchedulerModal = lazy(() => import('./components/CronSchedulerModal').
 const RulesEditorModal = lazy(() => import('./components/RulesEditorModal').then(m => ({ default: m.RulesEditorModal })));
 const HelpModal = lazy(() => import('./components/HelpModal').then(m => ({ default: m.HelpModal })));
 const AnalyticsModal = lazy(() => import('./components/AnalyticsModal').then(m => ({ default: m.AnalyticsModal })));
+const ContextCompactorModal = lazy(() => import('./components/ContextCompactorModal').then(m => ({ default: m.ContextCompactorModal })));
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption } from './types';
 import { parseStepsToMessages, cleanUserPrompt } from './utils/transcriptParser';
@@ -39,7 +40,8 @@ import {
   fetchChangelog,
   checkSystemUpdate,
   type GoogleAccountInfo,
-  type UpdateCheckResult
+  type UpdateCheckResult,
+  type PruneResult
 } from './services/api';
 import { chatSocket } from './services/ws';
 import { syncClient } from './services/sync';
@@ -241,6 +243,7 @@ export function App() {
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isContextCompactorOpen, setIsContextCompactorOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('models');
   const [activeGoogleAccount, setActiveGoogleAccount] = useState<GoogleAccountInfo | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
@@ -1361,6 +1364,24 @@ export function App() {
     }
   }, [activeConversationId]);
 
+  const handlePruneSuccess = useCallback(async (result: PruneResult) => {
+    if (!activeConversationId) return;
+    showToast(`Contexte élagué : -${result.tokens_saved.toLocaleString()} tokens (-${result.reduction_pct}%) !`, 'success');
+    try {
+      const freshData = await fetchConversationTranscript(activeConversationId);
+      const parsed = parseStepsToMessages(freshData?.steps || []);
+      setMessages(parsed);
+      const normUsage = normalizeUsage(freshData?.usage);
+      if (normUsage && normUsage.totalTokens > 0) {
+        setTokenUsage(normUsage);
+      } else {
+        setTokenUsage(estimateUsageFromMessages(parsed));
+      }
+    } catch (err) {
+      console.error('Failed to reload transcript after pruning:', err);
+    }
+  }, [activeConversationId]);
+
   const handleShowStatusCard = () => {
     const currentModelObj = models.find((m) => m.id === selectedModel) ||
       models.find((m) => selectedModel.startsWith(m.id)) ||
@@ -1796,6 +1817,7 @@ export function App() {
           onClearChat={() => setMessages([])}
           onNewChat={handleNewConversation}
           onCompact={handleCompactConversation}
+          onOpenCompactor={() => setIsContextCompactorOpen(true)}
           isCompacting={isCompacting}
           onOpenTerminal={() => openRightPanel('terminal')}
           onOpenGit={() => openRightPanel('git')}
@@ -1907,6 +1929,15 @@ export function App() {
         tokenUsage={tokenUsage}
         conversations={conversations}
         activeModel={displayModelName}
+      />
+
+      <ContextCompactorModal
+        isOpen={isContextCompactorOpen}
+        onClose={() => setIsContextCompactorOpen(false)}
+        conversationId={activeConversationId}
+        activeModel={selectedModel}
+        usage={tokenUsage}
+        onPruneSuccess={handlePruneSuccess}
       />
 
       <WorkspaceModal

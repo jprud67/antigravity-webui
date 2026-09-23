@@ -1041,6 +1041,107 @@ def compact_conversation_in_place(conversation_id: str, preserve_last_n_turns: i
     }
 
 
+def prune_conversation_steps(
+    conversation_id: str,
+    step_indices: list[int] | None = None,
+    preserve_last_n_turns: int = 2
+) -> dict[str, Any]:
+    """
+    Élagage ciblé d'étapes de conversation :
+    - Sauvegarde l'intégralité dans transcript_full.jsonl.
+    - Si step_indices est fourni, élague précisément ces étapes.
+    - Si step_indices est None/vide, applique la préservation des N derniers tours.
+    - Tronque le contenu verbeux tout en conservant statut, rôle et type.
+    - Écrit atomiquement transcript.jsonl et notifie les observateurs.
+    """
+    if not is_safe_conversation_id(conversation_id):
+        raise ValueError("Identifiant de conversation non valide")
+
+    conv_dir = BRAIN_DIR / conversation_id
+    logs_dir = conv_dir / ".system_generated" / "logs"
+    transcript_path = logs_dir / "transcript.jsonl"
+    transcript_full_path = logs_dir / "transcript_full.jsonl"
+
+    if not transcript_path.exists() or transcript_path.stat().st_size == 0:
+        raise ValueError("Aucun transcript à élaguer")
+
+    raw_lines: list[str] = []
+    with open(transcript_path, "r", encoding="utf-8-sig", errors="replace") as f:
+        raw_lines = [l.strip().lstrip("\ufeff") for l in f if l.strip().lstrip("\ufeff")]
+
+    steps: list[dict[str, Any]] = []
+    for l in raw_lines:
+        try:
+            steps.append(json.loads(l))
+        except Exception:
+            continue
+
+    if not steps:
+        raise ValueError("Transcript vide ou corrompu")
+
+    if not transcript_full_path.exists() or transcript_full_path.stat().st_size < transcript_path.stat().st_size:
+        atomic_write_jsonl(transcript_full_path, steps)
+
+    chars_before = sum(len(str(s.get("content") or "")) for s in steps)
+    pruned_count = 0
+
+    target_indices_set = set(step_indices) if step_indices is not None and len(step_indices) > 0 else None
+
+    if target_indices_set is not None:
+        for idx in target_indices_set:
+            if 0 <= idx < len(steps):
+                s = steps[idx]
+                cnt = str(s.get("content") or "")
+                if len(cnt) > 120:
+                    is_err = s.get("status") == "ERROR" or bool(s.get("error"))
+                    status_desc = "Erreur" if is_err else "Succès"
+                    s["content"] = f"[✓ {status_desc} — Contenu élagué pour économie de tokens. Version intégrale dans transcript_full.jsonl]"
+                    s["is_truncated"] = True
+                    s["truncated_fields"] = ["content"]
+                    pruned_count += 1
+    else:
+        user_step_indices = [
+            i for i, s in enumerate(steps)
+            if (
+                (s.get("type") or "").upper() == "USER_INPUT"
+                or (s.get("source") or "").upper() == "USER_EXPLICIT"
+                or (s.get("role") or "").lower() == "user"
+            )
+        ]
+        boundary_idx = 0
+        if len(user_step_indices) > preserve_last_n_turns:
+            boundary_idx = user_step_indices[-preserve_last_n_turns]
+
+        for i in range(boundary_idx):
+            s = steps[i]
+            stype = (s.get("type") or "").upper()
+            if stype in TOOL_STEP_TYPES or is_tool_output_content(s.get("content")):
+                cnt = str(s.get("content") or "")
+                if len(cnt) > 120:
+                    is_err = s.get("status") == "ERROR" or bool(s.get("error"))
+                    status_desc = "Erreur" if is_err else "Succès"
+                    s["content"] = f"[✓ {status_desc} — Contenu élagué pour économie de tokens. Version intégrale dans transcript_full.jsonl]"
+                    s["is_truncated"] = True
+                    s["truncated_fields"] = ["content"]
+                    pruned_count += 1
+
+    chars_after = sum(len(str(s.get("content") or "")) for s in steps)
+    chars_saved = max(0, chars_before - chars_after)
+    tokens_saved = int(chars_saved / 3.8)
+
+    atomic_write_jsonl(transcript_path, steps)
+    _notify_transcript_changed(conversation_id)
+
+    return {
+        "status": "ok",
+        "conversation_id": conversation_id,
+        "pruned_steps": pruned_count,
+        "chars_saved": chars_saved,
+        "tokens_saved": tokens_saved,
+        "reduction_pct": round((chars_saved / max(1, chars_before)) * 100, 1)
+    }
+
+
 def _safe_copy_artifacts(source_dir: Path, target_dir: Path) -> None:
     """
     Copie de façon sécurisée les artefacts d'une session source vers une session cible.
