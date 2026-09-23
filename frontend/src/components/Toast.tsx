@@ -58,17 +58,23 @@ const ToastEntry: React.FC<{ item: ToastItem; onDismiss: (id: string) => void }>
 
   return (
     <div
-      className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-lg backdrop-blur-sm max-w-sm transition-all duration-250 ${BG_MAP[item.type]} ${exiting ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}`}
-      style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', borderWidth: 1 }}
+      className={`glass-panel flex items-center gap-2.5 px-4 py-2.5 border shadow-lg max-w-sm ${BG_MAP[item.type]}`}
+      style={{
+        color: 'var(--text)',
+        borderWidth: 1,
+        animation: exiting
+          ? 'ag-toast-out var(--transition-base) var(--ease-out-expo) forwards'
+          : 'ag-toast-in var(--transition-base) var(--ease-spring) both',
+      }}
       role="alert"
+      aria-live="assertive"
     >
       <Icon className={`w-4 h-4 shrink-0 ${COLOR_MAP[item.type]}`} />
       <span className="text-sm leading-snug flex-1" style={{ fontFamily: 'var(--font-ui)' }}>{item.message}</span>
       <button
         onClick={handleDismiss}
-        className="shrink-0 p-0.5 rounded hover:bg-white/10 transition-colors"
-        style={{ color: 'var(--muted)' }}
-        aria-label="Close"
+        className="btn-icon shrink-0"
+        aria-label="Fermer la notification"
       >
         <X className="w-3 h-3" />
       </button>

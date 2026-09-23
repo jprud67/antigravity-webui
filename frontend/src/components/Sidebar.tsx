@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { 
   Plus, 
   MessageSquare, 
@@ -276,7 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     });
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = useCallback(async () => {
     if (selectedConvIds.size === 0) return;
     const count = selectedConvIds.size;
     if (!(await showConfirm(t('confirm_bulk_delete', 'Permanently delete these {0} session(s)? This action cannot be undone.').replace('{0}', String(count)), { destructive: true }))) {
@@ -305,7 +305,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       }
       setIsBulkLoading(false);
     }
-  };
+  }, [selectedConvIds, t, activeConversationId, onNewConversation, onRefreshConversations]);
 
   const handleBulkPin = async (pinState: boolean) => {
     if (selectedConvIds.size === 0) return;
@@ -435,6 +435,27 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     }
   };
 
+  // Keyboard shortcut: Delete to trigger bulk delete, Escape to exit bulk mode
+  useEffect(() => {
+    if (!isBulkMode) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (isInput) return;
+
+      if (e.key === 'Delete' && selectedConvIds.size > 0) {
+        e.preventDefault();
+        handleBulkDelete();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsBulkMode(false);
+        setSelectedConvIds(new Set());
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isBulkMode, selectedConvIds, handleBulkDelete]);
+
   return (
     <>
       {/* Mobile Drawer Backdrop */}
@@ -510,6 +531,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 color: isBulkMode ? '#ffffff' : 'var(--muted)',
               }}
               title={isBulkMode ? t("exit_bulk_mode", "Exit multiple selection mode") : t("bulk_selection_actions", "Multiple selection & bulk actions")}
+              aria-label={isBulkMode ? t("exit_bulk_mode", "Exit multiple selection mode") : t("bulk_selection_actions", "Multiple selection & bulk actions")}
             >
               <CheckSquare className="w-4 h-4" />
             </button>
@@ -532,6 +554,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 color: 'var(--muted)',
               }}
               title={t('import_session', 'Importer une session (JSON)')}
+              aria-label={t('import_session', 'Importer une session (JSON)')}
             >
               <Upload className="w-4 h-4" />
             </button>
@@ -552,6 +575,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 color: 'var(--accent)',
               }}
               title={t('new_session', 'New session')}
+              aria-label={t('new_session', 'New session')}
             >
               <Plus className="w-4 h-4" />
             </a>
@@ -568,6 +592,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                   color: 'var(--muted)',
                 }}
                 title={t("close_menu", "Close menu")}
+                aria-label={t("close_menu", "Close menu")}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -609,6 +634,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             placeholder={t('search_sessions', 'Search sessions & content...')}
             value={searchFilter}
             onChange={(e) => handleSearchChange(e.target.value)}
+            data-shortcut="search"
             className="w-full pl-8 pr-7 py-1.5 rounded-lg text-xs placeholder-slate-400 focus:outline-none transition-colors"
             style={{
               backgroundColor: 'var(--input-bg)',
@@ -917,8 +943,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                     key={conv.conversation_id}
                     role="button"
                     tabIndex={0}
-                    className="group relative w-full text-left p-2.5 rounded-xl text-xs transition-all flex flex-col gap-1.5 border cursor-pointer select-none block"
+                    className="group relative w-full text-left p-2.5 text-xs flex flex-col gap-1.5 border cursor-pointer select-none block"
                     style={{
+                      borderRadius: 'var(--radius-lg)',
+                      transition: `background-color var(--transition-fast) ease, border-color var(--transition-fast) ease, box-shadow var(--transition-fast) ease`,
                       backgroundColor: isBulkMode
                         ? isBulkSelected
                           ? 'var(--accent-bg)'
@@ -934,7 +962,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                         ? 'var(--accent)'
                         : 'transparent',
                       color: (isBulkMode ? isBulkSelected : isSelected) ? 'var(--strong)' : 'var(--text)',
-                      boxShadow: (isSelected && !isBulkMode) || (isBulkMode && isBulkSelected) ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+                      boxShadow: (isSelected && !isBulkMode) || (isBulkMode && isBulkSelected) ? 'var(--shadow-sm)' : 'none',
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -1037,10 +1065,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                                 e.stopPropagation();
                                 onTogglePin(conv.conversation_id, isPinned);
                               }}
-                              className={`p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer ${
+                              className={`btn-icon !p-1 cursor-pointer ${
                                 isPinned ? 'text-amber-500' : 'opacity-0 group-hover:opacity-100'
                               }`}
-                              style={{ color: isPinned ? '#F59E0B' : 'var(--muted)' }}
+                              style={{ color: isPinned ? '#F59E0B' : undefined }}
                               title={isPinned ? t('unpin', 'Unpin') : t('pin_to_top', 'Pin to top')}
                             >
                               <Pin className={`w-3 h-3 ${isPinned ? 'fill-current' : ''}`} />
@@ -1055,8 +1083,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                                 e.stopPropagation();
                                 onEditSessionMeta(conv);
                               }}
-                              className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                              style={{ color: 'var(--muted)' }}
+                              className="btn-icon !p-1 opacity-0 group-hover:opacity-100 cursor-pointer"
                               title={t("manage_tags_project_title", "Manage tags, project and title")}
                             >
                               <MoreVertical className="w-3 h-3" />

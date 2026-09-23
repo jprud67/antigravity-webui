@@ -1200,6 +1200,79 @@ export function App() {
   const handleToggleRightPanel = React.useCallback(() => setIsRightPanelOpen((prev) => !prev), []);
   const handleToggleMobileSidebar = React.useCallback(() => setIsMobileSidebarOpen((prev) => !prev), []);
 
+  // ── Global Keyboard Shortcuts ──────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      const shift = e.shiftKey;
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // Ctrl+K — Focus search / quick prompt
+      if (mod && e.key === 'k') {
+        e.preventDefault();
+        const searchInput = document.querySelector<HTMLInputElement>('[data-shortcut="search"]');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+        return;
+      }
+
+      // Ctrl+Shift+N — New conversation
+      if (mod && shift && e.key === 'N') {
+        e.preventDefault();
+        handleNewConversation();
+        return;
+      }
+
+      // Ctrl+Shift+S — Open settings
+      if (mod && shift && e.key === 'S') {
+        e.preventDefault();
+        setSettingsTab('models');
+        setIsSettingsOpen((prev) => !prev);
+        return;
+      }
+
+      // Ctrl+Shift+E — Toggle workspace panel
+      if (mod && shift && e.key === 'E') {
+        e.preventDefault();
+        setIsRightPanelOpen((prev) => !prev);
+        return;
+      }
+
+      // Escape — Close active modal
+      if (e.key === 'Escape') {
+        if (isSettingsOpen) { setIsSettingsOpen(false); return; }
+        if (isHelpOpen) { setIsHelpOpen(false); return; }
+        if (isArtifactsOpen) { setIsArtifactsOpen(false); return; }
+        if (isWorkspacesOpen) { setIsWorkspacesOpen(false); return; }
+        if (isFileExplorerOpen) { setIsFileExplorerOpen(false); return; }
+        if (isTaskDashboardOpen) { setIsTaskDashboardOpen(false); return; }
+        if (isCronModalOpen) { setIsCronModalOpen(false); return; }
+        if (isRulesModalOpen) { setIsRulesModalOpen(false); return; }
+        if (isSessionMetaOpen) { setIsSessionMetaOpen(false); return; }
+        if (isRightPanelOpen) { setIsRightPanelOpen(false); return; }
+        if (isMobileSidebarOpen) { setIsMobileSidebarOpen(false); return; }
+        return;
+      }
+
+      // ? — Toggle help (only when not typing)
+      if (e.key === '?' && !isInput && !mod) {
+        e.preventDefault();
+        setIsHelpOpen((prev) => !prev);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [
+    isSettingsOpen, isHelpOpen, isArtifactsOpen, isWorkspacesOpen,
+    isFileExplorerOpen, isTaskDashboardOpen, isCronModalOpen, isRulesModalOpen,
+    isSessionMetaOpen, isRightPanelOpen, isMobileSidebarOpen,
+  ]);
+
   // Phase 3 Session Handlers (Fork, Pin, Tags, Project, Search)
   const handleTogglePin = async (convId: string, currentPin: boolean) => {
     try {

@@ -22,10 +22,11 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { TerminalTab } from './TerminalTab';
-import { GitTab } from './GitTab';
-import { KanbanTab } from './KanbanTab';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
+
+const GitTab = React.lazy(() => import('./GitTab').then(m => ({ default: m.GitTab })));
+const KanbanTab = React.lazy(() => import('./KanbanTab').then(m => ({ default: m.KanbanTab })));
 import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent, fetchGitStatus, type GitStatusResult, getAuthToken, triggerFileDownload } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
@@ -567,6 +568,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             onClick={handleClose}
             className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
             title={t('close_side_panel', 'Close side panel')}
+            aria-label={t('close_side_panel', 'Close side panel')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -580,14 +582,32 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
         </div>
 
         {activeTab === 'git' && (
-          <GitTab currentWorkspace={currentWorkspace} />
+          <React.Suspense
+            fallback={
+              <div className="flex flex-col items-center justify-center h-full text-xs gap-2" style={{ color: 'var(--muted)' }}>
+                <RefreshCw className="w-5 h-5 animate-spin" style={{ color: 'var(--accent)' }} />
+                <span>{t('loading_git', 'Loading Git status...')}</span>
+              </div>
+            }
+          >
+            <GitTab currentWorkspace={currentWorkspace} />
+          </React.Suspense>
         )}
 
         {activeTab === 'kanban' && (
-          <KanbanTab 
-            currentWorkspace={currentWorkspace} 
-            onExecutePrompt={onExecutePrompt}
-          />
+          <React.Suspense
+            fallback={
+              <div className="flex flex-col items-center justify-center h-full text-xs gap-2" style={{ color: 'var(--muted)' }}>
+                <RefreshCw className="w-5 h-5 animate-spin" style={{ color: 'var(--accent)' }} />
+                <span>{t('loading_kanban', 'Loading Kanban...')}</span>
+              </div>
+            }
+          >
+            <KanbanTab 
+              currentWorkspace={currentWorkspace} 
+              onExecutePrompt={onExecutePrompt}
+            />
+          </React.Suspense>
         )}
 
         {/* FILES TAB */}

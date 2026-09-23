@@ -3,6 +3,7 @@ import { X, Terminal, Globe, Command, ExternalLink, Check } from 'lucide-react';
 import { ALL_SLASH_COMMANDS } from '../services/commands';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 import { AntigravityIcon } from './AntigravityLogo';
+import { KeyboardShortcuts } from './KeyboardShortcuts';
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -191,37 +192,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, onExecute
           )}
 
           {activeCategory === 'shortcuts' && (
-            <div className="space-y-3">
-              {[
-                { key: t('key_enter', 'Enter'), desc: t('shortcut_enter_desc', 'Send message or submit command') },
-                { key: t('key_shift_enter', 'Shift + Enter'), desc: t('shortcut_shift_enter_desc', 'Insert line break in composer') },
-                { key: '/', desc: t('shortcut_slash_desc', 'Open context menu of slash commands') },
-                { key: t('key_arrows', 'Up / Down Arrows'), desc: t('shortcut_arrows_desc', 'Navigate commands or recall prompts') },
-                { key: t('key_tab_enter', 'Tab or Enter'), desc: t('shortcut_tab_desc', 'Auto-complete selected command') },
-                { key: t('key_escape', 'Escape (Esc)'), desc: t('shortcut_esc_desc', 'Close menus, modals or cancel search') }
-              ].map((s, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-3.5 rounded-xl border text-xs"
-                  style={{
-                    backgroundColor: 'var(--surface-subtle)',
-                    borderColor: 'var(--border)'
-                  }}
-                >
-                  <span style={{ color: 'var(--text)' }}>{s.desc}</span>
-                  <kbd
-                    className="px-2.5 py-1 rounded-lg border font-mono text-[11px] shadow-xs shrink-0 ml-4 font-semibold"
-                    style={{
-                      backgroundColor: 'var(--surface)',
-                      borderColor: 'var(--border2)',
-                      color: 'var(--accent-text)'
-                    }}
-                  >
-                    {s.key}
-                  </kbd>
-                </div>
-              ))}
-            </div>
+            <KeyboardShortcuts />
           )}
 
           {activeCategory === 'languages' && (

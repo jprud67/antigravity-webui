@@ -864,4 +864,289 @@ body {
   --message-body-font-size: 18px;
 }
 
+/* ==========================================================================
+   Design Tokens — Animation, Radius, Shadow
+   ========================================================================== */
+:root {
+  /* Timing */
+  --transition-fast: 120ms;
+  --transition-base: 220ms;
+  --transition-slow: 380ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.22, 1.2, 0.36, 1);
+
+  /* Radius */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Shadows — Light */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.07), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-glow: 0 0 0 3px var(--focus-ring), 0 0 20px var(--focus-glow);
+}
+
+:root.dark {
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.28), 0 1px 2px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.32), 0 1px 4px rgba(0, 0, 0, 0.18);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.36), 0 2px 8px rgba(0, 0, 0, 0.18);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.44), 0 4px 16px rgba(0, 0, 0, 0.22);
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* ==========================================================================
+   Micro-Animations & Keyframes
+   ========================================================================== */
+@keyframes ag-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ag-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes ag-slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ag-slide-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ag-scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ag-scale-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.95); }
+}
+
+@keyframes ag-slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes ag-toast-in {
+  from { opacity: 0; transform: translateY(100%) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ag-toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(0.95); }
+}
+
+@keyframes ag-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes ag-pulse-ring {
+  0% { box-shadow: 0 0 0 0 var(--focus-ring); }
+  70% { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Animation utility classes */
+.ag-animate-fade-in { animation: ag-fade-in var(--transition-base) var(--ease-out-expo) both; }
+.ag-animate-slide-up { animation: ag-slide-up var(--transition-base) var(--ease-out-expo) both; }
+.ag-animate-slide-down { animation: ag-slide-down var(--transition-base) var(--ease-out-expo) both; }
+.ag-animate-scale-in { animation: ag-scale-in var(--transition-base) var(--ease-spring) both; }
+.ag-animate-slide-right { animation: ag-slide-in-right var(--transition-base) var(--ease-out-expo) both; }
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   Glass Panel
+   ========================================================================== */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: var(--shadow-glass);
+  border-radius: var(--radius-lg);
+}
+
+:root.dark .glass-panel {
+  background: rgba(17, 24, 39, 0.78);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ==========================================================================
+   Button System — Unified Components
+   ========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition:
+    background-color var(--transition-fast) ease,
+    border-color var(--transition-fast) ease,
+    color var(--transition-fast) ease,
+    box-shadow var(--transition-fast) ease,
+    transform var(--transition-fast) var(--ease-out-expo);
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-glow);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled, .btn[aria-disabled="true"] {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* ── Primary ── */
+.btn-primary {
+  background-color: var(--accent);
+  color: #FFFFFF;
+  border-color: var(--accent);
+}
+.btn-primary:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Secondary ── */
+.btn-secondary {
+  background-color: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn-secondary:hover {
+  background-color: var(--hover-bg);
+  border-color: var(--border2);
+}
+
+/* ── Ghost ── */
+.btn-ghost {
+  background-color: transparent;
+  color: var(--muted);
+  border-color: transparent;
+}
+.btn-ghost:hover {
+  background-color: var(--hover-bg);
+  color: var(--text);
+}
+
+/* ── Danger ── */
+.btn-danger {
+  background-color: var(--error);
+  color: #FFFFFF;
+  border-color: var(--error);
+}
+.btn-danger:hover {
+  background-color: color-mix(in srgb, var(--error), #000 15%);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Accent Ghost (text only) ── */
+.btn-accent-ghost {
+  background-color: transparent;
+  color: var(--accent);
+  border-color: transparent;
+}
+.btn-accent-ghost:hover {
+  background-color: var(--accent-bg);
+  color: var(--accent-hover);
+}
+
+/* ── Icon-Only Button ── */
+.btn-icon {
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color var(--transition-fast) ease,
+    color var(--transition-fast) ease,
+    transform var(--transition-fast) var(--ease-out-expo);
+}
+.btn-icon:hover {
+  background-color: var(--hover-bg);
+  color: var(--text);
+}
+.btn-icon:active {
+  transform: scale(0.9);
+}
+.btn-icon:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-glow);
+}
+
+/* ── Button Sizes ── */
+.btn-xs { padding: 4px 8px; font-size: 11px; border-radius: var(--radius-sm); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-lg { padding: 10px 22px; font-size: 15px; border-radius: var(--radius-lg); }
+
+/* ==========================================================================
+   Dialog / Modal Overlay
+   ========================================================================== */
+.ag-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: ag-fade-in var(--transition-fast) ease both;
+}
+
+:root.dark .ag-dialog-overlay {
+  background: rgba(0, 0, 0, 0.60);
+}
+
+.ag-dialog-panel {
+  animation: ag-scale-in var(--transition-base) var(--ease-spring) both;
+}
+
+.ag-dialog-panel.closing {
+  animation: ag-scale-out var(--transition-fast) ease both;
+}
 

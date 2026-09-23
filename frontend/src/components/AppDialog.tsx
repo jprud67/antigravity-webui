@@ -53,30 +53,32 @@ export const ConfirmDialogContainer: React.FC = () => {
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[10000] flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }}
+      className="ag-dialog-overlay flex items-center justify-center"
+      style={{ zIndex: 10000 }}
       onClick={(e) => { if (e.target === overlayRef.current) handleResolve(false); }}
     >
       <div
-        className="rounded-xl border shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-in fade-in zoom-in-95"
+        className="glass-panel ag-dialog-panel max-w-md w-full mx-4 overflow-hidden"
         style={{
-          backgroundColor: 'var(--surface)',
-          borderColor: 'var(--border)',
           color: 'var(--text)',
           fontFamily: 'var(--font-ui)',
+          boxShadow: 'var(--shadow-xl)',
         }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby="confirm-dialog-desc"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor: 'var(--border)' }}>
           <div className="flex items-center gap-2.5">
             {current.destructive && <AlertTriangle className="w-4 h-4 text-red-500" />}
-            <h3 className="text-sm font-semibold">{current.title}</h3>
+            <h3 id="confirm-dialog-title" className="text-sm font-semibold">{current.title}</h3>
           </div>
           <button
             onClick={() => handleResolve(false)}
-            className="p-1 rounded-lg hover:bg-white/10 transition-colors"
-            style={{ color: 'var(--muted)' }}
-            aria-label="Close"
+            className="btn-icon"
+            aria-label="Fermer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -84,7 +86,7 @@ export const ConfirmDialogContainer: React.FC = () => {
 
         {/* Body */}
         <div className="px-5 py-4">
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
+          <p id="confirm-dialog-desc" className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
             {current.message}
           </p>
         </div>
@@ -93,31 +95,13 @@ export const ConfirmDialogContainer: React.FC = () => {
         <div className="flex items-center justify-end gap-2.5 px-5 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
           <button
             onClick={() => handleResolve(false)}
-            className="px-4 py-1.5 text-sm rounded-lg border transition-colors hover:opacity-80"
-            style={{
-              backgroundColor: 'var(--surface)',
-              borderColor: 'var(--border)',
-              color: 'var(--text)',
-            }}
+            className="btn btn-secondary btn-sm"
           >
-            {current.cancelLabel || 'Cancel'}
+            {current.cancelLabel || 'Annuler'}
           </button>
           <button
             onClick={() => handleResolve(true)}
-            className={`px-4 py-1.5 text-sm rounded-lg border transition-colors hover:opacity-90 font-medium ${
-              current.destructive
-                ? 'bg-red-600 border-red-600 text-white hover:bg-red-700'
-                : ''
-            }`}
-            style={
-              current.destructive
-                ? undefined
-                : {
-                    backgroundColor: 'var(--accent)',
-                    borderColor: 'var(--accent)',
-                    color: '#fff',
-                  }
-            }
+            className={`btn btn-sm font-medium ${current.destructive ? 'btn-danger' : 'btn-primary'}`}
             autoFocus
           >
             {current.confirmLabel || 'Confirmer'}
