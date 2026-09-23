@@ -19,13 +19,15 @@ import {
   Trash2,
   Clock,
   Search,
-  Leaf
+  Leaf,
+  FileCode2
 } from 'lucide-react';
 import type { ModelOption } from '../types';
 import { ContextRing, type TokenUsageData } from './ContextRing';
 import { ALL_SLASH_COMMANDS, parseSlashCommand, type SlashCommandDef } from '../services/commands';
 import { applyTheme } from '../services/theme';
 import { useI18n, setLanguage, SUPPORTED_LANGUAGES, getCurrentLanguage } from '../services/i18n';
+import { PromptTemplatesModal } from './PromptTemplatesModal';
 
 interface ChatInputProps {
   onSendMessage: (
@@ -395,6 +397,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
   const draftRef = useRef<string>('');
   const historyMenuRef = useRef<HTMLDivElement>(null);
   const historyButtonRef = useRef<HTMLButtonElement>(null);
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
 
   // Helper to retrieve and merge persistent history + discussion prompts
   const getMergedHistory = (): string[] => {
@@ -606,6 +609,11 @@ export const ChatInput = React.memo<ChatInputProps>(({
 
       case '/rules':
         if (onOpenRules) onOpenRules();
+        return true;
+
+      case '/templates':
+      case '/snippets':
+        setIsTemplatesModalOpen(true);
         return true;
 
       case '/tasks':
@@ -1519,6 +1527,23 @@ export const ChatInput = React.memo<ChatInputProps>(({
               <History className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
 
+            {/* Prompt Templates & Snippets Library Button */}
+            <button
+              type="button"
+              onClick={() => setIsTemplatesModalOpen(true)}
+              className={`p-2 sm:p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+                isTemplatesModalOpen ? 'ring-2 ring-sky-500/50' : 'hover:opacity-100 opacity-80'
+              }`}
+              style={{
+                backgroundColor: isTemplatesModalOpen ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                borderColor: isTemplatesModalOpen ? 'var(--accent)' : 'var(--border)',
+                color: isTemplatesModalOpen ? 'var(--accent)' : 'var(--muted)'
+              }}
+              title={t('prompt_templates_tooltip', 'Bibliothèque de modèles de prompts & snippets (/templates)')}
+            >
+              <FileCode2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+            </button>
+
             {/* Workspace Chip (Clickable Button) */}
             <button
               type="button"
@@ -1707,6 +1732,22 @@ export const ChatInput = React.memo<ChatInputProps>(({
         </div>
       </div>
     </div>
+
+    {/* Prompt Templates & Snippets Modal */}
+    <PromptTemplatesModal
+      isOpen={isTemplatesModalOpen}
+      onClose={() => setIsTemplatesModalOpen(false)}
+      onSelectTemplate={(finalText) => {
+        setPrompt(finalText);
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+            textareaRef.current.focus();
+          }
+        }, 50);
+      }}
+    />
   </div>
 );
 });

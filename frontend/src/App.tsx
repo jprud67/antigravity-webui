@@ -443,7 +443,22 @@ export function App() {
       }).catch(() => {});
     }, 30 * 60 * 1000);
 
-    return () => clearInterval(updateInterval);
+    // Network resilience: online/offline detection
+    const handleOnline = () => {
+      showToast('Connexion rétablie — Antigravity en ligne', 'success');
+      loadInitialData();
+    };
+    const handleOffline = () => {
+      showToast('Mode hors-ligne — Connexion réseau indisponible', 'error');
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      clearInterval(updateInterval);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for session expiration or 401 Unauthorized across all API calls

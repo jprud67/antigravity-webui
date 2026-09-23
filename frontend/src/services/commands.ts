@@ -41,7 +41,8 @@ import {
   UserCheck,
   Coins,
   History,
-  RefreshCw
+  RefreshCw,
+  FileCode2
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -536,6 +537,24 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'panel',
     icon: Shield,
     color: 'text-emerald-400',
+    isAction: true
+  },
+  {
+    cmd: '/templates',
+    descKey: 'cmd_desc_templates',
+    desc: 'Ouvrir la bibliothèque de modèles de prompts et snippets',
+    category: 'panel',
+    icon: FileCode2,
+    color: 'text-amber-400',
+    isAction: true
+  },
+  {
+    cmd: '/snippets',
+    descKey: 'cmd_desc_snippets',
+    desc: 'Alias de /templates pour insérer un modèle de prompt',
+    category: 'panel',
+    icon: FileCode2,
+    color: 'text-amber-400',
     isAction: true
   },
   {
