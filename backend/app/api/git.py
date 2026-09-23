@@ -69,7 +69,7 @@ def _validate_workspace(workspace: str | None) -> Path:
     settings = get_settings()
     raw_workspaces = settings.get("trustedWorkspaces", [])
     workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
-    allowed_roots = [Path(DEFAULT_WORKSPACE).resolve()]
+    allowed_roots = [Path(DEFAULT_WORKSPACE).resolve(), Path.cwd().resolve()]
     for ws in workspaces:
         try:
             allowed_roots.append(Path(ws).resolve())
@@ -379,7 +379,7 @@ def get_branches(workspace: str | None = Query(None), _ = Depends(require_auth))
     target = _validate_workspace(workspace)
     res = run_git(["branch", "-a"], target)
     if res.returncode != 0:
-        raise HTTPException(status_code=400, detail="Impossible de récupérer les branches.")
+        return {"current": "", "branches": []}
 
     branches = []
     seen = set()
@@ -556,7 +556,7 @@ def get_git_tags(workspace: str | None = Query(None), _ = Depends(require_auth))
     target = _validate_workspace(workspace)
     res = run_git(["tag", "-l", "--sort=-v:refname"], target)
     if res.returncode != 0:
-        raise HTTPException(status_code=400, detail="Impossible de récupérer les tags.")
+        return {"tags": []}
     tags = [line.strip() for line in res.stdout.strip().split("\n") if line.strip()]
     return {"tags": tags}
 

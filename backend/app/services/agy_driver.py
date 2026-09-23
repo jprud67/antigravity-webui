@@ -128,11 +128,11 @@ async def get_available_models() -> list[dict[str, Any]]:
         **spawn_group_kwargs()
     )
     try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=12.0)
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=20.0)
     except asyncio.TimeoutError:
         await terminate_process_group_async(proc, grace=1.0)
         logger.error("Timeout fetching models via agy CLI")
-        raise TimeoutError("agy models timed out after 12s")
+        raise TimeoutError("agy models timed out after 20s")
     if proc.returncode != 0:
         logger.error(f"Error fetching models: {stderr.decode(errors='replace')}")
         raise RuntimeError(f"agy models failed: {stderr.decode(errors='replace')}")

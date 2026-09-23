@@ -30,7 +30,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
 
     # 1. Scan active process tree for agy and background workers
     try:
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'create_time', 'cpu_percent', 'memory_info']):
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'create_time', 'memory_info']):
             try:
                 info = proc.info
                 if not info or not info.get('pid'):

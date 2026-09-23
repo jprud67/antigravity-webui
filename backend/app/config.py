@@ -18,5 +18,5 @@ if not Path(AGY_BIN).exists():
     if resolved:
         AGY_BIN = resolved
 
-# Workspace par défaut : dossier utilisateur (surchargeable via ANTIGRAVITY_DEFAULT_WORKSPACE)
-DEFAULT_WORKSPACE = os.environ.get("ANTIGRAVITY_DEFAULT_WORKSPACE") or str(HOME)
+# Workspace par défaut : répertoire de travail actuel s'il contient un dépôt Git, sinon dossier utilisateur (surchargeable via ANTIGRAVITY_DEFAULT_WORKSPACE)
+DEFAULT_WORKSPACE = os.environ.get("ANTIGRAVITY_DEFAULT_WORKSPACE") or str(Path.cwd() if (Path.cwd() / ".git").exists() else HOME)
