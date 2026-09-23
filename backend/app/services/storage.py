@@ -3329,3 +3329,130 @@ def import_conversation(payload: dict[str, Any] | list[Any]) -> dict[str, Any]:
     _notify_conversations_changed()
     return res
 
+
+def get_conversation_branch_tree(conversation_id: str) -> dict[str, Any]:
+    """
+    Construit l'arbre complet des embranchements (ancêtres, racine, ramifications et signets)
+    autour d'une conversation donnée.
+    """
+    if not is_safe_conversation_id(conversation_id):
+        raise ValueError("Identifiant de conversation non valide")
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT conversation_id, title, preview, step_count, last_modified_time, parent_conversation_id, project_id, group_id
+            FROM conversation_summaries
+            WHERE conversation_id = ?
+            """,
+            (conversation_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return {
+                "root_id": conversation_id,
+                "current_id": conversation_id,
+                "total_branches": 1,
+                "tree": None,
+                "all_bookmarks": []
+            }
+
+        visited_up = set()
+        curr_id = conversation_id
+        curr_parent = row[5] or ""
+
+        while curr_parent and curr_parent not in visited_up:
+            visited_up.add(curr_id)
+            cursor.execute(
+                "SELECT parent_conversation_id FROM conversation_summaries WHERE conversation_id = ?",
+                (curr_parent,)
+            )
+            parent_row = cursor.fetchone()
+            if not parent_row:
+                break
+            curr_id = curr_parent
+            curr_parent = parent_row[0] or ""
+
+        root_id = curr_id
+
+        cursor.execute(
+            """
+            SELECT conversation_id, title, preview, step_count, last_modified_time, parent_conversation_id, project_id, group_id
+            FROM conversation_summaries
+            """
+        )
+        all_rows = cursor.fetchall()
+    finally:
+        conn.close()
+
+    nodes_by_id: dict[str, dict[str, Any]] = {}
+    children_map: dict[str, list[str]] = {}
+
+    for r in all_rows:
+        cid = r[0]
+        pid = r[5] or ""
+        nodes_by_id[cid] = {
+            "conversation_id": cid,
+            "title": r[1] or "Sans titre",
+            "preview": r[2] or "",
+            "step_count": r[3] or 0,
+            "last_modified_time": r[4] or "",
+            "parent_conversation_id": pid or None,
+            "project_id": r[6] or "",
+            "group_id": r[7] or "",
+            "is_current": (cid == conversation_id),
+            "is_root": (cid == root_id),
+            "bookmarks": [],
+            "children": []
+        }
+        children_map.setdefault(pid, []).append(cid)
+
+    family_ids: set[str] = set()
+    def _collect_descendants(node_id: str):
+        family_ids.add(node_id)
+        for child_id in children_map.get(node_id, []):
+            if child_id not in family_ids:
+                _collect_descendants(child_id)
+
+    _collect_descendants(root_id)
+
+    all_bookmarks = []
+    from app.services.session_metadata import get_session_meta
+    for fid in family_ids:
+        if fid in nodes_by_id:
+            meta = get_session_meta(fid) or {}
+            bms = meta.get("bookmarks") or []
+            if isinstance(bms, list):
+                nodes_by_id[fid]["bookmarks"] = bms
+                for b in bms:
+                    if isinstance(b, dict):
+                        all_bookmarks.append({**b, "conversation_id": fid, "conversation_title": nodes_by_id[fid]["title"]})
+
+    def _build_tree(node_id: str) -> dict[str, Any]:
+        node = nodes_by_id.get(node_id, {
+            "conversation_id": node_id,
+            "title": "Racine inconnue",
+            "step_count": 0,
+            "children": [],
+            "bookmarks": []
+        })
+        children = []
+        for child_id in children_map.get(node_id, []):
+            if child_id in family_ids:
+                children.append(_build_tree(child_id))
+        node["children"] = children
+        return node
+
+    root_tree = _build_tree(root_id) if root_id in nodes_by_id else None
+
+    return {
+        "root_id": root_id,
+        "current_id": conversation_id,
+        "total_branches": len(family_ids),
+        "tree": root_tree,
+        "all_bookmarks": all_bookmarks
+    }
+
+

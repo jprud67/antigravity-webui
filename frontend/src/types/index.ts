@@ -1,3 +1,13 @@
+export interface BookmarkItem {
+  id: string;
+  step_index: number;
+  label: string;
+  preview?: string;
+  created_at: string;
+  conversation_id?: string;
+  conversation_title?: string;
+}
+
 export interface Conversation {
   conversation_id: string;
   title: string;
@@ -20,6 +30,7 @@ export interface Conversation {
   match_type?: 'metadata' | 'transcript';
   match_snippet?: string;
   is_running?: boolean;
+  bookmarks?: BookmarkItem[];
 }
 
 export interface ToolCallItem {

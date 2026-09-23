@@ -81,6 +81,8 @@ interface ChatInputProps {
   onCompact?: () => void;
   onOpenCompactor?: () => void;
   isCompacting?: boolean;
+  onOpenBranchTree?: () => void;
+  onAddBookmark?: (label?: string) => void;
 }
 
 export interface AttachmentItem {
@@ -136,7 +138,9 @@ export const ChatInput = React.memo<ChatInputProps>(({
   onShowUpdateCard,
   onCompact,
   onOpenCompactor,
-  isCompacting
+  isCompacting,
+  onOpenBranchTree,
+  onAddBookmark
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -693,7 +697,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         if (onOpenExport) onOpenExport();
         return true;
 
-      case '/branch':
+      case '/fork':
         if (onForkMessage) {
           onForkMessage();
           showToast(t('toast_branch_created', 'Branch created.'), 'success');
@@ -761,6 +765,27 @@ export const ChatInput = React.memo<ChatInputProps>(({
           onCompact();
         } else {
           showToast('Assistant d\'élagage non disponible.', 'info');
+        }
+        return true;
+
+      case '/branch':
+      case '/tree':
+      case '/branches':
+        if (onOpenBranchTree) {
+          onOpenBranchTree();
+        } else {
+          showToast('Arbre des branches non disponible.', 'info');
+        }
+        return true;
+
+      case '/bookmark':
+      case '/signet':
+        if (onAddBookmark) {
+          onAddBookmark(args || undefined);
+        } else if (onOpenBranchTree) {
+          onOpenBranchTree();
+        } else {
+          showToast('Gestionnaire de signets non disponible.', 'info');
         }
         return true;
 

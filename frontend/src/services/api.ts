@@ -1,4 +1,4 @@
-import type { Conversation, ArtifactItem, AppSettings, ModelOption, WorkspaceFolder } from '../types';
+import type { Conversation, ArtifactItem, AppSettings, ModelOption, WorkspaceFolder, BookmarkItem } from '../types';
 
 const API_BASE = '/api';
 
@@ -1205,6 +1205,119 @@ export async function applySystemUpdate(): Promise<any> {
   }
   return res.json();
 }
+
+// ==========================================
+// Session Branches & Memory Bookmarks API
+// ==========================================
+
+export interface ConversationBranchNode {
+  conversation_id: string;
+  title: string;
+  preview: string;
+  step_count: number;
+  last_modified_time: string;
+  parent_conversation_id: string | null;
+  project_id?: string;
+  group_id?: string;
+  is_current: boolean;
+  is_root: boolean;
+  bookmarks: BookmarkItem[];
+  children: ConversationBranchNode[];
+}
+
+export interface BranchTreeResult {
+  root_id: string;
+  current_id: string;
+  total_branches: number;
+  tree: ConversationBranchNode | null;
+  all_bookmarks: BookmarkItem[];
+}
+
+export async function fetchConversationBranches(conversationId: string): Promise<BranchTreeResult> {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/branches`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du chargement des branches' }));
+    throw new Error(err.detail || 'Impossible de charger les branches');
+  }
+  return res.json();
+}
+
+export async function addConversationBookmark(
+  conversationId: string,
+  stepIndex: number,
+  label: string,
+  preview?: string
+): Promise<{ success: boolean; bookmark: BookmarkItem; bookmarks: BookmarkItem[] }> {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/bookmarks`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ step_index: stepIndex, label, preview })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'ajout du marque-page" }));
+    throw new Error(err.detail || "Impossible d'ajouter le marque-page");
+  }
+  return res.json();
+}
+
+export async function removeConversationBookmark(
+  conversationId: string,
+  bookmarkId: string
+): Promise<{ success: boolean; bookmarks: BookmarkItem[] }> {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/bookmarks/${encodeURIComponent(bookmarkId)}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de suppression du marque-page' }));
+    throw new Error(err.detail || 'Impossible de supprimer le marque-page');
+  }
+  return res.json();
+}
+
+// ==========================================
+// Multi-Shell Terminal API
+// ==========================================
+
+export interface TerminalShellInfo {
+  id: string;
+  name: string;
+  command: string;
+  available: boolean;
+  icon?: string;
+}
+
+export interface TerminalShellsResponse {
+  platform: string;
+  default_shell: string;
+  available_shells: TerminalShellInfo[];
+}
+
+export async function fetchTerminalShells(): Promise<TerminalShellsResponse> {
+  const res = await fetch(`${API_BASE}/terminal/shells`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du chargement des shells' }));
+    throw new Error(err.detail || 'Impossible de charger la liste des terminaux');
+  }
+  return res.json();
+}
+
+export async function deleteTerminalSession(sessionId: string): Promise<{ success: boolean; session_id: string }> {
+  const res = await fetch(`${API_BASE}/terminal/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de fermeture de session terminal' }));
+    throw new Error(err.detail || 'Impossible de clore la session terminal');
+  }
+  return res.json();
+}
+
 
 
 

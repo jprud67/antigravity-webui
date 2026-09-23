@@ -18,8 +18,9 @@ const RulesEditorModal = lazy(() => import('./components/RulesEditorModal').then
 const HelpModal = lazy(() => import('./components/HelpModal').then(m => ({ default: m.HelpModal })));
 const AnalyticsModal = lazy(() => import('./components/AnalyticsModal').then(m => ({ default: m.AnalyticsModal })));
 const ContextCompactorModal = lazy(() => import('./components/ContextCompactorModal').then(m => ({ default: m.ContextCompactorModal })));
+const SessionBranchModal = lazy(() => import('./components/SessionBranchModal').then(m => ({ default: m.SessionBranchModal })));
 import type { TokenUsageData } from './components/ContextRing';
-import type { Conversation, ChatMessage, ModelOption } from './types';
+import type { Conversation, ChatMessage, ModelOption, BookmarkItem } from './types';
 import { parseStepsToMessages, cleanUserPrompt } from './utils/transcriptParser';
 import { 
   fetchConversations, 
@@ -39,6 +40,8 @@ import {
   fetchCredits,
   fetchChangelog,
   checkSystemUpdate,
+  addConversationBookmark,
+  removeConversationBookmark,
   type GoogleAccountInfo,
   type UpdateCheckResult,
   type PruneResult
@@ -244,6 +247,8 @@ export function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isContextCompactorOpen, setIsContextCompactorOpen] = useState(false);
+  const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+  const [sessionBookmarks, setSessionBookmarks] = useState<BookmarkItem[]>([]);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('models');
   const [activeGoogleAccount, setActiveGoogleAccount] = useState<GoogleAccountInfo | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
@@ -299,6 +304,10 @@ export function App() {
       } else {
         setTokenUsage(estimateUsageFromMessages(chatMsgs));
       }
+
+      // Initialize session bookmarks
+      const bms = (data as any)?.meta?.bookmarks || (data as any)?.bookmarks || activeConv?.bookmarks || [];
+      setSessionBookmarks(Array.isArray(bms) ? bms : []);
 
       // Automatically synchronize workspace to active conversation if available
       const rawWs = (data as any)?.workspace_uris || data.meta?.workspace_uris || activeConv?.workspace_uris;
@@ -1273,6 +1282,7 @@ export function App() {
         if (isCronModalOpen) { setIsCronModalOpen(false); return; }
         if (isRulesModalOpen) { setIsRulesModalOpen(false); return; }
         if (isSessionMetaOpen) { setIsSessionMetaOpen(false); return; }
+        if (isBranchModalOpen) { setIsBranchModalOpen(false); return; }
         if (isRightPanelOpen) { setIsRightPanelOpen(false); return; }
         if (isMobileSidebarOpen) { setIsMobileSidebarOpen(false); return; }
         return;
@@ -1291,7 +1301,7 @@ export function App() {
   }, [
     isSettingsOpen, isAnalyticsOpen, isHelpOpen, isArtifactsOpen, isWorkspacesOpen,
     isFileExplorerOpen, isTaskDashboardOpen, isCronModalOpen, isRulesModalOpen,
-    isSessionMetaOpen, isRightPanelOpen, isMobileSidebarOpen,
+    isSessionMetaOpen, isBranchModalOpen, isRightPanelOpen, isMobileSidebarOpen,
   ]);
 
   // Phase 3 Session Handlers (Fork, Pin, Tags, Project, Search)
@@ -1312,6 +1322,28 @@ export function App() {
     setMetaTargetConversation(conv || activeConv || null);
     setIsSessionMetaOpen(true);
   }, [activeConv]);
+
+  const handleAddBookmark = useCallback(async (stepIndex: number, label: string, preview?: string) => {
+    if (!activeConversationId) return;
+    try {
+      const res = await addConversationBookmark(activeConversationId, stepIndex, label, preview);
+      setSessionBookmarks(res.bookmarks);
+      showToast('Signet enregistré avec succès', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de l’enregistrement du signet', 'error');
+    }
+  }, [activeConversationId]);
+
+  const handleRemoveBookmark = useCallback(async (bookmarkId: string) => {
+    if (!activeConversationId) return;
+    try {
+      const res = await removeConversationBookmark(activeConversationId, bookmarkId);
+      setSessionBookmarks(res.bookmarks);
+      showToast('Signet supprimé', 'info');
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de la suppression du signet', 'error');
+    }
+  }, [activeConversationId]);
 
   const handleForkMessage = async (stepIndex: number) => {
     if (!activeConversationId) return;
@@ -1784,6 +1816,10 @@ export function App() {
           onOpenRules={stableOpenRules}
           onOpenTasks={stableOpenTasks}
           onOpenAnalytics={stableOpenAnalytics}
+          onOpenBranchTree={() => setIsBranchModalOpen(true)}
+          bookmarks={sessionBookmarks}
+          onAddBookmark={handleAddBookmark}
+          onRemoveBookmark={handleRemoveBookmark}
           isRightPanelOpen={isRightPanelOpen}
           activeRightPanelTab={rightPanelTab}
           onToggleRightPanel={handleToggleRightPanel}
@@ -1819,6 +1855,12 @@ export function App() {
           onCompact={handleCompactConversation}
           onOpenCompactor={() => setIsContextCompactorOpen(true)}
           isCompacting={isCompacting}
+          onOpenBranchTree={() => setIsBranchModalOpen(true)}
+          onAddBookmark={(label) => {
+            const lastStep = messages.length > 0 ? (messages[messages.length - 1].stepIndex ?? messages.length - 1) : 0;
+            const lastContent = messages.length > 0 ? messages[messages.length - 1].content : '';
+            handleAddBookmark(lastStep, label || `Étape #${lastStep}`, lastContent?.slice(0, 150));
+          }}
           onOpenTerminal={() => openRightPanel('terminal')}
           onOpenGit={() => openRightPanel('git')}
           onOpenKanban={() => openRightPanel('kanban')}
@@ -1939,6 +1981,16 @@ export function App() {
         usage={tokenUsage}
         onPruneSuccess={handlePruneSuccess}
       />
+
+      {isBranchModalOpen && activeConversationId && (
+        <SessionBranchModal
+          isOpen={isBranchModalOpen}
+          onClose={() => setIsBranchModalOpen(false)}
+          currentConversationId={activeConversationId}
+          onSelectConversation={handleSelectConversation}
+          onForkConversation={handleForkMessage}
+        />
+      )}
 
       <WorkspaceModal
         isOpen={isWorkspacesOpen}

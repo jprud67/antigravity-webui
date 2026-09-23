@@ -19,16 +19,17 @@ from app.services.storage import (
     calculate_conversation_tokens,
     compact_conversation_in_place,
     create_conversation_handoff,
-    prune_conversation_steps,
     delete_conversation,
     export_conversation_html,
     export_conversation_markdown,
     fork_conversation,
+    get_conversation_branch_tree,
     get_conversation_by_id,
     get_conversation_transcript,
     import_conversation,
     is_safe_conversation_id,
     list_conversations,
+    prune_conversation_steps,
     search_conversations,
     undo_conversation_turn,
     update_conversation_summary_fields,
@@ -48,6 +49,11 @@ class HandoffRequest(BaseModel):
 class TitleUpdateRequest(BaseModel):
     title: str
 
+class BookmarkCreateRequest(BaseModel):
+    step_index: int
+    label: str
+    preview: str | None = None
+
 class MetadataUpdateRequest(BaseModel):
     pinned: bool | None = None
     archived: bool | None = None
@@ -59,6 +65,7 @@ class MetadataUpdateRequest(BaseModel):
     group_id: str | None = None
     projectId: str | None = None
     project_id: str | None = None
+    bookmarks: list[dict[str, Any]] | None = None
 
 @router.get("", response_model=list[dict[str, Any]])
 def get_conversations(limit: int = Query(100, ge=1, le=1000), q: str | None = None, _ = Depends(require_auth)):
@@ -507,5 +514,62 @@ def prune_session(conversation_id: str, req: PruneRequest = Body(default_factory
     except Exception as e:
         logger.error(f"Error pruning conversation {conversation_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Échec de l'élagage : {e!s}")
+
+
+@router.get("/{conversation_id}/branches")
+def get_branches(conversation_id: str, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
+    try:
+        res = get_conversation_branch_tree(conversation_id)
+        return res
+    except Exception as e:
+        logger.error(f"Error fetching branches for {conversation_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Échec de récupération de l'arbre des branches: {e!s}")
+
+
+@router.post("/{conversation_id}/bookmarks")
+def add_bookmark(conversation_id: str, req: BookmarkCreateRequest, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
+    if not req.label.strip():
+        raise HTTPException(status_code=400, detail="Le libellé du marque-page ne peut pas être vide")
+
+    import time
+    import uuid
+
+    meta = get_session_meta(conversation_id) or {}
+    existing_bms = meta.get("bookmarks") or []
+    if not isinstance(existing_bms, list):
+        existing_bms = []
+
+    new_bm = {
+        "id": f"bm-{int(time.time() * 1000)}-{uuid.uuid4().hex[:6]}",
+        "step_index": req.step_index,
+        "label": req.label.strip(),
+        "preview": (req.preview or "").strip()[:200],
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    updated_bms = [b for b in existing_bms if isinstance(b, dict) and b.get("id") != new_bm["id"]]
+    updated_bms.append(new_bm)
+    updated_bms.sort(key=lambda x: x.get("step_index", 0))
+
+    update_session_meta(conversation_id, {"bookmarks": updated_bms})
+    return {"success": True, "bookmark": new_bm, "bookmarks": updated_bms}
+
+
+@router.delete("/{conversation_id}/bookmarks/{bookmark_id}")
+def remove_bookmark(conversation_id: str, bookmark_id: str, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
+    meta = get_session_meta(conversation_id) or {}
+    existing_bms = meta.get("bookmarks") or []
+    if not isinstance(existing_bms, list):
+        existing_bms = []
+
+    filtered = [b for b in existing_bms if isinstance(b, dict) and b.get("id") != bookmark_id]
+    update_session_meta(conversation_id, {"bookmarks": filtered})
+    return {"success": True, "bookmarks": filtered}
+
 
 

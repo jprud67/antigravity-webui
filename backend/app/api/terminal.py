@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import struct
 import threading
 import time
@@ -51,6 +52,44 @@ def _validate_terminal_session_id(sid: str) -> str:
     return clean
 
 
+def get_available_shells() -> list[dict[str, str]]:
+    shells = []
+    if IS_WINDOWS:
+        pwsh = shutil.which("powershell.exe") or shutil.which("pwsh.exe")
+        if pwsh:
+            shells.append({"id": "powershell", "name": "PowerShell", "path": pwsh})
+        cmd = os.environ.get("COMSPEC") or shutil.which("cmd.exe") or "cmd.exe"
+        shells.append({"id": "cmd", "name": "Invite de commandes (CMD)", "path": cmd})
+        bash_candidates = [
+            shutil.which("bash.exe"),
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files (x86)\Git\bin\bash.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\Programs\Git\bin\bash.exe")
+        ]
+        bash_found = next((b for b in bash_candidates if b and os.path.exists(b)), None)
+        if bash_found:
+            shells.append({"id": "bash", "name": "Git Bash", "path": bash_found})
+    else:
+        for s_name in ["bash", "zsh", "sh"]:
+            s_path = shutil.which(s_name)
+            if s_path:
+                shells.append({"id": s_name, "name": s_name.capitalize(), "path": s_path})
+        if not shells:
+            shells.append({"id": "bash", "name": "Bash", "path": "/bin/bash"})
+    return shells
+
+
+def resolve_shell_command(shell_type: str = "default") -> list[str]:
+    avail = get_available_shells()
+    clean = (shell_type or "default").lower().strip()
+    if clean == "default":
+        target = next((s for s in avail if s["id"] in ("powershell", "bash")), avail[0])
+        return [target["path"]]
+    match = next((s for s in avail if s["id"] == clean), None)
+    if match:
+        return [match["path"]]
+    return [avail[0]["path"]]
+
 
 def set_winsize(fd: int, rows: int, cols: int):
     """Redimensionne le PTY (POSIX)."""
@@ -73,9 +112,10 @@ async def _safe_send_bytes(ws: WebSocket, data: bytes):
 
 
 class PersistentTerminalSession:
-    def __init__(self, session_id: str, cwd: str):
+    def __init__(self, session_id: str, cwd: str, shell_type: str = "default"):
         self.session_id = session_id
         self.cwd = cwd
+        self.shell_type = shell_type or "default"
         self.master_fd: int = -1
         self.proc: asyncio.subprocess.Process | None = None
         self.win_pty = None  # winpty.PtyProcess (Windows)
@@ -112,13 +152,13 @@ class PersistentTerminalSession:
             flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
             fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
-            shell = os.environ.get("SHELL", "/bin/bash")
+            cmd_args = resolve_shell_command(self.shell_type)
             env = os.environ.copy()
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
 
             proc = await asyncio.create_subprocess_exec(
-                shell,
+                *cmd_args,
                 stdin=slave_fd,
                 stdout=slave_fd,
                 stderr=slave_fd,
@@ -204,11 +244,11 @@ class PersistentTerminalSession:
                 "Le terminal intégré nécessite le paquet « pywinpty » sous Windows "
                 "(pip install pywinpty)."
             )
-        shell = os.environ.get("COMSPEC") or "cmd.exe"
+        cmd_args = resolve_shell_command(self.shell_type)
         env = os.environ.copy()
 
         def _spawn() -> Any:
-            return winpty.PtyProcess.spawn([shell], cwd=self.cwd, env=env)
+            return winpty.PtyProcess.spawn(cmd_args, cwd=self.cwd, env=env)
 
         self.win_pty = await asyncio.to_thread(_spawn)  # type: ignore[func-returns-value]
         self._win_reader = threading.Thread(
@@ -360,7 +400,7 @@ async def prune_dead_sessions() -> None:
             logger.debug(f"Ignored error closing pruned terminal session: {e}")
 
 
-async def get_or_create_session(session_id: str, cwd: str) -> tuple[PersistentTerminalSession, bool]:
+async def get_or_create_session(session_id: str, cwd: str, shell_type: str = "default") -> tuple[PersistentTerminalSession, bool]:
     """Returns (session, is_new)"""
     await prune_dead_sessions()
     old_session: PersistentTerminalSession | None = None
@@ -373,7 +413,7 @@ async def get_or_create_session(session_id: str, cwd: str) -> tuple[PersistentTe
         if session:
             old_session = _sessions.pop(session_id, None)
 
-        new_session = PersistentTerminalSession(session_id, cwd)
+        new_session = PersistentTerminalSession(session_id, cwd, shell_type)
         await new_session.start()
         _sessions[session_id] = new_session
         created_session = new_session
@@ -409,7 +449,8 @@ async def terminal_websocket(
     token: str | None = None,
     api_key: str | None = None,
     workspace: str | None = None,
-    session_id: str | None = None
+    session_id: str | None = None,
+    shell: str | None = None
 ):
     # Support token / API key extraction from query params or headers
     effective_token = token or api_key or websocket.query_params.get("token") or websocket.query_params.get("api_key")
@@ -485,9 +526,10 @@ async def terminal_websocket(
     else:
         sid = f"ws_{hashlib.sha256(cwd.encode()).hexdigest()[:8]}"
 
+    effective_shell = shell or websocket.query_params.get("shell") or "default"
     session: PersistentTerminalSession | None = None
     try:
-        session, is_new = await get_or_create_session(sid, cwd)
+        session, is_new = await get_or_create_session(sid, cwd, effective_shell)
     except Exception as e:
         # Terminal indisponible sur cette plateforme ou erreur d'initialisation
         logger.error(f"Failed to start terminal session {sid}: {e}")
@@ -579,9 +621,22 @@ async def list_terminal_sessions(_ = Depends(require_auth)):
         for sid, s in sessions_copy
     ]
 
-@router.post("/api/terminal/sessions/{session_id}/restart")
-async def restart_terminal_session(session_id: str, _ = Depends(require_auth)):
-    """Explicitly kill and restart a terminal session"""
+@router.get("/api/terminal/shells")
+def list_available_shells(_ = Depends(require_auth)):
+    """List available shell environments on host system"""
+    shells = get_available_shells()
+    default_sh = "powershell" if IS_WINDOWS else "bash"
+    return {
+        "platform": "windows" if IS_WINDOWS else "posix",
+        "default_shell": default_sh,
+        "available_shells": shells,
+        "shells": shells,
+    }
+
+
+@router.delete("/api/terminal/sessions/{session_id}")
+async def delete_terminal_session(session_id: str, _ = Depends(require_auth)):
+    """Explicitly terminate a terminal session"""
     valid_sid = _validate_terminal_session_id(session_id)
     await kill_session(valid_sid)
     return {"success": True, "session_id": valid_sid}

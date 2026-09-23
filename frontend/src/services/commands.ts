@@ -43,7 +43,9 @@ import {
   History,
   RefreshCw,
   FileCode2,
-  Scissors
+  Scissors,
+  Bookmark,
+  FolderGit2
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -188,6 +190,34 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'action',
     icon: Scissors,
     color: 'text-cyan-400',
+    isAction: true
+  },
+  {
+    cmd: '/branch',
+    descKey: 'cmd_desc_branch',
+    desc: 'Visualiser la généalogie des branches et forks de session',
+    category: 'action',
+    icon: FolderGit2,
+    color: 'text-purple-400',
+    isAction: true
+  },
+  {
+    cmd: '/tree',
+    descKey: 'cmd_desc_tree',
+    desc: 'Arbre visuel des branches et signets de la conversation',
+    category: 'action',
+    icon: GitBranch,
+    color: 'text-purple-400',
+    isAction: true
+  },
+  {
+    cmd: '/bookmark',
+    descKey: 'cmd_desc_bookmark',
+    desc: 'Ajouter ou consulter les signets mémoire de la session',
+    arg: '<libellé optionnel>',
+    category: 'action',
+    icon: Bookmark,
+    color: 'text-amber-400',
     isAction: true
   },
   {

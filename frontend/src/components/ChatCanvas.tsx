@@ -42,9 +42,10 @@ import {
   MoreHorizontal,
   RotateCcw,
   X,
-  Search
+  Search,
+  Bookmark
 } from 'lucide-react';
-import type { ChatMessage, ToolCallItem } from '../types';
+import type { ChatMessage, ToolCallItem, BookmarkItem } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
 import { DiffViewer } from './DiffViewer';
 import { ApprovalCard } from './ApprovalCard';
@@ -76,6 +77,10 @@ interface ChatCanvasProps {
   onOpenCrons?: () => void;
   onOpenRules?: () => void;
   onOpenAnalytics?: () => void;
+  onOpenBranchTree?: () => void;
+  bookmarks?: BookmarkItem[];
+  onAddBookmark?: (stepIndex: number, label: string, preview?: string) => void;
+  onRemoveBookmark?: (bookmarkId: string) => void;
   isRightPanelOpen?: boolean;
   activeRightPanelTab?: string;
   onToggleRightPanel?: () => void;
@@ -785,6 +790,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   onOpenCrons,
   onOpenRules,
   onOpenAnalytics,
+  onOpenBranchTree,
+  bookmarks,
+  onAddBookmark,
+  onRemoveBookmark,
   onOpenFiles,
   onOpenArtifacts,
   isRightPanelOpen,
@@ -1448,6 +1457,22 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
             </button>
           )}
 
+          {onOpenBranchTree && (
+            <button
+              onClick={onOpenBranchTree}
+              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden lg:flex"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)'
+              }}
+              title={t("session_branches_tooltip", "Arbre des branches et signets mémoire (/branch)")}
+            >
+              <GitBranch className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-[11px] font-medium">Branches</span>
+            </button>
+          )}
+
           {/* Conversation Search Toggle Button */}
           <button
             onClick={handleToggleSearch}
@@ -1740,6 +1765,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
             const isThoughtOpen = expandedThoughts[msg.id];
             const isToolsExpanded = expandedTools[msg.id] ?? (msg.isLive || false);
             const isSpeaking = activeSpeakingMsgId === msg.id;
+            const msgStep = msg.stepIndex !== undefined ? msg.stepIndex : msgIdx;
+            const matchingBookmark = bookmarks?.find((b) => b.step_index === msgStep);
 
             return (
               <div
@@ -1769,7 +1796,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                     >
                       <AntigravityIcon size={18} />
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-xs" style={{ color: 'var(--strong)' }}>
                         Antigravity
                       </span>
@@ -1791,6 +1818,20 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                           style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
                         >
                           #{msg.stepIndex}
+                        </span>
+                      )}
+                      {matchingBookmark && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border shadow-xs"
+                          style={{
+                            backgroundColor: 'rgba(234, 179, 8, 0.12)',
+                            borderColor: 'rgba(234, 179, 8, 0.3)',
+                            color: '#eab308',
+                          }}
+                          title={`Signet : ${matchingBookmark.label}`}
+                        >
+                          <Bookmark className="w-2.5 h-2.5 fill-current" />
+                          <span className="max-w-[120px] truncate">{matchingBookmark.label}</span>
                         </span>
                       )}
                     </div>
@@ -1939,6 +1980,30 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                       >
                         <GitBranch className="w-3 h-3 text-fuchsia-500" />
                         <span className="hidden sm:inline">{t("fork", "Fork")}</span>
+                      </button>
+                    )}
+
+                    {conversationId && onAddBookmark && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (matchingBookmark && onRemoveBookmark) {
+                            onRemoveBookmark(matchingBookmark.id);
+                          } else {
+                            const label = window.prompt("Libellé du signet mémoire :", `Étape #${msgStep}`);
+                            if (label && label.trim()) {
+                              onAddBookmark(msgStep, label.trim(), (msg.content || '').slice(0, 150));
+                            }
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-md border flex items-center gap-1 hover:text-strong hover:bg-surface-subtle transition-all cursor-pointer ${
+                          matchingBookmark ? 'text-amber-400 border-amber-500/30 bg-amber-500/10' : ''
+                        }`}
+                        style={{ borderColor: matchingBookmark ? undefined : 'var(--border)' }}
+                        title={matchingBookmark ? `Signet : ${matchingBookmark.label} (cliquer pour supprimer)` : "Ajouter un signet mémoire"}
+                      >
+                        <Bookmark className={`w-3 h-3 ${matchingBookmark ? 'text-amber-400 fill-amber-400' : 'text-amber-500'}`} />
+                        <span className="hidden sm:inline">{matchingBookmark ? "Marqué" : "Signet"}</span>
                       </button>
                     )}
 
