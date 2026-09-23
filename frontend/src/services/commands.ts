@@ -365,6 +365,15 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     isAction: true
   },
   {
+    cmd: '/artifacts',
+    descKey: 'cmd_desc_artifacts',
+    desc: 'Ouvrir l\'explorateur de documents & artefacts de la session',
+    category: 'action',
+    icon: FileCode2,
+    color: 'text-amber-400',
+    isAction: true
+  },
+  {
     cmd: '/title',
     descKey: 'cmd_desc_title',
     desc: 'Renommer le titre de la conversation en cours',

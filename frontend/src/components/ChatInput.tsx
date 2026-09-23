@@ -28,6 +28,7 @@ import { ALL_SLASH_COMMANDS, parseSlashCommand, type SlashCommandDef } from '../
 import { applyTheme } from '../services/theme';
 import { useI18n, setLanguage, SUPPORTED_LANGUAGES, getCurrentLanguage } from '../services/i18n';
 import { PromptTemplatesModal } from './PromptTemplatesModal';
+import { VoiceWaveformVisualizer } from './VoiceWaveformVisualizer';
 
 interface ChatInputProps {
   onSendMessage: (
@@ -184,6 +185,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
 
   // Attachment states
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
@@ -279,16 +281,47 @@ export const ChatInput = React.memo<ChatInputProps>(({
     };
   }, []);
 
-  const toggleListening = () => {
-    if (isListening) {
-      if (recognitionRef.current) {
+  const cancelListening = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+    setInterimTranscript('');
+    setPrompt(basePromptRef.current);
+    basePromptRef.current = '';
+    finalSpeechRef.current = '';
+  }, []);
+
+  const confirmListening = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
         recognitionRef.current.stop();
-        recognitionRef.current = null;
-      }
-      setIsListening(false);
-      basePromptRef.current = '';
-      finalSpeechRef.current = '';
+      } catch {}
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+    setInterimTranscript('');
+    basePromptRef.current = '';
+    finalSpeechRef.current = '';
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 50);
+  }, []);
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      confirmListening();
       return;
+    }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+      recognitionRef.current = null;
     }
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -303,10 +336,13 @@ export const ChatInput = React.memo<ChatInputProps>(({
       recognition.continuous = true;
       recognition.interimResults = true;
 
+      setIsListening(true);
+      setInterimTranscript('');
+      basePromptRef.current = prompt;
+      finalSpeechRef.current = '';
+
       recognition.onstart = () => {
         setIsListening(true);
-        basePromptRef.current = prompt;
-        finalSpeechRef.current = '';
       };
 
       recognition.onresult = (event: any) => {
@@ -320,6 +356,8 @@ export const ChatInput = React.memo<ChatInputProps>(({
             interim += (interim ? ' ' : '') + text.trim();
           }
         }
+        const activeText = interim || finalSpeechRef.current;
+        setInterimTranscript(activeText);
         const spoken = (finalSpeechRef.current + (interim ? ' ' + interim : '')).trim();
         const base = basePromptRef.current;
         const separator = base && !base.endsWith(' ') && spoken ? ' ' : '';
@@ -328,7 +366,11 @@ export const ChatInput = React.memo<ChatInputProps>(({
 
       recognition.onerror = (e: any) => {
         console.warn('Speech recognition event:', e);
+        if (e.error === 'not-allowed') {
+          showToast(t('toast_mic_permission_denied', 'Accès microphone non autorisé par le navigateur.'), 'error');
+        }
         setIsListening(false);
+        setInterimTranscript('');
         basePromptRef.current = '';
         finalSpeechRef.current = '';
         recognitionRef.current = null;
@@ -336,6 +378,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
 
       recognition.onend = () => {
         setIsListening(false);
+        setInterimTranscript('');
         basePromptRef.current = '';
         finalSpeechRef.current = '';
         recognitionRef.current = null;
@@ -346,11 +389,12 @@ export const ChatInput = React.memo<ChatInputProps>(({
     } catch (err) {
       console.error('Failed to start speech recognition', err);
       setIsListening(false);
+      setInterimTranscript('');
       basePromptRef.current = '';
       finalSpeechRef.current = '';
       recognitionRef.current = null;
     }
-  };
+  }, [confirmListening, currentLangObj, isListening, prompt, showToast, t]);
 
   const [prevInitialPrompt, setPrevInitialPrompt] = useState(initialPrompt);
   if (initialPrompt !== prevInitialPrompt) {
@@ -643,6 +687,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         return true;
 
       case '/export':
+      case '/artifacts':
         if (onOpenExport) onOpenExport();
         return true;
 
@@ -875,6 +920,11 @@ export const ChatInput = React.memo<ChatInputProps>(({
     }
 
     if (e.key === 'Escape') {
+      if (isListening) {
+        e.preventDefault();
+        cancelListening();
+        return;
+      }
       if (showSlashMenu) {
         e.preventDefault();
         setShowSlashMenu(false);
@@ -1413,6 +1463,75 @@ export const ChatInput = React.memo<ChatInputProps>(({
                   .replace('{0}', String(Math.round(attachments.reduce((acc, a) => acc + (a.isImage ? 0 : a.size), 0) / 1024)))
                   .replace('{1}', String(Math.round(attachments.reduce((acc, a) => acc + (a.isImage ? 0 : a.content.length), 0) / 4)))}
               </span>
+            </div>
+          )}
+
+          {/* Live Voice Waveform Studio & Dictation Hub */}
+          {isListening && (
+            <div
+              className="mb-2 p-2.5 rounded-xl border flex flex-col gap-2 transition-all animate-fadeIn"
+              style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.06)',
+                borderColor: 'rgba(239, 68, 68, 0.35)',
+                backdropFilter: 'blur(8px)'
+              }}
+            >
+              <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                  </span>
+                  <span className="text-xs font-semibold text-red-500 flex items-center gap-1.5">
+                    <Mic className="w-3.5 h-3.5 animate-pulse" />
+                    <span>{t('dictation_recording', 'Studio Dictée Vocale')}</span>
+                  </span>
+                </div>
+
+                {/* Real-time Canvas Waveform Visualizer */}
+                <div className="flex-1 min-w-[140px] max-w-[240px] sm:max-w-[280px] mx-auto sm:mx-2">
+                  <VoiceWaveformVisualizer isActive={isListening} height={24} barCount={24} />
+                </div>
+
+                {/* Action buttons: Valider & Annuler */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={confirmListening}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
+                    title={t('confirm_dictation', 'Valider la dictée et garder le texte')}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{t('validate', 'Valider')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelListening}
+                    className="p-1 rounded-lg hover:bg-red-500/20 text-red-400 border border-red-500/30 text-[11px] transition-all cursor-pointer active:scale-95"
+                    title={t('cancel_dictation', 'Annuler et restaurer le prompt initial (Échap)')}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Interim Transcript Live Preview */}
+              {interimTranscript && (
+                <div
+                  className="px-2.5 py-1.5 rounded-lg border text-xs font-sans italic opacity-90 truncate max-w-full"
+                  style={{
+                    backgroundColor: 'var(--surface-subtle)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text)'
+                  }}
+                  title={interimTranscript}
+                >
+                  <span className="font-semibold not-italic opacity-60 mr-1.5 text-[10px] uppercase tracking-wider">
+                    {t('transcript_detected', 'En cours :')}
+                  </span>
+                  « {interimTranscript} »
+                </div>
+              )}
             </div>
           )}
 

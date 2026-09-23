@@ -50,6 +50,30 @@ if (typeof window !== 'undefined') {
 
 
 export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
+  dictation_recording: {
+    en: 'Live Voice Dictation Studio',
+    fr: 'Studio Dictée Vocale en direct',
+    es: 'Estudio de Dictado de Voz',
+    de: 'Live-Sprachdiktat-Studio',
+  },
+  confirm_dictation: {
+    en: 'Accept dictation and keep text',
+    fr: 'Valider la dictée et garder le texte',
+    es: 'Validar dictado y conservar texto',
+    de: 'Diktat bestätigen und Text behalten',
+  },
+  cancel_dictation: {
+    en: 'Cancel dictation and restore previous prompt',
+    fr: 'Annuler la dictée et restaurer le prompt initial',
+    es: 'Cancelar dictado y restaurar prompt original',
+    de: 'Diktat abbrechen und vorherigen Prompt wiederherstellen',
+  },
+  transcript_detected: {
+    en: 'Transcribing:',
+    fr: 'En cours :',
+    es: 'Detectado:',
+    de: 'Erkannt:',
+  },
   eco_mode_label: {
     en: 'Eco Mode',
     fr: 'Mode Éco',
