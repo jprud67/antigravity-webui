@@ -235,6 +235,71 @@ def _do_bulk_export(req: "BulkActionRequest") -> Response:
 def bulk_export(req: BulkActionRequest, _ = Depends(require_auth)):
     return _do_bulk_export(req)
 
+def _do_zip_export(conversation_ids: list[str] | None = None) -> Response:
+    """Export conversations as a ZIP archive of Markdown files."""
+    import zipfile
+    import io
+    import re
+    import datetime
+
+    target_ids = conversation_ids if conversation_ids else []
+    if not target_ids:
+        all_convs = list_conversations(limit=500)
+        target_ids = [c["conversation_id"] for c in all_convs if c.get("conversation_id")]
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for cid in target_ids:
+            if not is_safe_conversation_id(cid):
+                continue
+            try:
+                md_content = export_conversation_markdown(cid)
+                conv_info = get_conversation_by_id(cid) or get_session_meta(cid) or {}
+                raw_title = conv_info.get("customTitle") or conv_info.get("title") or cid[:8]
+                clean_title = re.sub(r'[^a-zA-Z0-9_\-\.]+', '_', raw_title).strip('_')[:40] or cid[:8]
+                ts = conv_info.get("last_modified_time")
+                date_prefix = "session"
+                if ts:
+                    if isinstance(ts, (int, float)):
+                        val = ts / 1000.0 if ts > 10000000000 else ts
+                        date_prefix = datetime.datetime.fromtimestamp(val).strftime("%Y%m%d")
+                    elif isinstance(ts, str):
+                        s = ts.strip()
+                        if s.isdigit():
+                            val = int(s)
+                            val = val / 1000.0 if val > 10000000000 else val
+                            date_prefix = datetime.datetime.fromtimestamp(val).strftime("%Y%m%d")
+                        else:
+                            try:
+                                dt = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+                                date_prefix = dt.strftime("%Y%m%d")
+                            except Exception:
+                                date_prefix = "session"
+                filename = f"{date_prefix}_{clean_title}_{cid[:6]}.md"
+                zip_file.writestr(filename, md_content)
+            except Exception as e:
+                logger.warning(f"Could not export conversation {cid} to zip: {e}")
+                continue
+
+    zip_buffer.seek(0)
+    today_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return Response(
+        content=zip_buffer.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="antigravity_archive_{today_str}.zip"'
+        }
+    )
+
+@router.post("/export/zip")
+def export_zip_archive_post(req: BulkActionRequest | None = None, _ = Depends(require_auth)):
+    ids = req.conversation_ids if req else None
+    return _do_zip_export(ids)
+
+@router.get("/export/zip")
+def export_zip_archive_get(_ = Depends(require_auth)):
+    return _do_zip_export(None)
+
 @router.get("/metadata")
 def get_all_metadata(_ = Depends(require_auth)):
     return get_all_session_metadata()

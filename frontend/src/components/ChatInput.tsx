@@ -71,6 +71,7 @@ interface ChatInputProps {
   onUndo?: () => void;
   onShowStatus?: () => void;
   onShowUsage?: (type?: 'usage' | 'quota' | 'credits' | 'changelog') => void;
+  onOpenAnalytics?: () => void;
   onOpenGoogleAccount?: () => void;
   onOpenUpdates?: () => void;
   onShowUpdateCard?: () => void;
@@ -125,6 +126,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
   onUndo,
   onShowStatus,
   onShowUsage,
+  onOpenAnalytics,
   onOpenGoogleAccount,
   onOpenUpdates,
   onShowUpdateCard,
@@ -693,6 +695,15 @@ export const ChatInput = React.memo<ChatInputProps>(({
               : `[Compactage du contexte] Veuillez résumer et condenser l'historique de cette conversation de manière concise pour optimiser la fenêtre de contexte.`
           );
           showToast(t('toast_compress_sent', '🗜️ Context compression request sent...'), 'info');
+        }
+        return true;
+
+      case '/analytics':
+      case '/stats':
+        if (onOpenAnalytics) {
+          onOpenAnalytics();
+        } else if (onShowUsage) {
+          onShowUsage('usage');
         }
         return true;
 

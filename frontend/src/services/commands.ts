@@ -23,6 +23,7 @@ import {
   Download,
   Edit3,
   PieChart,
+  BarChart3,
   Clock,
   GitPullRequest,
   Kanban as KanbanIcon,
@@ -370,6 +371,15 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'action',
     icon: Edit3,
     color: 'text-emerald-400',
+    isAction: true
+  },
+  {
+    cmd: '/analytics',
+    descKey: 'cmd_desc_analytics',
+    desc: 'Ouvrir le tableau de bord interactif des quotas et de la consommation de tokens',
+    category: 'system',
+    icon: BarChart3,
+    color: 'text-sky-400',
     isAction: true
   },
   {

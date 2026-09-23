@@ -23,6 +23,7 @@ import {
   Download,
   Globe,
   Edit3,
+  BarChart3,
   Kanban as KanbanIcon,
   Clock,
   ShieldCheck,
@@ -72,6 +73,7 @@ interface ChatCanvasProps {
   onOpenKanban?: () => void;
   onOpenCrons?: () => void;
   onOpenRules?: () => void;
+  onOpenAnalytics?: () => void;
   isRightPanelOpen?: boolean;
   activeRightPanelTab?: string;
   onToggleRightPanel?: () => void;
@@ -780,6 +782,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   onOpenKanban,
   onOpenCrons,
   onOpenRules,
+  onOpenAnalytics,
   onOpenFiles,
   onOpenArtifacts,
   isRightPanelOpen,
@@ -1325,6 +1328,22 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
             >
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               <span className="text-[11px] font-medium">{t("rules", "Rules")}</span>
+            </button>
+          )}
+
+          {onOpenAnalytics && (
+            <button
+              onClick={onOpenAnalytics}
+              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden lg:flex"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)'
+              }}
+              title={t("analytics_dashboard", "Dashboard Quotas & Analytique (/analytics)")}
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-sky-400" />
+              <span className="text-[11px] font-medium">Quotas</span>
             </button>
           )}
 

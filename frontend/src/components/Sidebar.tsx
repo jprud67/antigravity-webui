@@ -27,14 +27,19 @@ import {
   Check, 
   Loader2,
   Upload,
-  Archive
+  Archive,
+  SlidersHorizontal,
+  ArrowUpDown,
+  BarChart3,
+  RotateCcw,
+  FileArchive
 } from 'lucide-react';
 import type { Conversation } from '../types';
 import { getStoredTheme, applyAppearance, type ThemeMode } from '../services/theme';
 import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 import type { GoogleAccountInfo } from '../services/api';
-import { bulkConversationAction, bulkConversationExport, importConversation } from '../services/api';
+import { bulkConversationAction, bulkConversationExport, exportConversationsZip, importConversation } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
 
@@ -80,6 +85,7 @@ interface SidebarProps {
   onRefreshConversations?: () => Promise<void> | void;
   updateAvailable?: boolean;
   onOpenUpdates?: () => void;
+  onOpenAnalytics?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = React.memo(({
@@ -107,12 +113,19 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   onOpenGoogleAccount,
   onRefreshConversations,
   updateAvailable,
-  onOpenUpdates
+  onOpenUpdates,
+  onOpenAnalytics
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
   const [searchFilter, setSearchFilter] = useState('');
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  
+  // Advanced filters & sorting states
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<'recent' | 'oldest' | 'alpha_asc' | 'alpha_desc'>('recent');
 
   // Bulk mode states
   const [isBulkMode, setIsBulkMode] = useState(false);
@@ -157,6 +170,40 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     return Array.from(tagsSet);
   }, [conversations]);
 
+  // Extract all unique projects
+  const allProjects = useMemo(() => {
+    const map = new Map<string, string>();
+    conversations.forEach((c) => {
+      if (c.project && c.project.trim()) {
+        map.set(c.project.trim(), c.projectColor || '#3B82F6');
+      }
+    });
+    return Array.from(map.entries()).map(([name, color]) => ({ name, color }));
+  }, [conversations]);
+
+  // Active filter count
+  const activeFilterCount = useMemo(() => {
+    return (selectedTags.length > 0 ? 1 : 0) +
+      (dateFilter !== 'all' ? 1 : 0) +
+      (projectFilter !== null ? 1 : 0) +
+      (sortOrder !== 'recent' ? 1 : 0);
+  }, [selectedTags, dateFilter, projectFilter, sortOrder]);
+
+  const handleResetFilters = useCallback(() => {
+    setSelectedTags([]);
+    setDateFilter('all');
+    setProjectFilter(null);
+    setSortOrder('recent');
+    setSearchFilter('');
+  }, []);
+
+  const handleToggleTag = useCallback((tag: string) => {
+    const lower = tag.toLowerCase();
+    setSelectedTags((prev) =>
+      prev.includes(lower) ? prev.filter((t) => t !== lower) : [...prev, lower]
+    );
+  }, []);
+
   const handleSearchChange = (val: string) => {
     setSearchFilter(val);
     if (onSearchQuery) {
@@ -174,33 +221,111 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     };
   }, []);
 
-  // Filter conversations
+  // Filter & sort conversations
   const filtered = useMemo(() => {
-    return conversations.filter((c) => {
-      if (selectedTag) {
-        const hasTag = (c.tags || []).some((t) => typeof t === 'string' && t.toLowerCase() === selectedTag.toLowerCase());
-        if (!hasTag) return false;
-      }
-      if (!searchFilter.trim()) return true;
-      const q = searchFilter.toLowerCase();
-      const titleMatch = (c.customTitle || c.title || '').toLowerCase().includes(q);
-      const previewMatch = (c.preview || '').toLowerCase().includes(q);
-      const projectMatch = (c.project || '').toLowerCase().includes(q);
-      const tagsMatch = (c.tags || []).some((t) => typeof t === 'string' && t.toLowerCase().includes(q));
-      const snippetMatch = (c.match_snippet || '').toLowerCase().includes(q);
-      return titleMatch || previewMatch || projectMatch || tagsMatch || snippetMatch;
-    });
-  }, [conversations, searchFilter, selectedTag]);
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOf7Days = new Date(startOfToday);
+    startOf7Days.setDate(startOf7Days.getDate() - 7);
+    const startOf30Days = new Date(startOfToday);
+    startOf30Days.setDate(startOf30Days.getDate() - 30);
 
-  // Date Grouping logic
+    const result = conversations.filter((c) => {
+      // Multi-tag matching: must contain all selected tags
+      if (selectedTags.length > 0) {
+        const cTags = (c.tags || []).map((t) => (typeof t === 'string' ? t.toLowerCase() : ''));
+        const matchesAll = selectedTags.every((st) => cTags.includes(st));
+        if (!matchesAll) return false;
+      }
+
+      // Project filter
+      if (projectFilter !== null) {
+        if ((c.project || '').trim().toLowerCase() !== projectFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Date range filter
+      if (dateFilter !== 'all') {
+        const d = parseSafeDate(c.last_modified_time);
+        if (dateFilter === 'today' && d < startOfToday) return false;
+        if (dateFilter === '7d' && d < startOf7Days) return false;
+        if (dateFilter === '30d' && d < startOf30Days) return false;
+      }
+
+      // Search query
+      if (searchFilter.trim()) {
+        const q = searchFilter.toLowerCase();
+        const titleMatch = (c.customTitle || c.title || '').toLowerCase().includes(q);
+        const previewMatch = (c.preview || '').toLowerCase().includes(q);
+        const projectMatch = (c.project || '').toLowerCase().includes(q);
+        const tagsMatch = (c.tags || []).some((t) => typeof t === 'string' && t.toLowerCase().includes(q));
+        const snippetMatch = (c.match_snippet || '').toLowerCase().includes(q);
+        if (!titleMatch && !previewMatch && !projectMatch && !tagsMatch && !snippetMatch) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // Sort order
+    return result.sort((a, b) => {
+      if (sortOrder === 'recent') {
+        const dateA = parseSafeDate(a.last_modified_time).getTime();
+        const dateB = parseSafeDate(b.last_modified_time).getTime();
+        return dateB - dateA;
+      }
+      if (sortOrder === 'oldest') {
+        const dateA = parseSafeDate(a.last_modified_time).getTime();
+        const dateB = parseSafeDate(b.last_modified_time).getTime();
+        return dateA - dateB;
+      }
+      if (sortOrder === 'alpha_asc') {
+        const titleA = (a.customTitle || a.title || '').toLowerCase();
+        const titleB = (b.customTitle || b.title || '').toLowerCase();
+        return titleA.localeCompare(titleB);
+      }
+      if (sortOrder === 'alpha_desc') {
+        const titleA = (a.customTitle || a.title || '').toLowerCase();
+        const titleB = (b.customTitle || b.title || '').toLowerCase();
+        return titleB.localeCompare(titleA);
+      }
+      return 0;
+    });
+  }, [conversations, selectedTags, projectFilter, dateFilter, searchFilter, sortOrder]);
+
+  // Grouping logic (chronological or alphabetical)
   const groupedConversations = useMemo(() => {
     const pinned: Conversation[] = [];
+    const archived: Conversation[] = [];
+    const regular: Conversation[] = [];
+
+    filtered.forEach((c) => {
+      if (c.archived) {
+        archived.push(c);
+      } else if (c.pinned) {
+        pinned.push(c);
+      } else {
+        regular.push(c);
+      }
+    });
+
+    // If alphabetical sort is active, preserve clean alphabetical order in one dedicated section
+    if (sortOrder === 'alpha_asc' || sortOrder === 'alpha_desc') {
+      const alphaLabel = sortOrder === 'alpha_asc' ? `🔤 ${t('alphabetical_asc', 'Alphabetical (A → Z)')}` : `🔤 ${t('alphabetical_desc', 'Alphabetical (Z → A)')}`;
+      return [
+        { label: `📌 ${t('pinned_section', 'Pinned')}`, items: pinned },
+        { label: alphaLabel, items: regular },
+        { label: `📦 ${t('archives', 'Archives')}`, items: archived },
+      ].filter((g) => g.items.length > 0);
+    }
+
     const today: Conversation[] = [];
     const yesterday: Conversation[] = [];
     const last7Days: Conversation[] = [];
     const last30Days: Conversation[] = [];
     const older: Conversation[] = [];
-    const archived: Conversation[] = [];
 
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -211,15 +336,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     const startOf30Days = new Date(startOfToday);
     startOf30Days.setDate(startOf30Days.getDate() - 30);
 
-    filtered.forEach((c) => {
-      if (c.archived) {
-        archived.push(c);
-        return;
-      }
-      if (c.pinned) {
-        pinned.push(c);
-        return;
-      }
+    regular.forEach((c) => {
       const date = parseSafeDate(c.last_modified_time);
       if (date >= startOfToday) {
         today.push(c);
@@ -243,7 +360,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       { label: `🗄️ ${t('older', 'Older')}`, items: older },
       { label: `📦 ${t('archives', 'Archives')}`, items: archived },
     ].filter((g) => g.items.length > 0);
-  }, [filtered, t]);
+  }, [filtered, t, sortOrder]);
 
   // Bulk selection helpers & handlers
   const isAllSelected = useMemo(() => {
@@ -432,6 +549,53 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       showToast(err.message || t('err_bulk_export', 'Error during bulk export'), 'error');
     } finally {
       setIsBulkLoading(false);
+    }
+  };
+
+  const handleBulkExportZip = async () => {
+    if (selectedConvIds.size === 0) return;
+    const count = selectedConvIds.size;
+    setIsBulkLoading(true);
+    try {
+      const blob = await exportConversationsZip(Array.from(selectedConvIds));
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `antigravity_selection_${count}_sessions.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setSelectedConvIds(new Set());
+      setIsBulkMode(false);
+      showToast(t('toast_bulk_zip_exported', '{0} session(s) exportées en ZIP').replace('{0}', String(count)), 'success');
+    } catch (err: any) {
+      showToast(err.message || t('err_bulk_export_zip', "Erreur lors de l'export ZIP"), 'error');
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
+
+  const handleExportFilteredZip = async () => {
+    const ids = filtered.map((c) => c.conversation_id);
+    if (ids.length === 0) {
+      showToast(t('no_sessions_to_export', 'Aucune session à exporter'), 'warning');
+      return;
+    }
+    try {
+      showToast(t('generating_zip', "Génération de l'archive ZIP en cours..."), 'info');
+      const blob = await exportConversationsZip(ids);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `antigravity_export_${ids.length}_sessions.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      showToast(t('toast_zip_exported', '{0} session(s) exportées en ZIP').replace('{0}', String(ids.length)), 'success');
+    } catch (err: any) {
+      showToast(err.message || t('err_export_zip', "Erreur lors de l'export ZIP"), 'error');
     }
   };
 
@@ -625,63 +789,296 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         </button>
       </div>
 
-      {/* Search Input */}
+      {/* Search Input & Advanced Filter Bar */}
       <div className="px-3 py-2 border-b space-y-2 shrink-0" style={{ borderColor: 'var(--border)' }}>
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5" style={{ color: 'var(--muted)' }} />
-          <input
-            type="text"
-            placeholder={t('search_sessions', 'Search sessions & content...')}
-            value={searchFilter}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            data-shortcut="search"
-            className="w-full pl-8 pr-7 py-1.5 rounded-lg text-xs placeholder-slate-400 focus:outline-none transition-colors"
+        <div className="flex items-center gap-1.5">
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5" style={{ color: 'var(--muted)' }} />
+            <input
+              type="text"
+              placeholder={t('search_sessions', 'Search sessions & content...')}
+              value={searchFilter}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              data-shortcut="search"
+              className="w-full pl-8 pr-7 py-1.5 rounded-lg text-xs placeholder-slate-400 focus:outline-none transition-colors"
+              style={{
+                backgroundColor: 'var(--input-bg)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
+              }}
+            />
+            {searchFilter && (
+              <button
+                onClick={() => handleSearchChange('')}
+                className="absolute right-2.5 top-2.5 hover:opacity-100 transition-opacity cursor-pointer"
+                style={{ color: 'var(--muted)' }}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Toggle Filter Panel Button */}
+          <button
+            type="button"
+            onClick={() => setIsFilterPanelOpen((prev) => !prev)}
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center relative ${
+              isFilterPanelOpen ? 'ring-2 ring-sky-500/30' : 'hover:border-sky-500/40'
+            }`}
             style={{
-              backgroundColor: 'var(--input-bg)',
-              border: '1px solid var(--border)',
-              color: 'var(--text)',
+              backgroundColor: isFilterPanelOpen || activeFilterCount > 0 ? 'var(--accent-bg)' : 'var(--surface)',
+              borderColor: isFilterPanelOpen || activeFilterCount > 0 ? 'var(--accent)' : 'var(--border)',
+              color: isFilterPanelOpen || activeFilterCount > 0 ? 'var(--accent)' : 'var(--muted)',
             }}
-          />
-          {searchFilter && (
-            <button
-              onClick={() => handleSearchChange('')}
-              className="absolute right-2.5 top-2.5 hover:opacity-100 transition-opacity cursor-pointer"
-              style={{ color: 'var(--muted)' }}
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
+            title={t('filter_and_sort', 'Filtres avancés et tri')}
+            aria-label={t('filter_and_sort', 'Filtres avancés et tri')}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-sky-500 text-white text-[9px] font-bold flex items-center justify-center shadow-xs">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
+
+        {/* Expandable Advanced Filter Drawer */}
+        {isFilterPanelOpen && (
+          <div
+            className="p-2.5 rounded-xl border space-y-2.5 text-xs transition-all shadow-xs animate-fadeIn"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border)',
+            }}
+          >
+            {/* Sort Order Selector */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] uppercase font-semibold tracking-wider flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                  <ArrowUpDown className="w-3 h-3" />
+                  {t('sort_by', 'Tri')}
+                </span>
+                <span className="text-[10px] font-mono opacity-70">
+                  {sortOrder === 'recent' ? t('sort_recent', 'Plus récent') : sortOrder === 'oldest' ? t('sort_oldest', 'Plus ancien') : sortOrder === 'alpha_asc' ? 'A → Z' : 'Z → A'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setSortOrder('recent')}
+                  className="px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer text-left flex items-center justify-between"
+                  style={{
+                    backgroundColor: sortOrder === 'recent' ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                    borderColor: sortOrder === 'recent' ? 'var(--accent)' : 'var(--border)',
+                    color: sortOrder === 'recent' ? 'var(--accent)' : 'var(--text)',
+                  }}
+                >
+                  <span>{t('sort_recent', 'Plus récent')}</span>
+                  {sortOrder === 'recent' && <Check className="w-3 h-3" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortOrder('oldest')}
+                  className="px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer text-left flex items-center justify-between"
+                  style={{
+                    backgroundColor: sortOrder === 'oldest' ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                    borderColor: sortOrder === 'oldest' ? 'var(--accent)' : 'var(--border)',
+                    color: sortOrder === 'oldest' ? 'var(--accent)' : 'var(--text)',
+                  }}
+                >
+                  <span>{t('sort_oldest', 'Plus ancien')}</span>
+                  {sortOrder === 'oldest' && <Check className="w-3 h-3" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortOrder('alpha_asc')}
+                  className="px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer text-left flex items-center justify-between"
+                  style={{
+                    backgroundColor: sortOrder === 'alpha_asc' ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                    borderColor: sortOrder === 'alpha_asc' ? 'var(--accent)' : 'var(--border)',
+                    color: sortOrder === 'alpha_asc' ? 'var(--accent)' : 'var(--text)',
+                  }}
+                >
+                  <span>Titre (A → Z)</span>
+                  {sortOrder === 'alpha_asc' && <Check className="w-3 h-3" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortOrder('alpha_desc')}
+                  className="px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer text-left flex items-center justify-between"
+                  style={{
+                    backgroundColor: sortOrder === 'alpha_desc' ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                    borderColor: sortOrder === 'alpha_desc' ? 'var(--accent)' : 'var(--border)',
+                    color: sortOrder === 'alpha_desc' ? 'var(--accent)' : 'var(--text)',
+                  }}
+                >
+                  <span>Titre (Z → A)</span>
+                  {sortOrder === 'alpha_desc' && <Check className="w-3 h-3" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Date Range Selector */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] uppercase font-semibold tracking-wider flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                  <Clock className="w-3 h-3" />
+                  {t('date_range', 'Date')}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-1 text-[10px]">
+                {(['all', 'today', '7d', '30d'] as const).map((dr) => {
+                  const labels: Record<string, string> = {
+                    all: t('date_all', 'Tout'),
+                    today: t('today', 'Aujourd\'hui'),
+                    '7d': '7j',
+                    '30d': '30j',
+                  };
+                  const active = dateFilter === dr;
+                  return (
+                    <button
+                      key={dr}
+                      type="button"
+                      onClick={() => setDateFilter(dr)}
+                      className="py-1 rounded-md border font-medium text-center transition-colors cursor-pointer"
+                      style={{
+                        backgroundColor: active ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                        borderColor: active ? 'var(--accent)' : 'var(--border)',
+                        color: active ? 'var(--accent)' : 'var(--muted)',
+                        fontWeight: active ? 600 : 400,
+                      }}
+                    >
+                      {labels[dr]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Project Filter */}
+            {allProjects.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] uppercase font-semibold tracking-wider flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                    <Folder className="w-3 h-3" />
+                    {t('project', 'Projet')}
+                  </span>
+                  {projectFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setProjectFilter(null)}
+                      className="text-[10px] text-sky-500 hover:underline cursor-pointer"
+                    >
+                      {t('clear', 'Effacer')}
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setProjectFilter(null)}
+                    className="px-2 py-0.5 rounded-full text-[10px] border transition-colors cursor-pointer"
+                    style={{
+                      backgroundColor: projectFilter === null ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                      borderColor: projectFilter === null ? 'var(--accent)' : 'var(--border)',
+                      color: projectFilter === null ? 'var(--accent)' : 'var(--muted)',
+                      fontWeight: projectFilter === null ? 600 : 400,
+                    }}
+                  >
+                    Tous les projets
+                  </button>
+                  {allProjects.map((proj) => {
+                    const active = projectFilter?.toLowerCase() === proj.name.toLowerCase();
+                    return (
+                      <button
+                        key={proj.name}
+                        type="button"
+                        onClick={() => setProjectFilter(active ? null : proj.name)}
+                        className="px-2 py-0.5 rounded-full text-[10px] border transition-colors cursor-pointer flex items-center gap-1"
+                        style={{
+                          backgroundColor: active ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                          borderColor: active ? proj.color : 'var(--border)',
+                          color: active ? proj.color : 'var(--text)',
+                          fontWeight: active ? 600 : 400,
+                        }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: proj.color }} />
+                        <span>{proj.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Filter Drawer Footer: count, reset button, and export filtered ZIP */}
+            <div className="pt-2 border-t flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
+              <div className="flex items-center gap-1.5 text-[11px] font-mono" style={{ color: 'var(--muted)' }}>
+                <span>{filtered.length} session(s)</span>
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 text-rose-500 flex items-center gap-1 transition-colors cursor-pointer"
+                    title={t('reset_filters', 'Réinitialiser tous les filtres')}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span className="text-[10px]">Reset</span>
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleExportFilteredZip}
+                disabled={filtered.length === 0}
+                className="px-2 py-1 rounded-lg text-[10px] font-medium border flex items-center gap-1 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40"
+                style={{
+                  borderColor: 'var(--border)',
+                  color: 'var(--accent)',
+                }}
+                title={t('export_filtered_zip', 'Exporter ces sessions en archive ZIP')}
+              >
+                <FileArchive className="w-3 h-3 text-amber-500" />
+                <span>ZIP ({filtered.length})</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Tag Filter Chips Bar */}
         {allTags.length > 0 && (
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[10px] font-mono">
             <button
-              onClick={() => setSelectedTag(null)}
+              onClick={() => setSelectedTags([])}
               className="px-2 py-0.5 rounded-full whitespace-nowrap transition-colors cursor-pointer border font-semibold"
               style={{
-                backgroundColor: selectedTag === null ? 'var(--accent-bg)' : 'var(--surface)',
-                color: selectedTag === null ? 'var(--accent)' : 'var(--muted)',
-                borderColor: selectedTag === null ? 'var(--accent)' : 'var(--border)',
+                backgroundColor: selectedTags.length === 0 ? 'var(--accent-bg)' : 'var(--surface)',
+                color: selectedTags.length === 0 ? 'var(--accent)' : 'var(--muted)',
+                borderColor: selectedTags.length === 0 ? 'var(--accent)' : 'var(--border)',
               }}
             >
               #tous
             </button>
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                className="px-2 py-0.5 rounded-full whitespace-nowrap transition-colors cursor-pointer border"
-                style={{
-                  backgroundColor: selectedTag === tag ? 'rgba(16, 185, 129, 0.12)' : 'var(--surface)',
-                  color: selectedTag === tag ? '#10B981' : 'var(--muted)',
-                  borderColor: selectedTag === tag ? '#10B981' : 'var(--border)',
-                  fontWeight: selectedTag === tag ? 600 : 400,
-                }}
-              >
-                #{tag}
-              </button>
-            ))}
+            {allTags.map((tag) => {
+              const active = selectedTags.includes(tag.toLowerCase());
+              return (
+                <button
+                  key={tag}
+                  onClick={() => handleToggleTag(tag)}
+                  className="px-2 py-0.5 rounded-full whitespace-nowrap transition-colors cursor-pointer border flex items-center gap-1"
+                  style={{
+                    backgroundColor: active ? 'rgba(16, 185, 129, 0.12)' : 'var(--surface)',
+                    color: active ? '#10B981' : 'var(--muted)',
+                    borderColor: active ? '#10B981' : 'var(--border)',
+                    fontWeight: active ? 600 : 400,
+                  }}
+                >
+                  <span>#{tag}</span>
+                  {active && <Check className="w-2.5 h-2.5" />}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -874,7 +1271,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               <span className="hidden sm:inline">{isAllSelectedArchived ? t('unarchive', 'Unarchive') : t('archive', 'Archive')}</span>
             </button>
 
-            {/* Export */}
+            {/* Export JSON */}
             <button
               type="button"
               disabled={selectedConvIds.size === 0 || isBulkLoading}
@@ -888,7 +1285,24 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               title={t("export_selection_json", "Export selection to JSON")}
             >
               <Download className="w-3 h-3 text-sky-500" />
-              <span className="hidden sm:inline">Export</span>
+              <span className="hidden sm:inline">JSON</span>
+            </button>
+
+            {/* Export ZIP */}
+            <button
+              type="button"
+              disabled={selectedConvIds.size === 0 || isBulkLoading}
+              onClick={handleBulkExportZip}
+              className="py-1.5 px-2 rounded-lg border text-[11px] font-medium flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+              style={{
+                borderColor: 'var(--border)',
+                backgroundColor: 'var(--surface)',
+                color: 'var(--text)',
+              }}
+              title={t("export_selection_zip", "Exporter la sélection en archive ZIP (Markdown)")}
+            >
+              <FileArchive className="w-3 h-3 text-amber-500" />
+              <span className="hidden sm:inline">ZIP</span>
             </button>
 
             {/* Delete */}
@@ -923,7 +1337,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       <div className="flex-1 overflow-y-auto p-2 space-y-3">
         {filtered.length === 0 ? (
           <div className="p-6 text-center text-xs text-slate-500">
-            {searchFilter || selectedTag ? t('no_sessions_match_filters', 'No sessions match filters.') : t('no_sessions_found', 'No sessions found.')}
+            {searchFilter || activeFilterCount > 0 ? t('no_sessions_match_filters', 'No sessions match filters.') : t('no_sessions_found', 'No sessions found.')}
           </div>
         ) : (
           groupedConversations.map((group) => (
@@ -1197,6 +1611,22 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
           </div>
           <span className="text-[10px] text-emerald-500 group-hover:translate-x-0.5 transition-transform">→</span>
         </button>
+
+        {onOpenAnalytics && (
+          <button
+            onClick={onOpenAnalytics}
+            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--text)' }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <BarChart3 className="w-3 h-3 text-amber-500" />
+              </div>
+              <span className="font-medium text-[11px]">{t('analytics_and_quotas', 'Quotas & Analytique')}</span>
+            </div>
+            <span className="text-[10px] text-amber-500 group-hover:translate-x-0.5 transition-transform">→</span>
+          </button>
+        )}
 
         {/* Google Account Switcher Widget */}
         <button

@@ -1064,6 +1064,16 @@ export async function exportConversationJSON(conversationId: string): Promise<Bl
   return res.blob();
 }
 
+export async function exportConversationsZip(conversationIds?: string[]): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/conversations/export/zip`, {
+    method: 'POST',
+    headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'export_zip', conversation_ids: conversationIds || [] })
+  });
+  if (!res.ok) throw new Error("Échec du téléchargement de l'archive ZIP");
+  return res.blob();
+}
+
 export async function fetchUsageQuota(): Promise<any> {
   const res = await fetch(`${API_BASE}/settings/usage`, {
     headers: getHeaders()

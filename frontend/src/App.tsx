@@ -16,6 +16,7 @@ const SessionMetaModal = lazy(() => import('./components/SessionMetaModal').then
 const CronSchedulerModal = lazy(() => import('./components/CronSchedulerModal').then(m => ({ default: m.CronSchedulerModal })));
 const RulesEditorModal = lazy(() => import('./components/RulesEditorModal').then(m => ({ default: m.RulesEditorModal })));
 const HelpModal = lazy(() => import('./components/HelpModal').then(m => ({ default: m.HelpModal })));
+const AnalyticsModal = lazy(() => import('./components/AnalyticsModal').then(m => ({ default: m.AnalyticsModal })));
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption } from './types';
 import { parseStepsToMessages, cleanUserPrompt } from './utils/transcriptParser';
@@ -239,6 +240,7 @@ export function App() {
   const [isCronModalOpen, setIsCronModalOpen] = useState(false);
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('models');
   const [activeGoogleAccount, setActiveGoogleAccount] = useState<GoogleAccountInfo | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
@@ -1244,6 +1246,7 @@ export function App() {
       // Escape — Close active modal
       if (e.key === 'Escape') {
         if (isSettingsOpen) { setIsSettingsOpen(false); return; }
+        if (isAnalyticsOpen) { setIsAnalyticsOpen(false); return; }
         if (isHelpOpen) { setIsHelpOpen(false); return; }
         if (isArtifactsOpen) { setIsArtifactsOpen(false); return; }
         if (isWorkspacesOpen) { setIsWorkspacesOpen(false); return; }
@@ -1268,7 +1271,7 @@ export function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [
-    isSettingsOpen, isHelpOpen, isArtifactsOpen, isWorkspacesOpen,
+    isSettingsOpen, isAnalyticsOpen, isHelpOpen, isArtifactsOpen, isWorkspacesOpen,
     isFileExplorerOpen, isTaskDashboardOpen, isCronModalOpen, isRulesModalOpen,
     isSessionMetaOpen, isRightPanelOpen, isMobileSidebarOpen,
   ]);
@@ -1624,6 +1627,7 @@ export function App() {
   const stableOpenCrons = useCallback(() => setIsCronModalOpen(true), []);
   const stableOpenRules = useCallback(() => setIsRulesModalOpen(true), []);
   const stableOpenTasks = useCallback(() => setIsTaskDashboardOpen(true), []);
+  const stableOpenAnalytics = useCallback(() => setIsAnalyticsOpen(true), []);
   const stableApprovalResolved = useCallback(() => setPendingApproval(null), []);
   
   const stableAnswerQuestion = useCallback((ans: string) => {
@@ -1674,6 +1678,7 @@ export function App() {
         onOpenArtifacts={() => openRightPanel('artifacts')}
         onOpenFiles={() => openRightPanel('files')}
         onOpenTasks={() => setIsTaskDashboardOpen(true)}
+        onOpenAnalytics={stableOpenAnalytics}
         onLogout={handleLogout}
         onTogglePin={handleTogglePin}
         onEditSessionMeta={handleEditSessionMeta}
@@ -1742,6 +1747,7 @@ export function App() {
           onOpenCrons={stableOpenCrons}
           onOpenRules={stableOpenRules}
           onOpenTasks={stableOpenTasks}
+          onOpenAnalytics={stableOpenAnalytics}
           isRightPanelOpen={isRightPanelOpen}
           activeRightPanelTab={rightPanelTab}
           onToggleRightPanel={handleToggleRightPanel}
@@ -1805,6 +1811,7 @@ export function App() {
           onUndo={handleUndo}
           onShowStatus={handleShowStatusCard}
           onShowUsage={handleShowUsageCard}
+          onOpenAnalytics={stableOpenAnalytics}
           onOpenGoogleAccount={handleOpenGoogleAccount}
           onOpenUpdates={handleOpenUpdates}
           onShowUpdateCard={handleShowUpdateCard}
@@ -1877,6 +1884,14 @@ export function App() {
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
         onExecuteCommand={(cmd) => setQuickPrompt(cmd)}
+      />
+
+      <AnalyticsModal
+        isOpen={isAnalyticsOpen}
+        onClose={() => setIsAnalyticsOpen(false)}
+        tokenUsage={tokenUsage}
+        conversations={conversations}
+        activeModel={displayModelName}
       />
 
       <WorkspaceModal
