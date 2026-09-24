@@ -27,7 +27,8 @@ import {
   Columns,
   Sparkles,
   FileCode,
-  Loader2
+  Loader2,
+  Play
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -240,6 +241,125 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       onTabChange(tab);
     }
   }, [checkUnsavedChanges, onTabChange]);
+
+  // Integrated Terminal Split View State
+  const [isTerminalSplitOpen, setIsTerminalSplitOpen] = useState(false);
+  const [terminalSplitHeight, setTerminalSplitHeight] = useState(260);
+  const isDraggingSplitRef = useRef(false);
+  const startDragYRef = useRef(0);
+  const startHeightRef = useRef(260);
+
+  const handleSplitResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingSplitRef.current = true;
+    startDragYRef.current = e.clientY;
+    startHeightRef.current = terminalSplitHeight;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingSplitRef.current) return;
+      const deltaY = startDragYRef.current - moveEvent.clientY;
+      const newHeight = Math.max(140, Math.min(650, startHeightRef.current + deltaY));
+      setTerminalSplitHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      isDraggingSplitRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, [terminalSplitHeight]);
+
+  // Global Ctrl+` shortcut to toggle split terminal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+        e.preventDefault();
+        setIsTerminalSplitOpen(prev => {
+          const next = !prev;
+          setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+          return next;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const activeFileFolder = useMemo(() => {
+    if (!selectedFilePath) return currentWorkspace;
+    const normalized = selectedFilePath.replace(/\\/g, '/');
+    const idx = normalized.lastIndexOf('/');
+    return idx !== -1 ? normalized.slice(0, idx) : currentWorkspace;
+  }, [selectedFilePath, currentWorkspace]);
+
+  const isExecutableFile = useMemo(() => {
+    if (!selectedFilePath) return false;
+    return /\.(py|js|ts|sh|bash|ps1|bat|cmd)$/i.test(selectedFilePath);
+  }, [selectedFilePath]);
+
+  const handleRunInTerminal = useCallback(() => {
+    if (!selectedFilePath) return;
+    if (!isTerminalSplitOpen) {
+      setIsTerminalSplitOpen(true);
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+    }
+
+    const ext = selectedFilePath.split('.').pop()?.toLowerCase();
+    const filePath = `"${selectedFilePath}"`;
+    let cmd = filePath;
+
+    switch (ext) {
+      case 'py':
+        cmd = `python ${filePath}`;
+        break;
+      case 'js':
+        cmd = `node ${filePath}`;
+        break;
+      case 'ts':
+        cmd = `npx tsx ${filePath}`;
+        break;
+      case 'sh':
+      case 'bash':
+        cmd = `bash ${filePath}`;
+        break;
+      case 'ps1':
+        cmd = `powershell -ExecutionPolicy Bypass -File ${filePath}`;
+        break;
+    }
+
+    setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent('terminal-run-command', {
+          detail: { command: cmd }
+        })
+      );
+      showToast(`Exécution : ${cmd}`, 'info');
+    }, 150);
+  }, [selectedFilePath, isTerminalSplitOpen]);
+
+  const handleCdToActiveFolder = useCallback(() => {
+    if (!activeFileFolder) return;
+    if (!isTerminalSplitOpen) {
+      setIsTerminalSplitOpen(true);
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+    }
+    setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent('terminal-run-command', {
+          detail: { command: `cd "${activeFileFolder}"` }
+        })
+      );
+      showToast(`cd "${activeFileFolder}"`, 'info');
+    }, 150);
+  }, [activeFileFolder, isTerminalSplitOpen]);
 
   const BINARY_EXTENSIONS = useMemo(() => new Set([
     'docx', 'doc', 'pdf', 'zip', 'tar', 'gz', 'tgz', '7z', 'rar',
@@ -1255,6 +1375,41 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           </button>
                         )}
 
+                        {/* Run in Integrated Terminal button */}
+                        {isExecutableFile && (
+                          <button
+                            type="button"
+                            onClick={handleRunInTerminal}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"
+                            title="Exécuter dans le terminal intégré"
+                          >
+                            <Play className="w-2.5 h-2.5 fill-amber-300" />
+                            <span>Exécuter</span>
+                          </button>
+                        )}
+
+                        {/* Toggle Integrated Terminal button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsTerminalSplitOpen(prev => {
+                              const next = !prev;
+                              setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+                              return next;
+                            });
+                          }}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border ${
+                            isTerminalSplitOpen
+                              ? 'bg-sky-500/20 text-sky-400 border-sky-500/40'
+                              : 'hover:bg-black/5 dark:hover:bg-white/5 border-transparent text-slate-400 hover:text-slate-200'
+                          }`}
+                          style={{ borderColor: isTerminalSplitOpen ? undefined : 'var(--border)' }}
+                          title="Basculer le terminal intégré (Ctrl+`)"
+                        >
+                          <TerminalIcon className="w-2.5 h-2.5" />
+                          <span>Terminal</span>
+                        </button>
+
                         {!activeTabItem.isBinary && (
                           <button
                             type="button"
@@ -1404,6 +1559,150 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         <FilePlus className="w-3.5 h-3.5" />
                         <span>Nouveau fichier</span>
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsTerminalSplitOpen(prev => {
+                            const next = !prev;
+                            setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+                            return next;
+                          });
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border hover:bg-black/5 dark:hover:bg-white/5 text-slate-300 cursor-pointer shadow-sm transition-all"
+                        style={{ borderColor: 'var(--border)' }}
+                      >
+                        <TerminalIcon className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Terminal (Ctrl+`)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Integrated Terminal Split Drawer */}
+                {isTerminalSplitOpen && (
+                  <div
+                    className="flex flex-col border-t shrink-0 relative"
+                    style={{
+                      height: `${terminalSplitHeight}px`,
+                      borderColor: 'var(--border)',
+                      backgroundColor: 'var(--surface)',
+                    }}
+                  >
+                    {/* Drag Resize Handle */}
+                    <div
+                      onMouseDown={handleSplitResizeMouseDown}
+                      className="h-1.5 w-full cursor-row-resize hover:bg-sky-500/50 transition-colors flex items-center justify-center group relative -top-0.5 z-10 select-none"
+                      title="Glisser pour redimensionner le terminal (double-clic pour réinitialiser)"
+                      onDoubleClick={() => {
+                        setTerminalSplitHeight(260);
+                        setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+                      }}
+                    >
+                      <div className="w-12 h-1 rounded-full bg-slate-600/40 group-hover:bg-sky-400 transition-colors" />
+                    </div>
+
+                    {/* Split Terminal Header */}
+                    <div
+                      className="flex items-center justify-between px-3 py-1 border-b text-xs shrink-0 select-none"
+                      style={{
+                        backgroundColor: 'var(--surface-subtle)',
+                        borderColor: 'var(--border)',
+                      }}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-1.5 text-sky-400 font-semibold text-[11px]">
+                          <TerminalIcon className="w-3.5 h-3.5" />
+                          <span>Terminal Intégré</span>
+                        </div>
+                        <span className="text-slate-500 text-[10px]">•</span>
+                        <span
+                          className="font-mono text-[10px] truncate max-w-[240px] px-1.5 py-0.5 rounded border"
+                          style={{
+                            backgroundColor: 'var(--surface)',
+                            borderColor: 'var(--border)',
+                            color: 'var(--muted)',
+                          }}
+                          title={activeFileFolder}
+                        >
+                          📂 {activeFileFolder}
+                        </span>
+                        {activeFileFolder && (
+                          <button
+                            type="button"
+                            onClick={handleCdToActiveFolder}
+                            className="px-1.5 py-0.5 text-[10px] rounded hover:bg-sky-500/10 text-sky-400 border border-sky-500/30 transition-colors cursor-pointer"
+                            title={`Envoyer cd "${activeFileFolder}" dans le terminal`}
+                          >
+                            cd ici
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* Height Presets */}
+                        <div className="flex items-center border rounded-md overflow-hidden text-[9px] font-mono" style={{ borderColor: 'var(--border)' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTerminalSplitHeight(160);
+                              setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+                            }}
+                            className={`px-1.5 py-0.5 transition-colors cursor-pointer ${terminalSplitHeight === 160 ? 'bg-sky-500 text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                            title="Hauteur compacte (160px)"
+                          >
+                            160
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTerminalSplitHeight(260);
+                              setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+                            }}
+                            className={`px-1.5 py-0.5 transition-colors cursor-pointer border-l ${terminalSplitHeight === 260 ? 'bg-sky-500 text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                            style={{ borderColor: 'var(--border)' }}
+                            title="Hauteur standard (260px)"
+                          >
+                            260
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTerminalSplitHeight(420);
+                              setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+                            }}
+                            className={`px-1.5 py-0.5 transition-colors cursor-pointer border-l ${terminalSplitHeight === 420 ? 'bg-sky-500 text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                            style={{ borderColor: 'var(--border)' }}
+                            title="Hauteur haute (420px)"
+                          >
+                            420
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsTerminalSplitOpen(false);
+                            setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+                          }}
+                          className="p-1 rounded hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors cursor-pointer"
+                          title="Masquer le terminal (Ctrl+`)"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Terminal Body */}
+                    <div className="flex-1 min-h-0 relative overflow-hidden">
+                      <TerminalTab
+                        currentWorkspace={currentWorkspace}
+                        compact={true}
+                        onClose={() => {
+                          setIsTerminalSplitOpen(false);
+                          setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+                        }}
+                      />
                     </div>
                   </div>
                 )}

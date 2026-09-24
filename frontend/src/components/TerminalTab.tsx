@@ -15,8 +15,10 @@ import { getAuthToken, fetchTerminalShells, deleteTerminalSession, type Terminal
 import { showConfirm } from '../services/dialog';
 import { useI18n } from '../services/i18n';
 
-interface TerminalTabProps {
+export interface TerminalTabProps {
   currentWorkspace: string;
+  onClose?: () => void;
+  compact?: boolean;
 }
 
 interface TabData {
@@ -126,7 +128,7 @@ function makeSessionId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${tabSeed}`;
 }
 
-export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) => {
+export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onClose, compact: _compact }) => {
   const { t } = useI18n();
 
   const [availableShells, setAvailableShells] = useState<TerminalShellInfo[]>([]);
@@ -744,6 +746,17 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace }) =>
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              title={t('close', 'Fermer')}
+              className="p-1.5 rounded-md transition-colors cursor-pointer hover:opacity-100 opacity-70 hover:text-rose-400"
+              style={{ color: 'var(--muted)' }}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
