@@ -24,9 +24,15 @@ import {
   Plus,
   Trash2,
   ArrowUpRight,
-  Save
+  Save,
+  ArrowRight,
+  Edit3,
+  Globe,
+  Play,
+  RotateCcw,
+  AlertTriangle
 } from 'lucide-react';
-import type { MonacoStudioConfig, GitStashItem } from '../types';
+import type { MonacoStudioConfig, GitStashItem, GitBranchDetail, RebaseStatusResponse } from '../types';
 import { 
   fetchGitStatus, 
   fetchGitDiff, 
@@ -41,6 +47,15 @@ import {
   dropGitStash,
   fetchGitStashDiff,
   cherryPickCommit,
+  fetchGitBranches,
+  checkoutGitBranch,
+  createGitBranch,
+  deleteGitBranch,
+  mergeGitBranch,
+  renameGitBranch,
+  fetchRebaseStatus,
+  continueGitRebase,
+  abortGitRebase,
   type GitStatusResult,
   type GitCommitItem
 } from '../services/api';
@@ -49,6 +64,7 @@ import { useI18n } from '../services/i18n';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
 import { GitConflictModal } from './GitConflictModal';
+import { GitRebaseModal } from './GitRebaseModal';
 
 interface GitTabProps {
   currentWorkspace: string;
@@ -61,8 +77,39 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // View Mode: 'changes' vs 'history' vs 'stashes'
-  const [viewMode, setViewMode] = useState<'changes' | 'history' | 'stashes'>('changes');
+  // View Mode: 'changes' vs 'history' vs 'stashes' vs 'branches'
+  const [viewMode, setViewMode] = useState<'changes' | 'history' | 'stashes' | 'branches'>('changes');
+
+  // Branch management states
+  const [branches, setBranches] = useState<GitBranchDetail[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [branchSearch, setBranchSearch] = useState('');
+  const [branchFilter, setBranchFilter] = useState<'all' | 'local' | 'remote'>('all');
+  
+  // Create branch modal/form state
+  const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false);
+  const [newBranchName, setNewBranchName] = useState('');
+  const [newBranchStartPoint, setNewBranchStartPoint] = useState('');
+  const [newBranchCheckout, setNewBranchCheckout] = useState(true);
+  const [creatingBranch, setCreatingBranch] = useState(false);
+
+  // Rename branch state
+  const [renamingBranch, setRenamingBranch] = useState<GitBranchDetail | null>(null);
+  const [newRenameName, setNewRenameName] = useState('');
+  const [renaming, setRenaming] = useState(false);
+
+  // Merge branch state
+  const [mergingBranch, setMergingBranch] = useState<GitBranchDetail | null>(null);
+  const [mergeNoFF, setMergeNoFF] = useState(false);
+  const [mergeMessage, setMergeMessage] = useState('');
+  const [merging, setMerging] = useState(false);
+
+  // Rebase states
+  const [isRebaseModalOpen, setIsRebaseModalOpen] = useState(false);
+  const [rebaseBaseRef, setRebaseBaseRef] = useState('HEAD~5');
+  const [rebaseStatus, setRebaseStatus] = useState<RebaseStatusResponse | null>(null);
+  const [continuingRebase, setContinuingRebase] = useState(false);
+  const [abortingRebase, setAbortingRebase] = useState(false);
 
   // Stash states
   const [stashes, setStashes] = useState<GitStashItem[]>([]);
@@ -201,6 +248,27 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
     }
   }, [currentWorkspace]);
 
+  const loadBranches = useCallback(async () => {
+    setLoadingBranches(true);
+    try {
+      const data = await fetchGitBranches(currentWorkspace);
+      setBranches(data.branches || []);
+    } catch (err: any) {
+      console.error('Failed to load branches:', err);
+    } finally {
+      setLoadingBranches(false);
+    }
+  }, [currentWorkspace]);
+
+  const loadRebaseStatus = useCallback(async () => {
+    try {
+      const res = await fetchRebaseStatus(currentWorkspace);
+      setRebaseStatus(res);
+    } catch {
+      setRebaseStatus(null);
+    }
+  }, [currentWorkspace]);
+
   const handleCreateStash = useCallback(async () => {
     setSavingStash(true);
     try {
@@ -331,6 +399,241 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
     }
   }, [currentWorkspace, loadStatus, loadHistory]);
 
+  const handleCheckoutBranch = useCallback(async (branchName: string) => {
+    try {
+      const res = await checkoutGitBranch({
+        workspace: currentWorkspace,
+        branch: branchName
+      });
+      showToast(`Bascule réussie sur '${res.branch || branchName}'`, 'success');
+      await loadStatus();
+      await loadBranches();
+      if (commits.length > 0) {
+        await loadHistory(true);
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de la bascule de branche', 'error');
+    }
+  }, [currentWorkspace, loadStatus, loadBranches, commits.length, loadHistory]);
+
+  const handleCreateBranch = useCallback(async () => {
+    if (!newBranchName.trim()) return;
+    setCreatingBranch(true);
+    try {
+      const res = await createGitBranch({
+        workspace: currentWorkspace,
+        name: newBranchName.trim(),
+        start_point: newBranchStartPoint.trim() || undefined,
+        checkout: newBranchCheckout
+      });
+      showToast(`Branche '${res.name}' créée avec succès !`, 'success');
+      setIsCreateBranchOpen(false);
+      setNewBranchName('');
+      setNewBranchStartPoint('');
+      setNewBranchCheckout(true);
+      await loadBranches();
+      await loadStatus();
+      if (commits.length > 0) {
+        await loadHistory(true);
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de la création de la branche', 'error');
+    } finally {
+      setCreatingBranch(false);
+    }
+  }, [currentWorkspace, newBranchName, newBranchStartPoint, newBranchCheckout, loadBranches, loadStatus, commits.length, loadHistory]);
+
+  const handleDeleteBranch = useCallback(async (branch: GitBranchDetail) => {
+    const isRemote = branch.is_remote;
+    const confirmMessage = isRemote
+      ? `Voulez-vous vraiment supprimer la branche distante '${branch.name}' sur le remote ?`
+      : `Voulez-vous vraiment supprimer la branche locale '${branch.name}' ?`;
+
+    const confirmed = await showConfirm(confirmMessage, {
+      title: 'Supprimer la branche',
+      confirmLabel: 'Supprimer',
+      cancelLabel: 'Annuler',
+      destructive: true
+    });
+    if (!confirmed) return;
+
+    try {
+      await deleteGitBranch({
+        workspace: currentWorkspace,
+        branch: branch.name,
+        force: false,
+        remote: isRemote
+      });
+      showToast(`Branche '${branch.name}' supprimée avec succès.`, 'info');
+      await loadBranches();
+    } catch (err: any) {
+      const msg = err.message || '';
+      if (msg.includes('non complètement fusionnée') || msg.includes('not fully merged')) {
+        const forceConfirm = await showConfirm(
+          `La branche '${branch.name}' n'est pas complètement fusionnée. Souhaitez-vous forcer la suppression (-D) ?`,
+          {
+            title: 'Forcer la suppression',
+            confirmLabel: 'Supprimer de force (-D)',
+            cancelLabel: 'Annuler',
+            destructive: true
+          }
+        );
+        if (forceConfirm) {
+          try {
+            await deleteGitBranch({
+              workspace: currentWorkspace,
+              branch: branch.name,
+              force: true,
+              remote: isRemote
+            });
+            showToast(`Branche '${branch.name}' supprimée de force.`, 'info');
+            await loadBranches();
+          } catch (forceErr: any) {
+            showToast(forceErr.message || 'Échec de la suppression forcée', 'error');
+          }
+        }
+      } else {
+        showToast(msg || 'Erreur lors de la suppression de la branche', 'error');
+      }
+    }
+  }, [currentWorkspace, loadBranches]);
+
+  const handleMergeBranch = useCallback(async () => {
+    if (!mergingBranch) return;
+    setMerging(true);
+    try {
+      const res = await mergeGitBranch({
+        workspace: currentWorkspace,
+        branch: mergingBranch.name,
+        no_ff: mergeNoFF,
+        message: mergeMessage.trim() || undefined
+      });
+      if (res.has_conflicts) {
+        showToast(`Conflits survenus lors de la fusion de '${mergingBranch.name}'`, 'error');
+        setMergingBranch(null);
+        await loadStatus();
+        if (res.conflicts && res.conflicts.length > 0) {
+          setActiveConflictFile(res.conflicts[0]);
+        }
+      } else {
+        showToast(`Branche '${mergingBranch.name}' fusionnée avec succès !`, 'success');
+        setMergingBranch(null);
+        setMergeMessage('');
+        setMergeNoFF(false);
+        await loadStatus();
+        await loadBranches();
+        if (commits.length > 0) {
+          await loadHistory(true);
+        }
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de la fusion', 'error');
+    } finally {
+      setMerging(false);
+    }
+  }, [currentWorkspace, mergingBranch, mergeNoFF, mergeMessage, loadStatus, loadBranches, commits.length, loadHistory]);
+
+  const handleRenameBranch = useCallback(async () => {
+    if (!renamingBranch || !newRenameName.trim()) return;
+    setRenaming(true);
+    try {
+      const res = await renameGitBranch({
+        workspace: currentWorkspace,
+        old_name: renamingBranch.name,
+        new_name: newRenameName.trim()
+      });
+      showToast(`Branche renommée en '${res.new_name}' avec succès !`, 'success');
+      setRenamingBranch(null);
+      setNewRenameName('');
+      await loadBranches();
+      await loadStatus();
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors du renommage', 'error');
+    } finally {
+      setRenaming(false);
+    }
+  }, [currentWorkspace, renamingBranch, newRenameName, loadBranches, loadStatus]);
+
+  const handleContinueRebase = useCallback(async () => {
+    setContinuingRebase(true);
+    try {
+      const res = await continueGitRebase(currentWorkspace);
+      if (res.status === 'completed') {
+        showToast('Rebase terminé avec succès !', 'success');
+        await loadStatus();
+        await loadRebaseStatus();
+        await loadBranches();
+        if (commits.length > 0) {
+          await loadHistory(true);
+        }
+      } else if (res.status === 'conflict') {
+        showToast('Conflits subsistants. Résolvez-les avant de poursuivre.', 'error');
+        await loadStatus();
+        await loadRebaseStatus();
+        if (res.conflicts && res.conflicts.length > 0) {
+          setActiveConflictFile(res.conflicts[0]);
+        }
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de la poursuite du rebase', 'error');
+    } finally {
+      setContinuingRebase(false);
+    }
+  }, [currentWorkspace, loadStatus, loadRebaseStatus, loadBranches, commits.length, loadHistory]);
+
+  const handleAbortRebase = useCallback(async () => {
+    const confirmed = await showConfirm(
+      'Voulez-vous abandonner le rebase en cours et restaurer la branche dans son état initial ?',
+      {
+        title: 'Abandonner le Rebase',
+        confirmLabel: 'Abandonner (git rebase --abort)',
+        cancelLabel: 'Continuer le rebase',
+        destructive: true
+      }
+    );
+    if (!confirmed) return;
+
+    setAbortingRebase(true);
+    try {
+      await abortGitRebase(currentWorkspace);
+      showToast('Rebase annulé, état initial restauré.', 'info');
+      await loadStatus();
+      await loadRebaseStatus();
+      await loadBranches();
+      if (commits.length > 0) {
+        await loadHistory(true);
+      }
+    } catch (err: any) {
+      showToast(err.message || "Erreur lors de l'abandon du rebase", 'error');
+    } finally {
+      setAbortingRebase(false);
+    }
+  }, [currentWorkspace, loadStatus, loadRebaseStatus, loadBranches, commits.length, loadHistory]);
+
+  const handleOpenRebase = useCallback((base: string = 'HEAD~5') => {
+    setRebaseBaseRef(base);
+    setIsRebaseModalOpen(true);
+  }, []);
+
+  const activeBranchDetail = useMemo(() => {
+    return branches.find((b) => b.is_current) || null;
+  }, [branches]);
+
+  const filteredBranches = useMemo(() => {
+    return branches.filter((b) => {
+      if (branchFilter === 'local' && b.is_remote) return false;
+      if (branchFilter === 'remote' && !b.is_remote) return false;
+      if (branchSearch.trim()) {
+        const q = branchSearch.toLowerCase().trim();
+        return b.name.toLowerCase().includes(q) || (b.upstream && b.upstream.toLowerCase().includes(q));
+      }
+      return true;
+    });
+  }, [branches, branchFilter, branchSearch]);
+
+  const localBranchesCount = useMemo(() => branches.filter((b) => !b.is_remote).length, [branches]);
+  const remoteBranchesCount = useMemo(() => branches.filter((b) => b.is_remote).length, [branches]);
+
   useEffect(() => {
     let active = true;
     fetchGitStatus(currentWorkspace)
@@ -360,6 +663,13 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           setLoading(false);
         }
       });
+
+    fetchRebaseStatus(currentWorkspace)
+      .then((res) => {
+        if (active) setRebaseStatus(res);
+      })
+      .catch(() => {});
+
     return () => {
       active = false;
     };
@@ -373,6 +683,15 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       });
     }
   }, [viewMode, commits.length, loadHistory]);
+
+  // Load branches automatically when user clicks Branches tab if empty
+  useEffect(() => {
+    if (viewMode === 'branches' && branches.length === 0) {
+      queueMicrotask(() => {
+        void loadBranches();
+      });
+    }
+  }, [viewMode, branches.length, loadBranches]);
 
   const handleCommit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -648,7 +967,87 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
             </span>
           )}
         </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setViewMode('branches');
+            void loadBranches();
+          }}
+          className={`flex items-center gap-1.5 px-3 py-2 border-b-2 font-medium transition-colors cursor-pointer ${
+            viewMode === 'branches'
+              ? 'border-sky-500 text-sky-500 font-semibold'
+              : 'border-transparent hover:opacity-100 opacity-70'
+          }`}
+          style={{ color: viewMode === 'branches' ? undefined : 'var(--text)' }}
+        >
+          <GitBranch className="w-3.5 h-3.5" />
+          <span>{t('git_tab_branches', 'Branches')}</span>
+          {branches.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-400 font-mono">
+              {branches.length}
+            </span>
+          )}
+        </button>
       </div>
+
+      {/* In-Progress Rebase Amber Banner */}
+      {rebaseStatus?.is_rebasing && (
+        <div className="p-3 bg-amber-500/15 border-b border-amber-500/40 text-amber-300 text-xs flex flex-col gap-2 shrink-0 font-medium">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <RotateCcw className="w-4 h-4 text-amber-400 animate-spin" />
+              <span className="font-semibold text-amber-200">
+                Rebase interactif en cours
+                {rebaseStatus.total_steps > 0 ? ` : étape ${rebaseStatus.current_step}/${rebaseStatus.total_steps}` : ''}
+                {rebaseStatus.current_commit ? ` (commit ${rebaseStatus.current_commit})` : ''}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleContinueRebase}
+                disabled={continuingRebase || abortingRebase}
+                className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                title="Poursuivre le rebase (git rebase --continue)"
+              >
+                {continuingRebase ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
+                <span>Continuer</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleAbortRebase}
+                disabled={continuingRebase || abortingRebase}
+                className="px-2.5 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                title="Abandonner le rebase (git rebase --abort)"
+              >
+                {abortingRebase ? <RefreshCw className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                <span>Abandonner</span>
+              </button>
+            </div>
+          </div>
+          {rebaseStatus.conflicted_files.length > 0 && (
+            <div className="flex flex-col gap-1 mt-1">
+              <span className="text-[11px] text-amber-200/90 font-medium">
+                Fichiers en conflit nécessitant une résolution :
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {rebaseStatus.conflicted_files.map((cf) => (
+                  <button
+                    key={cf}
+                    type="button"
+                    onClick={() => setActiveConflictFile(cf)}
+                    className="px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/30 font-mono text-[10px] flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>{cf}</span>
+                    <AlertTriangle className="w-3 h-3 text-rose-400" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Notifications */}
       {actionSuccess && (
@@ -1194,6 +1593,15 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                         <GitMerge className="w-3 h-3 text-amber-400" />
                         <span>Cherry-pick</span>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRebase(selectedCommit.hash)}
+                        className="px-2 py-1 rounded-md border text-[10px] font-semibold flex items-center gap-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border-sky-500/30 transition-colors cursor-pointer shrink-0"
+                        title="Démarrer un rebase interactif depuis ce commit (git rebase -i)"
+                      >
+                        <RotateCcw className="w-3 h-3 text-sky-400" />
+                        <span>Rebase</span>
+                      </button>
                       {onOpenMonacoStudio && commitDiff && (
                         <button
                           type="button"
@@ -1420,6 +1828,501 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           )}
         </div>
       )}
+
+      {/* VIEW MODE 4: BRANCH MANAGER */}
+      {viewMode === 'branches' && (
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-3 space-y-3">
+          {/* Active Branch Telemetry Card */}
+          {activeBranchDetail && (
+            <div
+              className="p-3.5 rounded-xl border bg-gradient-to-r from-sky-500/10 via-sky-500/5 to-transparent space-y-2"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 rounded-lg bg-sky-500/20 text-sky-400">
+                    <GitBranch className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-sky-400 truncate">
+                        {activeBranchDetail.name}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                        Active
+                      </span>
+                      {activeBranchDetail.upstream && (
+                        <span className="text-[10px] font-mono opacity-70" style={{ color: 'var(--muted)' }}>
+                          → {activeBranchDetail.upstream}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {activeBranchDetail.ahead > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                      ↑ {activeBranchDetail.ahead} en avance
+                    </span>
+                  )}
+                  {activeBranchDetail.behind > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                      ↓ {activeBranchDetail.behind} en retard
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenRebase('HEAD~5')}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium cursor-pointer shadow-xs transition-colors"
+                    title="Lancer un rebase interactif sur les derniers commits"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Rebase Interactif</span>
+                  </button>
+                </div>
+              </div>
+
+              {activeBranchDetail.last_commit_subject && (
+                <div className="text-[11px] truncate flex items-center gap-1.5 pt-1 border-t border-black/5 dark:border-white/5" style={{ color: 'var(--muted)' }}>
+                  <span className="font-mono text-sky-400 shrink-0">{activeBranchDetail.last_commit_sha}</span>
+                  <span className="truncate">{activeBranchDetail.last_commit_subject}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Bar: Search, Filters, New Branch */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-black/10 dark:bg-white/5 border" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
+              <Search className="w-3.5 h-3.5 opacity-50 shrink-0" />
+              <input
+                type="text"
+                value={branchSearch}
+                onChange={(e) => setBranchSearch(e.target.value)}
+                placeholder="Filtrer les branches..."
+                className="w-full bg-transparent text-xs outline-none"
+                style={{ color: 'var(--text)' }}
+              />
+              {branchSearch && (
+                <button type="button" onClick={() => setBranchSearch('')} className="text-slate-400 hover:text-white p-0.5">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Filter tabs */}
+              <div className="flex items-center p-0.5 rounded-lg border text-[11px]" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
+                <button
+                  type="button"
+                  onClick={() => setBranchFilter('all')}
+                  className={`px-2 py-0.5 rounded font-medium transition-colors cursor-pointer ${
+                    branchFilter === 'all' ? 'bg-sky-500/20 text-sky-400 font-semibold' : 'opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  Toutes ({branches.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBranchFilter('local')}
+                  className={`px-2 py-0.5 rounded font-medium transition-colors cursor-pointer ${
+                    branchFilter === 'local' ? 'bg-sky-500/20 text-sky-400 font-semibold' : 'opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  Locales ({localBranchesCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBranchFilter('remote')}
+                  className={`px-2 py-0.5 rounded font-medium transition-colors cursor-pointer ${
+                    branchFilter === 'remote' ? 'bg-sky-500/20 text-sky-400 font-semibold' : 'opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  Distantes ({remoteBranchesCount})
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsCreateBranchOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium cursor-pointer shadow-xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Nouvelle branche</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Create Branch Card / Modal Form */}
+          {isCreateBranchOpen && (
+            <div className="p-3.5 rounded-xl border border-sky-500/30 bg-sky-500/5 space-y-3 animate-in fade-in">
+              <div className="flex items-center justify-between text-xs font-semibold text-sky-400">
+                <span>Créer une nouvelle branche</span>
+                <button type="button" onClick={() => setIsCreateBranchOpen(false)} className="text-slate-400 hover:text-white">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--muted)' }}>
+                    Nom de la branche *
+                  </label>
+                  <input
+                    type="text"
+                    value={newBranchName}
+                    onChange={(e) => setNewBranchName(e.target.value)}
+                    placeholder="ex: feature/mon-module"
+                    className="w-full px-3 py-1.5 border rounded-lg text-xs outline-none bg-black/20 focus:border-sky-500 text-slate-100 font-mono"
+                    style={{ borderColor: 'var(--border)' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--muted)' }}>
+                    Point de départ (optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    value={newBranchStartPoint}
+                    onChange={(e) => setNewBranchStartPoint(e.target.value)}
+                    placeholder="ex: main, HEAD, ou sha (défaut: courant)"
+                    className="w-full px-3 py-1.5 border rounded-lg text-xs outline-none bg-black/20 focus:border-sky-500 text-slate-100 font-mono"
+                    style={{ borderColor: 'var(--border)' }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs pt-1">
+                <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 text-[11px]">
+                  <input
+                    type="checkbox"
+                    checked={newBranchCheckout}
+                    onChange={(e) => setNewBranchCheckout(e.target.checked)}
+                    className="rounded text-sky-500"
+                  />
+                  <span>Basculer immédiatement sur cette branche (-b)</span>
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateBranchOpen(false)}
+                    className="px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    disabled={creatingBranch || !newBranchName.trim()}
+                    onClick={handleCreateBranch}
+                    className="flex items-center gap-1 px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+                  >
+                    {creatingBranch ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    <span>Créer la branche</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Branch List */}
+          {loadingBranches && branches.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin text-sky-400" />
+              <span>Chargement des branches...</span>
+            </div>
+          ) : filteredBranches.length === 0 ? (
+            <div className="p-8 text-center text-xs italic text-slate-500 space-y-1">
+              <GitBranch className="w-8 h-8 mx-auto text-slate-600 mb-2" />
+              <p>Aucune branche trouvée.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredBranches.map((b) => {
+                const isCurrent = b.is_current;
+                const isProtected = ['main', 'master'].includes(b.name.toLowerCase());
+
+                return (
+                  <div
+                    key={b.name}
+                    className={`p-3 rounded-xl border bg-black/10 dark:bg-white/5 space-y-2 transition-all ${
+                      isCurrent
+                        ? 'border-sky-500/40 bg-sky-500/5 ring-1 ring-sky-500/20'
+                        : 'hover:border-slate-500/40'
+                    }`}
+                    style={{ borderColor: isCurrent ? undefined : 'var(--border)' }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {b.is_remote ? (
+                          <Globe className="w-4 h-4 text-purple-400 shrink-0" />
+                        ) : (
+                          <GitBranch className={`w-4 h-4 shrink-0 ${isCurrent ? 'text-sky-400' : 'text-slate-400'}`} />
+                        )}
+                        <span className="font-mono text-xs font-semibold truncate" style={{ color: isCurrent ? 'var(--strong)' : 'var(--text)' }}>
+                          {b.name}
+                        </span>
+                        {isCurrent && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+                            Courante
+                          </span>
+                        )}
+                        {b.is_remote && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-300 font-mono shrink-0">
+                            remote
+                          </span>
+                        )}
+                        {b.upstream && (
+                          <span className="text-[10px] font-mono text-slate-400 truncate hidden sm:inline">
+                            [{b.upstream}]
+                          </span>
+                        )}
+                        {b.ahead > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-sky-500/20 text-sky-400 shrink-0">
+                            ↑{b.ahead}
+                          </span>
+                        )}
+                        {b.behind > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-rose-500/20 text-rose-400 shrink-0">
+                            ↓{b.behind}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Branch Actions */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {!isCurrent && (
+                          <button
+                            type="button"
+                            onClick={() => handleCheckoutBranch(b.name)}
+                            className="px-2 py-1 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Basculer sur cette branche (git checkout)"
+                          >
+                            <ArrowRight className="w-3 h-3" />
+                            <span>Bascule</span>
+                          </button>
+                        )}
+
+                        {!isCurrent && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMergingBranch(b);
+                              setMergeMessage(`Merge branch '${b.name}' into ${status?.branch || 'main'}`);
+                            }}
+                            className="px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Fusionner cette branche dans la branche active (git merge)"
+                          >
+                            <GitMerge className="w-3 h-3" />
+                            <span>Fusionner</span>
+                          </button>
+                        )}
+
+                        {!b.is_remote && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRebase(b.name)}
+                            className="px-2 py-1 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Rebase interactif sur la base de cette branche"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Rebase</span>
+                          </button>
+                        )}
+
+                        {!b.is_remote && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRenamingBranch(b);
+                              setNewRenameName(b.name);
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 transition-colors cursor-pointer"
+                            title="Renommer la branche (git branch -m)"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        {!isCurrent && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBranch(b)}
+                            disabled={isProtected}
+                            className={`p-1 rounded transition-colors cursor-pointer ${
+                              isProtected
+                                ? 'text-slate-600 cursor-not-allowed'
+                                : 'text-slate-400 hover:text-rose-400 hover:bg-rose-500/10'
+                            }`}
+                            title={isProtected ? 'Branche protégée' : 'Supprimer cette branche'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {b.last_commit_subject && (
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-black/5 dark:border-white/5">
+                        <span className="truncate pr-2">{b.last_commit_subject}</span>
+                        {b.last_commit_sha && (
+                          <span className="font-mono text-sky-400 shrink-0 text-[10px]">
+                            {b.last_commit_sha}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Merge Branch Inline Modal */}
+          {mergingBranch && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <div
+                className="w-full max-w-md p-4 rounded-2xl border shadow-2xl space-y-3"
+                style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
+                    <GitMerge className="w-4 h-4" />
+                    <span>Fusionner la branche</span>
+                  </div>
+                  <button type="button" onClick={() => setMergingBranch(null)} className="text-slate-400 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-300">
+                  Fusion de <strong className="text-emerald-400 font-mono">{mergingBranch.name}</strong> dans la branche courante <strong className="text-sky-400 font-mono">{status?.branch}</strong>.
+                </p>
+
+                <div className="space-y-2 text-xs">
+                  <label className="block text-[11px] font-medium" style={{ color: 'var(--muted)' }}>
+                    Message de commit de fusion
+                  </label>
+                  <input
+                    type="text"
+                    value={mergeMessage}
+                    onChange={(e) => setMergeMessage(e.target.value)}
+                    placeholder="Message de merge..."
+                    className="w-full px-3 py-1.5 border rounded-lg text-xs outline-none bg-black/20 focus:border-emerald-500 text-slate-100 font-mono"
+                    style={{ borderColor: 'var(--border)' }}
+                  />
+
+                  <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 text-[11px] pt-1">
+                    <input
+                      type="checkbox"
+                      checked={mergeNoFF}
+                      onChange={(e) => setMergeNoFF(e.target.checked)}
+                      className="rounded text-emerald-500"
+                    />
+                    <span>Forcer un commit de fusion (--no-ff)</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setMergingBranch(null)}
+                    disabled={merging}
+                    className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleMergeBranch}
+                    disabled={merging}
+                    className="flex items-center gap-1 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer shadow-md"
+                  >
+                    {merging ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <GitMerge className="w-3.5 h-3.5" />}
+                    <span>Confirmer la fusion</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Rename Branch Inline Modal */}
+          {renamingBranch && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <div
+                className="w-full max-w-md p-4 rounded-2xl border shadow-2xl space-y-3"
+                style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-sky-400">
+                    <Edit3 className="w-4 h-4" />
+                    <span>Renommer la branche</span>
+                  </div>
+                  <button type="button" onClick={() => setRenamingBranch(null)} className="text-slate-400 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-1 text-xs">
+                  <label className="block text-[11px] font-medium" style={{ color: 'var(--muted)' }}>
+                    Nouveau nom pour &apos;{renamingBranch.name}&apos;
+                  </label>
+                  <input
+                    type="text"
+                    value={newRenameName}
+                    onChange={(e) => setNewRenameName(e.target.value)}
+                    placeholder="Nouveau nom..."
+                    className="w-full px-3 py-1.5 border rounded-lg text-xs outline-none bg-black/20 focus:border-sky-500 text-slate-100 font-mono"
+                    style={{ borderColor: 'var(--border)' }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setRenamingBranch(null)}
+                    disabled={renaming}
+                    className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRenameBranch}
+                    disabled={renaming || !newRenameName.trim() || newRenameName.trim() === renamingBranch.name}
+                    className="flex items-center gap-1 px-4 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold cursor-pointer shadow-md disabled:opacity-50"
+                  >
+                    {renaming ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    <span>Renommer</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Git Rebase Studio Modal */}
+      <GitRebaseModal
+        key={`rebase-${rebaseBaseRef}-${isRebaseModalOpen}`}
+        isOpen={isRebaseModalOpen}
+        onClose={() => setIsRebaseModalOpen(false)}
+        workspace={currentWorkspace}
+        initialBaseRef={rebaseBaseRef}
+        onRebaseCompleted={() => {
+          void loadStatus();
+          void loadBranches();
+          void loadRebaseStatus();
+          if (commits.length > 0) {
+            void loadHistory(true);
+          }
+        }}
+        onRebaseConflict={() => {
+          void loadStatus();
+          void loadRebaseStatus();
+        }}
+      />
 
       {/* Git Conflict Modal */}
       {activeConflictFile && (
