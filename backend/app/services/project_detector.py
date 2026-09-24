@@ -131,14 +131,23 @@ def _extract_runtimes_and_health(p: Path) -> tuple[list[dict[str, Any]], dict[st
     vendor_present: bool | None = None
     detected_name: str | None = None
 
-    # 1. Node.js detection
+    # 1. Node.js detection (root or frontend/client/web subfolder)
     pkg_json_file = p / "package.json"
+    node_sub = p
+    if not pkg_json_file.is_file():
+        for sub in ["frontend", "client", "web"]:
+            candidate = p / sub / "package.json"
+            if candidate.is_file():
+                pkg_json_file = candidate
+                node_sub = p / sub
+                break
+
     if pkg_json_file.is_file():
         try:
             pkg_data = json.loads(pkg_json_file.read_text(encoding="utf-8", errors="replace"))
             if isinstance(pkg_data, dict):
                 raw_name = pkg_data.get("name")
-                if raw_name and isinstance(raw_name, str) and raw_name.strip():
+                if raw_name and isinstance(raw_name, str) and raw_name.strip() and not detected_name:
                     detected_name = raw_name.split("/")[-1]
 
                 deps = pkg_data.get("dependencies", {})
@@ -171,11 +180,11 @@ def _extract_runtimes_and_health(p: Path) -> tuple[list[dict[str, Any]], dict[st
 
                 # Package manager detection
                 pkg_mgr = "npm"
-                if (p / "pnpm-lock.yaml").exists():
+                if (node_sub / "pnpm-lock.yaml").exists() or (p / "pnpm-lock.yaml").exists():
                     pkg_mgr = "pnpm"
-                elif (p / "yarn.lock").exists():
+                elif (node_sub / "yarn.lock").exists() or (p / "yarn.lock").exists():
                     pkg_mgr = "yarn"
-                elif (p / "bun.lockb").exists() or (p / "bun.lock").exists():
+                elif (node_sub / "bun.lockb").exists() or (node_sub / "bun.lock").exists() or (p / "bun.lock").exists():
                     pkg_mgr = "bun"
 
                 runtimes.append({
@@ -186,11 +195,8 @@ def _extract_runtimes_and_health(p: Path) -> tuple[list[dict[str, Any]], dict[st
                 })
 
                 # Health check: node_modules
-                node_modules_dir = p / "node_modules"
-                if node_modules_dir.is_dir():
-                    node_modules_present = True
-                else:
-                    node_modules_present = False
+                node_modules_present = (p / "node_modules").is_dir() or (node_sub / "node_modules").is_dir()
+                if not node_modules_present:
                     deps_installed = False
                     warnings.append("Dépendances Node.js non installées (node_modules manquant)")
                     if not suggested_action:
@@ -199,32 +205,44 @@ def _extract_runtimes_and_health(p: Path) -> tuple[list[dict[str, Any]], dict[st
                             "command": f"{pkg_mgr} install",
                         }
         except Exception as e:
-            logger.debug(f"Error parsing package.json in {p}: {e}")
+            logger.debug(f"Error parsing package.json in {pkg_json_file}: {e}")
 
-    # 2. Python detection
+    # 2. Python detection (root or backend/server/api subfolder)
+    py_dir = p
     has_pyproject = (p / "pyproject.toml").is_file()
     has_requirements = (p / "requirements.txt").is_file()
     has_pipfile = (p / "Pipfile").is_file()
     has_setup_py = (p / "setup.py").is_file()
 
+    if not (has_pyproject or has_requirements or has_pipfile or has_setup_py):
+        for sub in ["backend", "api", "server"]:
+            candidate_dir = p / sub
+            if (candidate_dir / "pyproject.toml").is_file() or (candidate_dir / "requirements.txt").is_file():
+                py_dir = candidate_dir
+                has_pyproject = (candidate_dir / "pyproject.toml").is_file()
+                has_requirements = (candidate_dir / "requirements.txt").is_file()
+                has_pipfile = (candidate_dir / "Pipfile").is_file()
+                has_setup_py = (candidate_dir / "setup.py").is_file()
+                break
+
     if has_pyproject or has_requirements or has_pipfile or has_setup_py:
         py_frameworks: list[str] = []
         py_pkg_mgr = "pip"
-        if (p / "poetry.lock").exists():
+        if (py_dir / "poetry.lock").exists() or (p / "poetry.lock").exists():
             py_pkg_mgr = "poetry"
-        elif (p / "Pipfile.lock").exists():
+        elif (py_dir / "Pipfile.lock").exists() or (p / "Pipfile.lock").exists():
             py_pkg_mgr = "pipenv"
 
         # Check content in requirements or pyproject
         content_to_check = ""
         if has_requirements:
             try:
-                content_to_check += (p / "requirements.txt").read_text(encoding="utf-8", errors="replace").lower()
+                content_to_check += (py_dir / "requirements.txt").read_text(encoding="utf-8", errors="replace").lower()
             except Exception:
                 pass
         if has_pyproject:
             try:
-                content_to_check += (p / "pyproject.toml").read_text(encoding="utf-8", errors="replace").lower()
+                content_to_check += (py_dir / "pyproject.toml").read_text(encoding="utf-8", errors="replace").lower()
             except Exception:
                 pass
 
@@ -251,11 +269,9 @@ def _extract_runtimes_and_health(p: Path) -> tuple[list[dict[str, Any]], dict[st
         })
 
         # Health check: venv
-        has_venv = any((p / d).is_dir() for d in [".venv", "venv", "env", ".env_py"])
-        if has_venv:
-            venv_present = True
-        else:
-            venv_present = False
+        venv_present = any((p / d).is_dir() for d in [".venv", "venv", "env", ".env_py"]) or \
+                       any((py_dir / d).is_dir() for d in [".venv", "venv", "env", ".env_py"])
+        if not venv_present:
             deps_installed = False
             warnings.append("Environnement virtuel Python (.venv) manquant")
             if not suggested_action:
