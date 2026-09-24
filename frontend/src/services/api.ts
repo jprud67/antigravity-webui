@@ -1,4 +1,4 @@
-import type { Conversation, ArtifactItem, AppSettings, ModelOption, WorkspaceFolder, BookmarkItem, GitFileVersionsResponse } from '../types';
+import type { Conversation, ArtifactItem, AppSettings, ModelOption, WorkspaceFolder, BookmarkItem, GitFileVersionsResponse, PromptAnalysisResponse, PromptOptimizationResponse } from '../types';
 
 const API_BASE = '/api';
 
@@ -1347,6 +1347,37 @@ export async function deleteTerminalSession(sessionId: string): Promise<{ succes
   }
   return res.json();
 }
+
+export async function analyzePrompt(prompt: string): Promise<PromptAnalysisResponse> {
+  const res = await fetch(`${API_BASE}/prompt/analyze`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ prompt })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de l\'analyse du prompt' }));
+    throw new Error(err.detail || 'Impossible d\'analyser le prompt');
+  }
+  return res.json();
+}
+
+export async function optimizePrompt(
+  prompt: string,
+  preset: string = 'general',
+  model?: string
+): Promise<PromptOptimizationResponse> {
+  const res = await fetch(`${API_BASE}/prompt/optimize`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ prompt, preset, model })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de l\'optimisation du prompt' }));
+    throw new Error(err.detail || 'Impossible d\'optimiser le prompt');
+  }
+  return res.json();
+}
+
 
 
 

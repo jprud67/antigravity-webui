@@ -123,3 +123,40 @@ export interface MonacoStudioConfig {
   readOnly?: boolean;
 }
 
+export type PromptPreset = 'general' | 'debug' | 'plan' | 'refactor' | 'review';
+
+export interface PromptBreakdownScore {
+  context: number;
+  objective: number;
+  constraints: number;
+  output_format: number;
+}
+
+export interface PromptDetectedElements {
+  files: string[];
+  has_error_logs: boolean;
+  has_code_block: boolean;
+  has_constraints: boolean;
+}
+
+export interface PromptAnalysisResponse {
+  prompt: string;
+  word_count: number;
+  char_count: number;
+  estimated_tokens: number;
+  clarity_score: number;
+  breakdown: PromptBreakdownScore;
+  suggestions: string[];
+  detected_elements: PromptDetectedElements;
+}
+
+export interface PromptOptimizationResponse {
+  original: string;
+  optimized: string;
+  preset: string;
+  tokens_original: number;
+  tokens_optimized: number;
+  improvement_factor: number;
+}
+
+
