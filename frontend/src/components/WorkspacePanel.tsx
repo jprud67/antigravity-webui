@@ -31,6 +31,8 @@ Loader2,
   RotateCcw,
   SplitSquareVertical,
   SlidersHorizontal,
+  ChevronUp,
+  Layers,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon';
 import ReactMarkdown from 'react-markdown';
@@ -60,13 +62,20 @@ import {
   getAuthToken, 
   triggerFileDownload,
   uploadWorkspaceFile,
-  duplicateWorkspaceFile
+  duplicateWorkspaceFile,
+  fetchGitDiffRanges
 } from '../services/api';
 import { detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
 import { useI18n } from '../services/i18n';
-import type { ArtifactItem, MonacoStudioConfig } from '../types';
+import {
+  getMonacoMultiCursorOptions,
+  setupMultiCursor,
+  applyGitDecorations,
+  navigateGitDiff
+} from '../services/monacoAnnotations';
+import type { ArtifactItem, MonacoStudioConfig, GitDiffRange, GitDiffSummary } from '../types';
 
 export type RightPanelTab = 'files' | 'search' | 'artifacts' | 'terminal' | 'git' | 'kanban';
 
@@ -167,6 +176,14 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
   const [monacoTheme, setMonacoTheme] = useState<'vs-dark' | 'light'>(getInitialMonacoTheme);
   const monacoEditorRef = useRef<any>(null);
+  const monacoInstanceRef = useRef<any>(null);
+
+  // Monaco Multi-Cursor & Git Diff Annotations State
+  const [cursorCount, setCursorCount] = useState<number>(1);
+  const [diffRanges, setDiffRanges] = useState<GitDiffRange[]>([]);
+  const [diffSummary, setDiffSummary] = useState<GitDiffSummary | null>(null);
+  const gitDecorationsRef = useRef<string[]>([]);
+  const multiCursorControllerRef = useRef<any>(null);
 
   // Monaco Copilot State
   const [copilotActive, setCopilotActive] = useState<boolean>(isCopilotEnabled());
@@ -716,11 +733,75 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     });
   }, [activeTabIndex, openTabs.length]);
 
+  const loadGitDiffRanges = useCallback(async (filePath?: string) => {
+    const targetPath = filePath || activeTabItem?.path;
+    if (!targetPath) return;
+    try {
+      const res = await fetchGitDiffRanges(targetPath, currentWorkspace);
+      setDiffRanges(res.ranges || []);
+      setDiffSummary(res.summary || null);
+      if (monacoEditorRef.current && monacoInstanceRef.current) {
+        gitDecorationsRef.current = applyGitDecorations(
+          monacoEditorRef.current,
+          monacoInstanceRef.current,
+          res.ranges || [],
+          gitDecorationsRef.current
+        );
+      }
+    } catch {
+      setDiffRanges([]);
+      setDiffSummary(null);
+      if (monacoEditorRef.current && monacoInstanceRef.current) {
+        gitDecorationsRef.current = applyGitDecorations(
+          monacoEditorRef.current,
+          monacoInstanceRef.current,
+          [],
+          gitDecorationsRef.current
+        );
+      }
+    }
+  }, [activeTabItem?.path, currentWorkspace]);
+
+  const activePath = activeTabItem?.path;
+  const isBinaryTab = Boolean(activeTabItem?.isBinary);
+
+  useEffect(() => {
+    if (!activePath || isBinaryTab) return;
+    let isCancelled = false;
+    fetchGitDiffRanges(activePath, currentWorkspace)
+      .then((res) => {
+        if (!isCancelled) {
+          setDiffRanges(res.ranges || []);
+          setDiffSummary(res.summary || null);
+          if (monacoEditorRef.current && monacoInstanceRef.current) {
+            gitDecorationsRef.current = applyGitDecorations(
+              monacoEditorRef.current,
+              monacoInstanceRef.current,
+              res.ranges || [],
+              gitDecorationsRef.current
+            );
+          }
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setDiffRanges([]);
+          setDiffSummary(null);
+        }
+      });
+    return () => {
+      isCancelled = true;
+    };
+  }, [activePath, isBinaryTab, currentWorkspace]);
+
+
+
   const handleSaveActiveTab = useCallback(async () => {
     if (!activeTabItem || activeTabItem.isBinary) return;
     setSavingFile(true);
     try {
       await saveFileContent(activeTabItem.path, activeTabItem.content, currentWorkspace);
+      loadGitDiffRanges(activeTabItem.path);
       setOpenTabs(prev => {
         const updated = [...prev];
         if (updated[activeTabIndex]) {
@@ -740,7 +821,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } finally {
       setSavingFile(false);
     }
-  }, [activeTabItem, activeTabIndex, currentWorkspace, t]);
+  }, [activeTabItem, activeTabIndex, currentWorkspace, loadGitDiffRanges, t]);
+
 
   const handleFormatCode = useCallback(() => {
     if (monacoEditorRef.current) {
@@ -1967,6 +2049,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           onChange={(val) => handleEditorChange(val || '')}
                           onMount={(editor, monaco) => {
                             monacoEditorRef.current = editor;
+                            monacoInstanceRef.current = monaco;
                             registerMonacoCopilot(monaco, {
                               onStatusChange: (s) => setCopilotStatus(s)
                             });
@@ -1976,8 +2059,20 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
                               handleSaveActiveTab();
                             });
+                            editor.addCommand(monaco.KeyCode.F7, () => {
+                              navigateGitDiff(editor, diffRanges, 'next');
+                            });
+                            editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F7, () => {
+                              navigateGitDiff(editor, diffRanges, 'prev');
+                            });
+                            const multiCtrl = setupMultiCursor(editor, monaco, (count) => {
+                              setCursorCount(count);
+                            });
+                            multiCursorControllerRef.current = multiCtrl;
+                            loadGitDiffRanges(activeTabItem.path);
                           }}
                           options={{
+                            ...getMonacoMultiCursorOptions(),
                             fontSize: 12,
                             lineNumbers: 'on',
                             minimap: { enabled: isMinimap },
@@ -2006,21 +2101,69 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
                     {/* Editor Status Bar */}
                     <div
-                      className="flex items-center justify-between px-3 py-1 border-t text-[10px] font-mono shrink-0 select-none"
+                      className="flex items-center justify-between px-3 py-1 border-t text-[10px] font-mono shrink-0 select-none gap-2"
                       style={{
                         backgroundColor: 'var(--surface-subtle)',
                         borderColor: 'var(--border)',
                         color: 'var(--muted)',
                       }}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5 flex-wrap">
                         <span>Lg {cursorPos.line}, Col {cursorPos.col}</span>
+                        {cursorCount > 1 && (
+                          <>
+                            <span>•</span>
+                            <button
+                              type="button"
+                              onClick={() => multiCursorControllerRef.current?.resetToSingleCursor()}
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[9px] hover:bg-amber-500/25 transition-colors cursor-pointer"
+                              title="Curseurs multiples actifs. Cliquez pour réinitialiser à un seul curseur (ou Échap)."
+                            >
+                              <Layers className="w-2.5 h-2.5" />
+                              <span>{cursorCount} curseurs</span>
+                              <X className="w-2.5 h-2.5 opacity-60 hover:opacity-100" />
+                            </button>
+                          </>
+                        )}
                         <span>•</span>
                         <span className="uppercase text-sky-400">{activeTabItem.language}</span>
                         <span>•</span>
                         <span>UTF-8</span>
                       </div>
-                      <div className="flex items-center gap-3">
+
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        {diffSummary && diffSummary.total_changes > 0 && (
+                          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/20 dark:bg-white/5 border border-zinc-700/50 text-[9px]">
+                            <span
+                              onClick={() => navigateGitDiff(monacoEditorRef.current, diffRanges, 'next')}
+                              className="cursor-pointer hover:underline flex items-center gap-1 font-semibold"
+                              title="Modifications Git. Cliquez pour aller à la modification suivante (F7)."
+                            >
+                              <span className="text-emerald-400">+{diffSummary.added_lines}</span>
+                              <span className="text-sky-400">~{diffSummary.modified_lines}</span>
+                              <span className="text-rose-400">-{diffSummary.deleted_lines}</span>
+                            </span>
+                            <div className="flex items-center border-l border-zinc-700/60 pl-1 ml-0.5 gap-0.5">
+                              <button
+                                type="button"
+                                onClick={() => navigateGitDiff(monacoEditorRef.current, diffRanges, 'prev')}
+                                className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
+                                title="Modification précédente (Shift+F7)"
+                              >
+                                <ChevronUp className="w-2.5 h-2.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => navigateGitDiff(monacoEditorRef.current, diffRanges, 'next')}
+                                className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
+                                title="Modification suivante (F7)"
+                              >
+                                <ChevronDown className="w-2.5 h-2.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        <span>•</span>
                         <span>{activeTabItem.content.length} car.</span>
                         <span>•</span>
                         <kbd className="px-1 py-0.2 rounded border bg-black/10 dark:bg-white/10 text-[9px]">Ctrl+S</kbd>
