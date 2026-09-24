@@ -518,13 +518,18 @@ _HUNK_HEADER_RE = re.compile(r"^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@
 
 @router.get("/file-diff-ranges", response_model=GitDiffRangesResponse)
 def get_file_diff_ranges(
-    file_path: str = Query(..., description="Chemin relatif du fichier"),
+    filePath: str | None = Query(None, alias="filePath", description="Chemin relatif du fichier"),
+    file_path: str | None = Query(None, description="Chemin relatif du fichier (alias snake_case)"),
+    path: str | None = Query(None, description="Chemin relatif du fichier (alias path)"),
     workspace: str | None = Query(None),
     _ = Depends(require_auth)
 ):
     """Calcule de manière asynchrone et légère les plages de modifications Git (lignes ajoutées, modifiées, supprimées) pour les décorations de gouttière et minimap."""
+    target_path = filePath or file_path or path
+    if not target_path:
+        raise HTTPException(status_code=422, detail="Paramètre de fichier requis (filePath ou file_path)")
     target = _validate_workspace(workspace)
-    norm_path = _resolve_relative_git_path(file_path, target)
+    norm_path = _resolve_relative_git_path(target_path, target)
 
     disk_file = target / norm_path
 
