@@ -21,15 +21,24 @@ import {
   Sparkles,
   Search,
   Zap,
-  Wand2
+  Wand2,
+  Layers,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import Editor, { DiffEditor } from '@monaco-editor/react';
-import { saveFileContent, fetchFileContent, fetchGitFileVersions } from '../services/api';
-import type { MonacoStudioConfig } from '../types';
+import { saveFileContent, fetchFileContent, fetchGitFileVersions, fetchGitDiffRanges } from '../services/api';
+import type { MonacoStudioConfig, GitDiffRange, GitDiffSummary } from '../types';
 import { showToast } from '../services/toast';
 import { useI18n } from '../services/i18n';
 import { SUPPORTED_LANGUAGES, detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
 import { registerMonacoCopilot, isCopilotEnabled, setCopilotEnabled } from '../services/copilot';
+import {
+  getMonacoMultiCursorOptions,
+  setupMultiCursor,
+  applyGitDecorations,
+  navigateGitDiff
+} from '../services/monacoAnnotations';
 import { CopilotActionModal } from './CopilotActionModal';
 
 interface MonacoStudioModalProps {
@@ -88,7 +97,81 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
   const [copilotLatency, setCopilotLatency] = useState<number | null>(null);
   const [isActionModalOpen, setIsActionModalOpen] = useState<boolean>(false);
 
+  // Sprint 18: Multi-Cursor & Git Diff Annotations state
+  const [cursorCount, setCursorCount] = useState<number>(1);
+  const [diffRanges, setDiffRanges] = useState<GitDiffRange[]>([]);
+  const [diffSummary, setDiffSummary] = useState<GitDiffSummary | null>(null);
+  const gitDecorationsRef = useRef<string[]>([]);
+  const multiCursorControllerRef = useRef<any>(null);
+  const monacoInstanceRef = useRef<any>(null);
+  const diffRangesRef = useRef<GitDiffRange[]>([]);
+
+  useEffect(() => {
+    diffRangesRef.current = diffRanges;
+  }, [diffRanges]);
+
   const editorRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (multiCursorControllerRef.current) {
+        multiCursorControllerRef.current.dispose();
+      }
+    };
+  }, []);
+
+  const configFilePath = config.filePath;
+
+  const loadGitDiffRanges = useCallback(async (filePath?: string) => {
+    const targetPath = filePath || configFilePath;
+    if (!targetPath || mode !== 'editor') return;
+    try {
+      const res = await fetchGitDiffRanges(targetPath, currentWorkspace);
+      setDiffRanges(res.ranges || []);
+      setDiffSummary(res.summary || null);
+      if (editorRef.current && monacoInstanceRef.current) {
+        gitDecorationsRef.current = applyGitDecorations(
+          editorRef.current,
+          monacoInstanceRef.current,
+          res.ranges || [],
+          gitDecorationsRef.current
+        );
+      }
+    } catch {
+      setDiffRanges([]);
+      setDiffSummary(null);
+    }
+  }, [configFilePath, mode, currentWorkspace]);
+
+  useEffect(() => {
+    if (!configFilePath || mode !== 'editor') return;
+    let isCancelled = false;
+    fetchGitDiffRanges(configFilePath, currentWorkspace)
+      .then((res) => {
+        if (!isCancelled) {
+          setDiffRanges(res.ranges || []);
+          setDiffSummary(res.summary || null);
+          if (editorRef.current && monacoInstanceRef.current) {
+            gitDecorationsRef.current = applyGitDecorations(
+              editorRef.current,
+              monacoInstanceRef.current,
+              res.ranges || [],
+              gitDecorationsRef.current
+            );
+          }
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setDiffRanges([]);
+          setDiffSummary(null);
+        }
+      });
+    return () => {
+      isCancelled = true;
+    };
+  }, [configFilePath, mode, currentWorkspace]);
+
 
   // Sync theme with Antigravity appearance changes
   useEffect(() => {
@@ -195,6 +278,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
       await saveFileContent(config.filePath, codeToSave, currentWorkspace);
       setSaveStatus('saved');
       showToast(t('editor_file_saved', 'Fichier enregistré avec succès sur le disque.'), 'success');
+      loadGitDiffRanges(config.filePath);
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (err: any) {
       setSaveStatus('error');
@@ -202,7 +286,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
     } finally {
       setIsSaving(false);
     }
-  }, [config, mode, modifiedContent, content, currentWorkspace, t]);
+  }, [config, mode, modifiedContent, content, currentWorkspace, loadGitDiffRanges, t]);
 
   // Handle Format Code (Shift+Alt+F)
   const handleFormat = useCallback(() => {
@@ -613,6 +697,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             value={content}
             onChange={(value) => setContent(value || '')}
             options={{
+              ...getMonacoMultiCursorOptions(),
               wordWrap: isWordWrap ? 'on' : 'off',
               minimap: { enabled: isMinimap },
               fontSize: 13,
@@ -633,9 +718,29 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             }}
             onMount={(editor, monaco) => {
               editorRef.current = editor;
+              monacoInstanceRef.current = monaco;
               registerMonacoCopilot(monaco, {
                 onStatusChange: (s) => setCopilotStatus(s)
               });
+
+              if (multiCursorControllerRef.current) {
+                multiCursorControllerRef.current.dispose();
+              }
+              const multiCtrl = setupMultiCursor(editor, monaco, (count) => {
+                setCursorCount(count);
+              });
+              multiCursorControllerRef.current = multiCtrl;
+
+              editor.addCommand(monaco.KeyCode.F7, () => {
+                navigateGitDiff(editor, diffRangesRef.current, 'next');
+              });
+              editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F7, () => {
+                navigateGitDiff(editor, diffRangesRef.current, 'prev');
+              });
+
+              if (config.filePath) {
+                loadGitDiffRanges(config.filePath);
+              }
             }}
             loading={
               <div className="flex items-center justify-center h-full gap-2 text-zinc-500">
@@ -654,6 +759,21 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             <Sparkles className="w-3 h-3" />
             <span>Antigravity Monaco Studio</span>
           </span>
+          {cursorCount > 1 && (
+            <>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => multiCursorControllerRef.current?.resetToSingleCursor()}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[10px] hover:bg-amber-500/25 transition-colors cursor-pointer"
+                title="Curseurs multiples actifs. Cliquez pour réinitialiser à un seul curseur (ou Échap)."
+              >
+                <Layers className="w-3 h-3" />
+                <span>{cursorCount} curseurs</span>
+                <X className="w-3 h-3 opacity-60 hover:opacity-100" />
+              </button>
+            </>
+          )}
           <span>•</span>
           <span>{language.toUpperCase()}</span>
           <span>•</span>
@@ -661,6 +781,37 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          {diffSummary && diffSummary.total_changes > 0 && (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[10px]">
+              <span
+                onClick={() => navigateGitDiff(editorRef.current, diffRangesRef.current, 'next')}
+                className="cursor-pointer hover:underline flex items-center gap-1 font-semibold"
+                title="Modifications Git. Cliquez pour aller à la modification suivante (F7)."
+              >
+                <span className="text-emerald-400">+{diffSummary.added_lines}</span>
+                <span className="text-sky-400">~{diffSummary.modified_lines}</span>
+                <span className="text-rose-400">-{diffSummary.deleted_lines}</span>
+              </span>
+              <div className="flex items-center border-l border-zinc-700/60 pl-1.5 ml-1 gap-1">
+                <button
+                  type="button"
+                  onClick={() => navigateGitDiff(editorRef.current, diffRangesRef.current, 'prev')}
+                  className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
+                  title="Modification précédente (Shift+F7)"
+                >
+                  <ChevronUp className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigateGitDiff(editorRef.current, diffRangesRef.current, 'next')}
+                  className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
+                  title="Modification suivante (F7)"
+                >
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
           <span>
             <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[10px] border border-zinc-700">Ctrl+S</kbd> {t('save', 'Enregistrer')}
           </span>

@@ -184,6 +184,11 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const [diffSummary, setDiffSummary] = useState<GitDiffSummary | null>(null);
   const gitDecorationsRef = useRef<string[]>([]);
   const multiCursorControllerRef = useRef<any>(null);
+  const diffRangesRef = useRef<GitDiffRange[]>([]);
+
+  useEffect(() => {
+    diffRangesRef.current = diffRanges;
+  }, [diffRanges]);
 
   // Monaco Copilot State
   const [copilotActive, setCopilotActive] = useState<boolean>(isCopilotEnabled());
@@ -2060,10 +2065,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               handleSaveActiveTab();
                             });
                             editor.addCommand(monaco.KeyCode.F7, () => {
-                              navigateGitDiff(editor, diffRanges, 'next');
+                              navigateGitDiff(editor, diffRangesRef.current, 'next');
                             });
                             editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F7, () => {
-                              navigateGitDiff(editor, diffRanges, 'prev');
+                              navigateGitDiff(editor, diffRangesRef.current, 'prev');
                             });
                             const multiCtrl = setupMultiCursor(editor, monaco, (count) => {
                               setCursorCount(count);
@@ -2135,7 +2140,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         {diffSummary && diffSummary.total_changes > 0 && (
                           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/20 dark:bg-white/5 border border-zinc-700/50 text-[9px]">
                             <span
-                              onClick={() => navigateGitDiff(monacoEditorRef.current, diffRanges, 'next')}
+                              onClick={() => navigateGitDiff(monacoEditorRef.current, diffRangesRef.current, 'next')}
                               className="cursor-pointer hover:underline flex items-center gap-1 font-semibold"
                               title="Modifications Git. Cliquez pour aller à la modification suivante (F7)."
                             >
@@ -2146,7 +2151,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             <div className="flex items-center border-l border-zinc-700/60 pl-1 ml-0.5 gap-0.5">
                               <button
                                 type="button"
-                                onClick={() => navigateGitDiff(monacoEditorRef.current, diffRanges, 'prev')}
+                                onClick={() => navigateGitDiff(monacoEditorRef.current, diffRangesRef.current, 'prev')}
                                 className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
                                 title="Modification précédente (Shift+F7)"
                               >
@@ -2154,7 +2159,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => navigateGitDiff(monacoEditorRef.current, diffRanges, 'next')}
+                                onClick={() => navigateGitDiff(monacoEditorRef.current, diffRangesRef.current, 'next')}
                                 className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
                                 title="Modification suivante (F7)"
                               >
