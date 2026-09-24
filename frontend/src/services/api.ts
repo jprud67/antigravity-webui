@@ -481,19 +481,29 @@ export async function fetchFileTree(path?: string, depth = 2): Promise<{ root: s
   return res.json();
 }
 
-export async function fetchFileContent(path: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/files/content?path=${encodeURIComponent(path)}`, {
+export async function fetchFileContent(path: string, workspace?: string): Promise<{
+  path: string;
+  filename: string;
+  extension: string;
+  size: number;
+  last_modified: number;
+  content: string;
+}> {
+  const url = workspace
+    ? `${API_BASE}/files/content?path=${encodeURIComponent(path)}&workspace=${encodeURIComponent(workspace)}`
+    : `${API_BASE}/files/content?path=${encodeURIComponent(path)}`;
+  const res = await fetch(url, {
     headers: getHeaders()
   });
   if (!res.ok) throw new Error(`Failed to load file content: ${res.statusText}`);
   return res.json();
 }
 
-export async function saveFileContent(path: string, content: string): Promise<{ success: boolean; path: string; size: number; last_modified: number }> {
+export async function saveFileContent(path: string, content: string, workspace?: string): Promise<{ success: boolean; path: string; size: number; last_modified: number }> {
   const res = await fetch(`${API_BASE}/files/save`, {
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ path, content })
+    body: JSON.stringify({ path, content, workspace })
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Échec de la sauvegarde' }));
