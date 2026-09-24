@@ -404,6 +404,75 @@ def get_git_diff(
         "truncated": truncated
     }
 
+
+@router.get("/file-versions")
+def get_git_file_versions(
+    path: str = Query(..., description="Chemin relatif du fichier"),
+    workspace: str | None = Query(None),
+    commit: str | None = Query(None, description="Commit SHA ou HEAD"),
+    staged: bool = Query(False, description="Comparer le staged vs HEAD"),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    norm_path = _resolve_relative_git_path(path, target)
+
+    # 1. Determine original content (from git revision)
+    git_rev = commit if commit else "HEAD"
+    original_text = ""
+    is_new = False
+    is_deleted = False
+
+    # Check if file exists at revision
+    show_target = f"{git_rev}:{norm_path}"
+    res_show = run_git(["show", show_target], target)
+    if res_show.returncode == 0:
+        original_text = res_show.stdout
+    else:
+        # File did not exist at revision (newly added or untracked)
+        is_new = True
+
+    # 2. Determine modified content
+    modified_text = ""
+    if commit and not staged:
+        # If inspecting historical commit, modified is that commit's version
+        res_mod = run_git(["show", f"{commit}:{norm_path}"], target)
+        if res_mod.returncode == 0:
+            modified_text = res_mod.stdout
+        else:
+            is_deleted = True
+    elif staged:
+        # Read from git index (staged)
+        res_staged = run_git(["show", f":{norm_path}"], target)
+        if res_staged.returncode == 0:
+            modified_text = res_staged.stdout
+        else:
+            is_deleted = True
+    else:
+        # Read current working tree file from disk
+        file_disk = target / norm_path
+        if file_disk.exists() and file_disk.is_file():
+            try:
+                modified_text = file_disk.read_text(encoding="utf-8", errors="replace")
+            except Exception as e:
+                logger.error(f"Error reading {file_disk}: {e}")
+                modified_text = ""
+        else:
+            is_deleted = True
+
+    filename = Path(norm_path).name
+    return {
+        "workspace": str(target.resolve()),
+        "path": norm_path,
+        "filename": filename,
+        "original": _mask_git_output(original_text),
+        "modified": _mask_git_output(modified_text),
+        "is_new": is_new,
+        "is_deleted": is_deleted,
+        "staged": staged,
+        "commit": commit
+    }
+
+
 @router.get("/branches")
 def get_branches(workspace: str | None = Query(None), _ = Depends(require_auth)):
     target = _validate_workspace(workspace)
