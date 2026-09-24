@@ -96,3 +96,28 @@ export interface WorkspaceFolder {
     size?: number | null;
   }[];
 }
+
+export interface GitFileVersionsResponse {
+  workspace: string;
+  path: string;
+  filename: string;
+  original: string;
+  modified: string;
+  is_new: boolean;
+  is_deleted: boolean;
+  staged: boolean;
+  commit?: string;
+}
+
+export interface MonacoStudioConfig {
+  mode: 'editor' | 'diff';
+  title?: string;
+  filePath?: string;
+  language?: string;
+  content?: string;
+  originalContent?: string;
+  modifiedContent?: string;
+  diffText?: string;
+  readOnly?: boolean;
+}
+

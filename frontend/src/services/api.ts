@@ -1,4 +1,4 @@
-import type { Conversation, ArtifactItem, AppSettings, ModelOption, WorkspaceFolder, BookmarkItem } from '../types';
+import type { Conversation, ArtifactItem, AppSettings, ModelOption, WorkspaceFolder, BookmarkItem, GitFileVersionsResponse } from '../types';
 
 const API_BASE = '/api';
 
@@ -591,6 +591,26 @@ export async function fetchGitDiff(
   if (commit) params.append('commit', commit);
   const res = await fetch(`${API_BASE}/git/diff?${params.toString()}`, { headers: getHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch Git diff: ${res.statusText}`);
+  return res.json();
+}
+
+export async function fetchGitFileVersions(
+  workspace?: string,
+  filePath?: string,
+  commit?: string,
+  staged?: boolean
+): Promise<GitFileVersionsResponse> {
+  const params = new URLSearchParams();
+  if (filePath) params.set('path', filePath);
+  if (workspace) params.set('workspace', workspace);
+  if (commit) params.set('commit', commit);
+  if (staged) params.set('staged', 'true');
+
+  const res = await fetch(`${API_BASE}/git/file-versions?${params.toString()}`, { headers: getHeaders() });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Impossible de récupérer les versions du fichier');
+  }
   return res.json();
 }
 
