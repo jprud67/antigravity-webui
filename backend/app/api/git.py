@@ -823,3 +823,321 @@ def get_git_log(
         "total": len(commits)
     }
 
+
+# ==========================================
+# Sprint 14: Git Stash & Conflict Resolver
+# ==========================================
+
+class StashSaveRequest(BaseModel):
+    workspace: str | None = None
+    message: str | None = None
+    include_untracked: bool = False
+    keep_index: bool = False
+
+
+class StashActionRequest(BaseModel):
+    workspace: str | None = None
+    index: int = 0
+
+
+class ResolveConflictRequest(BaseModel):
+    workspace: str | None = None
+    path: str
+    resolution: str  # "ours", "theirs", "custom"
+    custom_content: str | None = None
+
+
+class CherryPickRequest(BaseModel):
+    workspace: str | None = None
+    commit_hash: str
+
+
+class AbortOrContinueRequest(BaseModel):
+    workspace: str | None = None
+
+
+@router.get("/stash")
+def list_git_stashes(
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+) -> list[dict]:
+    target = _validate_workspace(workspace)
+    res = run_git(["stash", "list", "--format=%gd%x1f%h%x1f%cr%x1f%gs"], target)
+    if res.returncode != 0:
+        return []
+
+    stashes = []
+    lines = res.stdout.strip().split("\n") if res.stdout.strip() else []
+    for line in lines:
+        if not line.strip():
+            continue
+        parts = line.split("\x1f")
+        if len(parts) >= 4:
+            id_ref = parts[0].strip()  # stash@{0}
+            short_h = parts[1].strip()
+            rel_time = parts[2].strip()
+            msg = _mask_git_output(_sanitize_git_message(parts[3].strip()))
+            idx_match = re.search(r'stash@\{(\d+)\}', id_ref)
+            idx = int(idx_match.group(1)) if idx_match else len(stashes)
+            stashes.append({
+                "index": idx,
+                "id": id_ref,
+                "hash": short_h,
+                "relative_time": rel_time,
+                "message": msg
+            })
+    return stashes
+
+
+@router.post("/stash")
+def save_git_stash(
+    req: StashSaveRequest,
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(req.workspace)
+    args = ["stash", "push"]
+    if req.include_untracked:
+        args.append("-u")
+    if req.keep_index:
+        args.append("-k")
+    if req.message and req.message.strip():
+        args.extend(["-m", _sanitize_git_message(req.message.strip())])
+
+    res = run_git(args, target)
+    if res.returncode != 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Erreur lors de la création du stash : {_mask_git_output(res.stderr.strip() or res.stdout.strip())}"
+        )
+    return {
+        "status": "ok",
+        "message": _mask_git_output(res.stdout.strip() or "Stash enregistré avec succès.")
+    }
+
+
+@router.post("/stash/pop")
+def pop_git_stash(
+    req: StashActionRequest,
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(req.workspace)
+    res = run_git(["stash", "pop", f"stash@{{{req.index}}}"], target)
+    out = _mask_git_output(res.stdout.strip() or res.stderr.strip())
+    if res.returncode != 0:
+        if "conflict" in out.lower():
+            return {
+                "status": "conflict",
+                "message": out
+            }
+        raise HTTPException(status_code=400, detail=f"Erreur lors du dépilage du stash : {out}")
+    return {
+        "status": "ok",
+        "message": out or "Stash dépilé avec succès."
+    }
+
+
+@router.post("/stash/apply")
+def apply_git_stash(
+    req: StashActionRequest,
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(req.workspace)
+    res = run_git(["stash", "apply", f"stash@{{{req.index}}}"], target)
+    out = _mask_git_output(res.stdout.strip() or res.stderr.strip())
+    if res.returncode != 0:
+        if "conflict" in out.lower():
+            return {
+                "status": "conflict",
+                "message": out
+            }
+        raise HTTPException(status_code=400, detail=f"Erreur lors de l'application du stash : {out}")
+    return {
+        "status": "ok",
+        "message": out or "Stash appliqué avec succès."
+    }
+
+
+@router.delete("/stash")
+def drop_git_stash(
+    workspace: str | None = Query(None),
+    index: int | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    if index is not None:
+        res = run_git(["stash", "drop", f"stash@{{{index}}}"], target)
+    else:
+        res = run_git(["stash", "clear"], target)
+
+    if res.returncode != 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Erreur lors de la suppression du stash : {_mask_git_output(res.stderr.strip() or res.stdout.strip())}"
+        )
+    return {"status": "ok", "message": "Stash supprimé avec succès."}
+
+
+@router.get("/stash/diff")
+def get_git_stash_diff(
+    workspace: str | None = Query(None),
+    index: int = Query(0),
+    path: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    args = ["stash", "show", "-p", f"stash@{{{index}}}"]
+    if path:
+        norm_p = _resolve_relative_git_path(path, target)
+        args.extend(["--", norm_p])
+
+    res = run_git(args, target)
+    if res.returncode != 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Erreur lors de l'affichage du diff de stash : {_mask_git_output(res.stderr.strip())}"
+        )
+    return {
+        "diff": _mask_git_output(res.stdout),
+        "index": index
+    }
+
+
+@router.get("/conflicts/file")
+def get_conflict_file_info(
+    workspace: str | None = Query(None),
+    path: str = Query(...),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    norm_path = _resolve_relative_git_path(path, target)
+    full_path = target / norm_path
+
+    # Extract 3-way stage contents
+    res_base = run_git(["show", f":1:{norm_path}"], target)
+    base_content = res_base.stdout if res_base.returncode == 0 else ""
+
+    res_ours = run_git(["show", f":2:{norm_path}"], target)
+    ours_content = res_ours.stdout if res_ours.returncode == 0 else ""
+
+    res_theirs = run_git(["show", f":3:{norm_path}"], target)
+    theirs_content = res_theirs.stdout if res_theirs.returncode == 0 else ""
+
+    # Current working file content
+    current_content = ""
+    if full_path.exists() and full_path.is_file():
+        try:
+            current_content = full_path.read_text(encoding="utf-8", errors="replace")
+        except Exception as e:
+            logger.debug(f"Could not read conflict file on disk: {e}")
+
+    return {
+        "file_path": str(full_path.resolve()),
+        "relative_path": norm_path,
+        "base_content": base_content,
+        "ours_content": ours_content,
+        "theirs_content": theirs_content,
+        "current_content": current_content
+    }
+
+
+@router.post("/conflicts/resolve")
+def resolve_conflict(
+    req: ResolveConflictRequest,
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(req.workspace)
+    norm_path = _resolve_relative_git_path(req.path, target)
+    full_path = target / norm_path
+
+    if req.resolution == "ours":
+        run_git(["checkout", "--ours", "--", norm_path], target)
+    elif req.resolution == "theirs":
+        run_git(["checkout", "--theirs", "--", norm_path], target)
+    elif req.resolution == "custom":
+        if req.custom_content is None:
+            raise HTTPException(status_code=400, detail="custom_content requis pour une résolution personnalisée.")
+        full_path.write_text(req.custom_content, encoding="utf-8")
+    else:
+        raise HTTPException(status_code=400, detail=f"Résolution invalide: {req.resolution}")
+
+    # Stage the resolved file
+    add_res = run_git(["add", norm_path], target)
+    if add_res.returncode != 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Erreur lors de l'ajout du fichier résolu : {_mask_git_output(add_res.stderr.strip())}"
+        )
+
+    return {
+        "status": "resolved",
+        "file_path": norm_path
+    }
+
+
+@router.post("/cherry-pick")
+def cherry_pick_commit(
+    req: CherryPickRequest,
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(req.workspace)
+    clean_hash = req.commit_hash.strip()
+    if clean_hash.startswith("-") or "--" in clean_hash or not re.match(r'^[a-zA-Z0-9_\-\./~^]+$', clean_hash):
+        raise HTTPException(status_code=400, detail="Hash de commit non valide.")
+
+    res = run_git(["cherry-pick", clean_hash], target)
+    if res.returncode == 0:
+        return {
+            "status": "applied",
+            "message": "Commit appliqué avec succès.",
+            "conflicts": []
+        }
+
+    # Check for conflicts
+    st_res = run_git(["status", "--porcelain=v1"], target)
+    conflicts = []
+    if st_res.returncode == 0:
+        for line in st_res.stdout.split("\n"):
+            if len(line) >= 4 and (line[:2] in ("UU", "AA", "DD", "AU", "UA", "UD", "DU")):
+                conflicts.append(line[3:].strip().strip('"'))
+
+    if conflicts:
+        return {
+            "status": "conflict",
+            "message": "Conflit détecté lors du cherry-pick.",
+            "conflicts": conflicts
+        }
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"Erreur lors du cherry-pick : {_mask_git_output(res.stderr.strip() or res.stdout.strip())}"
+    )
+
+
+@router.post("/cherry-pick/abort")
+def abort_cherry_pick(
+    req: AbortOrContinueRequest,
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(req.workspace)
+    res = run_git(["cherry-pick", "--abort"], target)
+    if res.returncode != 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Erreur lors de l'annulation du cherry-pick : {_mask_git_output(res.stderr.strip() or res.stdout.strip())}"
+        )
+    return {"status": "aborted", "message": "Cherry-pick annulé."}
+
+
+@router.post("/cherry-pick/continue")
+def continue_cherry_pick(
+    req: AbortOrContinueRequest,
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(req.workspace)
+    res = run_git(["cherry-pick", "--continue"], target)
+    if res.returncode != 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Erreur lors de la poursuite du cherry-pick : {_mask_git_output(res.stderr.strip() or res.stdout.strip())}"
+        )
+    return {"status": "continued", "message": "Cherry-pick continué avec succès."}

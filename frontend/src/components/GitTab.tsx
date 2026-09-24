@@ -18,9 +18,15 @@ import {
   GitMerge,
   History,
   X,
-  Code2
+  Code2,
+  Archive,
+  Layers,
+  Plus,
+  Trash2,
+  ArrowUpRight,
+  Save
 } from 'lucide-react';
-import type { MonacoStudioConfig } from '../types';
+import type { MonacoStudioConfig, GitStashItem } from '../types';
 import { 
   fetchGitStatus, 
   fetchGitDiff, 
@@ -28,11 +34,21 @@ import {
   gitPush, 
   gitPull, 
   fetchGitLog,
+  fetchGitStashes,
+  saveGitStash,
+  popGitStash,
+  applyGitStash,
+  dropGitStash,
+  fetchGitStashDiff,
+  cherryPickCommit,
   type GitStatusResult,
   type GitCommitItem
 } from '../services/api';
 import { DiffViewer } from './DiffViewer';
 import { useI18n } from '../services/i18n';
+import { showToast } from '../services/toast';
+import { showConfirm } from '../services/dialog';
+import { GitConflictModal } from './GitConflictModal';
 
 interface GitTabProps {
   currentWorkspace: string;
@@ -45,8 +61,19 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // View Mode: 'changes' vs 'history'
-  const [viewMode, setViewMode] = useState<'changes' | 'history'>('changes');
+  // View Mode: 'changes' vs 'history' vs 'stashes'
+  const [viewMode, setViewMode] = useState<'changes' | 'history' | 'stashes'>('changes');
+
+  // Stash states
+  const [stashes, setStashes] = useState<GitStashItem[]>([]);
+  const [loadingStashes, setLoadingStashes] = useState(false);
+  const [isCreateStashOpen, setIsCreateStashOpen] = useState(false);
+  const [newStashMessage, setNewStashMessage] = useState('');
+  const [newStashUntracked, setNewStashUntracked] = useState(false);
+  const [savingStash, setSavingStash] = useState(false);
+
+  // Active Conflict File for modal
+  const [activeConflictFile, setActiveConflictFile] = useState<string | null>(null);
 
   // Selected file for working tree diff
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -161,6 +188,148 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       setLoadingCommits(false);
     }
   }, [currentWorkspace, handleSelectCommit]);
+
+  const loadStashes = useCallback(async () => {
+    setLoadingStashes(true);
+    try {
+      const data = await fetchGitStashes(currentWorkspace);
+      setStashes(data);
+    } catch {
+      setStashes([]);
+    } finally {
+      setLoadingStashes(false);
+    }
+  }, [currentWorkspace]);
+
+  const handleCreateStash = useCallback(async () => {
+    setSavingStash(true);
+    try {
+      await saveGitStash({
+        workspace: currentWorkspace,
+        message: newStashMessage.trim() || undefined,
+        include_untracked: newStashUntracked
+      });
+      showToast('Stash enregistré avec succès !', 'success');
+      setIsCreateStashOpen(false);
+      setNewStashMessage('');
+      setNewStashUntracked(false);
+      await loadStashes();
+      await loadStatus();
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de la création du stash', 'error');
+    } finally {
+      setSavingStash(false);
+    }
+  }, [currentWorkspace, newStashMessage, newStashUntracked, loadStashes, loadStatus]);
+
+  const handlePopStash = useCallback(async (index: number) => {
+    try {
+      const res = await popGitStash({ workspace: currentWorkspace, index });
+      if (res.status === 'conflict') {
+        showToast(`Stash dépilé avec des conflits: ${res.message}`, 'error');
+      } else {
+        showToast('Stash dépilé et appliqué !', 'success');
+      }
+      await loadStashes();
+      await loadStatus();
+      setViewMode('changes');
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors du dépilage du stash', 'error');
+    }
+  }, [currentWorkspace, loadStashes, loadStatus]);
+
+  const handleApplyStash = useCallback(async (index: number) => {
+    try {
+      const res = await applyGitStash({ workspace: currentWorkspace, index });
+      if (res.status === 'conflict') {
+        showToast(`Stash appliqué avec des conflits: ${res.message}`, 'error');
+      } else {
+        showToast('Stash appliqué avec succès !', 'success');
+      }
+      await loadStatus();
+      setViewMode('changes');
+    } catch (err: any) {
+      showToast(err.message || "Erreur lors de l'application du stash", 'error');
+    }
+  }, [currentWorkspace, loadStatus]);
+
+  const handleDropStash = useCallback(async (index: number) => {
+    const confirmed = await showConfirm(`Voulez-vous vraiment supprimer le stash@{${index}} ?`, {
+      title: 'Supprimer le stash',
+      confirmLabel: 'Supprimer',
+      cancelLabel: 'Annuler',
+      destructive: true
+    });
+    if (!confirmed) return;
+    try {
+      await dropGitStash(currentWorkspace, index);
+      showToast('Stash supprimé.', 'info');
+      await loadStashes();
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de la suppression du stash', 'error');
+    }
+  }, [currentWorkspace, loadStashes]);
+
+  const handleClearAllStashes = useCallback(async () => {
+    const confirmed = await showConfirm('Voulez-vous supprimer TOUS les stashes ? Cette action est irréversible.', {
+      title: 'Vider tous les stashes',
+      confirmLabel: 'Tout supprimer',
+      cancelLabel: 'Annuler',
+      destructive: true
+    });
+    if (!confirmed) return;
+    try {
+      await dropGitStash(currentWorkspace);
+      showToast('Tous les stashes ont été supprimés.', 'info');
+      await loadStashes();
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors du vidage des stashes', 'error');
+    }
+  }, [currentWorkspace, loadStashes]);
+
+  const handlePreviewStashDiff = useCallback(async (stash: GitStashItem) => {
+    if (!onOpenMonacoStudio) return;
+    try {
+      const res = await fetchGitStashDiff(currentWorkspace, stash.index);
+      onOpenMonacoStudio({
+        mode: 'diff',
+        title: `Diff ${stash.id} (${stash.hash})`,
+        diffText: res.diff,
+        originalContent: '',
+        modifiedContent: res.diff,
+        readOnly: true,
+        workspace: currentWorkspace
+      });
+    } catch (err: any) {
+      showToast(err.message || 'Impossible de charger le diff du stash', 'error');
+    }
+  }, [onOpenMonacoStudio, currentWorkspace]);
+
+  const handleCherryPick = useCallback(async (commit: GitCommitItem) => {
+    const confirmed = await showConfirm(
+      `Voulez-vous appliquer le commit « ${commit.short_hash} : ${commit.subject} » sur la branche active ?`,
+      {
+        title: 'Cherry-pick commit',
+        confirmLabel: 'Appliquer (Cherry-pick)',
+        cancelLabel: 'Annuler'
+      }
+    );
+    if (!confirmed) return;
+    try {
+      const res = await cherryPickCommit({ workspace: currentWorkspace, commit_hash: commit.hash });
+      if (res.status === 'applied') {
+        showToast('Commit appliqué avec succès via Cherry-pick !', 'success');
+        await loadStatus();
+        await loadHistory(true);
+      } else if (res.status === 'conflict') {
+        showToast(`Conflit lors du cherry-pick: ${res.message}`, 'error');
+        await loadStatus();
+        setViewMode('changes');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors du cherry-pick', 'error');
+    }
+  }, [currentWorkspace, loadStatus, loadHistory]);
 
   useEffect(() => {
     let active = true;
@@ -457,6 +626,28 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
             </span>
           )}
         </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setViewMode('stashes');
+            void loadStashes();
+          }}
+          className={`flex items-center gap-1.5 px-3 py-2 border-b-2 font-medium transition-colors cursor-pointer ${
+            viewMode === 'stashes'
+              ? 'border-sky-500 text-sky-500 font-semibold'
+              : 'border-transparent hover:opacity-100 opacity-70'
+          }`}
+          style={{ color: viewMode === 'stashes' ? undefined : 'var(--text)' }}
+        >
+          <Archive className="w-3.5 h-3.5" />
+          <span>Stashes</span>
+          {stashes.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-500/20 text-purple-400 font-mono">
+              {stashes.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Notifications */}
@@ -492,9 +683,31 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       )}
 
       {status?.conflicts && status.conflicts.length > 0 && (
-        <div className="p-2 bg-rose-500/15 border-b border-rose-500/40 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2 shrink-0 font-medium">
-          <ShieldAlert className="w-4 h-4 shrink-0 text-rose-500 animate-pulse" />
-          <span>{t('git_conflict_warning', '{0} unresolved merge conflict(s). Resolve them before committing.').replace('{0}', String(status.conflicts.length))}</span>
+        <div className="p-3 bg-rose-500/15 border-b border-rose-500/40 text-rose-300 text-xs flex flex-col gap-2 shrink-0 font-medium">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-rose-400 animate-pulse" />
+              <span className="font-semibold text-rose-200">
+                {t('git_conflict_warning', '{0} conflit(s) de fusion non résolu(s).').replace('{0}', String(status.conflicts.length))}
+              </span>
+            </div>
+            <span className="text-[10px] text-rose-400/80">Action requise</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {status.conflicts.map((confFile) => (
+              <div key={confFile} className="flex items-center justify-between p-2 rounded-lg bg-black/25 border border-rose-500/30 text-xs">
+                <span className="font-mono text-rose-200 truncate">{confFile}</span>
+                <button
+                  type="button"
+                  onClick={() => setActiveConflictFile(confFile)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-medium text-[11px] cursor-pointer shadow-xs transition-colors shrink-0"
+                >
+                  <GitMerge className="w-3 h-3" />
+                  <span>Résoudre le conflit</span>
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -972,6 +1185,15 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                           </>
                         )}
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCherryPick(selectedCommit)}
+                        className="px-2 py-1 rounded-md border text-[10px] font-semibold flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30 transition-colors cursor-pointer shrink-0"
+                        title="Appliquer ce commit sur la branche courante (git cherry-pick)"
+                      >
+                        <GitMerge className="w-3 h-3 text-amber-400" />
+                        <span>Cherry-pick</span>
+                      </button>
                       {onOpenMonacoStudio && commitDiff && (
                         <button
                           type="button"
@@ -1033,6 +1255,184 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
             </div>
           </div>
         </div>
+      )}
+
+      {/* VIEW MODE 3: STASH MANAGER */}
+      {viewMode === 'stashes' && (
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-3 space-y-3">
+          {/* Stash Header Action Bar */}
+          <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-black/10 dark:bg-white/5 border" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex items-center gap-2 text-xs">
+              <Archive className="w-4 h-4 text-purple-400" />
+              <span className="font-semibold text-slate-200">Stash Stack</span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-purple-500/20 text-purple-300 font-mono">
+                {stashes.length}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsCreateStashOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium cursor-pointer shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Nouveau Stash</span>
+              </button>
+
+              {stashes.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllStashes}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-xs cursor-pointer"
+                  title="Supprimer tous les stashes (`git stash clear`)"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Tout vider</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Create Stash Inline Card */}
+          {isCreateStashOpen && (
+            <div className="p-3 rounded-xl border border-sky-500/30 bg-sky-500/5 space-y-2.5 animate-in fade-in">
+              <div className="flex items-center justify-between text-xs font-semibold text-sky-400">
+                <span>Créer un nouveau stash</span>
+                <button type="button" onClick={() => setIsCreateStashOpen(false)} className="text-slate-400 hover:text-white">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <input
+                type="text"
+                value={newStashMessage}
+                onChange={(e) => setNewStashMessage(e.target.value)}
+                placeholder="Message du stash (optionnel)..."
+                className="w-full px-3 py-1.5 border rounded-lg text-xs outline-none bg-black/20 focus:border-sky-500 text-slate-100"
+                style={{ borderColor: 'var(--border)' }}
+              />
+              <div className="flex items-center justify-between text-xs">
+                <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 text-[11px]">
+                  <input
+                    type="checkbox"
+                    checked={newStashUntracked}
+                    onChange={(e) => setNewStashUntracked(e.target.checked)}
+                    className="rounded text-sky-500"
+                  />
+                  <span>Inclure les fichiers non suivis (-u)</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateStashOpen(false)}
+                    className="px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingStash}
+                    onClick={handleCreateStash}
+                    className="flex items-center gap-1 px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+                  >
+                    {savingStash ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    <span>Enregistrer le Stash</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Stash List */}
+          {loadingStashes && stashes.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin text-sky-400" />
+              <span>Chargement des stashes...</span>
+            </div>
+          ) : stashes.length === 0 ? (
+            <div className="p-8 text-center text-xs italic text-slate-500 space-y-1">
+              <Archive className="w-8 h-8 mx-auto text-slate-600 mb-2" />
+              <p>Aucun stash dans la pile.</p>
+              <p className="text-[11px] text-slate-600">Utilisez « Nouveau Stash » pour remiser vos modifications courantes.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {stashes.map((s) => (
+                <div
+                  key={s.id}
+                  className="p-3 rounded-xl border bg-black/10 dark:bg-white/5 space-y-2 hover:border-purple-500/40 transition-colors"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 shrink-0">
+                        {s.id}
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-400">{s.hash}</span>
+                      <span className="text-[11px] text-slate-400">• {s.relative_time}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handlePreviewStashDiff(s)}
+                        className="px-2 py-1 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
+                        title="Voir le diff complet du stash"
+                      >
+                        <FileDiff className="w-3 h-3" />
+                        <span>Diff</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyStash(s.index)}
+                        className="px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
+                        title="Appliquer les modifications sans supprimer le stash (git stash apply)"
+                      >
+                        <Layers className="w-3 h-3" />
+                        <span>Appliquer</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePopStash(s.index)}
+                        className="px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
+                        title="Appliquer et dépiler le stash (git stash pop)"
+                      >
+                        <ArrowUpRight className="w-3 h-3" />
+                        <span>Dépiler</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDropStash(s.index)}
+                        className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                        title="Supprimer ce stash (`git stash drop`)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-200 font-medium break-all">
+                    {s.message}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Git Conflict Modal */}
+      {activeConflictFile && (
+        <GitConflictModal
+          isOpen={true}
+          filePath={activeConflictFile}
+          workspace={currentWorkspace}
+          onClose={() => setActiveConflictFile(null)}
+          onResolved={() => {
+            setActiveConflictFile(null);
+            void loadStatus();
+          }}
+        />
       )}
     </div>
   );

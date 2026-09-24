@@ -260,5 +260,52 @@ export interface SingleReplaceResponse {
   modified_content: string;
 }
 
+export interface GitStashItem {
+  index: number;
+  id: string;
+  hash: string;
+  relative_time: string;
+  message: string;
+}
+
+export interface StashSaveRequest {
+  workspace?: string;
+  message?: string;
+  include_untracked?: boolean;
+  keep_index?: boolean;
+}
+
+export interface StashActionRequest {
+  workspace?: string;
+  index: number;
+}
+
+export interface ConflictFileInfo {
+  file_path: string;
+  relative_path: string;
+  base_content: string;
+  ours_content: string;
+  theirs_content: string;
+  current_content: string;
+}
+
+export interface ResolveConflictRequest {
+  workspace?: string;
+  path: string;
+  resolution: 'ours' | 'theirs' | 'custom';
+  custom_content?: string;
+}
+
+export interface CherryPickRequest {
+  workspace?: string;
+  commit_hash: string;
+}
+
+export interface CherryPickResponse {
+  status: 'applied' | 'conflict';
+  message: string;
+  conflicts: string[];
+}
+
 
 

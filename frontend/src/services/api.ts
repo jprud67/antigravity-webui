@@ -13,7 +13,14 @@ import type {
   WorkspaceReplaceRequest,
   WorkspaceReplaceResponse,
   SingleReplaceRequest,
-  SingleReplaceResponse
+  SingleReplaceResponse,
+  GitStashItem,
+  StashSaveRequest,
+  StashActionRequest,
+  ConflictFileInfo,
+  ResolveConflictRequest,
+  CherryPickRequest,
+  CherryPickResponse
 } from '../types';
 
 const API_BASE = '/api';
@@ -853,6 +860,161 @@ export async function fetchGitLog(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Échec de la récupération de l\'historique Git' }));
     throw new Error(err.detail || 'Erreur lors de la récupération de l\'historique Git');
+  }
+  return res.json();
+}
+
+export async function fetchGitStashes(workspace?: string): Promise<GitStashItem[]> {
+  const url = workspace ? `${API_BASE}/git/stash?workspace=${encodeURIComponent(workspace)}` : `${API_BASE}/git/stash`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la récupération des stashes' }));
+    throw new Error(err.detail || 'Erreur lors de la récupération des stashes');
+  }
+  return res.json();
+}
+
+export async function saveGitStash(payload: StashSaveRequest): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${API_BASE}/git/stash`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la création du stash' }));
+    throw new Error(err.detail || 'Erreur lors de la création du stash');
+  }
+  return res.json();
+}
+
+export async function popGitStash(payload: StashActionRequest): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${API_BASE}/git/stash/pop`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du dépilage du stash' }));
+    throw new Error(err.detail || 'Erreur lors du dépilage du stash');
+  }
+  return res.json();
+}
+
+export async function applyGitStash(payload: StashActionRequest): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${API_BASE}/git/stash/apply`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'application du stash" }));
+    throw new Error(err.detail || "Erreur lors de l'application du stash");
+  }
+  return res.json();
+}
+
+export async function dropGitStash(workspace?: string, index?: number): Promise<{ status: string; message: string }> {
+  const params = new URLSearchParams();
+  if (workspace) params.append('workspace', workspace);
+  if (index !== undefined) params.append('index', String(index));
+  const res = await fetch(`${API_BASE}/git/stash?${params.toString()}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la suppression du stash' }));
+    throw new Error(err.detail || 'Erreur lors de la suppression du stash');
+  }
+  return res.json();
+}
+
+export async function fetchGitStashDiff(
+  workspace?: string,
+  index: number = 0,
+  path?: string
+): Promise<{ diff: string; index: number }> {
+  const params = new URLSearchParams();
+  if (workspace) params.append('workspace', workspace);
+  params.append('index', String(index));
+  if (path) params.append('path', path);
+  const res = await fetch(`${API_BASE}/git/stash/diff?${params.toString()}`, { headers: getHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la récupération du diff de stash' }));
+    throw new Error(err.detail || 'Erreur lors de la récupération du diff de stash');
+  }
+  return res.json();
+}
+
+export async function fetchConflictFileInfo(
+  path: string,
+  workspace?: string
+): Promise<ConflictFileInfo> {
+  const params = new URLSearchParams({ path });
+  if (workspace) params.append('workspace', workspace);
+  const res = await fetch(`${API_BASE}/git/conflicts/file?${params.toString()}`, { headers: getHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la récupération des détails de conflit' }));
+    throw new Error(err.detail || 'Erreur lors de la récupération du conflit');
+  }
+  return res.json();
+}
+
+export async function resolveGitConflict(
+  payload: ResolveConflictRequest
+): Promise<{ status: string; file_path: string }> {
+  const res = await fetch(`${API_BASE}/git/conflicts/resolve`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la résolution du conflit' }));
+    throw new Error(err.detail || 'Erreur lors de la résolution du conflit');
+  }
+  return res.json();
+}
+
+export async function cherryPickCommit(
+  payload: CherryPickRequest
+): Promise<CherryPickResponse> {
+  const res = await fetch(`${API_BASE}/git/cherry-pick`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du cherry-pick' }));
+    throw new Error(err.detail || 'Erreur lors du cherry-pick');
+  }
+  return res.json();
+}
+
+export async function abortCherryPick(
+  workspace?: string
+): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${API_BASE}/git/cherry-pick/abort`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ workspace })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'annulation du cherry-pick" }));
+    throw new Error(err.detail || "Erreur lors de l'annulation du cherry-pick");
+  }
+  return res.json();
+}
+
+export async function continueCherryPick(
+  workspace?: string
+): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${API_BASE}/git/cherry-pick/continue`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ workspace })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la poursuite du cherry-pick' }));
+    throw new Error(err.detail || 'Erreur lors de la poursuite du cherry-pick');
   }
   return res.json();
 }
