@@ -29,6 +29,7 @@ from app.api.terminal import router as terminal_router
 from app.api.updater import router as updater_router
 from app.api.workspaces import router as ws_router
 from app.api.prompt import router as prompt_router
+from app.api.copilot import router as copilot_router
 from app.config import BRAIN_DIR, CONVERSATION_DB
 from app.services.cron_ticker import cron_ticker_loop
 from app.services.execution_manager import execution_manager
@@ -128,6 +129,7 @@ app.include_router(google_router)
 app.include_router(events_router)  # SSE real-time sync CLI ↔ WebUI
 app.include_router(updater_router)  # Hermes-style update check & apply
 app.include_router(prompt_router)
+app.include_router(copilot_router)
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
