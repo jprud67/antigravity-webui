@@ -307,5 +307,43 @@ export interface CherryPickResponse {
   conflicts: string[];
 }
 
+export interface InlineSuggestRequest {
+  prefix: string;
+  suffix?: string;
+  language: string;
+  file_path?: string;
+  max_tokens?: number;
+  temperature?: number;
+}
+
+export interface InlineSuggestResponse {
+  suggestion: string;
+  cached: boolean;
+  latency_ms: number;
+  model: string;
+}
+
+export interface CopilotActionRequest {
+  action: 'refactor' | 'types' | 'docstring' | 'tests';
+  code: string;
+  language: string;
+  file_path?: string;
+  user_instruction?: string;
+}
+
+export interface CopilotActionResponse {
+  action: string;
+  result_code: string;
+  explanation: string;
+  diff?: string | null;
+}
+
+export interface CopilotStatusResponse {
+  available: boolean;
+  default_model: string;
+  cached_items: number;
+}
+
+
 
 

@@ -20,7 +20,12 @@ import type {
   ConflictFileInfo,
   ResolveConflictRequest,
   CherryPickRequest,
-  CherryPickResponse
+  CherryPickResponse,
+  InlineSuggestRequest,
+  InlineSuggestResponse,
+  CopilotActionRequest,
+  CopilotActionResponse,
+  CopilotStatusResponse
 } from '../types';
 
 const API_BASE = '/api';
@@ -1713,6 +1718,55 @@ export async function replaceSingleOccurrence(
   }
   return res.json();
 }
+
+// ==========================================
+// Sprint 15: AI Inline Copilot & Ghost Text
+// ==========================================
+
+export async function fetchInlineCompletion(
+  payload: InlineSuggestRequest,
+  signal?: AbortSignal
+): Promise<InlineSuggestResponse> {
+  const res = await fetch(`${API_BASE}/copilot/inline-suggest`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+    signal
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la suggestion inline' }));
+    throw new Error(err.detail || 'Erreur lors de la suggestion inline');
+  }
+  return res.json();
+}
+
+export async function executeCopilotAction(
+  payload: CopilotActionRequest,
+  signal?: AbortSignal
+): Promise<CopilotActionResponse> {
+  const res = await fetch(`${API_BASE}/copilot/action`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+    signal
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'action Copilot" }));
+    throw new Error(err.detail || "Erreur lors de l'exécution de l'action Copilot");
+  }
+  return res.json();
+}
+
+export async function fetchCopilotStatus(): Promise<CopilotStatusResponse> {
+  const res = await fetch(`${API_BASE}/copilot/status`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Impossible de récupérer le statut Copilot');
+  }
+  return res.json();
+}
+
 
 
 
