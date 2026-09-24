@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
 from app.platform_utils import is_blocked_sensitive_path
+from app.services.project_detector import detect_project_details, detect_project_health
 from app.services.storage import get_settings, save_settings
 
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
@@ -18,6 +19,85 @@ def list_workspaces(_ = Depends(require_auth)) -> list[str]:
     if DEFAULT_WORKSPACE not in workspaces:
         workspaces.insert(0, DEFAULT_WORKSPACE)
     return workspaces
+
+@router.get("/details")
+def list_workspace_details(active_path: str | None = Query(None), _ = Depends(require_auth)) -> list[dict[str, Any]]:
+    settings = get_settings()
+    raw = settings.get("trustedWorkspaces", [])
+    workspaces = list(raw) if isinstance(raw, list) else []
+    if DEFAULT_WORKSPACE not in workspaces:
+        workspaces.insert(0, DEFAULT_WORKSPACE)
+
+    default_ws = settings.get("defaultWorkspace") or DEFAULT_WORKSPACE
+    try:
+        norm_default = str(Path(default_ws).resolve())
+    except Exception:
+        norm_default = default_ws
+
+    norm_active = None
+    if active_path:
+        try:
+            norm_active = str(Path(active_path).resolve())
+        except Exception:
+            norm_active = active_path
+
+    results = []
+    for w in workspaces:
+        try:
+            norm_w = str(Path(w).resolve())
+        except Exception:
+            norm_w = w
+        is_default = (norm_w == norm_default)
+        is_active = (norm_w == norm_active) if norm_active else is_default
+        results.append(detect_project_details(w, is_default=is_default, is_active=is_active))
+    return results
+
+@router.get("/health")
+def get_workspace_health(path: str = Query(...), _ = Depends(require_auth)) -> dict[str, Any]:
+    if not path or not path.strip():
+        raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
+    cleaned_path = path.strip()
+    if "\x00" in cleaned_path or any(ord(c) < 32 or ord(c) == 127 for c in cleaned_path):
+        raise HTTPException(status_code=400, detail="Chemin invalide : caractère interdit détecté.")
+    try:
+        p = Path(cleaned_path).resolve()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Chemin invalide : {e}")
+
+    if is_blocked_sensitive_path(p):
+        raise HTTPException(status_code=403, detail="Accès refusé : répertoire système ou restreint.")
+    if not p.is_dir():
+        raise HTTPException(status_code=404, detail=f"Le dossier '{path}' n'existe pas.")
+
+    return detect_project_health(str(p))
+
+@router.post("/default")
+def set_default_workspace(path: str = Query(...), _ = Depends(require_auth)):
+    if not path or not path.strip():
+        raise HTTPException(status_code=400, detail="Chemin invalide : chemin vide.")
+    cleaned_path = path.strip()
+    if "\x00" in cleaned_path or any(ord(c) < 32 or ord(c) == 127 for c in cleaned_path):
+        raise HTTPException(status_code=400, detail="Chemin invalide : caractère interdit détecté.")
+    try:
+        p = Path(cleaned_path).resolve()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Chemin invalide : {e}")
+
+    if is_blocked_sensitive_path(p):
+        raise HTTPException(status_code=403, detail="Accès refusé : répertoire système ou restreint.")
+    if not p.is_dir():
+        raise HTTPException(status_code=404, detail=f"Le dossier '{path}' n'existe pas.")
+
+    settings = get_settings()
+    raw = settings.get("trustedWorkspaces", [])
+    workspaces = list(raw) if isinstance(raw, list) else []
+    str_p = str(p)
+    if str_p not in workspaces:
+        workspaces.append(str_p)
+        settings["trustedWorkspaces"] = workspaces
+    settings["defaultWorkspace"] = str_p
+    save_settings(settings)
+    return {"status": "ok", "default_workspace": str_p}
 
 @router.post("")
 def add_workspace(path: str = Query(...), _ = Depends(require_auth)):

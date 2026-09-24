@@ -157,3 +157,60 @@ def test_detect_project_health_standalone():
         assert "status" in health
         assert "warnings" in health
         assert health["dependencies_installed"] is False
+
+
+from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app)
+
+
+def get_auth_headers():
+    login_res = client.post("/api/auth/login", json={"password": "antigravity2026"})
+    token = login_res.json().get("token")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+def test_api_get_workspaces_details():
+    headers = get_auth_headers()
+    res = client.get("/api/workspaces/details", headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data, list)
+    if data:
+        first = data[0]
+        assert "path" in first
+        assert "name" in first
+        assert "is_default" in first
+        assert "runtimes" in first
+        assert "git" in first
+        assert "health" in first
+
+
+def test_api_get_workspaces_health():
+    headers = get_auth_headers()
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        (tmp_path / "package.json").write_text('{"name": "api-health-test"}', encoding="utf-8")
+
+        res = client.get(f"/api/workspaces/health?path={str(tmp_path)}", headers=headers)
+        assert res.status_code == 200
+        data = res.json()
+        assert "status" in data
+        assert "warnings" in data
+
+    # Invalid path
+    res = client.get("/api/workspaces/health?path=C:\\non_existent_folder_xyz_12345", headers=headers)
+    assert res.status_code in [400, 404]
+
+
+def test_api_set_default_workspace():
+    headers = get_auth_headers()
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        res = client.post(f"/api/workspaces/default?path={str(tmp_path)}", headers=headers)
+        assert res.status_code == 200
+        data = res.json()
+        assert data.get("status") == "ok"
+        assert "default_workspace" in data
+
