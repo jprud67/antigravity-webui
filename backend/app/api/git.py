@@ -772,6 +772,256 @@ def rename_branch(req: BranchRenameRequest, _ = Depends(require_auth)):
         "output": _mask_git_output(res.stdout or res.stderr)
     }
 
+
+class RebaseCommitAction(BaseModel):
+    sha: str
+    action: str = "pick"
+    new_message: str | None = None
+
+
+class RebaseExecuteRequest(BaseModel):
+    workspace: str | None = None
+    base: str
+    commits: list[RebaseCommitAction]
+
+
+class RebaseActionRequest(BaseModel):
+    workspace: str | None = None
+
+
+REBASE_HELPER_PATH = (Path(__file__).resolve().parent.parent / "services" / "git_rebase_helper.py").resolve()
+
+
+@router.get("/rebase/todo")
+def get_rebase_todo(
+    base: str = Query(..., description="Commit de départ ou ref pour le rebase"),
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    clean_base = base.strip()
+    if clean_base.startswith("-") or "--" in clean_base or not re.match(r'^[a-zA-Z0-9_\-\./~^]+$', clean_base):
+        raise HTTPException(status_code=400, detail="Identifiant de commit base invalide.")
+
+    log_format = "%h%x09%H%x09%an%x09%aI%x09%s"
+    res = run_git(["log", "--reverse", f"--format={log_format}", f"{clean_base}..HEAD"], target)
+    if res.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Impossible de récupérer les commits pour le rebase : {_mask_git_output(res.stderr or res.stdout)}")
+
+    commits = []
+    if res.stdout.strip():
+        for line in res.stdout.strip().split("\n"):
+            parts = line.split("\t")
+            if len(parts) >= 5:
+                commits.append({
+                    "sha": parts[0],
+                    "full_sha": parts[1],
+                    "author": parts[2],
+                    "date": parts[3],
+                    "subject": parts[4],
+                    "action": "pick",
+                    "new_message": None,
+                })
+
+    return {
+        "base": clean_base,
+        "commits": commits
+    }
+
+
+@router.get("/rebase/status")
+def get_rebase_status(workspace: str | None = Query(None), _ = Depends(require_auth)):
+    target = _validate_workspace(workspace)
+    rebase_merge = target / ".git" / "rebase-merge"
+    rebase_apply = target / ".git" / "rebase-apply"
+    
+    is_rebasing = rebase_merge.exists() or rebase_apply.exists()
+    current_step = 0
+    total_steps = 0
+    current_commit = None
+    conflicts = []
+
+    if is_rebasing:
+        active_dir = rebase_merge if rebase_merge.exists() else rebase_apply
+        try:
+            msgnum_f = active_dir / "msgnum"
+            end_f = active_dir / "end"
+            if msgnum_f.exists():
+                current_step = int(msgnum_f.read_text(encoding="utf-8").strip())
+            if end_f.exists():
+                total_steps = int(end_f.read_text(encoding="utf-8").strip())
+            stopped_f = active_dir / "stopped-sha"
+            if stopped_f.exists():
+                current_commit = stopped_f.read_text(encoding="utf-8").strip()[:7]
+        except Exception:
+            pass
+
+        conf_res = run_git(["diff", "--name-only", "--diff-filter=U"], target)
+        if conf_res.returncode == 0 and conf_res.stdout.strip():
+            conflicts = [f.strip() for f in conf_res.stdout.splitlines() if f.strip()]
+
+    return {
+        "is_rebasing": is_rebasing,
+        "current_step": current_step,
+        "total_steps": total_steps,
+        "current_commit": current_commit,
+        "conflicted_files": conflicts
+    }
+
+
+@router.post("/rebase/execute")
+def execute_rebase(req: RebaseExecuteRequest, _ = Depends(require_auth)):
+    import json
+    import os as _os
+    target = _validate_workspace(req.workspace)
+    clean_base = req.base.strip()
+    if clean_base.startswith("-") or "--" in clean_base or not re.match(r'^[a-zA-Z0-9_\-\./~^]+$', clean_base):
+        raise HTTPException(status_code=400, detail="Identifiant base invalide.")
+
+    if not req.commits:
+        raise HTTPException(status_code=400, detail="Aucun commit spécifié pour le rebase.")
+
+    # Vérification de l'arbre de travail
+    status_res = run_git(["status", "--porcelain"], target)
+    dirty_files = [line.strip() for line in status_res.stdout.splitlines() if line.strip() and not line.startswith("??")]
+    if dirty_files:
+        raise HTTPException(
+            status_code=409,
+            detail="Impossible de démarrer un rebase avec des modifications suivies non commitées. Effectuez un stash d'abord."
+        )
+
+    # Préparation du fichier d'instructions JSON
+    config_file = target / ".git" / "antigravity_rebase_config.json"
+    messages_queue = []
+    commits_payload = []
+    for c in req.commits:
+        action = c.action.lower() if c.action else "pick"
+        commits_payload.append({"sha": c.sha, "action": action})
+        if action in ["reword", "squash"] and c.new_message:
+            clean_msg = _sanitize_git_message(c.new_message)
+            messages_queue.append(clean_msg)
+
+    config_data = {
+        "commits": commits_payload,
+        "messages": messages_queue
+    }
+
+    try:
+        with open(config_file, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, ensure_ascii=False)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur d'initialisation du rebase : {str(e)}")
+
+    python_bin = sys.executable
+    helper_script = str(REBASE_HELPER_PATH)
+    cfg_str = str(config_file)
+
+    git_env = _os.environ.copy()
+    git_env["GIT_TERMINAL_PROMPT"] = "0"
+    git_env["GIT_SEQUENCE_EDITOR"] = f'"{python_bin}" "{helper_script}" sequence "{cfg_str}"'
+    git_env["GIT_EDITOR"] = f'"{python_bin}" "{helper_script}" editor "{cfg_str}"'
+
+    res = run_git(["rebase", "-i", clean_base], target, timeout=45, env=git_env)
+    
+    # Check if conflicts or in-progress
+    rebase_merge = target / ".git" / "rebase-merge"
+    rebase_apply = target / ".git" / "rebase-apply"
+    if rebase_merge.exists() or rebase_apply.exists():
+        conf_res = run_git(["diff", "--name-only", "--diff-filter=U"], target)
+        conf_files = [f.strip() for f in conf_res.stdout.splitlines() if f.strip()]
+        return {
+            "success": False,
+            "status": "conflict",
+            "conflicts": conf_files,
+            "message": "Des conflits sont survenus pendant le rebase."
+        }
+
+    # Clean up config file on success or clean termination
+    try:
+        if config_file.exists():
+            config_file.unlink()
+    except Exception:
+        pass
+
+    if res.returncode != 0:
+        err = res.stderr or res.stdout or ""
+        raise HTTPException(status_code=400, detail=f"Échec du rebase : {_mask_git_output(err)}")
+
+    return {
+        "success": True,
+        "status": "completed",
+        "output": _mask_git_output(res.stdout or res.stderr or "Rebase interactif terminé avec succès.")
+    }
+
+
+@router.post("/rebase/continue")
+def continue_rebase(req: RebaseActionRequest, _ = Depends(require_auth)):
+    import os as _os
+    target = _validate_workspace(req.workspace)
+    config_file = target / ".git" / "antigravity_rebase_config.json"
+    
+    python_bin = sys.executable
+    helper_script = str(REBASE_HELPER_PATH)
+    cfg_str = str(config_file)
+
+    git_env = _os.environ.copy()
+    git_env["GIT_TERMINAL_PROMPT"] = "0"
+    git_env["GIT_EDITOR"] = f'"{python_bin}" "{helper_script}" editor "{cfg_str}"'
+
+    res = run_git(["rebase", "--continue"], target, timeout=45, env=git_env)
+
+    rebase_merge = target / ".git" / "rebase-merge"
+    rebase_apply = target / ".git" / "rebase-apply"
+    if rebase_merge.exists() or rebase_apply.exists():
+        conf_res = run_git(["diff", "--name-only", "--diff-filter=U"], target)
+        conf_files = [f.strip() for f in conf_res.stdout.splitlines() if f.strip()]
+        return {
+            "success": False,
+            "status": "conflict",
+            "conflicts": conf_files,
+            "message": "Des conflits subsistent."
+        }
+
+    try:
+        if config_file.exists():
+            config_file.unlink()
+    except Exception:
+        pass
+
+    if res.returncode != 0:
+        err = res.stderr or res.stdout or ""
+        raise HTTPException(status_code=400, detail=f"Échec du rebase --continue : {_mask_git_output(err)}")
+
+    return {
+        "success": True,
+        "status": "completed",
+        "output": _mask_git_output(res.stdout or res.stderr or "Rebase complété.")
+    }
+
+
+@router.post("/rebase/abort")
+def abort_rebase(req: RebaseActionRequest, _ = Depends(require_auth)):
+    target = _validate_workspace(req.workspace)
+    config_file = target / ".git" / "antigravity_rebase_config.json"
+
+    res = run_git(["rebase", "--abort"], target, timeout=30)
+    try:
+        if config_file.exists():
+            config_file.unlink()
+    except Exception:
+        pass
+
+    if res.returncode != 0:
+        err = res.stderr or res.stdout or ""
+        raise HTTPException(status_code=400, detail=f"Échec de l'annulation du rebase : {_mask_git_output(err)}")
+
+    return {
+        "success": True,
+        "status": "aborted",
+        "output": _mask_git_output(res.stdout or res.stderr or "Rebase annulé, état d'origine restauré.")
+    }
+
+
 def _unstage_sensitive_files(target: Path) -> None:
     """Désindexe automatiquement tout fichier sensible non suivi avant commit."""
     staged_files_res = run_git(["diff", "--name-only", "--cached", "-z"], target)

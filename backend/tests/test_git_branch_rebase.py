@@ -177,3 +177,77 @@ def test_merge_branch(git_test_repo, auth_headers):
     assert merge_res.status_code == 200
     assert merge_res.json()["success"] is True
     assert (git_test_repo / "docs.md").exists()
+
+
+def test_rebase_todo(git_test_repo, auth_headers):
+    ws = str(git_test_repo)
+    # Add 2 more commits
+    f = git_test_repo / "c1.txt"
+    f.write_text("c1\n")
+    run_git_cmd(["add", "c1.txt"], cwd=git_test_repo)
+    run_git_cmd(["commit", "-m", "feat: commit one"], cwd=git_test_repo)
+
+    f2 = git_test_repo / "c2.txt"
+    f2.write_text("c2\n")
+    run_git_cmd(["add", "c2.txt"], cwd=git_test_repo)
+    run_git_cmd(["commit", "-m", "feat: commit two"], cwd=git_test_repo)
+
+    res = client.get(f"/api/git/rebase/todo?base=HEAD~2&workspace={ws}", headers=auth_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert "commits" in data
+    assert len(data["commits"]) == 2
+    assert data["commits"][0]["subject"] == "feat: commit one"
+    assert data["commits"][1]["subject"] == "feat: commit two"
+    assert data["commits"][0]["action"] == "pick"
+
+
+def test_rebase_status_when_idle(git_test_repo, auth_headers):
+    ws = str(git_test_repo)
+    res = client.get(f"/api/git/rebase/status?workspace={ws}", headers=auth_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["is_rebasing"] is False
+
+
+def test_rebase_execute_reword_and_drop(git_test_repo, auth_headers):
+    ws = str(git_test_repo)
+    # Add commits
+    f1 = git_test_repo / "step1.txt"
+    f1.write_text("step1\n")
+    run_git_cmd(["add", "step1.txt"], cwd=git_test_repo)
+    run_git_cmd(["commit", "-m", "step 1 initial"], cwd=git_test_repo)
+
+    f2 = git_test_repo / "step2.txt"
+    f2.write_text("step2\n")
+    run_git_cmd(["add", "step2.txt"], cwd=git_test_repo)
+    run_git_cmd(["commit", "-m", "step 2 to drop"], cwd=git_test_repo)
+
+    # Fetch todo
+    todo_res = client.get(f"/api/git/rebase/todo?base=HEAD~2&workspace={ws}", headers=auth_headers)
+    commits = todo_res.json()["commits"]
+    assert len(commits) == 2
+
+    # Action: reword commit 1, drop commit 2
+    c1_sha = commits[0]["sha"]
+    c2_sha = commits[1]["sha"]
+
+    payload = {
+        "workspace": ws,
+        "base": "HEAD~2",
+        "commits": [
+            {"sha": c1_sha, "action": "reword", "new_message": "feat: step 1 reworded"},
+            {"sha": c2_sha, "action": "drop"}
+        ]
+    }
+    exec_res = client.post("/api/git/rebase/execute", json=payload, headers=auth_headers)
+    assert exec_res.status_code == 200
+    assert exec_res.json()["success"] is True
+
+    # Verify commit log: commit 2 dropped, commit 1 has new message
+    log_res = client.get(f"/api/git/log?workspace={ws}&limit=5", headers=auth_headers)
+    commits_after = log_res.json()["commits"]
+    subjects = [c["subject"] for c in commits_after]
+    assert "feat: step 1 reworded" in subjects
+    assert "step 2 to drop" not in subjects
+    assert not (git_test_repo / "step2.txt").exists()
