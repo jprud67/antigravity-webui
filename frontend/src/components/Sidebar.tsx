@@ -857,6 +857,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       <div className="p-3 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
         <button
           onClick={onOpenWorkspaces}
+          title="Studio Projets & Workspaces (Ctrl+Alt+W)"
           className="w-full p-2.5 rounded-xl transition-all text-left flex items-center justify-between cursor-pointer group shadow-xs hover:border-sky-500/50"
           style={{
             backgroundColor: 'var(--surface)',
@@ -866,9 +867,14 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
           <div className="flex items-center gap-2.5 min-w-0">
             <FolderGit2 className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
             <div className="min-w-0">
-              <span className="text-[10px] block uppercase tracking-wider font-semibold" style={{ color: 'var(--muted)' }}>
-                {t('active_workspace', 'Active Workspace')}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] block uppercase tracking-wider font-semibold" style={{ color: 'var(--muted)' }}>
+                  {t('active_workspace', 'Active Workspace')}
+                </span>
+                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-surface-2 text-text-muted border border-border/50 hidden group-hover:inline-block">
+                  Ctrl+Alt+W
+                </span>
+              </div>
               <p className="text-xs truncate font-mono font-medium" style={{ color: 'var(--strong)' }}>
                 {currentWorkspace}
               </p>

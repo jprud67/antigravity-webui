@@ -6,7 +6,7 @@ import { ChatInput } from './components/ChatInput';
 const ArtifactViewer = lazy(() => import('./components/ArtifactViewer').then(m => ({ default: m.ArtifactViewer })));
 const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
 import type { SettingsTab } from './components/SettingsModal';
-const WorkspaceModal = lazy(() => import('./components/WorkspaceModal').then(m => ({ default: m.WorkspaceModal })));
+const ProjectSwitcherModal = lazy(() => import('./components/ProjectSwitcherModal').then(m => ({ default: m.ProjectSwitcherModal })));
 const LoginModal = lazy(() => import('./components/LoginModal').then(m => ({ default: m.LoginModal })));
 const FileExplorerModal = lazy(() => import('./components/FileExplorerModal').then(m => ({ default: m.FileExplorerModal })));
 const TaskDashboardModal = lazy(() => import('./components/TaskDashboardModal').then(m => ({ default: m.TaskDashboardModal })));
@@ -1321,6 +1321,13 @@ export function App() {
         return;
       }
 
+      // Ctrl+Alt+W — Project Switcher Studio
+      if (mod && e.altKey && (e.key === 'w' || e.key === 'W')) {
+        e.preventDefault();
+        setIsWorkspacesOpen((prev) => !prev);
+        return;
+      }
+
       // Escape — Close active modal
       if (e.key === 'Escape') {
         if (isQuickOpenOpen) { setIsQuickOpenOpen(false); return; }
@@ -2078,11 +2085,15 @@ export function App() {
         />
       )}
 
-      <WorkspaceModal
+      <ProjectSwitcherModal
         isOpen={isWorkspacesOpen}
         onClose={() => setIsWorkspacesOpen(false)}
         currentWorkspace={currentWorkspace}
         onSelectWorkspace={handleSelectWorkspace}
+        onRunTerminalCommand={(cmd) => {
+          openRightPanel('terminal');
+          window.dispatchEvent(new CustomEvent('terminal-run-command', { detail: { command: cmd } }));
+        }}
       />
 
       <SessionMetaModal

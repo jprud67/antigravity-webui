@@ -274,6 +274,24 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     isAction: true
   },
   {
+    cmd: '/workspace',
+    descKey: 'cmd_desc_workspace',
+    desc: 'Ouvrir le Studio Projets & Multi-Workspace (Ctrl+Alt+W)',
+    category: 'action',
+    icon: Layers,
+    color: 'text-emerald-400',
+    isAction: true
+  },
+  {
+    cmd: '/project',
+    descKey: 'cmd_desc_project',
+    desc: 'Alias de /workspace pour basculer de projet et voir la santé des dépôts',
+    category: 'action',
+    icon: Folder,
+    color: 'text-emerald-400',
+    isAction: true
+  },
+  {
     cmd: '/yolo',
     descKey: 'cmd_desc_yolo',
     desc: 'Basculer le mode Auto-Run (exécution autonome sans confirmation)',

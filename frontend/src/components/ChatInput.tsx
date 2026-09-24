@@ -944,6 +944,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         return true;
 
       case '/workspace':
+      case '/project':
         if (onOpenWorkspace) {
           onOpenWorkspace();
         } else {
