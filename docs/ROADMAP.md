@@ -132,12 +132,18 @@ This roadmap outlines the strategic direction for **Antigravity‑webui**, the f
 | **Interactive Git Rebase & Visual Branch Manager Studio** | Gestionnaire visuel de branches (sous-onglet dédié `Branches` dans `GitTab.tsx`, télémétrie de la branche active avec upstream et badges ahead/behind, création avec point de départ et checkout immédiat, fusion fast-forward / `--no-ff` avec détection automatique des conflits, suppression sécurisée avec gardes branches actives/protégées et fallback force `-D`, renommage 1-clic). Studio de rebase interactif visuel (`GitRebaseModal.tsx` avec réordonnancement up/down des commits, actions `pick`, `reword` avec édition inline du message, `squash` et `drop`, automatisation `git rebase -i` via script helper sans invite terminal, bannière amber de rebase en cours avec actions `continue` et `abort`). | Git / IDE | 2027‑02‑02 | ✅ **Completed** |
 | **Release v0.2.20** | Version bump à 0.2.20 (`package.json`, `main.py`, `updater.py`, `sw.js`), 0 warning/erreur Oxlint (63 fichiers), 0 erreur TypeScript (`tsc -b`), build production Vite optimisé (15.74s), 82/82 tests unitaires pytest backend validés (100% de réussite), vérification live Chrome DevTools, commit & tag v0.2.20 poussé vers GitHub. | Release Manager | 2027‑02‑03 | ✅ **Completed** |
 
-### 📌 Sprint 17 (v0.2.21 – Prochaine étape)
+### 📌 Sprint 17 (v0.2.21 – Terminé)
 | Milestone | Description | Owner | Target | Status |
 |---|---|---|---|---|
-| **Option A : Multi-Workspace & Project Switcher Studio** *(Recommandé)* | Gestionnaire multi-projets avec bascule instantanée sans rechargement complet de l'interface, détection automatique des runtimes (Node, Python, PHP, Rust), et dashboard de santé globale des dépôts. | Workspace / Web | 2027‑02‑06 | ⏳ Planned |
-| **Option B : Monaco Multi-Cursor & Minimap Annotations Studio** | Support des curseurs multiples avec raccourcis VS Code étendus (`Ctrl+D`, `Alt+Click`), annotations de diagnostic en marge et minimap enrichie avec heatmap des modifications Git. | IDE / Web | 2027‑02‑09 | ⏳ Planned |
-| **Option C : Git Remote Manager & Interactive Tag Publisher Studio** | Gestion des remotes Git (add, remove, rename, set-url), push/fetch sélectifs, création et signature de tags avec publication GitHub Releases 1-clic. | Git / Release | 2027‑02‑12 | ⏳ Planned |
+| **Multi-Workspace & Project Switcher Studio** | Modal studio universel (`ProjectSwitcherModal.tsx`) accessible via raccourci global `Ctrl+Alt+W`, pill workspace dans `ChatInput`, bouton Sidebar, et commandes `/workspace` / `/project`. Carte Hero du projet actif avec badge pulsation, navigation clavier (`Haut`/`Bas`/`Entrée`/`Échap`), détection automatique des runtimes (Node.js, Python, PHP, Rust, Go, Docker avec support monorepo `frontend/`, `backend/`), extraction des dépendances, package managers et frameworks. Dashboard de diagnostic de santé avec actions 1-clic directes (`npm install`, `python -m venv venv`) transmises au terminal interactif. Bascule de workspace fluide et continue sans interruption du chat actif avec toasts informatifs. | Workspace / Web | 2027‑02‑06 | ✅ **Completed** |
+| **Release v0.2.21** | Version bump à 0.2.21 (`package.json`, `main.py`, `updater.py`, `sw.js`), 0 warning/erreur Oxlint (64 fichiers), 0 erreur TypeScript (`tsc -b`), build production Vite optimisé (11.35s), 91/91 tests unitaires pytest backend validés (100% de réussite), vérification live Chrome DevTools, commit & tag v0.2.21 poussé vers GitHub. | Release Manager | 2027‑02‑07 | ✅ **Completed** |
+
+### 📌 Sprint 18 (v0.2.22 – Prochaine étape)
+| Milestone | Description | Owner | Target | Status |
+|---|---|---|---|---|
+| **Option A : Monaco Multi-Cursor & Minimap Annotations Studio** *(Recommandé)* | Support des curseurs multiples avec raccourcis VS Code étendus (`Ctrl+D`, `Alt+Click`), annotations de diagnostic en marge et minimap enrichie avec heatmap des modifications Git. | IDE / Web | 2027‑02‑10 | ⏳ Planned |
+| **Option B : Git Remote Manager & Interactive Tag Publisher Studio** | Gestion des remotes Git (add, remove, rename, set-url), push/fetch sélectifs, création et signature de tags avec publication GitHub Releases 1-clic. | Git / Release | 2027‑02‑13 | ⏳ Planned |
+| **Option C : Integrated Docker & Container Management Studio** | Détection automatique des `Dockerfile` et `docker-compose.yml`, inspection de l'état des conteneurs, logs en streaming et contrôles start/stop/restart. | DevOps / IDE | 2027‑02‑16 | ⏳ Planned |
 
 ### 📌 Long‑Term (v0.4 – 3‑6 months)
 | Milestone | Description |
