@@ -178,4 +178,87 @@ export interface PromptOptimizationResponse {
   improvement_factor: number;
 }
 
+export interface WorkspaceSearchMatchItem {
+  line_number: number;
+  column: number;
+  match_length: number;
+  line_text: string;
+  match_text: string;
+}
+
+export interface WorkspaceFileSearchResult {
+  file_path: string;
+  relative_path: string;
+  matches: WorkspaceSearchMatchItem[];
+}
+
+export interface WorkspaceSearchRequest {
+  query: string;
+  workspace?: string;
+  case_sensitive?: boolean;
+  whole_word?: boolean;
+  is_regex?: boolean;
+  include_pattern?: string;
+  exclude_pattern?: string;
+  max_results?: number;
+  max_file_size_kb?: number;
+}
+
+export interface WorkspaceSearchResponse {
+  query: string;
+  total_matches: number;
+  total_files: number;
+  files: WorkspaceFileSearchResult[];
+  duration_ms: number;
+  truncated: boolean;
+}
+
+export interface FileReplacePreview {
+  file_path: string;
+  relative_path: string;
+  replacements_count: number;
+  original_content: string;
+  modified_content: string;
+}
+
+export interface WorkspaceReplaceRequest {
+  query: string;
+  replace_text: string;
+  workspace?: string;
+  case_sensitive?: boolean;
+  whole_word?: boolean;
+  is_regex?: boolean;
+  include_pattern?: string;
+  exclude_pattern?: string;
+  file_paths?: string[];
+  dry_run?: boolean;
+}
+
+export interface WorkspaceReplaceResponse {
+  query: string;
+  replace_text: string;
+  total_replacements: number;
+  files_modified: number;
+  previews: FileReplacePreview[];
+  dry_run: boolean;
+  duration_ms: number;
+}
+
+export interface SingleReplaceRequest {
+  file_path: string;
+  workspace?: string;
+  line_number: number;
+  column: number;
+  match_length: number;
+  replace_text: string;
+  expected_match?: string;
+}
+
+export interface SingleReplaceResponse {
+  success: boolean;
+  file_path: string;
+  modified_content: string;
+}
+
+
 

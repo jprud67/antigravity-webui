@@ -30,6 +30,7 @@ Loader2,
   Copy,
   RotateCcw,
   SplitSquareVertical,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon';
 import ReactMarkdown from 'react-markdown';
@@ -38,6 +39,7 @@ import Editor from '@monaco-editor/react';
 import { TerminalTab } from './TerminalTab';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
+import { WorkspaceSearchPanel } from './WorkspaceSearchPanel';
 
 const GitTab = React.lazy(() => import('./GitTab').then(m => ({ default: m.GitTab })));
 const KanbanTab = React.lazy(() => import('./KanbanTab').then(m => ({ default: m.KanbanTab })));
@@ -64,7 +66,7 @@ import { showConfirm } from '../services/dialog';
 import { useI18n } from '../services/i18n';
 import type { ArtifactItem, MonacoStudioConfig } from '../types';
 
-export type RightPanelTab = 'files' | 'artifacts' | 'terminal' | 'git' | 'kanban';
+export type RightPanelTab = 'files' | 'search' | 'artifacts' | 'terminal' | 'git' | 'kanban';
 
 export interface EditorTabItem {
   path: string;
@@ -105,6 +107,8 @@ export interface WorkspacePanelProps {
   onExecutePrompt?: (prompt: string) => void;
   initialFilePath?: string | null;
   onClearInitialFilePath?: () => void;
+  initialSearchQuery?: string;
+  initialSearchMode?: 'find' | 'replace';
   agentActivityTimestamp?: number;
   onGitStatusChanged?: (status: GitStatusResult | null) => void;
   onArtifactsCountChanged?: (count: number) => void;
@@ -122,6 +126,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   onExecutePrompt,
   initialFilePath,
   onClearInitialFilePath,
+  initialSearchQuery,
+  initialSearchMode,
   agentActivityTimestamp,
   onGitStatusChanged,
   onArtifactsCountChanged,
@@ -620,6 +626,63 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       showToast(err.message || 'Erreur lors de la duplication', 'error');
     }
   }, [currentWorkspace, loadTree, handleSelectFile]);
+
+  const handleSelectSearchMatch = useCallback(async (
+    filePath: string,
+    lineNumber: number,
+    column: number,
+    matchLength: number
+  ) => {
+    await handleSelectFile(filePath);
+    setTimeout(() => {
+      if (monacoEditorRef.current) {
+        monacoEditorRef.current.revealPositionInCenter({ lineNumber, column });
+        monacoEditorRef.current.setPosition({ lineNumber, column });
+        if (matchLength > 0) {
+          monacoEditorRef.current.setSelection({
+            startLineNumber: lineNumber,
+            startColumn: column,
+            endLineNumber: lineNumber,
+            endColumn: column + matchLength
+          });
+        }
+        monacoEditorRef.current.focus();
+      }
+    }, 120);
+  }, [handleSelectFile]);
+
+  const handlePreviewSearchDiff = useCallback((
+    filePath: string,
+    originalContent: string,
+    modifiedContent: string
+  ) => {
+    if (onOpenMonacoStudio) {
+      onOpenMonacoStudio({
+        mode: 'diff',
+        filePath,
+        originalContent,
+        modifiedContent,
+        workspace: currentWorkspace,
+        readOnly: true
+      });
+    }
+  }, [onOpenMonacoStudio, currentWorkspace]);
+
+  const handleSearchFileModified = useCallback(async (filePath: string) => {
+    const tabIndex = openTabs.findIndex(t => t.path === filePath);
+    if (tabIndex !== -1) {
+      try {
+        const res = await fetchFileContent(filePath, currentWorkspace);
+        setOpenTabs(prev => prev.map((t, idx) => idx === tabIndex ? {
+          ...t,
+          content: res.content,
+          originalContent: res.content,
+          isDirty: false
+        } : t));
+      } catch {}
+    }
+    loadTree();
+  }, [openTabs, currentWorkspace, loadTree]);
 
   const handleTabContextMenu = (e: React.MouseEvent, index: number) => {
     e.preventDefault();
@@ -1136,6 +1199,19 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
           </button>
 
           <button
+            onClick={() => handleTabClick('search')}
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
+              activeTab === 'search'
+                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
+            }`}
+            title="Recherche globale dans le workspace (Ctrl+Shift+F)"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>Recherche</span>
+          </button>
+
+          <button
             onClick={() => handleTabClick('artifacts')}
             className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'artifacts'
@@ -1252,13 +1328,32 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
           </React.Suspense>
         )}
 
-        {/* FILES TAB */}
-        {activeTab === 'files' && (
+        {/* FILES OR SEARCH TAB */}
+        {(activeTab === 'files' || activeTab === 'search') && (
           <div className="flex h-full flex-col">
             <div className="flex-1 flex min-h-0">
-              {/* File Tree Column */}
-              <div
-                onDragOver={(e) => {
+              {/* Left Column: Search Panel or File Tree Column */}
+              {activeTab === 'search' ? (
+                <div
+                  className="w-[340px] min-w-[280px] max-w-[440px] border-r flex flex-col shrink-0 relative overflow-hidden"
+                  style={{
+                    backgroundColor: 'var(--sidebar)',
+                    borderColor: 'var(--border)',
+                  }}
+                >
+                  <WorkspaceSearchPanel
+                    currentWorkspace={currentWorkspace}
+                    initialQuery={initialSearchQuery}
+                    initialMode={initialSearchMode}
+                    onSelectMatch={handleSelectSearchMatch}
+                    onPreviewDiff={handlePreviewSearchDiff}
+                    onFileModified={handleSearchFileModified}
+                  />
+                </div>
+              ) : (
+                /* File Tree Column */
+                <div
+                  onDragOver={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   setIsDraggingOverTree(true);
@@ -1337,6 +1432,16 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     style={{ borderColor: 'var(--border)' }}
                   >
                     <Search className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTabClick('search')}
+                    title="Recherche & Remplacement global dans le workspace (Ctrl+Shift+F)"
+                    className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-amber-400 cursor-pointer shrink-0"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
                   </button>
 
                   <button
@@ -1437,6 +1542,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   )}
                 </div>
               </div>
+            )}
 
               {/* File Content Preview / Monaco Editor Column */}
               <div className="flex-1 flex flex-col min-h-0 min-w-0" style={{ backgroundColor: 'var(--surface)' }}>

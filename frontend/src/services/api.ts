@@ -1,4 +1,20 @@
-import type { Conversation, ArtifactItem, AppSettings, ModelOption, WorkspaceFolder, BookmarkItem, GitFileVersionsResponse, PromptAnalysisResponse, PromptOptimizationResponse } from '../types';
+import type { 
+  Conversation, 
+  ArtifactItem, 
+  AppSettings, 
+  ModelOption, 
+  WorkspaceFolder, 
+  BookmarkItem, 
+  GitFileVersionsResponse, 
+  PromptAnalysisResponse, 
+  PromptOptimizationResponse,
+  WorkspaceSearchRequest,
+  WorkspaceSearchResponse,
+  WorkspaceReplaceRequest,
+  WorkspaceReplaceResponse,
+  SingleReplaceRequest,
+  SingleReplaceResponse
+} from '../types';
 
 const API_BASE = '/api';
 
@@ -1490,6 +1506,52 @@ export async function optimizePrompt(
   }
   return res.json();
 }
+
+export async function searchWorkspaceFiles(
+  payload: WorkspaceSearchRequest
+): Promise<WorkspaceSearchResponse> {
+  const res = await fetch(`${API_BASE}/files/workspace-search`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la recherche dans le workspace' }));
+    throw new Error(err.detail || 'Erreur lors de la recherche dans le workspace');
+  }
+  return res.json();
+}
+
+export async function replaceWorkspaceFiles(
+  payload: WorkspaceReplaceRequest
+): Promise<WorkspaceReplaceResponse> {
+  const res = await fetch(`${API_BASE}/files/workspace-replace`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du remplacement dans le workspace' }));
+    throw new Error(err.detail || 'Erreur lors du remplacement dans le workspace');
+  }
+  return res.json();
+}
+
+export async function replaceSingleOccurrence(
+  payload: SingleReplaceRequest
+): Promise<SingleReplaceResponse> {
+  const res = await fetch(`${API_BASE}/files/single-replace`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec du remplacement de l'occurrence" }));
+    throw new Error(err.detail || "Erreur lors du remplacement de l'occurrence");
+  }
+  return res.json();
+}
+
 
 
 

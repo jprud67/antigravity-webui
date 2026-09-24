@@ -217,6 +217,8 @@ export function App() {
 
   const [pendingOpenFile, setPendingOpenFile] = useState<string | null>(null);
   const [isQuickOpenOpen, setIsQuickOpenOpen] = useState(false);
+  const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState('');
+  const [workspaceSearchMode, setWorkspaceSearchMode] = useState<'find' | 'replace'>('find');
 
   useEffect(() => {
     const handleOpenFile = (e: any) => {
@@ -233,13 +235,25 @@ export function App() {
     const handleQuickOpen = () => {
       setIsQuickOpenOpen(true);
     };
+    const handleWorkspaceSearch = (e: any) => {
+      setIsRightPanelOpen(true);
+      setRightPanelTab('search');
+      if (e?.detail?.query) {
+        setWorkspaceSearchQuery(e.detail.query);
+      }
+      if (e?.detail?.mode) {
+        setWorkspaceSearchMode(e.detail.mode);
+      }
+    };
     window.addEventListener('open-workspace-file', handleOpenFile);
     window.addEventListener('terminal-run-command', handleRunTerminal);
     window.addEventListener('open-quick-open', handleQuickOpen);
+    window.addEventListener('open-workspace-search', handleWorkspaceSearch);
     return () => {
       window.removeEventListener('open-workspace-file', handleOpenFile);
       window.removeEventListener('terminal-run-command', handleRunTerminal);
       window.removeEventListener('open-quick-open', handleQuickOpen);
+      window.removeEventListener('open-workspace-search', handleWorkspaceSearch);
     };
   }, []);
 
@@ -1289,6 +1303,24 @@ export function App() {
         return;
       }
 
+      // Ctrl+Shift+F — Global Search in Workspace
+      if (mod && shift && (e.key === 'F' || e.key === 'f')) {
+        e.preventDefault();
+        setIsRightPanelOpen(true);
+        setRightPanelTab('search');
+        setWorkspaceSearchMode('find');
+        return;
+      }
+
+      // Ctrl+Shift+H — Global Replace in Workspace
+      if (mod && shift && (e.key === 'H' || e.key === 'h')) {
+        e.preventDefault();
+        setIsRightPanelOpen(true);
+        setRightPanelTab('search');
+        setWorkspaceSearchMode('replace');
+        return;
+      }
+
       // Escape — Close active modal
       if (e.key === 'Escape') {
         if (isQuickOpenOpen) { setIsQuickOpenOpen(false); return; }
@@ -1953,6 +1985,8 @@ export function App() {
         onExecutePrompt={(p) => setQuickPrompt(p)}
         initialFilePath={pendingOpenFile}
         onClearInitialFilePath={() => setPendingOpenFile(null)}
+        initialSearchQuery={workspaceSearchQuery}
+        initialSearchMode={workspaceSearchMode}
         agentActivityTimestamp={agentActivityTimestamp}
         onOpenMonacoStudio={handleOpenMonacoStudio}
       />

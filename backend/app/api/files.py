@@ -1,7 +1,9 @@
+import fnmatch
 import logging
 import os
 import re
 import shutil
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -669,5 +671,358 @@ def duplicate_file(req: DuplicateFileRequest, _ = Depends(require_auth)):
     except Exception as e:
         logger.error(f"Error duplicating file {resolved_path} to {resolved_candidate}: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur lors de la duplication du fichier : {e!s}")
+
+
+def _matches_pattern(rel_path: str, filename: str, pattern: str) -> bool:
+    tokens = [p.strip() for p in pattern.split(",") if p.strip()]
+    norm_rel = rel_path.replace("\\", "/")
+    for token in tokens:
+        if fnmatch.fnmatch(filename, token) or fnmatch.fnmatch(norm_rel, token) or fnmatch.fnmatch(norm_rel, f"*{token}*"):
+            return True
+    return False
+
+
+def _compile_search_regex(query: str, case_sensitive: bool, whole_word: bool, is_regex: bool) -> re.Pattern:
+    if not is_regex:
+        pat_str = re.escape(query)
+    else:
+        pat_str = query
+
+    if whole_word:
+        pat_str = rf"\b{pat_str}\b"
+
+    flags = 0 if case_sensitive else re.IGNORECASE
+    return re.compile(pat_str, flags)
+
+
+class SearchMatchItem(BaseModel):
+    line_number: int
+    column: int
+    match_length: int
+    line_text: str
+    match_text: str
+
+
+class FileSearchResult(BaseModel):
+    file_path: str
+    relative_path: str
+    matches: list[SearchMatchItem]
+
+
+class WorkspaceSearchRequest(BaseModel):
+    query: str
+    workspace: str | None = None
+    case_sensitive: bool = False
+    whole_word: bool = False
+    is_regex: bool = False
+    include_pattern: str | None = None
+    exclude_pattern: str | None = None
+    max_results: int = 500
+    max_file_size_kb: int = 1024
+
+
+class WorkspaceSearchResponse(BaseModel):
+    query: str
+    total_matches: int
+    total_files: int
+    files: list[FileSearchResult]
+    duration_ms: float
+    truncated: bool
+
+
+@router.post("/workspace-search", response_model=WorkspaceSearchResponse)
+def workspace_search(req: WorkspaceSearchRequest, _ = Depends(require_auth)):
+    if not req.query:
+        raise HTTPException(status_code=400, detail="Requête de recherche vide.")
+
+    start_time = time.time()
+    target_path = Path(req.workspace) if req.workspace else Path(DEFAULT_WORKSPACE)
+    resolved_root = _validate_path_access(target_path)
+    if not resolved_root.exists() or not resolved_root.is_dir():
+        raise HTTPException(status_code=400, detail="Répertoire workspace invalide.")
+
+    try:
+        regex = _compile_search_regex(req.query, req.case_sensitive, req.whole_word, req.is_regex)
+    except re.error as e:
+        raise HTTPException(status_code=400, detail=f"Expression régulière invalide : {e!s}")
+
+    total_matches = 0
+    results_by_file: list[FileSearchResult] = []
+    truncated = False
+    max_bytes = req.max_file_size_kb * 1024
+
+    try:
+        for root, dirs, files in os.walk(resolved_root, onerror=lambda err: None):
+            try:
+                rel_depth = len(Path(root).relative_to(resolved_root).parts)
+            except Exception:
+                rel_depth = 0
+            if rel_depth >= 6:
+                dirs.clear()
+
+            dirs[:] = [
+                d for d in dirs
+                if d not in IGNORED_DIRS and not d.startswith(".") and not os.path.islink(os.path.join(root, d))
+            ]
+
+            for f in files:
+                if f.startswith(".") and f != ".gitignore":
+                    continue
+
+                full_file_p = Path(root) / f
+                try:
+                    rel_path = str(full_file_p.relative_to(resolved_root))
+                except Exception:
+                    rel_path = f
+
+                if req.exclude_pattern and _matches_pattern(rel_path, f, req.exclude_pattern):
+                    continue
+                if req.include_pattern and not _matches_pattern(rel_path, f, req.include_pattern):
+                    continue
+
+                try:
+                    stat = full_file_p.stat()
+                    if stat.st_size > max_bytes:
+                        continue
+
+                    with open(full_file_p, "r", encoding="utf-8", errors="ignore") as f_obj:
+                        first_chunk = f_obj.read(1024)
+                        if "\x00" in first_chunk:
+                            continue
+                        f_obj.seek(0)
+
+                        file_matches: list[SearchMatchItem] = []
+                        for line_idx, line in enumerate(f_obj, 1):
+                            for m in regex.finditer(line):
+                                match_len = m.end() - m.start()
+                                file_matches.append(SearchMatchItem(
+                                    line_number=line_idx,
+                                    column=m.start() + 1,
+                                    match_length=match_len,
+                                    line_text=line.rstrip("\r\n")[:300],
+                                    match_text=m.group(0)
+                                ))
+                                total_matches += 1
+                                if total_matches >= req.max_results:
+                                    truncated = True
+                                    break
+                            if truncated:
+                                break
+
+                        if file_matches:
+                            results_by_file.append(FileSearchResult(
+                                file_path=str(full_file_p),
+                                relative_path=rel_path.replace("\\", "/"),
+                                matches=file_matches
+                            ))
+
+                except (OSError, PermissionError):
+                    continue
+
+                if (time.time() - start_time) > 8.0:
+                    truncated = True
+                    break
+
+                if truncated:
+                    break
+            if truncated:
+                break
+    except Exception as e:
+        logger.error(f"Error during workspace search: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la recherche : {e!s}")
+
+    duration = round((time.time() - start_time) * 1000, 2)
+    return WorkspaceSearchResponse(
+        query=req.query,
+        total_matches=total_matches,
+        total_files=len(results_by_file),
+        files=results_by_file,
+        duration_ms=duration,
+        truncated=truncated
+    )
+
+
+class FileReplacePreview(BaseModel):
+    file_path: str
+    relative_path: str
+    replacements_count: int
+    original_content: str
+    modified_content: str
+
+
+class WorkspaceReplaceRequest(BaseModel):
+    query: str
+    replace_text: str
+    workspace: str | None = None
+    case_sensitive: bool = False
+    whole_word: bool = False
+    is_regex: bool = False
+    include_pattern: str | None = None
+    exclude_pattern: str | None = None
+    file_paths: list[str] | None = None
+    dry_run: bool = False
+
+
+class WorkspaceReplaceResponse(BaseModel):
+    query: str
+    replace_text: str
+    total_replacements: int
+    files_modified: int
+    previews: list[FileReplacePreview]
+    dry_run: bool
+    duration_ms: float
+
+
+@router.post("/workspace-replace", response_model=WorkspaceReplaceResponse)
+def workspace_replace(req: WorkspaceReplaceRequest, _ = Depends(require_auth)):
+    if not req.query:
+        raise HTTPException(status_code=400, detail="Requête de remplacement vide.")
+
+    start_time = time.time()
+    target_path = Path(req.workspace) if req.workspace else Path(DEFAULT_WORKSPACE)
+    resolved_root = _validate_path_access(target_path)
+    if not resolved_root.exists() or not resolved_root.is_dir():
+        raise HTTPException(status_code=400, detail="Répertoire workspace invalide.")
+
+    try:
+        regex = _compile_search_regex(req.query, req.case_sensitive, req.whole_word, req.is_regex)
+    except re.error as e:
+        raise HTTPException(status_code=400, detail=f"Expression régulière invalide : {e!s}")
+
+    previews: list[FileReplacePreview] = []
+    total_replacements = 0
+    files_modified = 0
+
+    files_to_check: list[Path] = []
+    if req.file_paths:
+        for fp in req.file_paths:
+            p = _validate_path_access(Path(fp), base_dir=str(resolved_root))
+            if p.exists() and p.is_file():
+                files_to_check.append(p)
+    else:
+        for root, dirs, files in os.walk(resolved_root, onerror=lambda err: None):
+            try:
+                rel_depth = len(Path(root).relative_to(resolved_root).parts)
+            except Exception:
+                rel_depth = 0
+            if rel_depth >= 6:
+                dirs.clear()
+            dirs[:] = [d for d in dirs if d not in IGNORED_DIRS and not d.startswith(".") and not os.path.islink(os.path.join(root, d))]
+            for f in files:
+                if f.startswith(".") and f != ".gitignore":
+                    continue
+                full_p = Path(root) / f
+                try:
+                    rel = str(full_p.relative_to(resolved_root))
+                except Exception:
+                    rel = f
+                if req.exclude_pattern and _matches_pattern(rel, f, req.exclude_pattern):
+                    continue
+                if req.include_pattern and not _matches_pattern(rel, f, req.include_pattern):
+                    continue
+                files_to_check.append(full_p)
+
+    for file_p in files_to_check:
+        try:
+            stat = file_p.stat()
+            if stat.st_size > 2 * 1024 * 1024:
+                continue
+            with open(file_p, "r", encoding="utf-8", errors="ignore") as f_in:
+                original = f_in.read()
+            if "\x00" in original[:1024]:
+                continue
+
+            matches_count = len(regex.findall(original))
+            if matches_count == 0:
+                continue
+
+            modified = regex.sub(req.replace_text, original)
+            try:
+                rel_path = str(file_p.relative_to(resolved_root))
+            except Exception:
+                rel_path = file_p.name
+
+            total_replacements += matches_count
+            files_modified += 1
+
+            previews.append(FileReplacePreview(
+                file_path=str(file_p),
+                relative_path=rel_path.replace("\\", "/"),
+                replacements_count=matches_count,
+                original_content=original,
+                modified_content=modified
+            ))
+
+            if not req.dry_run:
+                tmp_file = file_p.with_suffix(file_p.suffix + f".tmp_{uuid.uuid4().hex[:6]}")
+                with open(tmp_file, "w", encoding="utf-8") as f_out:
+                    f_out.write(modified)
+                os.replace(tmp_file, file_p)
+
+        except (OSError, PermissionError) as e:
+            logger.warning(f"Could not replace in file {file_p}: {e}")
+            continue
+
+    duration = round((time.time() - start_time) * 1000, 2)
+    return WorkspaceReplaceResponse(
+        query=req.query,
+        replace_text=req.replace_text,
+        total_replacements=total_replacements,
+        files_modified=files_modified,
+        previews=previews,
+        dry_run=req.dry_run,
+        duration_ms=duration
+    )
+
+
+class SingleReplaceRequest(BaseModel):
+    file_path: str
+    workspace: str | None = None
+    line_number: int
+    column: int
+    match_length: int
+    replace_text: str
+    expected_match: str | None = None
+
+
+@router.post("/single-replace")
+def single_replace(req: SingleReplaceRequest, _ = Depends(require_auth)):
+    p = _validate_path_access(Path(req.file_path), base_dir=req.workspace)
+    if not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="Fichier introuvable.")
+
+    try:
+        with open(p, "r", encoding="utf-8") as f_in:
+            lines = f_in.readlines()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur de lecture : {e!s}")
+
+    if req.line_number < 1 or req.line_number > len(lines):
+        raise HTTPException(status_code=400, detail=f"Numéro de ligne {req.line_number} hors limites.")
+
+    target_line = lines[req.line_number - 1]
+    col_idx = req.column - 1
+    if col_idx < 0 or col_idx + req.match_length > len(target_line):
+        raise HTTPException(status_code=400, detail="Coordonnées de remplacement invalides.")
+
+    actual_match = target_line[col_idx : col_idx + req.match_length]
+    if req.expected_match and actual_match != req.expected_match:
+        raise HTTPException(status_code=409, detail=f"Le contenu cible a changé (attendu: '{req.expected_match}', trouvé: '{actual_match}').")
+
+    new_line = target_line[:col_idx] + req.replace_text + target_line[col_idx + req.match_length:]
+    lines[req.line_number - 1] = new_line
+    modified_content = "".join(lines)
+
+    tmp_file = p.with_suffix(p.suffix + f".tmp_{uuid.uuid4().hex[:6]}")
+    with open(tmp_file, "w", encoding="utf-8") as f_out:
+        f_out.write(modified_content)
+    os.replace(tmp_file, p)
+
+    return {
+        "success": True,
+        "file_path": str(p),
+        "modified_content": modified_content
+    }
+
 
 
