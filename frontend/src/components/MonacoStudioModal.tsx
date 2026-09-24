@@ -19,7 +19,9 @@ import {
   WrapText,
   MapPin,
   Sparkles,
-  Search
+  Search,
+  Zap,
+  Wand2
 } from 'lucide-react';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import { saveFileContent, fetchFileContent, fetchGitFileVersions } from '../services/api';
@@ -27,6 +29,8 @@ import type { MonacoStudioConfig } from '../types';
 import { showToast } from '../services/toast';
 import { useI18n } from '../services/i18n';
 import { SUPPORTED_LANGUAGES, detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
+import { registerMonacoCopilot, isCopilotEnabled, setCopilotEnabled } from '../services/copilot';
+import { CopilotActionModal } from './CopilotActionModal';
 
 interface MonacoStudioModalProps {
   isOpen: boolean;
@@ -78,6 +82,12 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
   const [isLoadingFile, setIsLoadingFile] = useState<boolean>(needsFetchFile);
   const [theme, setTheme] = useState<'vs-dark' | 'light'>(getInitialMonacoTheme);
 
+  // Sprint 15: Copilot Inline Ghost Text & AI Code Actions state
+  const [copilotActive, setCopilotActive] = useState<boolean>(isCopilotEnabled);
+  const [copilotStatus, setCopilotStatus] = useState<'idle' | 'generating' | 'suggested' | 'disabled'>('idle');
+  const [copilotLatency, setCopilotLatency] = useState<number | null>(null);
+  const [isActionModalOpen, setIsActionModalOpen] = useState<boolean>(false);
+
   const editorRef = useRef<any>(null);
 
   // Sync theme with Antigravity appearance changes
@@ -88,6 +98,40 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
     window.addEventListener('antigravity-appearance-change', handleThemeChange);
     return () => window.removeEventListener('antigravity-appearance-change', handleThemeChange);
   }, []);
+
+  // Listen to Copilot status and toggle events
+  useEffect(() => {
+    const handleStatus = (e: any) => {
+      if (e.detail?.status) setCopilotStatus(e.detail.status);
+      if (typeof e.detail?.latency === 'number') setCopilotLatency(e.detail.latency);
+    };
+    const handleToggle = (e: any) => {
+      if (typeof e.detail?.enabled === 'boolean') {
+        setCopilotActive(e.detail.enabled);
+      }
+    };
+    window.addEventListener('antigravity:copilot-status', handleStatus);
+    window.addEventListener('antigravity:copilot-toggle', handleToggle);
+    return () => {
+      window.removeEventListener('antigravity:copilot-status', handleStatus);
+      window.removeEventListener('antigravity:copilot-toggle', handleToggle);
+    };
+  }, []);
+
+  // Keyboard shortcut Alt+C to toggle Copilot
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 'c' || e.key === 'C')) {
+        e.preventDefault();
+        const next = !copilotActive;
+        setCopilotActive(next);
+        setCopilotEnabled(next);
+        showToast(next ? 'AI Copilot activé' : 'AI Copilot mis en pause', 'info');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [copilotActive]);
 
   // Fetch file content if in editor mode without pre-supplied content
   useEffect(() => {
@@ -423,6 +467,44 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
             <span>{copied ? t('copied', 'Copié !') : t('copy', 'Copier')}</span>
           </button>
+
+          {/* AI Code Actions Studio Button */}
+          {mode === 'editor' && (
+            <button
+              type="button"
+              onClick={() => setIsActionModalOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-lg transition-colors cursor-pointer"
+              title="Ouvrir le Studio de Code Actions IA (Refactor, Types, Docs, Tests)"
+            >
+              <Wand2 className="w-3.5 h-3.5 text-sky-400" />
+              <span>Actions IA</span>
+            </button>
+          )}
+
+          {/* Copilot Ghost Text Toggle Pill */}
+          {mode === 'editor' && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = !copilotActive;
+                setCopilotActive(next);
+                setCopilotEnabled(next);
+                showToast(next ? 'AI Copilot activé (Tab pour insérer)' : 'AI Copilot en pause', 'info');
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors border cursor-pointer ${
+                copilotActive
+                  ? 'bg-purple-500/15 text-purple-300 border-purple-500/30 hover:bg-purple-500/25'
+                  : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/60 hover:text-zinc-300'
+              }`}
+              title="Activer ou mettre en pause AI Copilot Ghost Text (Alt+C)"
+            >
+              <Zap className={`w-3.5 h-3.5 ${copilotStatus === 'generating' ? 'animate-pulse text-amber-400' : copilotActive ? 'text-purple-400' : ''}`} />
+              <span>Copilot {copilotActive ? 'Actif' : 'En pause'}</span>
+              {copilotLatency !== null && copilotActive && (
+                <span className="text-[10px] opacity-70 font-mono">({copilotLatency}ms)</span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* View Toggles */}
@@ -543,9 +625,17 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
               automaticLayout: true,
               formatOnPaste: true,
               formatOnType: true,
+              inlineSuggest: {
+                enabled: copilotActive,
+                mode: 'subwordSmart',
+                showToolbar: 'always',
+              },
             }}
-            onMount={(editor) => {
+            onMount={(editor, monaco) => {
               editorRef.current = editor;
+              registerMonacoCopilot(monaco, {
+                onStatusChange: (s) => setCopilotStatus(s)
+              });
             }}
             loading={
               <div className="flex items-center justify-center h-full gap-2 text-zinc-500">
@@ -579,6 +669,22 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
           </span>
         </div>
       </div>
+
+      {/* AI Code Actions Modal */}
+      <CopilotActionModal
+        isOpen={isActionModalOpen}
+        code={content}
+        language={language}
+        filePath={config.filePath}
+        theme={theme}
+        onClose={() => setIsActionModalOpen(false)}
+        onApply={(newCode) => {
+          setContent(newCode);
+          if (editorRef.current && typeof editorRef.current.setValue === 'function') {
+            editorRef.current.setValue(newCode);
+          }
+        }}
+      />
     </div>
   );
 };

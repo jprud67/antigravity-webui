@@ -40,6 +40,8 @@ import { TerminalTab } from './TerminalTab';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
 import { WorkspaceSearchPanel } from './WorkspaceSearchPanel';
+import { registerMonacoCopilot, isCopilotEnabled, setCopilotEnabled } from '../services/copilot';
+import { CopilotActionModal } from './CopilotActionModal';
 
 const GitTab = React.lazy(() => import('./GitTab').then(m => ({ default: m.GitTab })));
 const KanbanTab = React.lazy(() => import('./KanbanTab').then(m => ({ default: m.KanbanTab })));
@@ -165,6 +167,11 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
   const [monacoTheme, setMonacoTheme] = useState<'vs-dark' | 'light'>(getInitialMonacoTheme);
   const monacoEditorRef = useRef<any>(null);
+
+  // Monaco Copilot State
+  const [copilotActive, setCopilotActive] = useState<boolean>(isCopilotEnabled());
+  const [isCopilotActionOpen, setIsCopilotActionOpen] = useState<boolean>(false);
+  const [copilotStatus, setCopilotStatus] = useState<'idle' | 'generating' | 'suggested' | 'disabled'>('idle');
 
   // Creation & Renaming State
   const [creatingType, setCreatingType] = useState<'file' | 'folder' | null>(null);
@@ -1863,6 +1870,19 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           </button>
                         )}
 
+                        {/* AI Code Actions Studio */}
+                        {!activeTabItem.isBinary && (
+                          <button
+                            type="button"
+                            onClick={() => setIsCopilotActionOpen(true)}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                            title="Actions de Code IA (Refactor, Typage, Docs, Tests)"
+                          >
+                            <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
+                            <span>Actions IA</span>
+                          </button>
+                        )}
+
                         {/* Revert changes */}
                         {activeTabItem.isDirty && (
                           <button
@@ -1947,6 +1967,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           onChange={(val) => handleEditorChange(val || '')}
                           onMount={(editor, monaco) => {
                             monacoEditorRef.current = editor;
+                            registerMonacoCopilot(monaco, {
+                              onStatusChange: (s) => setCopilotStatus(s)
+                            });
                             editor.onDidChangeCursorPosition((e) => {
                               setCursorPos({ line: e.position.lineNumber, col: e.position.column });
                             });
@@ -1964,7 +1987,12 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             tabSize: 2,
                             smoothScrolling: true,
                             fontFamily: 'JetBrains Mono, Fira Code, Consolas, monospace',
-                            padding: { top: 8, bottom: 8 }
+                            padding: { top: 8, bottom: 8 },
+                            inlineSuggest: {
+                              enabled: copilotActive,
+                              mode: 'subwordSmart',
+                              showToolbar: 'always',
+                            },
                           }}
                           loading={
                             <div className="flex items-center justify-center h-full gap-2 text-zinc-500">
@@ -1996,6 +2024,29 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         <span>{activeTabItem.content.length} car.</span>
                         <span>•</span>
                         <kbd className="px-1 py-0.2 rounded border bg-black/10 dark:bg-white/10 text-[9px]">Ctrl+S</kbd>
+                        <span>•</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !copilotActive;
+                            setCopilotActive(next);
+                            setCopilotEnabled(next);
+                          }}
+                          className="flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-mono cursor-pointer transition-colors"
+                          style={{
+                            backgroundColor: copilotActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(113, 113, 122, 0.1)',
+                            borderColor: copilotActive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(113, 113, 122, 0.3)',
+                            color: copilotActive ? '#34d399' : '#a1a1aa'
+                          }}
+                          title="Activer/Désactiver AI Copilot Inline"
+                        >
+                          {copilotStatus === 'generating' ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin text-amber-400" />
+                          ) : (
+                            <Sparkles className="w-2.5 h-2.5" />
+                          )}
+                          <span>{copilotActive ? 'Copilot On' : 'Copilot Off'}</span>
+                        </button>
                       </div>
                     </div>
                   </>
@@ -2302,6 +2353,24 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
         )}
       </div>
     </aside>
+
+    {/* Copilot Action Modal for Workspace Panel */}
+    {activeTabItem && !activeTabItem.isBinary && (
+      <CopilotActionModal
+        isOpen={isCopilotActionOpen}
+        code={activeTabItem.content}
+        language={activeTabItem.language}
+        filePath={activeTabItem.path}
+        theme={monacoTheme}
+        onClose={() => setIsCopilotActionOpen(false)}
+        onApply={(newCode) => {
+          handleEditorChange(newCode);
+          if (monacoEditorRef.current && typeof monacoEditorRef.current.setValue === 'function') {
+            monacoEditorRef.current.setValue(newCode);
+          }
+        }}
+      />
+    )}
     </>
   );
 });
