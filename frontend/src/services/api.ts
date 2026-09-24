@@ -25,7 +25,18 @@ import type {
   InlineSuggestResponse,
   CopilotActionRequest,
   CopilotActionResponse,
-  CopilotStatusResponse
+  CopilotStatusResponse,
+  GitBranchesResponse,
+  BranchCheckoutRequest,
+  BranchCreateRequest,
+  BranchDeleteRequest,
+  BranchMergeRequest,
+  BranchRenameRequest,
+  BranchActionResponse,
+  RebaseTodoResponse,
+  RebaseExecuteRequest,
+  RebaseExecuteResponse,
+  RebaseStatusResponse
 } from '../types';
 
 const API_BASE = '/api';
@@ -765,7 +776,7 @@ export async function fetchGitFileVersions(
   return res.json();
 }
 
-export async function fetchGitBranches(workspace?: string): Promise<{ current: string; branches: string[] }> {
+export async function fetchGitBranches(workspace?: string): Promise<GitBranchesResponse> {
   const url = workspace ? `${API_BASE}/git/branches?workspace=${encodeURIComponent(workspace)}` : `${API_BASE}/git/branches`;
   const res = await fetch(url, { headers: getHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch branches: ${res.statusText}`);
@@ -1020,6 +1031,133 @@ export async function continueCherryPick(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Échec de la poursuite du cherry-pick' }));
     throw new Error(err.detail || 'Erreur lors de la poursuite du cherry-pick');
+  }
+  return res.json();
+}
+
+// Sprint 16: Branch Management API
+export async function checkoutGitBranch(payload: BranchCheckoutRequest): Promise<BranchActionResponse> {
+  const res = await fetch(`${API_BASE}/git/branches/checkout`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la bascule de branche' }));
+    throw new Error(err.detail || 'Erreur lors de la bascule de branche');
+  }
+  return res.json();
+}
+
+export async function createGitBranch(payload: BranchCreateRequest): Promise<BranchActionResponse> {
+  const res = await fetch(`${API_BASE}/git/branches/create`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la création de la branche' }));
+    throw new Error(err.detail || 'Erreur lors de la création de la branche');
+  }
+  return res.json();
+}
+
+export async function deleteGitBranch(payload: BranchDeleteRequest): Promise<BranchActionResponse> {
+  const res = await fetch(`${API_BASE}/git/branches`, {
+    method: 'DELETE',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la suppression de la branche' }));
+    throw new Error(err.detail || 'Erreur lors de la suppression de la branche');
+  }
+  return res.json();
+}
+
+export async function mergeGitBranch(payload: BranchMergeRequest): Promise<BranchActionResponse> {
+  const res = await fetch(`${API_BASE}/git/branches/merge`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la fusion de la branche' }));
+    throw new Error(err.detail || 'Erreur lors de la fusion');
+  }
+  return res.json();
+}
+
+export async function renameGitBranch(payload: BranchRenameRequest): Promise<BranchActionResponse> {
+  const res = await fetch(`${API_BASE}/git/branches/rename`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du renommage de la branche' }));
+    throw new Error(err.detail || 'Erreur lors du renommage');
+  }
+  return res.json();
+}
+
+// Sprint 16: Interactive Rebase API
+export async function fetchRebaseTodo(base: string, workspace?: string): Promise<RebaseTodoResponse> {
+  const params = new URLSearchParams({ base });
+  if (workspace) params.append('workspace', workspace);
+  const res = await fetch(`${API_BASE}/git/rebase/todo?${params.toString()}`, { headers: getHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la récupération des commits pour le rebase' }));
+    throw new Error(err.detail || 'Erreur lors du chargement des commits');
+  }
+  return res.json();
+}
+
+export async function executeGitRebase(payload: RebaseExecuteRequest): Promise<RebaseExecuteResponse> {
+  const res = await fetch(`${API_BASE}/git/rebase/execute`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du rebase' }));
+    throw new Error(err.detail || 'Erreur lors du rebase');
+  }
+  return res.json();
+}
+
+export async function fetchRebaseStatus(workspace?: string): Promise<RebaseStatusResponse> {
+  const url = workspace ? `${API_BASE}/git/rebase/status?workspace=${encodeURIComponent(workspace)}` : `${API_BASE}/git/rebase/status`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la récupération du statut du rebase' }));
+    throw new Error(err.detail || 'Erreur statut rebase');
+  }
+  return res.json();
+}
+
+export async function continueGitRebase(workspace?: string): Promise<RebaseExecuteResponse> {
+  const res = await fetch(`${API_BASE}/git/rebase/continue`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ workspace })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la poursuite du rebase' }));
+    throw new Error(err.detail || 'Erreur lors du rebase --continue');
+  }
+  return res.json();
+}
+
+export async function abortGitRebase(workspace?: string): Promise<RebaseExecuteResponse> {
+  const res = await fetch(`${API_BASE}/git/rebase/abort`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ workspace })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'annulation du rebase" }));
+    throw new Error(err.detail || "Erreur lors de l'annulation du rebase");
   }
   return res.json();
 }

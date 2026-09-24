@@ -344,6 +344,108 @@ export interface CopilotStatusResponse {
   cached_items: number;
 }
 
+// Sprint 16: Visual Branch Manager & Interactive Rebase Types
+export interface GitBranchDetail {
+  name: string;
+  is_current: boolean;
+  is_remote: boolean;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  last_commit_sha: string | null;
+  last_commit_date: string | null;
+  last_commit_subject: string | null;
+}
 
+export interface GitBranchesResponse {
+  current: string;
+  branches: GitBranchDetail[];
+}
 
+export interface BranchCheckoutRequest {
+  workspace?: string;
+  branch: string;
+  create?: boolean;
+  start_point?: string | null;
+}
 
+export interface BranchCreateRequest {
+  workspace?: string;
+  name: string;
+  start_point?: string | null;
+  checkout?: boolean;
+}
+
+export interface BranchDeleteRequest {
+  workspace?: string;
+  branch: string;
+  force?: boolean;
+  remote?: boolean;
+  remote_name?: string;
+}
+
+export interface BranchMergeRequest {
+  workspace?: string;
+  branch: string;
+  no_ff?: boolean;
+  message?: string | null;
+}
+
+export interface BranchRenameRequest {
+  workspace?: string;
+  old_name: string;
+  new_name: string;
+}
+
+export interface BranchActionResponse {
+  success: boolean;
+  branch?: string;
+  name?: string;
+  old_name?: string;
+  new_name?: string;
+  has_conflicts?: boolean;
+  conflicts?: string[];
+  output?: string;
+  message?: string;
+}
+
+export interface RebaseCommitItem {
+  sha: string;
+  full_sha?: string;
+  author?: string;
+  date?: string;
+  subject: string;
+  action: 'pick' | 'reword' | 'squash' | 'drop';
+  new_message?: string | null;
+}
+
+export interface RebaseTodoResponse {
+  base: string;
+  commits: RebaseCommitItem[];
+}
+
+export interface RebaseExecuteRequest {
+  workspace?: string;
+  base: string;
+  commits: Array<{
+    sha: string;
+    action: string;
+    new_message?: string | null;
+  }>;
+}
+
+export interface RebaseExecuteResponse {
+  success: boolean;
+  status: 'completed' | 'conflict' | 'error';
+  conflicts?: string[];
+  output?: string;
+  message?: string;
+}
+
+export interface RebaseStatusResponse {
+  is_rebasing: boolean;
+  current_step: number;
+  total_steps: number;
+  current_commit: string | null;
+  conflicted_files: string[];
+}
