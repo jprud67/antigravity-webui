@@ -501,3 +501,26 @@ export interface WorkspaceProjectDetail {
   health: ProjectHealthDiagnostic;
 }
 
+export type GitDiffRangeType = 'added' | 'modified' | 'deleted';
+
+export interface GitDiffRange {
+  type: GitDiffRangeType;
+  start_line: number;
+  end_line: number;
+}
+
+export interface GitDiffSummary {
+  added_lines: number;
+  modified_lines: number;
+  deleted_lines: number;
+  total_changes: number;
+}
+
+export interface GitDiffRangesResponse {
+  file_path: string;
+  is_tracked: boolean;
+  ranges: GitDiffRange[];
+  summary: GitDiffSummary;
+}
+
+

@@ -38,7 +38,8 @@ import type {
   RebaseExecuteResponse,
   RebaseStatusResponse,
   WorkspaceProjectDetail,
-  ProjectHealthDiagnostic
+  ProjectHealthDiagnostic,
+  GitDiffRangesResponse
 } from '../types';
 
 const API_BASE = '/api';
@@ -777,6 +778,23 @@ export async function fetchGitFileVersions(
   }
   return res.json();
 }
+
+export async function fetchGitDiffRanges(
+  filePath: string,
+  workspace?: string
+): Promise<GitDiffRangesResponse> {
+  const params = new URLSearchParams();
+  params.set('file_path', filePath);
+  if (workspace) params.set('workspace', workspace);
+
+  const res = await fetch(`${API_BASE}/git/file-diff-ranges?${params.toString()}`, { headers: getHeaders() });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Impossible de récupérer les plages de modifications Git');
+  }
+  return res.json();
+}
+
 
 export async function fetchGitBranches(workspace?: string): Promise<GitBranchesResponse> {
   const url = workspace ? `${API_BASE}/git/branches?workspace=${encodeURIComponent(workspace)}` : `${API_BASE}/git/branches`;
