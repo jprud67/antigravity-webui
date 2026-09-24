@@ -56,8 +56,21 @@ def _sanitize_git_message(msg: str) -> str:
     clean = re.sub(r'\n{3,}', '\n\n', clean)
     return clean or "chore: update repository"
 
+def _normalize_workspace_str(ws: str | None) -> str | None:
+    if not ws:
+        return ws
+    cleaned = ws.strip()
+    # Normalize URL leading slash for Windows drives: /C:/foo -> C:/foo or /C:\foo -> C:\foo
+    if re.match(r"^/[a-zA-Z]:", cleaned):
+        cleaned = cleaned[1:]
+    # Fix missing slash after drive letter on Windows: C:laragon -> C:/laragon
+    if re.match(r"^[a-zA-Z]:[^/\\]", cleaned):
+        cleaned = cleaned[:2] + "/" + cleaned[2:]
+    return cleaned
+
 def _validate_workspace(workspace: str | None) -> Path:
-    target = Path(workspace) if workspace else Path(DEFAULT_WORKSPACE)
+    ws_norm = _normalize_workspace_str(workspace)
+    target = Path(ws_norm) if ws_norm else Path(DEFAULT_WORKSPACE)
     try:
         resolved = target.resolve()
     except Exception:
@@ -69,10 +82,17 @@ def _validate_workspace(workspace: str | None) -> Path:
     settings = get_settings()
     raw_workspaces = settings.get("trustedWorkspaces", [])
     workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
-    allowed_roots = [Path(DEFAULT_WORKSPACE).resolve(), Path.cwd().resolve()]
+    # Toujours inclure le workspace par défaut, le répertoire courant, et la racine du dépôt git parent
+    allowed_roots = [
+        Path(DEFAULT_WORKSPACE).resolve(), 
+        Path.cwd().resolve(),
+        Path(__file__).resolve().parent.parent.parent.parent
+    ]
     for ws in workspaces:
         try:
-            allowed_roots.append(Path(ws).resolve())
+            ws_n = _normalize_workspace_str(ws)
+            if ws_n:
+                allowed_roots.append(Path(ws_n).resolve())
         except Exception as e:
             logger.debug(f"Ignored error: {e}")
 

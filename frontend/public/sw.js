@@ -1,6 +1,6 @@
 // Antigravity WebUI Service Worker
-// Version: 0.2.12
-const CACHE_NAME = 'antigravity-cache-v0.2.12';
+// Version: 0.2.13
+const CACHE_NAME = 'antigravity-cache-v0.2.13';
 
 const STATIC_PRECACHE = [
   '/',

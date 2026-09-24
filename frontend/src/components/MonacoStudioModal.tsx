@@ -513,7 +513,8 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             language={language}
             theme={theme}
             original={originalContent}
-            modified={modifiedContent}
+            keepCurrentOriginalModel={true}
+            keepCurrentModifiedModel={true}
             options={{
               renderSideBySide: isSplitView,
               wordWrap: isWordWrap ? 'on' : 'off',
