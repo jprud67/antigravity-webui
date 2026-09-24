@@ -17,8 +17,10 @@ import {
   User,
   GitMerge,
   History,
-  X
+  X,
+  Code2
 } from 'lucide-react';
+import type { MonacoStudioConfig } from '../types';
 import { 
   fetchGitStatus, 
   fetchGitDiff, 
@@ -34,9 +36,10 @@ import { useI18n } from '../services/i18n';
 
 interface GitTabProps {
   currentWorkspace: string;
+  onOpenMonacoStudio?: (config: MonacoStudioConfig) => void;
 }
 
-export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
+export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoStudio }) => {
   const { t } = useI18n();
   const [status, setStatus] = useState<GitStatusResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -606,13 +609,32 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => setSelectedFile(null)}
-                    className="text-[10px] hover:underline cursor-pointer"
-                    style={{ color: 'var(--muted)' }}
-                  >
-                    {t('git_close_diff', 'Close diff')}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {onOpenMonacoStudio && selectedFile && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onOpenMonacoStudio({
+                            mode: 'diff',
+                            filePath: selectedFile,
+                            diffText: activeDiff || undefined,
+                          })
+                        }
+                        className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30 transition-colors cursor-pointer"
+                        title="Ouvrir dans le studio de diff sémantique Monaco"
+                      >
+                        <Code2 className="w-3 h-3" />
+                        <span>Monaco Studio</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setSelectedFile(null)}
+                      className="text-[10px] hover:underline cursor-pointer"
+                      style={{ color: 'var(--muted)' }}
+                    >
+                      {t('git_close_diff', 'Close diff')}
+                    </button>
+                  </div>
                 </div>
                 <div
                   className="flex-1 overflow-auto p-2"
@@ -950,6 +972,23 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace }) => {
                           </>
                         )}
                       </button>
+                      {onOpenMonacoStudio && commitDiff && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onOpenMonacoStudio({
+                              mode: 'diff',
+                              title: `Commit ${selectedCommit.short_hash}`,
+                              diffText: commitDiff,
+                            })
+                          }
+                          className="px-2 py-1 rounded-md border text-[10px] font-medium flex items-center gap-1 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25 transition-colors cursor-pointer shrink-0"
+                          title="Inspecter le patch dans Monaco Studio"
+                        >
+                          <Code2 className="w-3 h-3" />
+                          <span>Monaco Studio</span>
+                        </button>
+                      )}
                     </div>
 
                     {selectedCommit.body && (

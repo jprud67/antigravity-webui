@@ -17,6 +17,7 @@ import {
   Check,
   Eye,
   Code,
+  Code2,
   Download
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -31,7 +32,7 @@ import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetch
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
 import { useI18n } from '../services/i18n';
-import type { ArtifactItem } from '../types';
+import type { ArtifactItem, MonacoStudioConfig } from '../types';
 
 export type RightPanelTab = 'files' | 'artifacts' | 'terminal' | 'git' | 'kanban';
 
@@ -49,6 +50,7 @@ export interface WorkspacePanelProps {
   agentActivityTimestamp?: number;
   onGitStatusChanged?: (status: GitStatusResult | null) => void;
   onArtifactsCountChanged?: (count: number) => void;
+  onOpenMonacoStudio?: (config: MonacoStudioConfig) => void;
 }
 
 export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
@@ -65,6 +67,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   agentActivityTimestamp,
   onGitStatusChanged,
   onArtifactsCountChanged,
+  onOpenMonacoStudio,
 }) => {
   const { t } = useI18n();
   const [panelWidth, setPanelWidth] = useState<number>(() => {
@@ -590,7 +593,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
               </div>
             }
           >
-            <GitTab currentWorkspace={currentWorkspace} />
+            <GitTab currentWorkspace={currentWorkspace} onOpenMonacoStudio={onOpenMonacoStudio} />
           </React.Suspense>
         )}
 
@@ -736,6 +739,22 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           >
                             <Edit3 className="w-2.5 h-2.5" />
                             <span>{isEditingFile ? t('reading_mode', 'Reading') : t('edit_mode', 'Edit')}</span>
+                          </button>
+                        )}
+                        {onOpenMonacoStudio && !isBinaryFile(selectedFilePath) && (
+                          <button
+                            onClick={() => onOpenMonacoStudio({
+                              mode: 'editor',
+                              filePath: selectedFilePath,
+                              initialValue: fileContent || '',
+                              workspace: currentWorkspace,
+                              readOnly: false,
+                            })}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:bg-sky-500/10 text-sky-400 border-sky-500/30"
+                            title="Ouvrir dans Monaco Studio"
+                          >
+                            <Code2 className="w-2.5 h-2.5" />
+                            <span>Studio</span>
                           </button>
                         )}
                         {isEditingFile && (

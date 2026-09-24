@@ -113,8 +113,10 @@ export interface MonacoStudioConfig {
   mode: 'editor' | 'diff';
   title?: string;
   filePath?: string;
+  workspace?: string;
   language?: string;
   content?: string;
+  initialValue?: string;
   originalContent?: string;
   modifiedContent?: string;
   diffText?: string;

@@ -60,6 +60,7 @@ import { PreContext, copyText, extractRawText } from '../utils/codeBlockUtils';
 import { triggerFileDownload } from '../services/api';
 import { useI18n } from '../services/i18n';
 import { showToast } from '../services/toast';
+import type { MonacoStudioConfig } from '../types';
 
 const MermaidRenderer = React.lazy(() =>
   import('./MermaidRenderer').then((m) => ({ default: m.MermaidRenderer }))
@@ -336,6 +337,7 @@ export interface AdaptiveCodeBlockProps {
   children?: any;
   onOpenFile?: (path: string) => void;
   onOpenTerminal?: () => void;
+  onOpenMonacoStudio?: (config: MonacoStudioConfig) => void;
 }
 
 /**
@@ -354,6 +356,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
   children,
   onOpenFile,
   onOpenTerminal,
+  onOpenMonacoStudio,
 }) => {
   const { t } = useI18n();
   const rawCode = extractRawText(children).replace(/\n$/, '');
@@ -571,6 +574,30 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
               >
                 <Terminal className="w-3 h-3 text-emerald-400" />
                 <span className="hidden md:inline">{t('terminal', 'Terminal')}</span>
+              </button>
+            )}
+
+            {onOpenMonacoStudio && (
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenMonacoStudio({
+                    mode: 'editor',
+                    language,
+                    content: cleanedCode,
+                    title: filename || `Extrait ${language}`
+                  })
+                }
+                title="Ouvrir dans Monaco Studio"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer border hover:text-emerald-400"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--muted)',
+                }}
+              >
+                <Code2 className="w-3 h-3 text-emerald-400" />
+                <span className="hidden sm:inline">Studio</span>
               </button>
             )}
 
@@ -1014,6 +1041,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
 export const CodeOrInlineBlock: React.FC<any> = ({
   onOpenFile,
   onOpenTerminal,
+  onOpenMonacoStudio,
   className,
   children,
   inline,
@@ -1032,6 +1060,7 @@ export const CodeOrInlineBlock: React.FC<any> = ({
       className={className}
       onOpenFile={onOpenFile}
       onOpenTerminal={onOpenTerminal}
+      onOpenMonacoStudio={onOpenMonacoStudio}
       {...props}
     >
       {children}

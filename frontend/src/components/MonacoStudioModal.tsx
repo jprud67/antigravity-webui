@@ -148,9 +148,9 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
   const [language, setLanguage] = useState<string>(() =>
     config.language || detectLanguage(config.filePath, 'typescript')
   );
-  const [content, setContent] = useState<string>(() => config.content || '');
+  const [content, setContent] = useState<string>(() => config.content || config.initialValue || '');
   const [originalContent, setOriginalContent] = useState<string>(() => config.originalContent || '');
-  const [modifiedContent, setModifiedContent] = useState<string>(() => config.modifiedContent || config.content || '');
+  const [modifiedContent, setModifiedContent] = useState<string>(() => config.modifiedContent || config.content || config.initialValue || '');
   const [isSplitView, setIsSplitView] = useState<boolean>(true);
   const [isWordWrap, setIsWordWrap] = useState<boolean>(true);
   const [isMinimap, setIsMinimap] = useState<boolean>(true);

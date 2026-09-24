@@ -45,7 +45,7 @@ import {
   Search,
   Bookmark
 } from 'lucide-react';
-import type { ChatMessage, ToolCallItem, BookmarkItem } from '../types';
+import type { ChatMessage, ToolCallItem, BookmarkItem, MonacoStudioConfig } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
 import { DiffViewer } from './DiffViewer';
 import { ApprovalCard } from './ApprovalCard';
@@ -94,6 +94,7 @@ interface ChatCanvasProps {
   loopWarning?: { errorCount: number; message: string } | null;
   onDismissLoopWarning?: () => void;
   onStopStreaming?: () => void;
+  onOpenMonacoStudio?: (config: MonacoStudioConfig) => void;
 }
 
 const copyTextToClipboard = async (text: string): Promise<boolean> => {
@@ -401,7 +402,8 @@ const LinkBlock = ({ href, children, onOpenFile, onOpenArtifacts, ...props }: an
 const createMarkdownComponents = (
   onOpenFile?: () => void,
   onOpenArtifacts?: () => void,
-  onOpenTerminal?: () => void
+  onOpenTerminal?: () => void,
+  onOpenMonacoStudio?: (config: MonacoStudioConfig) => void
 ) => ({
   pre: PreBlock,
   code: (props: any) => (
@@ -409,6 +411,7 @@ const createMarkdownComponents = (
       {...props}
       onOpenFile={onOpenFile}
       onOpenTerminal={onOpenTerminal}
+      onOpenMonacoStudio={onOpenMonacoStudio}
     />
   ),
   blockquote: CalloutBlock,
@@ -808,6 +811,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   loopWarning,
   onDismissLoopWarning,
   onStopStreaming,
+  onOpenMonacoStudio,
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -916,8 +920,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   };
 
   const markdownComponents = useMemo(
-    () => createMarkdownComponents(onOpenFiles, onOpenArtifacts, onOpenTerminal),
-    [onOpenFiles, onOpenArtifacts, onOpenTerminal]
+    () => createMarkdownComponents(onOpenFiles, onOpenArtifacts, onOpenTerminal, onOpenMonacoStudio),
+    [onOpenFiles, onOpenArtifacts, onOpenTerminal, onOpenMonacoStudio]
   );
 
   // Index of the last assistant message — computed once per render instead of per message
@@ -1470,6 +1474,22 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
             >
               <GitBranch className="w-3.5 h-3.5 text-purple-400" />
               <span className="text-[11px] font-medium">Branches</span>
+            </button>
+          )}
+
+          {onOpenMonacoStudio && (
+            <button
+              onClick={() => onOpenMonacoStudio({ mode: 'editor', initialValue: '', readOnly: false })}
+              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden lg:flex"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)'
+              }}
+              title="Monaco Code Studio (/editor)"
+            >
+              <Code2 className="w-3.5 h-3.5 text-sky-400" />
+              <span className="text-[11px] font-medium">Éditeur</span>
             </button>
           )}
 

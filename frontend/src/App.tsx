@@ -19,8 +19,9 @@ const HelpModal = lazy(() => import('./components/HelpModal').then(m => ({ defau
 const AnalyticsModal = lazy(() => import('./components/AnalyticsModal').then(m => ({ default: m.AnalyticsModal })));
 const ContextCompactorModal = lazy(() => import('./components/ContextCompactorModal').then(m => ({ default: m.ContextCompactorModal })));
 const SessionBranchModal = lazy(() => import('./components/SessionBranchModal').then(m => ({ default: m.SessionBranchModal })));
+const MonacoStudioModal = lazy(() => import('./components/MonacoStudioModal').then(m => ({ default: m.MonacoStudioModal })));
 import type { TokenUsageData } from './components/ContextRing';
-import type { Conversation, ChatMessage, ModelOption, BookmarkItem } from './types';
+import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig } from './types';
 import { parseStepsToMessages, cleanUserPrompt } from './utils/transcriptParser';
 import { 
   fetchConversations, 
@@ -248,6 +249,8 @@ export function App() {
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isContextCompactorOpen, setIsContextCompactorOpen] = useState(false);
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+  const [isMonacoStudioOpen, setIsMonacoStudioOpen] = useState(false);
+  const [monacoStudioConfig, setMonacoStudioConfig] = useState<MonacoStudioConfig>({ mode: 'editor' });
   const [sessionBookmarks, setSessionBookmarks] = useState<BookmarkItem[]>([]);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('models');
   const [activeGoogleAccount, setActiveGoogleAccount] = useState<GoogleAccountInfo | null>(null);
@@ -1720,6 +1723,26 @@ export function App() {
     handleEditSessionMeta(activeConv);
   }, [activeConv, handleEditSessionMeta]);
 
+  const handleOpenMonacoStudio = useCallback((config: MonacoStudioConfig) => {
+    setMonacoStudioConfig(config);
+    setIsMonacoStudioOpen(true);
+  }, []);
+
+  const handleCloseMonacoStudio = useCallback(() => {
+    setIsMonacoStudioOpen(false);
+  }, []);
+
+  const handleExplainCode = useCallback((code: string, language?: string, filePath?: string) => {
+    setIsMonacoStudioOpen(false);
+    const prompt = filePath 
+      ? `Explique et analyse ce code issu de \`${filePath}\` (${language || 'code'}) :\n\`\`\`${language || ''}\n${code}\n\`\`\``
+      : `Explique et analyse ce code (${language || 'code'}) :\n\`\`\`${language || ''}\n${code}\n\`\`\``;
+    handleSendMessage(prompt, {
+      model: selectedModel,
+      effort: selectedEffort
+    });
+  }, [handleSendMessage, selectedModel, selectedEffort]);
+
   return (
     <div
       className="flex h-[100dvh] w-screen font-sans overflow-hidden antialiased"
@@ -1833,6 +1856,7 @@ export function App() {
           loopWarning={loopWarning}
           onDismissLoopWarning={() => setLoopWarning(null)}
           onStopStreaming={handleStopStreaming}
+          onOpenMonacoStudio={handleOpenMonacoStudio}
         />
 
         <ChatInput
@@ -1894,6 +1918,7 @@ export function App() {
           onOpenGoogleAccount={handleOpenGoogleAccount}
           onOpenUpdates={handleOpenUpdates}
           onShowUpdateCard={handleShowUpdateCard}
+          onOpenMonacoStudio={handleOpenMonacoStudio}
         />
       </main>
 
@@ -1911,6 +1936,7 @@ export function App() {
         initialFilePath={pendingOpenFile}
         onClearInitialFilePath={() => setPendingOpenFile(null)}
         agentActivityTimestamp={agentActivityTimestamp}
+        onOpenMonacoStudio={handleOpenMonacoStudio}
       />
 
       {/* Modals & Panels */}
@@ -1980,6 +2006,14 @@ export function App() {
         activeModel={selectedModel}
         usage={tokenUsage}
         onPruneSuccess={handlePruneSuccess}
+      />
+
+      <MonacoStudioModal
+        isOpen={isMonacoStudioOpen}
+        onClose={handleCloseMonacoStudio}
+        config={monacoStudioConfig}
+        onExplainCode={handleExplainCode}
+        currentWorkspace={currentWorkspace}
       />
 
       {isBranchModalOpen && activeConversationId && (

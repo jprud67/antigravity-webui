@@ -45,7 +45,9 @@ import {
   FileCode2,
   Scissors,
   Bookmark,
-  FolderGit2
+  FolderGit2,
+  GitCompare,
+  Code2
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -218,6 +220,36 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'action',
     icon: Bookmark,
     color: 'text-amber-400',
+    isAction: true
+  },
+  {
+    cmd: '/editor',
+    descKey: 'cmd_desc_editor',
+    desc: 'Ouvrir le studio de code et scratchpad Monaco',
+    arg: '<chemin fichier optionnel>',
+    category: 'action',
+    icon: Code2,
+    color: 'text-indigo-400',
+    isAction: true
+  },
+  {
+    cmd: '/studio',
+    descKey: 'cmd_desc_studio',
+    desc: 'Ouvrir le studio de code et scratchpad Monaco',
+    arg: '<chemin fichier optionnel>',
+    category: 'action',
+    icon: Code2,
+    color: 'text-indigo-400',
+    isAction: true
+  },
+  {
+    cmd: '/diff',
+    descKey: 'cmd_desc_diff',
+    desc: 'Ouvrir le studio de diff sémantique côte-à-côte Monaco',
+    arg: '<chemin fichier optionnel>',
+    category: 'action',
+    icon: GitCompare,
+    color: 'text-emerald-400',
     isAction: true
   },
   {

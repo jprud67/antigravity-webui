@@ -22,7 +22,7 @@ import {
   Leaf,
   FileCode2
 } from 'lucide-react';
-import type { ModelOption } from '../types';
+import type { ModelOption, MonacoStudioConfig } from '../types';
 import { ContextRing, type TokenUsageData } from './ContextRing';
 import { ALL_SLASH_COMMANDS, parseSlashCommand, type SlashCommandDef } from '../services/commands';
 import { applyTheme } from '../services/theme';
@@ -83,6 +83,7 @@ interface ChatInputProps {
   isCompacting?: boolean;
   onOpenBranchTree?: () => void;
   onAddBookmark?: (label?: string) => void;
+  onOpenMonacoStudio?: (config: MonacoStudioConfig) => void;
 }
 
 export interface AttachmentItem {
@@ -140,7 +141,8 @@ export const ChatInput = React.memo<ChatInputProps>(({
   onOpenCompactor,
   isCompacting,
   onOpenBranchTree,
-  onAddBookmark
+  onAddBookmark,
+  onOpenMonacoStudio
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -786,6 +788,23 @@ export const ChatInput = React.memo<ChatInputProps>(({
           onOpenBranchTree();
         } else {
           showToast('Gestionnaire de signets non disponible.', 'info');
+        }
+        return true;
+
+      case '/editor':
+      case '/studio':
+        if (onOpenMonacoStudio) {
+          onOpenMonacoStudio({ mode: 'editor', filePath: args || undefined });
+        } else {
+          showToast('Studio Monaco non disponible.', 'info');
+        }
+        return true;
+
+      case '/diff':
+        if (onOpenMonacoStudio) {
+          onOpenMonacoStudio({ mode: 'diff', filePath: args || undefined });
+        } else {
+          showToast('Studio Diff Monaco non disponible.', 'info');
         }
         return true;
 
