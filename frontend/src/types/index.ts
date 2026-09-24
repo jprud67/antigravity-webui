@@ -449,3 +449,55 @@ export interface RebaseStatusResponse {
   current_commit: string | null;
   conflicted_files: string[];
 }
+
+export interface ProjectRuntimeInfo {
+  type: 'node' | 'python' | 'php' | 'rust' | 'go' | 'docker' | 'generic';
+  version?: string | null;
+  frameworks: string[];
+  package_manager?: 'npm' | 'pnpm' | 'yarn' | 'bun' | 'pip' | 'poetry' | 'pipenv' | 'composer' | 'cargo' | 'go' | null;
+}
+
+export interface ProjectGitStatus {
+  is_repo: boolean;
+  branch?: string | null;
+  is_dirty: boolean;
+  uncommitted_count: number;
+  remote_url?: string | null;
+  ahead?: number;
+  behind?: number;
+  last_commit?: {
+    sha: string;
+    date: string;
+    subject: string;
+  } | null;
+}
+
+export interface ProjectHealthDiagnostic {
+  status: 'healthy' | 'warning' | 'error';
+  dependencies_installed: boolean;
+  venv_present?: boolean | null;
+  node_modules_present?: boolean | null;
+  vendor_present?: boolean | null;
+  warnings: string[];
+  suggested_action?: {
+    label: string;
+    command: string;
+  } | null;
+}
+
+export interface WorkspaceProjectDetail {
+  path: string;
+  name: string;
+  is_default: boolean;
+  is_active: boolean;
+  last_modified?: string | null;
+  stats?: {
+    file_count?: number;
+    disk_size_mb?: number;
+    last_modified?: string | null;
+  };
+  runtimes: ProjectRuntimeInfo[];
+  git: ProjectGitStatus;
+  health: ProjectHealthDiagnostic;
+}
+

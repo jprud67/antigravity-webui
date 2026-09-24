@@ -36,7 +36,9 @@ import type {
   RebaseTodoResponse,
   RebaseExecuteRequest,
   RebaseExecuteResponse,
-  RebaseStatusResponse
+  RebaseStatusResponse,
+  WorkspaceProjectDetail,
+  ProjectHealthDiagnostic
 } from '../types';
 
 const API_BASE = '/api';
@@ -1904,6 +1906,81 @@ export async function fetchCopilotStatus(): Promise<CopilotStatusResponse> {
   }
   return res.json();
 }
+
+// Workspace & Project Switcher Studio API
+export async function fetchWorkspaceProjects(activePath?: string): Promise<WorkspaceProjectDetail[]> {
+  const query = activePath ? `?active_path=${encodeURIComponent(activePath)}` : '';
+  const res = await fetch(`${API_BASE}/workspaces/details${query}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de récupération des projets' }));
+    throw new Error(err.detail || 'Erreur lors de la récupération des projets');
+  }
+  return res.json();
+}
+
+export async function fetchProjectHealth(path: string): Promise<ProjectHealthDiagnostic> {
+  const res = await fetch(`${API_BASE}/workspaces/health?path=${encodeURIComponent(path)}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du diagnostic de santé' }));
+    throw new Error(err.detail || 'Erreur lors du diagnostic de santé du projet');
+  }
+  return res.json();
+}
+
+export async function setDefaultWorkspace(path: string): Promise<{ status: string; default_workspace: string }> {
+  const res = await fetch(`${API_BASE}/workspaces/default?path=${encodeURIComponent(path)}`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de définition du workspace par défaut' }));
+    throw new Error(err.detail || 'Erreur lors de la configuration du workspace par défaut');
+  }
+  return res.json();
+}
+
+export async function addWorkspaceProject(path: string): Promise<{ status: string; workspaces: string[] }> {
+  const res = await fetch(`${API_BASE}/workspaces?path=${encodeURIComponent(path)}`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'ajout du workspace" }));
+    throw new Error(err.detail || "Erreur lors de l'ajout du workspace");
+  }
+  return res.json();
+}
+
+export async function removeWorkspaceProject(path: string): Promise<{ status: string; workspaces: string[] }> {
+  const res = await fetch(`${API_BASE}/workspaces?path=${encodeURIComponent(path)}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de suppression du workspace' }));
+    throw new Error(err.detail || 'Erreur lors de la suppression du workspace');
+  }
+  return res.json();
+}
+
+export async function exploreWorkspaceDirectory(
+  path?: string
+): Promise<{ current_path: string; parent_path: string | null; entries: Array<{ name: string; path: string; is_dir: boolean; size?: number | null }> }> {
+  const query = path ? `?path=${encodeURIComponent(path)}` : '';
+  const res = await fetch(`${API_BASE}/workspaces/explore${query}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec d'exploration du dossier" }));
+    throw new Error(err.detail || "Erreur lors de l'exploration du dossier");
+  }
+  return res.json();
+}
+
 
 
 
