@@ -18,13 +18,15 @@ import {
   Columns,
   WrapText,
   MapPin,
-  Sparkles
+  Sparkles,
+  Search
 } from 'lucide-react';
 import Editor, { DiffEditor } from '@monaco-editor/react';
-import { saveFileContent, fetchGitFileVersions } from '../services/api';
+import { saveFileContent, fetchFileContent, fetchGitFileVersions } from '../services/api';
 import type { MonacoStudioConfig } from '../types';
 import { showToast } from '../services/toast';
 import { useI18n } from '../services/i18n';
+import { SUPPORTED_LANGUAGES, detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
 
 interface MonacoStudioModalProps {
   isOpen: boolean;
@@ -33,99 +35,6 @@ interface MonacoStudioModalProps {
   onExplainCode?: (code: string, language?: string, filePath?: string) => void;
   onExecuteCode?: (code: string, language: string) => void;
   currentWorkspace?: string;
-}
-
-const SUPPORTED_LANGUAGES = [
-  { id: 'typescript', name: 'TypeScript (.ts, .tsx)' },
-  { id: 'javascript', name: 'JavaScript (.js, .jsx)' },
-  { id: 'python', name: 'Python (.py)' },
-  { id: 'html', name: 'HTML (.html)' },
-  { id: 'css', name: 'CSS (.css)' },
-  { id: 'json', name: 'JSON (.json)' },
-  { id: 'markdown', name: 'Markdown (.md)' },
-  { id: 'yaml', name: 'YAML (.yml, .yaml)' },
-  { id: 'shell', name: 'Shell / Bash (.sh, .bash)' },
-  { id: 'diff', name: 'Diff Patch (.diff, .patch)' },
-  { id: 'sql', name: 'SQL (.sql)' },
-  { id: 'rust', name: 'Rust (.rs)' },
-  { id: 'go', name: 'Go (.go)' },
-  { id: 'cpp', name: 'C++ (.cpp, .hpp)' },
-  { id: 'csharp', name: 'C# (.cs)' },
-  { id: 'java', name: 'Java (.java)' },
-  { id: 'php', name: 'PHP (.php)' },
-  { id: 'dockerfile', name: 'Dockerfile' },
-  { id: 'plaintext', name: 'Texte Brut (.txt)' },
-];
-
-function detectLanguage(filePath?: string, fallback = 'plaintext'): string {
-  if (!filePath) return fallback;
-  const ext = filePath.split('.').pop()?.toLowerCase();
-  switch (ext) {
-    case 'ts':
-    case 'tsx':
-      return 'typescript';
-    case 'js':
-    case 'jsx':
-    case 'mjs':
-    case 'cjs':
-      return 'javascript';
-    case 'py':
-    case 'py3':
-      return 'python';
-    case 'html':
-    case 'htm':
-      return 'html';
-    case 'css':
-    case 'scss':
-    case 'less':
-      return 'css';
-    case 'json':
-      return 'json';
-    case 'md':
-    case 'markdown':
-      return 'markdown';
-    case 'yml':
-    case 'yaml':
-      return 'yaml';
-    case 'sh':
-    case 'bash':
-    case 'zsh':
-      return 'shell';
-    case 'diff':
-    case 'patch':
-      return 'diff';
-    case 'sql':
-      return 'sql';
-    case 'rs':
-      return 'rust';
-    case 'go':
-      return 'go';
-    case 'cpp':
-    case 'cc':
-    case 'cxx':
-    case 'h':
-    case 'hpp':
-      return 'cpp';
-    case 'cs':
-      return 'csharp';
-    case 'java':
-      return 'java';
-    case 'php':
-      return 'php';
-    case 'dockerfile':
-      return 'dockerfile';
-    default:
-      return fallback;
-  }
-}
-
-function getInitialMonacoTheme(): 'vs-dark' | 'light' {
-  if (typeof document === 'undefined') return 'vs-dark';
-  const isLight =
-    document.documentElement.classList.contains('theme-light') ||
-    document.body.classList.contains('theme-light') ||
-    document.documentElement.getAttribute('data-theme') === 'light';
-  return isLight ? 'light' : 'vs-dark';
 }
 
 interface MonacoStudioInnerProps {
@@ -162,6 +71,11 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
     config.mode === 'diff' && config.filePath && !config.originalContent && !config.modifiedContent
   );
   const [isLoadingVersions, setIsLoadingVersions] = useState<boolean>(needsFetch);
+
+  const needsFetchFile = Boolean(
+    mode === 'editor' && config.filePath && !config.content && !config.initialValue
+  );
+  const [isLoadingFile, setIsLoadingFile] = useState<boolean>(needsFetchFile);
   const [theme, setTheme] = useState<'vs-dark' | 'light'>(getInitialMonacoTheme);
 
   const editorRef = useRef<any>(null);
@@ -175,6 +89,26 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
     return () => window.removeEventListener('antigravity-appearance-change', handleThemeChange);
   }, []);
 
+  // Fetch file content if in editor mode without pre-supplied content
+  useEffect(() => {
+    if (!needsFetchFile || !config.filePath) return;
+    let isCancelled = false;
+    fetchFileContent(config.filePath, currentWorkspace)
+      .then((res) => {
+        if (isCancelled) return;
+        setContent(res.content);
+        setOriginalContent(res.content);
+        setLanguage(detectLanguage(config.filePath));
+      })
+      .catch((err) => {
+        showToast(`Erreur chargement: ${err.message}`, 'error');
+      })
+      .finally(() => {
+        if (!isCancelled) setIsLoadingFile(false);
+      });
+    return () => { isCancelled = true; };
+  }, [needsFetchFile, config.filePath, currentWorkspace]);
+
   // Fetch git file versions if in diff mode without pre-supplied content
   useEffect(() => {
     if (!needsFetch) return;
@@ -185,8 +119,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
         setOriginalContent(res.original || '');
         setModifiedContent(res.modified || '');
       })
-      .catch((err) => {
-        logger_warn('Failed to load git file versions, falling back to diff text:', err);
+      .catch(() => {
         if (!isCancelled && config.diffText) {
           setContent(config.diffText);
           setMode('editor');
@@ -227,12 +160,30 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
     }
   }, [config, mode, modifiedContent, content, currentWorkspace, t]);
 
-  // Keyboard shortcut listener (Ctrl+S to save, Escape to close)
+  // Handle Format Code (Shift+Alt+F)
+  const handleFormat = useCallback(() => {
+    if (editorRef.current) {
+      editorRef.current.getAction('editor.action.formatDocument')?.run();
+      showToast('Document formaté', 'info');
+    }
+  }, []);
+
+  // Handle Find in File (Ctrl+F)
+  const handleFind = useCallback(() => {
+    if (editorRef.current) {
+      editorRef.current.getAction('actions.find')?.run();
+    }
+  }, []);
+
+  // Keyboard shortcut listener (Ctrl+S to save, Escape to close, Shift+Alt+F to format)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         handleSave();
+      } else if (e.shiftKey && e.altKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        handleFormat();
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -241,7 +192,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, onClose]);
+  }, [handleSave, handleFormat, onClose]);
 
   // Handle Copy to clipboard
   const handleCopy = useCallback(() => {
@@ -438,6 +389,30 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             <span>{t('editor_lens_explain', 'Expliquer avec Antigravity')}</span>
           </button>
 
+          {/* Format button */}
+          {mode === 'editor' && (
+            <button
+              type="button"
+              onClick={handleFormat}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/60 rounded-lg transition-colors"
+              title="Formater le document (Shift+Alt+F)"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{t('format', 'Formater')}</span>
+            </button>
+          )}
+
+          {/* Find button */}
+          <button
+            type="button"
+            onClick={handleFind}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/60 rounded-lg transition-colors"
+            title="Rechercher dans le fichier (Ctrl+F)"
+          >
+            <Search className="w-3.5 h-3.5 text-sky-400" />
+            <span>{t('find', 'Rechercher')}</span>
+          </button>
+
           {/* Copy button */}
           <button
             type="button"
@@ -504,6 +479,13 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-950/80 z-20">
             <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
             <p className="text-xs text-zinc-400">{t('monaco_loading_versions', 'Récupération des versions du fichier Git...')}</p>
+          </div>
+        ) : null}
+
+        {isLoadingFile ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-950/80 z-20">
+            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+            <p className="text-xs text-zinc-400">{t('monaco_loading_file', 'Chargement du contenu du fichier...')}</p>
           </div>
         ) : null}
 
@@ -629,9 +611,3 @@ export const MonacoStudioModal: React.FC<MonacoStudioModalProps> = ({
     </div>
   );
 };
-
-function logger_warn(msg: string, ...args: any[]) {
-  if (typeof console !== 'undefined') {
-    console.warn(msg, ...args);
-  }
-}

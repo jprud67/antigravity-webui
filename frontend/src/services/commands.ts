@@ -47,7 +47,8 @@ import {
   Bookmark,
   FolderGit2,
   GitCompare,
-  Code2
+  Code2,
+  Wand2
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -250,6 +251,26 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'action',
     icon: GitCompare,
     color: 'text-emerald-400',
+    isAction: true
+  },
+  {
+    cmd: '/optimize',
+    descKey: 'cmd_desc_optimize',
+    desc: 'Ouvrir le studio d\'optimisation de prompt et structuration agentique',
+    arg: '<prompt optionnel>',
+    category: 'action',
+    icon: Wand2,
+    color: 'text-purple-400',
+    isAction: true
+  },
+  {
+    cmd: '/metaprompt',
+    descKey: 'cmd_desc_metaprompt',
+    desc: 'Ouvrir le studio d\'optimisation de prompt et structuration agentique',
+    arg: '<prompt optionnel>',
+    category: 'action',
+    icon: Wand2,
+    color: 'text-purple-400',
     isAction: true
   },
   {

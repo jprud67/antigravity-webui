@@ -121,6 +121,25 @@ export interface MonacoStudioConfig {
   modifiedContent?: string;
   diffText?: string;
   readOnly?: boolean;
+  openFiles?: Array<{ path: string; name?: string; content?: string }>;
+}
+
+export interface FileSearchResult {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  match_type: 'name' | 'content';
+  line_number?: number;
+  snippet?: string;
+}
+
+export interface OpenEditorFile {
+  path: string;
+  filename: string;
+  content: string;
+  originalContent: string;
+  isDirty: boolean;
+  language: string;
 }
 
 export type PromptPreset = 'general' | 'debug' | 'plan' | 'refactor' | 'review';

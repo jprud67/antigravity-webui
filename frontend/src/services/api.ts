@@ -512,6 +512,71 @@ export async function saveFileContent(path: string, content: string, workspace?:
   return res.json();
 }
 
+export async function createFile(path: string, content = '', workspace?: string): Promise<{ success: boolean; path: string; filename: string; size: number; last_modified: number }> {
+  const res = await fetch(`${API_BASE}/files/create`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ path, content, workspace })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la création du fichier' }));
+    throw new Error(err.detail || 'Erreur lors de la création du fichier');
+  }
+  return res.json();
+}
+
+export async function createDirectory(path: string, workspace?: string): Promise<{ success: boolean; path: string; name?: string; already_existed?: boolean }> {
+  const res = await fetch(`${API_BASE}/files/create-dir`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ path, workspace })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la création du dossier' }));
+    throw new Error(err.detail || 'Erreur lors de la création du dossier');
+  }
+  return res.json();
+}
+
+export async function renameFile(oldPath: string, newPath: string, workspace?: string): Promise<{ success: boolean; old_path: string; new_path: string; name: string; is_dir: boolean }> {
+  const res = await fetch(`${API_BASE}/files/rename`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ old_path: oldPath, new_path: newPath, workspace })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du renommage' }));
+    throw new Error(err.detail || 'Erreur lors du renommage');
+  }
+  return res.json();
+}
+
+export async function deleteFile(path: string, workspace?: string): Promise<{ success: boolean; path: string; was_dir: boolean }> {
+  const res = await fetch(`${API_BASE}/files/delete`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ path, workspace })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la suppression' }));
+    throw new Error(err.detail || 'Erreur lors de la suppression');
+  }
+  return res.json();
+}
+
+export async function searchFiles(query: string, path?: string, maxResults = 50): Promise<{ query: string; results: any[]; total: number }> {
+  const params = new URLSearchParams({ q: query, max_results: String(maxResults) });
+  if (path) params.append('path', path);
+  const res = await fetch(`${API_BASE}/files/search?${params.toString()}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la recherche' }));
+    throw new Error(err.detail || 'Erreur lors de la recherche');
+  }
+  return res.json();
+}
+
 // Tasks & Subagents Monitoring
 export async function fetchTasksList(conversationId?: string): Promise<{ tasks: any[]; subagents: any[]; processes: any[] }> {
   const url = conversationId

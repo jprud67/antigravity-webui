@@ -8,33 +8,86 @@ import {
   ChevronRight, 
   ChevronDown, 
   Folder, 
-  File, 
+  FolderOpen,
   RefreshCw, 
   Plus,
   Kanban as KanbanIcon,
-  Edit3,
+  Edit2,
   Save,
   Check,
   Eye,
   Code,
   Code2,
-  Download
+  Download,
+  FilePlus,
+  FolderPlus,
+  Trash2,
+  Search,
+  WrapText,
+  Columns,
+  Sparkles,
+  FileCode,
+  Loader2
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import Editor from '@monaco-editor/react';
 import { TerminalTab } from './TerminalTab';
 import { MermaidRenderer } from './MermaidRenderer';
 import { DiffViewer } from './DiffViewer';
 
 const GitTab = React.lazy(() => import('./GitTab').then(m => ({ default: m.GitTab })));
 const KanbanTab = React.lazy(() => import('./KanbanTab').then(m => ({ default: m.KanbanTab })));
-import { fetchFileTree, fetchFileContent, saveFileContent, fetchArtifacts, fetchArtifactContent, fetchGitStatus, type GitStatusResult, getAuthToken, triggerFileDownload } from '../services/api';
+import { 
+  fetchFileTree, 
+  fetchFileContent, 
+  saveFileContent, 
+  createFile, 
+  createDirectory, 
+  renameFile, 
+  deleteFile, 
+  fetchArtifacts, 
+  fetchArtifactContent, 
+  fetchGitStatus, 
+  type GitStatusResult, 
+  getAuthToken, 
+  triggerFileDownload 
+} from '../services/api';
+import { detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
 import { useI18n } from '../services/i18n';
 import type { ArtifactItem, MonacoStudioConfig } from '../types';
 
 export type RightPanelTab = 'files' | 'artifacts' | 'terminal' | 'git' | 'kanban';
+
+export interface EditorTabItem {
+  path: string;
+  name: string;
+  content: string;
+  originalContent: string;
+  isDirty: boolean;
+  language: string;
+  size?: number;
+  isBinary?: boolean;
+}
+
+function filterTreeItems(items: any[], query: string): any[] {
+  if (!query.trim()) return items;
+  const lower = query.toLowerCase();
+  return items.reduce<any[]>((acc, item) => {
+    const match = item.name.toLowerCase().includes(lower);
+    if (item.is_dir && item.children) {
+      const matchingKids = filterTreeItems(item.children, query);
+      if (match || matchingKids.length > 0) {
+        acc.push({ ...item, children: matchingKids });
+      }
+    } else if (match) {
+      acc.push(item);
+    }
+    return acc;
+  }, []);
+}
 
 export interface WorkspacePanelProps {
   isOpen: boolean;
@@ -78,21 +131,43 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
         if (!isNaN(parsed) && parsed >= 360 && parsed <= 1200) return parsed;
       }
     } catch {}
-    return 540;
+    return 600;
   });
   const isResizingRef = useRef(false);
 
   // Files Tab State
   const [fileTree, setFileTree] = useState<any>(null);
   const [loadingTree, setLoadingTree] = useState(false);
-  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState<string | null>(null);
+  const [treeSearch, setTreeSearch] = useState('');
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+
+  // Multi-Tabs State
+  const [openTabs, setOpenTabs] = useState<EditorTabItem[]>([]);
+  const [activeTabIndex, setActiveTabIndex] = useState<number>(-1);
   const [loadingContent, setLoadingContent] = useState(false);
-  const [isEditingFile, setIsEditingFile] = useState(false);
-  const [editedFileContent, setEditedFileContent] = useState('');
   const [savingFile, setSavingFile] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+
+  // Monaco Editor Options in Panel
+  const [isWordWrap, setIsWordWrap] = useState(true);
+  const [isMinimap, setIsMinimap] = useState(false);
+  const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
+  const [monacoTheme, setMonacoTheme] = useState<'vs-dark' | 'light'>(getInitialMonacoTheme);
+  const monacoEditorRef = useRef<any>(null);
+
+  // Creation & Renaming State
+  const [creatingType, setCreatingType] = useState<'file' | 'folder' | null>(null);
+  const [creatingParent, setCreatingParent] = useState<string | null>(null);
+  const [newItemName, setNewItemName] = useState('');
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renamedName, setRenamedName] = useState('');
+
+  // Sync Monaco Theme
+  useEffect(() => {
+    const handleThemeChange = () => setMonacoTheme(getInitialMonacoTheme());
+    window.addEventListener('antigravity-appearance-change', handleThemeChange);
+    return () => window.removeEventListener('antigravity-appearance-change', handleThemeChange);
+  }, []);
 
   // Artifacts Tab State
   const [artifacts, setArtifacts] = useState<ArtifactItem[]>([]);
@@ -114,7 +189,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!isResizingRef.current) return;
       const newWidth = window.innerWidth - moveEvent.clientX;
-      if (newWidth >= 360 && newWidth <= Math.min(1000, window.innerWidth - 300)) {
+      if (newWidth >= 360 && newWidth <= Math.min(1100, window.innerWidth - 300)) {
         setPanelWidth(newWidth);
         try {
           localStorage.setItem('antigravity_aux_panel_width', String(newWidth));
@@ -134,18 +209,25 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     window.addEventListener('mouseup', handleMouseUp);
   };
 
+  const activeTabItem = activeTabIndex >= 0 && activeTabIndex < openTabs.length ? openTabs[activeTabIndex] : null;
+  const selectedFilePath = activeTabItem ? activeTabItem.path : null;
+
   // Unsaved changes guard
   const checkUnsavedChanges = useCallback(async (): Promise<boolean> => {
-    if (isEditingFile && editedFileContent !== fileContent) {
-      return await showConfirm(t('unsaved_changes_message', 'You have unsaved changes. Do you want to continue without saving?'), {
-        title: t('unsaved_changes_title', 'Unsaved changes'),
-        confirmLabel: t('discard_changes', 'Discard changes'),
-        cancelLabel: t('continue_editing', 'Continue editing'),
-        destructive: true
-      });
+    const dirtyTabs = openTabs.filter(t => t.isDirty);
+    if (dirtyTabs.length > 0) {
+      return await showConfirm(
+        t('unsaved_changes_message', 'Des fichiers comportent des modifications non enregistrées. Voulez-vous continuer sans sauvegarder ?'), 
+        {
+          title: t('unsaved_changes_title', 'Modifications non enregistrées'),
+          confirmLabel: t('discard_changes', 'Abandonner'),
+          cancelLabel: t('continue_editing', 'Continuer l\'édition'),
+          destructive: true
+        }
+      );
     }
     return true;
-  }, [isEditingFile, editedFileContent, fileContent, t]);
+  }, [openTabs, t]);
 
   const handleClose = useCallback(async () => {
     if (await checkUnsavedChanges()) {
@@ -171,69 +253,129 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   }, [BINARY_EXTENSIONS]);
 
   const handleSelectFile = useCallback(async (path: string) => {
-    if (!(await checkUnsavedChanges())) return;
-    setSelectedFilePath(path);
-    setIsEditingFile(false);
-    setSaveSuccess(false);
+    const existingIdx = openTabs.findIndex(t => t.path === path);
+    if (existingIdx !== -1) {
+      setActiveTabIndex(existingIdx);
+      return;
+    }
+
+    const filename = path.split(/[/\\]/).pop() || 'file';
 
     if (isBinaryFile(path)) {
-      setFileContent('');
-      setEditedFileContent('');
-      setLoadingContent(false);
+      const newTab: EditorTabItem = {
+        path,
+        name: filename,
+        content: '',
+        originalContent: '',
+        isDirty: false,
+        language: 'plaintext',
+        isBinary: true,
+      };
+      setOpenTabs(prev => [...prev, newTab]);
+      setActiveTabIndex(openTabs.length);
       return;
     }
 
     setLoadingContent(true);
     try {
-      const res = await fetchFileContent(path);
-      setFileContent(res.content);
-      setEditedFileContent(res.content);
+      const res = await fetchFileContent(path, currentWorkspace);
+      const newTab: EditorTabItem = {
+        path,
+        name: filename,
+        content: res.content,
+        originalContent: res.content,
+        isDirty: false,
+        language: detectLanguage(path),
+        size: res.size,
+        isBinary: false,
+      };
+      setOpenTabs(prev => {
+        const found = prev.findIndex(t => t.path === path);
+        if (found !== -1) return prev;
+        return [...prev, newTab];
+      });
+      setActiveTabIndex(openTabs.length);
     } catch (err: any) {
       const msg = String(err?.message || '');
-      if (msg.toLowerCase().includes('volumineux') || msg.includes('2 Mo') || msg.toLowerCase().includes('large')) {
-        setFileContent(`⚠️ ${t('file_explorer_load_error', 'File too large for built-in editor. Please use the Download button above.')}`);
-      } else {
-        setFileContent(`${t('error', 'Error')}: ${msg || t('error', 'Unknown error')}`);
-      }
-      setEditedFileContent('');
+      showToast(`${t('error', 'Erreur')}: ${msg || t('error', 'Erreur de chargement')}`, 'error');
     } finally {
       setLoadingContent(false);
     }
-  }, [checkUnsavedChanges, isBinaryFile, t]);
+  }, [openTabs, currentWorkspace, isBinaryFile, t]);
 
-  const handleDownloadCurrentFile = useCallback(async () => {
-    if (!selectedFilePath) return;
-    try {
-      const token = getAuthToken();
-      const downloadUrl = `/api/files/download?path=${encodeURIComponent(selectedFilePath)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
-      const res = await fetch(downloadUrl, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const blob = await res.blob();
-      const filename = selectedFilePath.split(/[/\\]/).pop() || 'file';
-      triggerFileDownload(blob, filename);
-      showToast(`${t('download', 'Download')} « ${filename} » ${t('done', 'done')}`, 'success');
-    } catch {
-      showToast(t('error_downloading_file', 'Error downloading file.'), 'error');
+  const handleCloseTab = useCallback(async (indexToClose: number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const tabToClose = openTabs[indexToClose];
+    if (!tabToClose) return;
+
+    if (tabToClose.isDirty) {
+      const discard = await showConfirm(
+        `Le fichier « ${tabToClose.name} » a des modifications non enregistrées. Fermer quand même ?`,
+        {
+          title: 'Modifications non enregistrées',
+          confirmLabel: 'Fermer sans enregistrer',
+          cancelLabel: 'Annuler',
+          destructive: true
+        }
+      );
+      if (!discard) return;
     }
-  }, [selectedFilePath, t]);
 
-  const handleSaveFile = useCallback(async () => {
-    if (!selectedFilePath) return;
+    setOpenTabs(prev => prev.filter((_, i) => i !== indexToClose));
+    setActiveTabIndex(prev => {
+      if (prev > indexToClose) return prev - 1;
+      if (prev === indexToClose) return Math.max(0, openTabs.length - 2);
+      return prev;
+    });
+  }, [openTabs]);
+
+  const handleEditorChange = useCallback((newVal: string) => {
+    if (activeTabIndex < 0 || activeTabIndex >= openTabs.length) return;
+    setOpenTabs(prev => {
+      const cur = prev[activeTabIndex];
+      if (!cur) return prev;
+      const updated = [...prev];
+      updated[activeTabIndex] = {
+        ...cur,
+        content: newVal,
+        isDirty: newVal !== cur.originalContent,
+      };
+      return updated;
+    });
+  }, [activeTabIndex, openTabs.length]);
+
+  const handleSaveActiveTab = useCallback(async () => {
+    if (!activeTabItem || activeTabItem.isBinary) return;
     setSavingFile(true);
     try {
-      await saveFileContent(selectedFilePath, editedFileContent);
-      setFileContent(editedFileContent);
+      await saveFileContent(activeTabItem.path, activeTabItem.content, currentWorkspace);
+      setOpenTabs(prev => {
+        const updated = [...prev];
+        if (updated[activeTabIndex]) {
+          updated[activeTabIndex] = {
+            ...updated[activeTabIndex],
+            originalContent: activeTabItem.content,
+            isDirty: false,
+          };
+        }
+        return updated;
+      });
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
-    } catch {
-      showToast(t('error_saving_file', 'Error saving file.'), 'error');
+      showToast(t('editor_file_saved', 'Fichier enregistré avec succès.'), 'success');
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (err: any) {
+      showToast(err.message || t('error_saving_file', 'Erreur lors de la sauvegarde du fichier.'), 'error');
     } finally {
       setSavingFile(false);
     }
-  }, [selectedFilePath, editedFileContent, t]);
+  }, [activeTabItem, activeTabIndex, currentWorkspace, t]);
 
+  const handleFormatCode = useCallback(() => {
+    if (monacoEditorRef.current) {
+      monacoEditorRef.current.getAction('editor.action.formatDocument')?.run();
+      showToast('Document formaté', 'info');
+    }
+  }, []);
   const handleSelectArtifact = useCallback(async (art: ArtifactItem) => {
     setSelectedArtifact(art);
     try {
@@ -366,13 +508,99 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     }
   }, [initialFilePath, isOpen, handleSelectFile, onClearInitialFilePath]);
 
+  const handleDownloadCurrentFile = useCallback(async () => {
+    if (!selectedFilePath) return;
+    try {
+      const token = getAuthToken();
+      const downloadUrl = `/api/files/download?path=${encodeURIComponent(selectedFilePath)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+      const res = await fetch(downloadUrl, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const blob = await res.blob();
+      const filename = selectedFilePath.split(/[/\\]/).pop() || 'file';
+      triggerFileDownload(blob, filename);
+      showToast(`${t('download', 'Téléchargement')} « ${filename} » ${t('done', 'terminé')}`, 'success');
+    } catch {
+      showToast(t('error_downloading_file', 'Erreur lors du téléchargement du fichier.'), 'error');
+    }
+  }, [selectedFilePath, t]);
+
+  const handleCreateNewItem = useCallback(async () => {
+    if (!newItemName.trim() || !creatingType) return;
+    const name = newItemName.trim();
+    const base = creatingParent || currentWorkspace;
+    const targetPath = `${base}/${name}`;
+
+    try {
+      if (creatingType === 'file') {
+        await createFile(targetPath, '', currentWorkspace);
+        showToast(`Fichier « ${name} » créé avec succès`, 'success');
+        setCreatingType(null);
+        setNewItemName('');
+        await loadTree();
+        handleSelectFile(targetPath);
+      } else {
+        await createDirectory(targetPath, currentWorkspace);
+        showToast(`Dossier « ${name} » créé avec succès`, 'success');
+        setCreatingType(null);
+        setNewItemName('');
+        await loadTree();
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de la création', 'error');
+    }
+  }, [newItemName, creatingType, creatingParent, currentWorkspace, loadTree, handleSelectFile]);
+
+  const handleRenameItem = useCallback(async () => {
+    if (!renamingPath || !renamedName.trim()) return;
+    const newName = renamedName.trim();
+    const parts = renamingPath.replace(/\\/g, '/').split('/');
+    parts.pop();
+    const parentDir = parts.join('/');
+    const newPath = parentDir ? `${parentDir}/${newName}` : newName;
+
+    try {
+      await renameFile(renamingPath, newPath, currentWorkspace);
+      showToast(`Renommé en « ${newName} »`, 'success');
+      setRenamingPath(null);
+      setRenamedName('');
+      // Update any open tab with old path
+      setOpenTabs(prev => prev.map(t => t.path === renamingPath ? { ...t, path: newPath, name: newName } : t));
+      await loadTree();
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors du renommage', 'error');
+    }
+  }, [renamingPath, renamedName, currentWorkspace, loadTree]);
+
+  const handleDeleteItem = useCallback(async (path: string, isDir: boolean, name: string) => {
+    const confirmed = await showConfirm(
+      `Êtes-vous sûr de vouloir supprimer ${isDir ? 'le dossier' : 'le fichier'} « ${name} » ? Cette action est irréversible.`,
+      {
+        title: 'Confirmation de suppression',
+        confirmLabel: 'Supprimer définitivement',
+        cancelLabel: 'Annuler',
+        destructive: true
+      }
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteFile(path, currentWorkspace);
+      showToast(`« ${name} » supprimé`, 'info');
+      // If open in tabs, close it
+      setOpenTabs(prev => prev.filter(t => !t.path.startsWith(path)));
+      await loadTree();
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de la suppression', 'error');
+    }
+  }, [currentWorkspace, loadTree]);
+
   const toggleFolder = (folderPath: string) => {
     setExpandedFolders((prev) => ({ ...prev, [folderPath]: !prev[folderPath] }));
   };
 
-
-
-  // File Tree Recursive Renderer
+  // File Tree Recursive Renderer with full actions
   const renderTreeItems = (items: any[], level = 0) => {
     if (!items || items.length === 0) return null;
 
@@ -382,19 +610,54 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
           const isDir = item.is_dir;
           const isExpanded = !!expandedFolders[item.path];
           const isSelected = selectedFilePath === item.path;
+          const isItemRenaming = renamingPath === item.path;
+
+          if (isItemRenaming) {
+            return (
+              <div key={item.path} style={{ paddingLeft: `${level * 14 + 10}px` }} className="py-1 pr-2 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  autoFocus
+                  value={renamedName}
+                  onChange={(e) => setRenamedName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRenameItem();
+                    if (e.key === 'Escape') setRenamingPath(null);
+                  }}
+                  className="flex-1 px-2 py-0.5 text-xs rounded border border-sky-500 bg-zinc-900 text-zinc-100 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleRenameItem}
+                  className="p-1 rounded bg-sky-600 hover:bg-sky-500 text-white cursor-pointer"
+                  title="Valider"
+                >
+                  <Check className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRenamingPath(null)}
+                  className="p-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 cursor-pointer"
+                  title="Annuler"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            );
+          }
 
           return (
             <div key={item.path}>
               <div
                 onClick={() => (isDir ? toggleFolder(item.path) : handleSelectFile(item.path))}
                 style={{ paddingLeft: `${level * 14 + 10}px` }}
-                className={`flex items-center justify-between py-1 pr-2 rounded-lg text-xs cursor-pointer group transition-colors ${
+                className={`flex items-center justify-between py-1 pr-1.5 rounded-lg text-xs cursor-pointer group transition-colors ${
                   isSelected
                     ? 'bg-sky-500/15 text-sky-600 dark:text-sky-300 font-medium border-l-2 border-sky-500'
                     : 'text-slate-700 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
                 }`}
               >
-                <div className="flex items-center gap-1.5 truncate">
+                <div className="flex items-center gap-1.5 truncate flex-1 min-w-0 mr-1">
                   {isDir ? (
                     <>
                       {isExpanded ? (
@@ -402,30 +665,108 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       ) : (
                         <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                       )}
-                      <Folder className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                      {isExpanded ? (
+                        <FolderOpen className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      ) : (
+                        <Folder className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                      )}
                     </>
                   ) : (
                     <>
                       <span className="w-3.5" />
-                      <File className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <FileCode className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     </>
                   )}
                   <span className="font-mono truncate">{item.name}</span>
                 </div>
 
-                {!isDir && onInsertPath && (
+                {/* Hover Quick Action Buttons */}
+                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity">
+                  {isDir && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCreatingParent(item.path);
+                          setCreatingType('file');
+                          setNewItemName('');
+                        }}
+                        title="Nouveau fichier ici"
+                        className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
+                      >
+                        <FilePlus className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCreatingParent(item.path);
+                          setCreatingType('folder');
+                          setNewItemName('');
+                        }}
+                        title="Nouveau dossier ici"
+                        className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
+                      >
+                        <FolderPlus className="w-3 h-3" />
+                      </button>
+                    </>
+                  )}
+                  {!isDir && onOpenMonacoStudio && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenMonacoStudio({
+                          mode: 'editor',
+                          filePath: item.path,
+                          workspace: currentWorkspace,
+                          openFiles: openTabs.map(t => ({ path: t.path, name: t.name, content: t.content })),
+                        });
+                      }}
+                      title="Ouvrir dans Monaco Studio"
+                      className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
+                    >
+                      <Code2 className="w-3 h-3" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onInsertPath(item.path);
+                      setRenamingPath(item.path);
+                      setRenamedName(item.name);
                     }}
-                    title={t('insert_path_in_prompt', 'Insert this path into prompt')}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300 transition-opacity"
+                    title="Renommer"
+                    className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-amber-300"
                   >
-                    <Plus className="w-3 h-3" />
+                    <Edit2 className="w-3 h-3" />
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteItem(item.path, isDir, item.name);
+                    }}
+                    title="Supprimer"
+                    className="p-1 hover:bg-rose-500/20 rounded text-slate-400 hover:text-rose-400"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                  {!isDir && onInsertPath && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onInsertPath(item.path);
+                      }}
+                      title={t('insert_path_in_prompt', 'Insérer le chemin')}
+                      className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {isDir && isExpanded && item.children && (
@@ -616,60 +957,182 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
         {/* FILES TAB */}
         {activeTab === 'files' && (
           <div className="flex h-full flex-col">
-            <div
-              className="flex items-center justify-between px-3 py-2 border-b text-xs shrink-0"
-              style={{
-                backgroundColor: 'var(--surface-subtle)',
-                borderColor: 'var(--border)',
-              }}
-            >
-              <div className="flex items-center gap-2 truncate font-mono text-[11px]" style={{ color: 'var(--muted)' }}>
-                <span>{t('root_path', 'Root:')}</span>
-                <strong className="truncate" style={{ color: 'var(--strong)' }}>{currentWorkspace}</strong>
-              </div>
-              <button
-                onClick={loadTree}
-                disabled={loadingTree}
-                className="p-1 rounded transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
-                style={{ color: 'var(--muted)' }}
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingTree ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-
             <div className="flex-1 flex min-h-0">
               {/* File Tree Column */}
               <div
-                className="w-1/2 border-r overflow-y-auto p-2"
+                className="w-[260px] min-w-[220px] max-w-[340px] border-r flex flex-col shrink-0"
                 style={{
                   backgroundColor: 'var(--sidebar)',
                   borderColor: 'var(--border)',
                 }}
               >
-                {loadingTree && !fileTree ? (
-                  <div className="p-4 text-center text-xs" style={{ color: 'var(--muted)' }}>{t('loading', 'Loading...')}</div>
-                ) : fileTree && fileTree.items ? (
-                  renderTreeItems(fileTree.items)
-                ) : (
-                  <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>{t('no_files', 'No files')}</div>
+                {/* File Tree Toolbar */}
+                <div className="p-2 border-b flex items-center gap-1.5 shrink-0" style={{ borderColor: 'var(--border)' }}>
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="w-3 h-3 absolute left-2 top-2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={treeSearch}
+                      onChange={(e) => setTreeSearch(e.target.value)}
+                      placeholder="Filtrer..."
+                      className="w-full pl-6 pr-5 py-1 text-xs rounded-lg border bg-black/5 dark:bg-white/5 outline-none font-mono text-slate-200 focus:border-sky-500"
+                      style={{ borderColor: 'var(--border)' }}
+                    />
+                    {treeSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setTreeSearch('')}
+                        className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreatingParent(null);
+                      setCreatingType('file');
+                      setNewItemName('');
+                    }}
+                    title="Nouveau fichier à la racine"
+                    className="p-1.5 rounded-lg border hover:bg-sky-500/10 text-sky-400 border-sky-500/30 cursor-pointer shrink-0"
+                  >
+                    <FilePlus className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreatingParent(null);
+                      setCreatingType('folder');
+                      setNewItemName('');
+                    }}
+                    title="Nouveau dossier à la racine"
+                    className="p-1.5 rounded-lg border hover:bg-sky-500/10 text-sky-400 border-sky-500/30 cursor-pointer shrink-0"
+                  >
+                    <FolderPlus className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={loadTree}
+                    disabled={loadingTree}
+                    title="Actualiser"
+                    className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-200 cursor-pointer shrink-0"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingTree ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+
+                {/* Inline Creation Row */}
+                {creatingType && (
+                  <div className="p-2 border-b bg-sky-500/10 flex items-center gap-1.5 shrink-0" style={{ borderColor: 'var(--border)' }}>
+                    <span className="text-[11px] font-semibold text-sky-400 shrink-0">
+                      {creatingType === 'file' ? '+ Fichier' : '+ Dossier'}
+                    </span>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={newItemName}
+                      onChange={(e) => setNewItemName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCreateNewItem();
+                        if (e.key === 'Escape') setCreatingType(null);
+                      }}
+                      placeholder={creatingType === 'file' ? 'nom.ts' : 'dossier'}
+                      className="flex-1 min-w-0 px-2 py-0.5 text-xs rounded border border-sky-500 bg-zinc-950 text-zinc-100 outline-none font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateNewItem}
+                      className="p-1 rounded bg-sky-600 hover:bg-sky-500 text-white cursor-pointer"
+                      title="Créer (Entrée)"
+                    >
+                      <Check className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreatingType(null)}
+                      className="p-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 cursor-pointer"
+                      title="Annuler (Échap)"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 )}
+
+                {/* Tree Item List */}
+                <div className="flex-1 overflow-y-auto p-2">
+                  {loadingTree && !fileTree ? (
+                    <div className="p-4 text-center text-xs flex items-center justify-center gap-2" style={{ color: 'var(--muted)' }}>
+                      <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+                      <span>{t('loading', 'Chargement...')}</span>
+                    </div>
+                  ) : fileTree && fileTree.items ? (
+                    renderTreeItems(filterTreeItems(fileTree.items, treeSearch))
+                  ) : (
+                    <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>{t('no_files', 'Aucun fichier')}</div>
+                  )}
+                </div>
               </div>
 
-              {/* File Content Preview / Editor Column */}
-              <div className="w-1/2 flex flex-col min-h-0" style={{ backgroundColor: 'var(--surface)' }}>
-                {selectedFilePath ? (
+              {/* File Content Preview / Monaco Editor Column */}
+              <div className="flex-1 flex flex-col min-h-0 min-w-0" style={{ backgroundColor: 'var(--surface)' }}>
+                {/* Multi-Tabs Bar */}
+                {openTabs.length > 0 && (
+                  <div
+                    className="flex items-center gap-1 border-b px-1.5 py-1 overflow-x-auto no-scrollbar shrink-0 select-none"
+                    style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}
+                  >
+                    {openTabs.map((tab, idx) => {
+                      const isActive = activeTabIndex === idx;
+                      return (
+                        <div
+                          key={tab.path}
+                          onClick={() => setActiveTabIndex(idx)}
+                          className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono cursor-pointer border transition-colors shrink-0 max-w-[170px] ${
+                            isActive
+                              ? 'bg-sky-500/15 border-sky-500/40 text-sky-400 font-semibold'
+                              : 'bg-transparent border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-200'
+                          }`}
+                          title={tab.path}
+                        >
+                          <FileCode className="w-3 h-3 shrink-0 text-sky-400" />
+                          <span className="truncate flex-1 text-[11px]">{tab.name}</span>
+                          {tab.isDirty && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Modifications non enregistrées" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => handleCloseTab(idx, e)}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/20 text-slate-400 hover:text-slate-200 cursor-pointer"
+                            title="Fermer l'onglet"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {activeTabItem ? (
                   <>
+                    {/* Editor Action Header Bar */}
                     <div
-                      className="flex items-center justify-between px-3 py-1.5 border-b text-[11px] shrink-0"
+                      className="flex items-center justify-between px-3 py-1.5 border-b text-[11px] shrink-0 gap-2"
                       style={{
                         backgroundColor: 'var(--surface-subtle)',
                         borderColor: 'var(--border)',
                         color: 'var(--muted)',
                       }}
                     >
-                      {/* Clickable Breadcrumb */}
-                      <div className="flex items-center gap-1 font-mono text-[11px] truncate flex-1 mr-2" style={{ color: 'var(--muted)' }}>
-                        {selectedFilePath.split('/').filter(Boolean).map((part, idx, arr) => (
+                      {/* Breadcrumb */}
+                      <div className="flex items-center gap-1 font-mono text-[11px] truncate flex-1 min-w-0" style={{ color: 'var(--muted)' }}>
+                        {activeTabItem.path.split(/[/\\]/).filter(Boolean).map((part, idx, arr) => (
                           <React.Fragment key={idx}>
                             <span
                               className={idx === arr.length - 1 ? 'font-semibold' : 'opacity-70'}
@@ -680,18 +1143,23 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             {idx < arr.length - 1 && <span className="opacity-40">/</span>}
                           </React.Fragment>
                         ))}
+                        {activeTabItem.isDirty && (
+                          <span className="text-amber-400 font-bold ml-1 text-xs">•</span>
+                        )}
                       </div>
 
+                      {/* Header Actions */}
                       <div className="flex items-center gap-1.5 shrink-0">
                         {onInsertPath && (
                           <button
-                            onClick={() => onInsertPath(selectedFilePath)}
+                            onClick={() => onInsertPath(activeTabItem.path)}
                             className="text-[10px] text-sky-500 hover:text-sky-400 font-medium cursor-pointer mr-1"
-                            title={t('insert_path_in_prompt', 'Insert this path into prompt')}
+                            title={t('insert_path_in_prompt', 'Insérer le chemin')}
                           >
-                            + {t('insert_path', 'Insert path')}
+                            + {t('insert_path', 'Insérer')}
                           </button>
                         )}
+
                         <button
                           type="button"
                           onClick={handleDownloadCurrentFile}
@@ -701,12 +1169,13 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             borderColor: 'var(--border)',
                             color: 'var(--text)',
                           }}
-                          title={t('download_file_to_device', 'Download file to your device')}
+                          title={t('download_file_to_device', 'Télécharger le fichier')}
                         >
                           <Download className="w-2.5 h-2.5" />
-                          <span>{t('download', 'Download')}</span>
+                          <span>{t('download', 'Télécharger')}</span>
                         </button>
-                        {selectedFilePath.endsWith('.md') && !isEditingFile && (
+
+                        {activeTabItem.path.endsWith('.md') && (
                           <button
                             type="button"
                             onClick={() => setShowMarkdownPreview(!showMarkdownPreview)}
@@ -716,96 +1185,117 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               borderColor: showMarkdownPreview ? 'var(--accent)' : 'var(--border)',
                               color: showMarkdownPreview ? 'var(--accent)' : 'var(--text)',
                             }}
-                            title={t('toggle_markdown_preview', 'Toggle Markdown preview')}
+                            title="Bascule Aperçu Markdown"
                           >
                             {showMarkdownPreview ? <Code className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
-                            <span>{showMarkdownPreview ? t('source', 'Source') : t('preview', 'Preview')}</span>
+                            <span>{showMarkdownPreview ? 'Source' : 'Aperçu'}</span>
                           </button>
                         )}
-                        {!isBinaryFile(selectedFilePath) && (
-                          <button
-                            onClick={() => {
-                              if (!isEditingFile) {
-                                setEditedFileContent(fileContent || '');
-                              }
-                              setIsEditingFile(!isEditingFile);
-                            }}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border"
-                            style={{
-                              backgroundColor: isEditingFile ? 'var(--accent-bg)' : 'var(--surface)',
-                              borderColor: isEditingFile ? 'var(--accent)' : 'var(--border)',
-                              color: isEditingFile ? 'var(--accent)' : 'var(--text)',
-                            }}
-                          >
-                            <Edit3 className="w-2.5 h-2.5" />
-                            <span>{isEditingFile ? t('reading_mode', 'Reading') : t('edit_mode', 'Edit')}</span>
-                          </button>
+
+                        {!activeTabItem.isBinary && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleFormatCode}
+                              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:text-emerald-400 hover:border-emerald-500/40"
+                              style={{
+                                backgroundColor: 'var(--surface)',
+                                borderColor: 'var(--border)',
+                                color: 'var(--text)',
+                              }}
+                              title="Formater le code (Shift+Alt+F)"
+                            >
+                              <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
+                              <span>Format</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setIsWordWrap(!isWordWrap)}
+                              className={`p-1 rounded text-[10px] font-medium transition-colors cursor-pointer border ${
+                                isWordWrap ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'hover:bg-black/5 dark:hover:bg-white/5'
+                              }`}
+                              style={{ borderColor: isWordWrap ? undefined : 'var(--border)' }}
+                              title="Retour à la ligne automatique"
+                            >
+                              <WrapText className="w-2.5 h-2.5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setIsMinimap(!isMinimap)}
+                              className={`p-1 rounded text-[10px] font-medium transition-colors cursor-pointer border ${
+                                isMinimap ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'hover:bg-black/5 dark:hover:bg-white/5'
+                              }`}
+                              style={{ borderColor: isMinimap ? undefined : 'var(--border)' }}
+                              title="Minimap Monaco"
+                            >
+                              <Columns className="w-2.5 h-2.5" />
+                            </button>
+                          </>
                         )}
-                        {onOpenMonacoStudio && !isBinaryFile(selectedFilePath) && (
+
+                        {onOpenMonacoStudio && !activeTabItem.isBinary && (
                           <button
+                            type="button"
                             onClick={() => onOpenMonacoStudio({
                               mode: 'editor',
-                              filePath: selectedFilePath,
-                              initialValue: fileContent || '',
+                              filePath: activeTabItem.path,
+                              initialValue: activeTabItem.content,
+                              content: activeTabItem.content,
                               workspace: currentWorkspace,
                               readOnly: false,
+                              openFiles: openTabs.map(t => ({ path: t.path, name: t.name, content: t.content })),
                             })}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:bg-sky-500/10 text-sky-400 border-sky-500/30"
-                            title="Ouvrir dans Monaco Studio"
+                            title="Ouvrir dans Monaco Studio plein écran"
                           >
                             <Code2 className="w-2.5 h-2.5" />
                             <span>Studio</span>
                           </button>
                         )}
-                        {isEditingFile && (
+
+                        {!activeTabItem.isBinary && (
                           <button
-                            onClick={handleSaveFile}
+                            type="button"
+                            onClick={handleSaveActiveTab}
                             disabled={savingFile}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer bg-sky-600 hover:bg-sky-500 text-white"
+                            className="flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-50"
+                            title="Enregistrer (Ctrl+S)"
                           >
-                            {saveSuccess ? <Check className="w-2.5 h-2.5" /> : <Save className="w-2.5 h-2.5" />}
-                            <span>{saveSuccess ? t('saved', 'Saved') : savingFile ? '...' : t('save', 'Save')}</span>
+                            {saveSuccess ? <Check className="w-2.5 h-2.5" /> : savingFile ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Save className="w-2.5 h-2.5" />}
+                            <span>{saveSuccess ? 'Enregistré' : savingFile ? '...' : 'Enregistrer'}</span>
                           </button>
                         )}
                       </div>
                     </div>
-                    <div
-                      className="flex-1 overflow-auto p-3 font-mono text-xs flex flex-col"
-                      style={{
-                        backgroundColor: 'var(--code-bg)',
-                        color: 'var(--code-text)',
-                      }}
-                    >
+
+                    {/* Editor Viewport */}
+                    <div className="flex-1 relative overflow-hidden bg-zinc-950 flex flex-col min-h-0">
                       {loadingContent ? (
-                        <div style={{ color: 'var(--muted)' }}>{t('loading_content', 'Loading content...')}</div>
-                      ) : isEditingFile ? (
-                        <textarea
-                          value={editedFileContent}
-                          onChange={(e) => setEditedFileContent(e.target.value)}
-                          className="w-full h-full bg-transparent resize-none outline-none font-mono text-xs leading-relaxed"
-                          style={{ color: 'var(--code-text)' }}
-                          spellCheck={false}
-                        />
-                      ) : selectedFilePath.match(/\.(png|jpe?g|gif|svg|webp)$/i) ? (
-                        <div className="flex-1 flex items-center justify-center p-4">
+                        <div className="flex-1 flex items-center justify-center gap-2 text-xs text-zinc-400">
+                          <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+                          <span>{t('loading_content', 'Chargement du contenu...')}</span>
+                        </div>
+                      ) : activeTabItem.path.match(/\.(png|jpe?g|gif|svg|webp)$/i) ? (
+                        <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
                           <img
-                            src={`/api/files/download?path=${encodeURIComponent(selectedFilePath)}${getAuthToken() ? `&token=${encodeURIComponent(getAuthToken()!)}` : ''}`}
-                            alt={selectedFilePath.split('/').pop()}
-                            className="max-w-full max-h-full object-contain rounded-lg shadow-sm border"
-                            style={{ borderColor: 'var(--border)' }}
+                            src={`/api/files/download?path=${encodeURIComponent(activeTabItem.path)}${getAuthToken() ? `&token=${encodeURIComponent(getAuthToken()!)}` : ''}`}
+                            alt={activeTabItem.name}
+                            className="max-w-full max-h-full object-contain rounded-lg shadow-sm border border-zinc-800"
                           />
                         </div>
-                      ) : isBinaryFile(selectedFilePath) ? (
+                      ) : activeTabItem.isBinary ? (
                         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-3">
                           <div className="w-14 h-14 rounded-2xl flex items-center justify-center border shadow-sm" style={{ backgroundColor: 'var(--accent-bg)', borderColor: 'var(--accent)' }}>
                             <FileText className="w-7 h-7" style={{ color: 'var(--accent)' }} />
                           </div>
                           <div>
                             <h4 className="text-sm font-semibold mb-1" style={{ color: 'var(--strong)' }}>
-                              {selectedFilePath.split(/[/\\]/).pop()}
+                              {activeTabItem.name}
                             </h4>
                             <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                              {t('binary_file_desc', 'Binary file (office document or archive).')}
+                              {t('binary_file_desc', 'Fichier binaire (document ou archive).')}
                             </p>
                           </div>
                           <button
@@ -818,23 +1308,103 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             }}
                           >
                             <Download className="w-3.5 h-3.5" />
-                            <span>{t('download_file', 'Download file')}</span>
+                            <span>{t('download_file', 'Télécharger le fichier')}</span>
                           </button>
                         </div>
-                      ) : selectedFilePath.endsWith('.md') && showMarkdownPreview ? (
-                        <div className="p-3 prose dark:prose-invert max-w-none text-xs leading-relaxed overflow-y-auto">
+                      ) : activeTabItem.path.endsWith('.md') && showMarkdownPreview ? (
+                        <div className="flex-1 p-4 prose dark:prose-invert max-w-none text-xs leading-relaxed overflow-y-auto">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {fileContent || ''}
+                            {activeTabItem.content}
                           </ReactMarkdown>
                         </div>
                       ) : (
-                        <pre className="whitespace-pre-wrap">{fileContent}</pre>
+                        <Editor
+                          height="100%"
+                          language={activeTabItem.language}
+                          value={activeTabItem.content}
+                          theme={monacoTheme}
+                          onChange={(val) => handleEditorChange(val || '')}
+                          onMount={(editor, monaco) => {
+                            monacoEditorRef.current = editor;
+                            editor.onDidChangeCursorPosition((e) => {
+                              setCursorPos({ line: e.position.lineNumber, col: e.position.column });
+                            });
+                            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+                              handleSaveActiveTab();
+                            });
+                          }}
+                          options={{
+                            fontSize: 12,
+                            lineNumbers: 'on',
+                            minimap: { enabled: isMinimap },
+                            wordWrap: isWordWrap ? 'on' : 'off',
+                            scrollBeyondLastLine: false,
+                            automaticLayout: true,
+                            tabSize: 2,
+                            smoothScrolling: true,
+                            fontFamily: 'JetBrains Mono, Fira Code, Consolas, monospace',
+                            padding: { top: 8, bottom: 8 }
+                          }}
+                          loading={
+                            <div className="flex items-center justify-center h-full gap-2 text-zinc-500">
+                              <Loader2 className="w-5 h-5 animate-spin text-sky-400" />
+                              <span className="text-xs">Chargement de Monaco Editor...</span>
+                            </div>
+                          }
+                        />
                       )}
+                    </div>
+
+                    {/* Editor Status Bar */}
+                    <div
+                      className="flex items-center justify-between px-3 py-1 border-t text-[10px] font-mono shrink-0 select-none"
+                      style={{
+                        backgroundColor: 'var(--surface-subtle)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--muted)',
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span>Lg {cursorPos.line}, Col {cursorPos.col}</span>
+                        <span>•</span>
+                        <span className="uppercase text-sky-400">{activeTabItem.language}</span>
+                        <span>•</span>
+                        <span>UTF-8</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span>{activeTabItem.content.length} car.</span>
+                        <span>•</span>
+                        <kbd className="px-1 py-0.2 rounded border bg-black/10 dark:bg-white/10 text-[9px]">Ctrl+S</kbd>
+                      </div>
                     </div>
                   </>
                 ) : (
-                  <div className="flex-1 flex items-center justify-center text-xs p-4 text-center" style={{ color: 'var(--muted)' }}>
-                    {t('select_file_preview', 'Select a file to preview or edit its contents.')}
+                  <div className="flex-1 flex flex-col items-center justify-center text-xs p-8 text-center gap-3" style={{ color: 'var(--muted)' }}>
+                    <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+                      <Code2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-sm mb-1" style={{ color: 'var(--strong)' }}>
+                        Éditeur de fichiers Antigravity
+                      </h4>
+                      <p className="text-xs max-w-sm">
+                        Sélectionnez un fichier dans l'arborescence à gauche ou créez un nouveau fichier pour commencer l'édition avec coloration syntaxique et raccourcis IDE.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCreatingParent(null);
+                          setCreatingType('file');
+                          setNewItemName('');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-sky-600 hover:bg-sky-500 text-white cursor-pointer shadow-sm transition-all"
+                      >
+                        <FilePlus className="w-3.5 h-3.5" />
+                        <span>Nouveau fichier</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

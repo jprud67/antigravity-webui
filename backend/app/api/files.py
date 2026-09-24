@@ -19,7 +19,9 @@ router = APIRouter(prefix="/api/files", tags=["files"])
 
 IGNORED_DIRS = {
     ".git", "node_modules", "__pycache__", ".venv", "venv", 
-    "dist", ".cache", ".next", ".turbo", "vendor"
+    "dist", ".cache", ".next", ".turbo", "vendor", "AppData",
+    "Application Data", "Local Settings", ".cargo", ".rustup",
+    ".vscode", ".idea", "build", "target", "env"
 }
 
 def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2, visited: set[Path] | None = None) -> list[dict[str, Any]]:
@@ -284,6 +286,245 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
             tmp_path.unlink(missing_ok=True)
         logger.error(f"Error saving file {resolved_path}: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement : {e!s}")
+
+class CreateFileRequest(BaseModel):
+    path: str
+    content: str = ""
+    workspace: str | None = None
+
+@router.post("/create")
+def create_file(req: CreateFileRequest, _ = Depends(require_auth)):
+    file_path = Path(req.path)
+    resolved_path = _validate_path_access(file_path, base_dir=req.workspace)
+
+    if resolved_path.exists():
+        raise HTTPException(status_code=409, detail="Un fichier ou dossier avec ce nom existe déjà.")
+
+    try:
+        resolved_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(resolved_path, "w", encoding="utf-8") as f:
+            f.write(req.content)
+
+        stat = resolved_path.stat()
+        return {
+            "success": True,
+            "path": str(resolved_path),
+            "filename": resolved_path.name,
+            "size": stat.st_size,
+            "last_modified": stat.st_mtime
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating file {resolved_path}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la création du fichier : {e!s}")
+
+class CreateDirRequest(BaseModel):
+    path: str
+    workspace: str | None = None
+
+@router.post("/create-dir")
+def create_directory(req: CreateDirRequest, _ = Depends(require_auth)):
+    dir_path = Path(req.path)
+    resolved_path = _validate_path_access(dir_path, base_dir=req.workspace)
+
+    if resolved_path.exists():
+        if resolved_path.is_file():
+            raise HTTPException(status_code=409, detail="Un fichier avec ce nom existe déjà.")
+        return {
+            "success": True,
+            "path": str(resolved_path),
+            "already_existed": True
+        }
+
+    try:
+        resolved_path.mkdir(parents=True, exist_ok=True)
+        return {
+            "success": True,
+            "path": str(resolved_path),
+            "name": resolved_path.name
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating directory {resolved_path}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la création du dossier : {e!s}")
+
+class RenameFileRequest(BaseModel):
+    old_path: str
+    new_path: str
+    workspace: str | None = None
+
+@router.post("/rename")
+def rename_file_or_dir(req: RenameFileRequest, _ = Depends(require_auth)):
+    old_p = _validate_path_access(req.old_path, base_dir=req.workspace)
+    new_p = _validate_path_access(req.new_path, base_dir=req.workspace)
+
+    if not old_p.exists():
+        raise HTTPException(status_code=404, detail="Élément source introuvable.")
+
+    # Prevent renaming root directories
+    settings = get_settings()
+    raw_workspaces = settings.get("trustedWorkspaces", [])
+    workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
+    allowed_roots = {Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve()}
+    for ws in workspaces:
+        try:
+            allowed_roots.add(Path(ws).resolve())
+        except Exception:
+            pass
+
+    if old_p in allowed_roots:
+        raise HTTPException(status_code=403, detail="Impossible de renommer la racine du workspace.")
+
+    if new_p.exists():
+        raise HTTPException(status_code=409, detail="La cible existe déjà.")
+
+    try:
+        new_p.parent.mkdir(parents=True, exist_ok=True)
+        import shutil
+        shutil.move(str(old_p), str(new_p))
+        return {
+            "success": True,
+            "old_path": str(old_p),
+            "new_path": str(new_p),
+            "name": new_p.name,
+            "is_dir": new_p.is_dir()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error renaming {old_p} -> {new_p}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors du renommage : {e!s}")
+
+class DeleteFileRequest(BaseModel):
+    path: str
+    workspace: str | None = None
+
+@router.post("/delete")
+def delete_file_or_dir(req: DeleteFileRequest, _ = Depends(require_auth)):
+    target = _validate_path_access(req.path, base_dir=req.workspace)
+
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="Élément introuvable.")
+
+    # Guard against deleting workspace roots
+    settings = get_settings()
+    raw_workspaces = settings.get("trustedWorkspaces", [])
+    workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
+    allowed_roots = {Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve()}
+    for ws in workspaces:
+        try:
+            allowed_roots.add(Path(ws).resolve())
+        except Exception:
+            pass
+
+    if target in allowed_roots:
+        raise HTTPException(status_code=403, detail="Interdiction formelle de supprimer la racine du projet.")
+
+    try:
+        import shutil
+        is_dir = target.is_dir()
+        if is_dir:
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+
+        return {
+            "success": True,
+            "path": str(target),
+            "was_dir": is_dir
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting {target}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la suppression : {e!s}")
+
+@router.get("/search")
+def search_files(
+    q: str = Query(..., min_length=1),
+    path: str | None = Query(None),
+    max_results: int = Query(50, ge=1, le=200),
+    _ = Depends(require_auth)
+):
+    target_path = Path(path) if path else Path(DEFAULT_WORKSPACE)
+    resolved_root = _validate_path_access(target_path)
+    if not resolved_root.exists() or not resolved_root.is_dir():
+        raise HTTPException(status_code=400, detail="Répertoire racine invalide.")
+
+    query_lower = q.lower().strip()
+    results = []
+
+    try:
+        for root, dirs, files in os.walk(resolved_root):
+            try:
+                rel_depth = len(Path(root).relative_to(resolved_root).parts)
+            except Exception:
+                rel_depth = 0
+            if rel_depth >= 4:
+                dirs.clear()
+
+            # Prune ignored directories in-place
+            dirs[:] = [
+                d for d in dirs
+                if d not in IGNORED_DIRS and not d.startswith(".")
+            ]
+
+            # Check directory names
+            for d in dirs:
+                if query_lower in d.lower():
+                    full_p = Path(root) / d
+                    results.append({
+                        "name": d,
+                        "path": str(full_p),
+                        "is_dir": True,
+                        "match_type": "name"
+                    })
+                    if len(results) >= max_results:
+                        return {"query": q, "results": results, "total": len(results)}
+
+            # Check files
+            for f in files:
+                if f.startswith(".") and f != ".gitignore":
+                    continue
+                file_p = Path(root) / f
+                if query_lower in f.lower():
+                    results.append({
+                        "name": f,
+                        "path": str(file_p),
+                        "is_dir": False,
+                        "match_type": "name"
+                    })
+                    if len(results) >= max_results:
+                        return {"query": q, "results": results, "total": len(results)}
+
+                # Also search text content inside small text files (< 256KB)
+                if len(query_lower) >= 2:
+                    try:
+                        stat = file_p.stat()
+                        if stat.st_size < 256 * 1024:
+                            with open(file_p, "r", encoding="utf-8", errors="ignore") as content_f:
+                                for line_idx, line in enumerate(content_f, 1):
+                                    if query_lower in line.lower():
+                                        results.append({
+                                            "name": f,
+                                            "path": str(file_p),
+                                            "is_dir": False,
+                                            "match_type": "content",
+                                            "line_number": line_idx,
+                                            "snippet": line.strip()[:160]
+                                        })
+                                        if len(results) >= max_results:
+                                            return {"query": q, "results": results, "total": len(results)}
+                                        break  # one snippet per file match
+                    except (OSError, PermissionError):
+                        continue
+
+        return {"query": q, "results": results, "total": len(results)}
+    except Exception as e:
+        logger.error(f"Error searching files in {resolved_root}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur de recherche : {e!s}")
 
 @router.get("/download")
 def download_file(path: str = Query(...), workspace: str | None = Query(None), _ = Depends(require_auth)):
