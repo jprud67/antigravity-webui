@@ -1169,3 +1169,29 @@ body {
   animation: ag-scale-out var(--transition-fast) ease both;
 }
 
+/* Monaco Git Gutter & Minimap Annotations */
+.monaco-git-gutter-added {
+  border-left: 3px solid #10b981 !important;
+  margin-left: 2px;
+}
+.monaco-git-gutter-modified {
+  border-left: 3px solid #0ea5e9 !important;
+  margin-left: 2px;
+}
+.monaco-git-gutter-deleted {
+  position: relative;
+}
+.monaco-git-gutter-deleted::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 4px solid #f43f5e;
+}
+
+
