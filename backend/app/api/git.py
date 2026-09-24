@@ -493,6 +493,152 @@ def get_git_file_versions(
     }
 
 
+class GitDiffRangeItem(BaseModel):
+    type: str  # "added" | "modified" | "deleted"
+    start_line: int
+    end_line: int
+
+
+class GitDiffSummaryItem(BaseModel):
+    added_lines: int
+    modified_lines: int
+    deleted_lines: int
+    total_changes: int
+
+
+class GitDiffRangesResponse(BaseModel):
+    file_path: str
+    is_tracked: bool
+    ranges: list[GitDiffRangeItem]
+    summary: GitDiffSummaryItem
+
+
+_HUNK_HEADER_RE = re.compile(r"^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@")
+
+
+@router.get("/file-diff-ranges", response_model=GitDiffRangesResponse)
+def get_file_diff_ranges(
+    file_path: str = Query(..., description="Chemin relatif du fichier"),
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    """Calcule de manière asynchrone et légère les plages de modifications Git (lignes ajoutées, modifiées, supprimées) pour les décorations de gouttière et minimap."""
+    target = _validate_workspace(workspace)
+    norm_path = _resolve_relative_git_path(file_path, target)
+
+    disk_file = target / norm_path
+
+    # Vérifier si le fichier est suivi par Git
+    res_tracked = run_git(["ls-files", "--error-unmatch", "--", norm_path], target)
+    is_tracked = (res_tracked.returncode == 0)
+
+    ranges: list[GitDiffRangeItem] = []
+    added_lines = 0
+    modified_lines = 0
+    deleted_lines = 0
+
+    if not is_tracked:
+        if disk_file.is_file():
+            try:
+                line_count = len(disk_file.read_text(encoding="utf-8", errors="replace").splitlines())
+            except Exception:
+                line_count = 0
+            if line_count > 0:
+                ranges.append(GitDiffRangeItem(type="added", start_line=1, end_line=line_count))
+                added_lines = line_count
+        return GitDiffRangesResponse(
+            file_path=norm_path,
+            is_tracked=False,
+            ranges=ranges,
+            summary=GitDiffSummaryItem(
+                added_lines=added_lines,
+                modified_lines=0,
+                deleted_lines=0,
+                total_changes=added_lines
+            )
+        )
+
+    # Si suivi, exécuter git diff -U0 HEAD -- <norm_path>
+    res_diff = run_git(["diff", "-U0", "HEAD", "--", norm_path], target)
+    if res_diff.returncode == 0 and res_diff.stdout.strip():
+        for line in res_diff.stdout.splitlines():
+            m = _HUNK_HEADER_RE.match(line)
+            if not m:
+                continue
+            old_start = int(m.group(1))
+            old_count = int(m.group(2)) if m.group(2) is not None else 1
+            new_start = int(m.group(3))
+            new_count = int(m.group(4)) if m.group(4) is not None else 1
+
+            if old_count == 0 and new_count > 0:
+                # Ajouts purs
+                ranges.append(GitDiffRangeItem(
+                    type="added",
+                    start_line=new_start,
+                    end_line=new_start + new_count - 1
+                ))
+                added_lines += new_count
+            elif new_count == 0 and old_count > 0:
+                # Suppressions pures
+                del_line = max(1, new_start)
+                ranges.append(GitDiffRangeItem(
+                    type="deleted",
+                    start_line=del_line,
+                    end_line=del_line
+                ))
+                deleted_lines += old_count
+            else:
+                # Modifications
+                if new_count == old_count:
+                    ranges.append(GitDiffRangeItem(
+                        type="modified",
+                        start_line=new_start,
+                        end_line=new_start + new_count - 1
+                    ))
+                    modified_lines += new_count
+                elif new_count > old_count:
+                    ranges.append(GitDiffRangeItem(
+                        type="modified",
+                        start_line=new_start,
+                        end_line=new_start + old_count - 1
+                    ))
+                    modified_lines += old_count
+                    ranges.append(GitDiffRangeItem(
+                        type="added",
+                        start_line=new_start + old_count,
+                        end_line=new_start + new_count - 1
+                    ))
+                    added_lines += (new_count - old_count)
+                else:  # new_count < old_count
+                    ranges.append(GitDiffRangeItem(
+                        type="modified",
+                        start_line=new_start,
+                        end_line=new_start + new_count - 1
+                    ))
+                    modified_lines += new_count
+                    deleted_lines += (old_count - new_count)
+                    del_line = new_start + new_count - 1
+                    ranges.append(GitDiffRangeItem(
+                        type="deleted",
+                        start_line=max(1, del_line),
+                        end_line=max(1, del_line)
+                    ))
+
+    total_changes = added_lines + modified_lines + deleted_lines
+    return GitDiffRangesResponse(
+        file_path=norm_path,
+        is_tracked=True,
+        ranges=ranges,
+        summary=GitDiffSummaryItem(
+            added_lines=added_lines,
+            modified_lines=modified_lines,
+            deleted_lines=deleted_lines,
+            total_changes=total_changes
+        )
+    )
+
+
+
 class BranchCheckoutRequest(BaseModel):
     workspace: str | None = None
     branch: str
