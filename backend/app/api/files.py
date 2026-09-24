@@ -1,11 +1,12 @@
 import logging
 import os
 import re
+import shutil
 import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -574,4 +575,99 @@ def download_file(path: str = Query(...), workspace: str | None = Query(None), _
         filename=resolved_path.name,
         media_type=media_type or "application/octet-stream"
     )
+
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
+
+@router.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    destination_dir: str = Form(...),
+    workspace: str | None = Form(None),
+    _ = Depends(require_auth)
+):
+    target_dir = Path(destination_dir)
+    resolved_dir = _validate_path_access(target_dir, base_dir=workspace)
+    if not resolved_dir.exists():
+        resolved_dir.mkdir(parents=True, exist_ok=True)
+    elif not resolved_dir.is_dir():
+        resolved_dir = resolved_dir.parent
+
+    # Sanitize filename: extract strictly the basename and remove dangerous chars
+    raw_name = file.filename or "uploaded_file"
+    safe_name = Path(raw_name).name
+    if not safe_name or safe_name in (".", ".."):
+        safe_name = f"uploaded_{uuid.uuid4().hex[:6]}"
+
+    target_file = resolved_dir / safe_name
+    resolved_target = _validate_path_access(target_file, base_dir=workspace)
+
+    total_bytes = 0
+    chunk_size = 64 * 1024
+    try:
+        with open(resolved_target, "wb") as out_f:
+            while chunk := await file.read(chunk_size):
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UPLOAD_SIZE:
+                    out_f.close()
+                    try:
+                        resolved_target.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    raise HTTPException(
+                        status_code=413,
+                        detail="Fichier trop volumineux (taille maximale de 50 Mo dépassée)."
+                    )
+                out_f.write(chunk)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving uploaded file {resolved_target}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement du fichier : {e!s}")
+
+    return {
+        "success": True,
+        "path": str(resolved_target),
+        "filename": resolved_target.name,
+        "size": total_bytes
+    }
+
+class DuplicateFileRequest(BaseModel):
+    path: str
+    workspace: str | None = None
+
+@router.post("/duplicate")
+def duplicate_file(req: DuplicateFileRequest, _ = Depends(require_auth)):
+    file_path = Path(req.path)
+    resolved_path = _validate_path_access(file_path, base_dir=req.workspace)
+    if not resolved_path.exists():
+        raise HTTPException(status_code=404, detail="Fichier introuvable.")
+    if resolved_path.is_dir():
+        raise HTTPException(status_code=400, detail="La duplication des dossiers n'est pas supportée.")
+
+    stem = resolved_path.stem
+    suffix = resolved_path.suffix
+    parent = resolved_path.parent
+
+    # Find unique name: stem_copy.ext, stem_copy_1.ext, stem_copy_2.ext...
+    candidate_name = f"{stem}_copy{suffix}"
+    candidate_path = parent / candidate_name
+    counter = 1
+    while candidate_path.exists():
+        candidate_name = f"{stem}_copy_{counter}{suffix}"
+        candidate_path = parent / candidate_name
+        counter += 1
+
+    resolved_candidate = _validate_path_access(candidate_path, base_dir=req.workspace)
+    try:
+        shutil.copy2(resolved_path, resolved_candidate)
+        return {
+            "success": True,
+            "new_path": str(resolved_candidate),
+            "new_name": resolved_candidate.name,
+            "size": resolved_candidate.stat().st_size
+        }
+    except Exception as e:
+        logger.error(f"Error duplicating file {resolved_path} to {resolved_candidate}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la duplication du fichier : {e!s}")
+
 

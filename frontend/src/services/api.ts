@@ -577,6 +577,54 @@ export async function searchFiles(query: string, path?: string, maxResults = 50)
   return res.json();
 }
 
+export async function uploadWorkspaceFile(
+  file: File,
+  destinationDir: string,
+  workspace?: string
+): Promise<{ success: boolean; path: string; filename: string; size: number }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('destination_dir', destinationDir);
+  if (workspace) {
+    formData.append('workspace', workspace);
+  }
+
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}/files/upload`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'importation du fichier" }));
+    throw new Error(err.detail || "Erreur lors de l'importation du fichier");
+  }
+  return res.json();
+}
+
+export async function duplicateWorkspaceFile(
+  path: string,
+  workspace?: string
+): Promise<{ success: boolean; new_path: string; new_name: string; size: number }> {
+  const res = await fetch(`${API_BASE}/files/duplicate`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ path, workspace }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la duplication' }));
+    throw new Error(err.detail || 'Erreur lors de la duplication du fichier');
+  }
+  return res.json();
+}
+
+
 // Tasks & Subagents Monitoring
 export async function fetchTasksList(conversationId?: string): Promise<{ tasks: any[]; subagents: any[]; processes: any[] }> {
   const url = conversationId

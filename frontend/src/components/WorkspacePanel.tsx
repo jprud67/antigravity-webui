@@ -6,10 +6,8 @@ import {
   Terminal as TerminalIcon, 
   GitBranch, 
   ChevronRight, 
-  ChevronDown, 
-  Folder, 
-  FolderOpen,
-  RefreshCw, 
+  ChevronDown,
+RefreshCw, 
   Plus,
   Kanban as KanbanIcon,
   Edit2,
@@ -26,10 +24,14 @@ import {
   WrapText,
   Columns,
   Sparkles,
-  FileCode,
-  Loader2,
-  Play
+Loader2,
+  Play,
+  Upload,
+  Copy,
+  RotateCcw,
+  SplitSquareVertical,
 } from 'lucide-react';
+import { FileIcon } from './FileIcon';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Editor from '@monaco-editor/react';
@@ -52,7 +54,9 @@ import {
   fetchGitStatus, 
   type GitStatusResult, 
   getAuthToken, 
-  triggerFileDownload 
+  triggerFileDownload,
+  uploadWorkspaceFile,
+  duplicateWorkspaceFile
 } from '../services/api';
 import { detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
 import { showToast } from '../services/toast';
@@ -162,6 +166,20 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const [newItemName, setNewItemName] = useState('');
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renamedName, setRenamedName] = useState('');
+
+  // Upload & Drag-and-Drop State
+  const [isDraggingOverTree, setIsDraggingOverTree] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Tab Context Menu State
+  const [tabContextMenu, setTabContextMenu] = useState<{ x: number; y: number; tabIndex: number } | null>(null);
+
+  useEffect(() => {
+    if (!tabContextMenu) return;
+    const handleCloseMenu = () => setTabContextMenu(null);
+    window.addEventListener('click', handleCloseMenu);
+    return () => window.removeEventListener('click', handleCloseMenu);
+  }, [tabContextMenu]);
 
   // Sync Monaco Theme
   useEffect(() => {
@@ -449,6 +467,170 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     });
   }, [openTabs]);
 
+  const handleCloseOtherTabs = useCallback(async (keepIndex: number) => {
+    const otherTabs = openTabs.filter((_, i) => i !== keepIndex);
+    const dirtyOthers = otherTabs.filter(t => t.isDirty);
+    if (dirtyOthers.length > 0) {
+      const discard = await showConfirm(
+        `Certains onglets comportent des modifications non enregistrées. Fermer les autres onglets quand même ?`,
+        {
+          title: 'Fermer les autres onglets',
+          confirmLabel: 'Fermer sans enregistrer',
+          cancelLabel: 'Annuler',
+          destructive: true
+        }
+      );
+      if (!discard) return;
+    }
+    const kept = openTabs[keepIndex];
+    if (kept) {
+      setOpenTabs([kept]);
+      setActiveTabIndex(0);
+    }
+    setTabContextMenu(null);
+  }, [openTabs]);
+
+  const handleCloseTabsToRight = useCallback(async (fromIndex: number) => {
+    const rightTabs = openTabs.filter((_, i) => i > fromIndex);
+    const dirtyRight = rightTabs.filter(t => t.isDirty);
+    if (dirtyRight.length > 0) {
+      const discard = await showConfirm(
+        `Certains onglets à droite comportent des modifications non enregistrées. Les fermer quand même ?`,
+        {
+          title: 'Fermer les onglets à droite',
+          confirmLabel: 'Fermer sans enregistrer',
+          cancelLabel: 'Annuler',
+          destructive: true
+        }
+      );
+      if (!discard) return;
+    }
+    setOpenTabs(prev => prev.slice(0, fromIndex + 1));
+    setActiveTabIndex(prev => Math.min(prev, fromIndex));
+    setTabContextMenu(null);
+  }, [openTabs]);
+
+  const handleCloseSavedTabs = useCallback(() => {
+    const dirtyOnly = openTabs.filter(t => t.isDirty);
+    setOpenTabs(dirtyOnly);
+    setActiveTabIndex(dirtyOnly.length > 0 ? 0 : -1);
+    setTabContextMenu(null);
+  }, [openTabs]);
+
+  const handleCloseAllTabs = useCallback(async () => {
+    const dirtyTabs = openTabs.filter(t => t.isDirty);
+    if (dirtyTabs.length > 0) {
+      const discard = await showConfirm(
+        `Plusieurs onglets comportent des modifications non enregistrées. Tout fermer quand même ?`,
+        {
+          title: 'Tout fermer',
+          confirmLabel: 'Fermer sans enregistrer',
+          cancelLabel: 'Annuler',
+          destructive: true
+        }
+      );
+      if (!discard) return;
+    }
+    setOpenTabs([]);
+    setActiveTabIndex(-1);
+    setTabContextMenu(null);
+  }, [openTabs]);
+
+  const handleRevertActiveTab = useCallback(async () => {
+    if (!activeTabItem || !activeTabItem.isDirty) return;
+    const confirmed = await showConfirm(
+      `Voulez-vous annuler toutes les modifications non enregistrées pour « ${activeTabItem.name} » et rétablir le contenu du disque ?`,
+      {
+        title: 'Annuler les modifications',
+        confirmLabel: 'Rétablir la version disque',
+        cancelLabel: 'Continuer l\'édition',
+        destructive: true
+      }
+    );
+    if (!confirmed) return;
+    setOpenTabs(prev => {
+      const updated = [...prev];
+      if (updated[activeTabIndex]) {
+        updated[activeTabIndex] = {
+          ...updated[activeTabIndex],
+          content: updated[activeTabIndex].originalContent,
+          isDirty: false
+        };
+      }
+      return updated;
+    });
+    showToast('Modifications annulées', 'info');
+  }, [activeTabItem, activeTabIndex]);
+
+  // Load file tree when files tab is active
+  const loadTree = useCallback(async () => {
+    setLoadingTree(true);
+    try {
+      const data = await fetchFileTree(currentWorkspace, 3);
+      setFileTree(data);
+    } catch (e) {
+      console.error('Failed to load file tree', e);
+    } finally {
+      setLoadingTree(false);
+    }
+  }, [currentWorkspace]);
+
+  const handleUploadFiles = useCallback(async (files: FileList | File[], targetFolder?: string) => {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
+    const destination = targetFolder || creatingParent || currentWorkspace;
+    let successCount = 0;
+    let lastUploadedPath = '';
+
+    for (const file of fileArray) {
+      try {
+        const res = await uploadWorkspaceFile(file, destination, currentWorkspace);
+        if (res.success) {
+          successCount++;
+          lastUploadedPath = res.path;
+        }
+      } catch (err: any) {
+        showToast(`Erreur d'import pour ${file.name} : ${err.message}`, 'error');
+      }
+    }
+
+    if (successCount > 0) {
+      showToast(`${successCount} fichier${successCount > 1 ? 's' : ''} importé${successCount > 1 ? 's' : ''} avec succès.`, 'success');
+      await loadTree();
+      if (lastUploadedPath) {
+        handleSelectFile(lastUploadedPath);
+      }
+    }
+  }, [creatingParent, currentWorkspace, loadTree, handleSelectFile]);
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleUploadFiles(e.target.files);
+      e.target.value = '';
+    }
+  };
+
+  const handleDuplicateFile = useCallback(async (path: string) => {
+    try {
+      const res = await duplicateWorkspaceFile(path, currentWorkspace);
+      showToast(`Fichier dupliqué : ${res.new_name}`, 'success');
+      await loadTree();
+      handleSelectFile(res.new_path);
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de la duplication', 'error');
+    }
+  }, [currentWorkspace, loadTree, handleSelectFile]);
+
+  const handleTabContextMenu = (e: React.MouseEvent, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setTabContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      tabIndex: index
+    });
+  };
+
   const handleEditorChange = useCallback((newVal: string) => {
     if (activeTabIndex < 0 || activeTabIndex >= openTabs.length) return;
     setOpenTabs(prev => {
@@ -505,19 +687,6 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       setArtifactMarkdown(t('error_loading_file', 'Unable to load artifact content.'));
     }
   }, [t]);
-
-  // Load file tree when files tab is active
-  const loadTree = useCallback(async () => {
-    setLoadingTree(true);
-    try {
-      const data = await fetchFileTree(currentWorkspace, 3);
-      setFileTree(data);
-    } catch (e) {
-      console.error('Failed to load file tree', e);
-    } finally {
-      setLoadingTree(false);
-    }
-  }, [currentWorkspace]);
 
   useEffect(() => {
     if (!isOpen || activeTab !== 'files') return;
@@ -785,16 +954,12 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       ) : (
                         <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                       )}
-                      {isExpanded ? (
-                        <FolderOpen className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                      ) : (
-                        <Folder className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                      )}
+                      <FileIcon filename={item.name} isDir={true} isExpanded={isExpanded} className="w-3.5 h-3.5 shrink-0" />
                     </>
                   ) : (
                     <>
                       <span className="w-3.5" />
-                      <FileCode className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <FileIcon filename={item.name} isDir={false} className="w-3.5 h-3.5 shrink-0" />
                     </>
                   )}
                   <span className="font-mono truncate">{item.name}</span>
@@ -848,6 +1013,19 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
                     >
                       <Code2 className="w-3 h-3" />
+                    </button>
+                  )}
+                  {!isDir && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDuplicateFile(item.path);
+                      }}
+                      title="Dupliquer le fichier"
+                      className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300 cursor-pointer"
+                    >
+                      <Copy className="w-3 h-3" />
                     </button>
                   )}
                   <button
@@ -1080,12 +1258,54 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             <div className="flex-1 flex min-h-0">
               {/* File Tree Column */}
               <div
-                className="w-[260px] min-w-[220px] max-w-[340px] border-r flex flex-col shrink-0"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingOverTree(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    setIsDraggingOverTree(false);
+                  }
+                }}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingOverTree(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    await handleUploadFiles(e.dataTransfer.files);
+                  }
+                }}
+                className="w-[260px] min-w-[220px] max-w-[340px] border-r flex flex-col shrink-0 relative"
                 style={{
                   backgroundColor: 'var(--sidebar)',
                   borderColor: 'var(--border)',
                 }}
               >
+                {/* Drag and drop overlay */}
+                {isDraggingOverTree && (
+                  <div className="absolute inset-0 z-30 bg-sky-500/20 backdrop-blur-xs border-2 border-dashed border-sky-400 rounded-lg flex flex-col items-center justify-center p-4 text-center pointer-events-none animate-fadeIn">
+                    <Upload className="w-8 h-8 text-sky-300 animate-bounce mb-2" />
+                    <p className="text-xs font-semibold text-white drop-shadow-sm">
+                      Déposez vos fichiers ici
+                    </p>
+                    <p className="text-[10px] text-sky-200 opacity-80 mt-0.5">
+                      Importation directe dans le workspace
+                    </p>
+                  </div>
+                )}
+
+                {/* Hidden File Input for Native File Picker */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                />
+
                 {/* File Tree Toolbar */}
                 <div className="p-2 border-b flex items-center gap-1.5 shrink-0" style={{ borderColor: 'var(--border)' }}>
                   <div className="relative flex-1 min-w-0">
@@ -1108,6 +1328,25 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       </button>
                     )}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new CustomEvent('open-quick-open'))}
+                    title="Recherche rapide de fichiers (Ctrl+P)"
+                    className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-sky-400 cursor-pointer shrink-0"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Importer des fichiers depuis votre ordinateur"
+                    className="p-1.5 rounded-lg border hover:bg-emerald-500/10 text-emerald-400 border-emerald-500/30 cursor-pointer shrink-0"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                  </button>
 
                   <button
                     type="button"
@@ -1204,7 +1443,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                 {/* Multi-Tabs Bar */}
                 {openTabs.length > 0 && (
                   <div
-                    className="flex items-center gap-1 border-b px-1.5 py-1 overflow-x-auto no-scrollbar shrink-0 select-none"
+                    className="flex items-center gap-1 border-b px-1.5 py-1 overflow-x-auto no-scrollbar shrink-0 select-none relative"
                     style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}
                   >
                     {openTabs.map((tab, idx) => {
@@ -1213,14 +1452,15 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         <div
                           key={tab.path}
                           onClick={() => setActiveTabIndex(idx)}
+                          onContextMenu={(e) => handleTabContextMenu(e, idx)}
                           className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono cursor-pointer border transition-colors shrink-0 max-w-[170px] ${
                             isActive
                               ? 'bg-sky-500/15 border-sky-500/40 text-sky-400 font-semibold'
                               : 'bg-transparent border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-200'
                           }`}
-                          title={tab.path}
+                          title={`${tab.path} (clic droit pour plus d'options)`}
                         >
-                          <FileCode className="w-3 h-3 shrink-0 text-sky-400" />
+                          <FileIcon filename={tab.name} isDir={false} className="w-3 h-3 shrink-0" />
                           <span className="truncate flex-1 text-[11px]">{tab.name}</span>
                           {tab.isDirty && (
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Modifications non enregistrées" />
@@ -1236,6 +1476,94 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         </div>
                       );
                     })}
+
+                    {/* Floating Tab Context Menu */}
+                    {tabContextMenu && (
+                      <div
+                        style={{
+                          top: `${tabContextMenu.y}px`,
+                          left: `${Math.min(tabContextMenu.x, window.innerWidth - 220)}px`,
+                          backgroundColor: 'var(--surface)',
+                          borderColor: 'var(--border)',
+                        }}
+                        className="fixed z-50 min-w-[210px] py-1.5 rounded-xl border shadow-2xl backdrop-blur-md text-xs font-sans animate-fadeIn select-none"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="px-3 py-1 text-[10px] font-mono text-slate-400 border-b border-white/5 truncate max-w-[210px]">
+                          {openTabs[tabContextMenu.tabIndex]?.name}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleCloseTab(tabContextMenu.tabIndex)}
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                        >
+                          <span>Fermer</span>
+                          <span className="text-[10px] text-slate-500 font-mono">Fermer onglet</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleCloseOtherTabs(tabContextMenu.tabIndex)}
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                        >
+                          <span>Fermer les autres</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleCloseTabsToRight(tabContextMenu.tabIndex)}
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                        >
+                          <span>Fermer à droite</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleCloseSavedTabs}
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                        >
+                          <span>Fermer les onglets enregistrés</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleCloseAllTabs}
+                          className="w-full text-left px-3 py-1.5 hover:bg-rose-500/10 flex items-center justify-between text-rose-400 hover:text-rose-300 cursor-pointer"
+                        >
+                          <span>Tout fermer</span>
+                        </button>
+
+                        <div className="my-1 border-t border-white/5" />
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tab = openTabs[tabContextMenu.tabIndex];
+                            if (tab) handleDuplicateFile(tab.path);
+                            setTabContextMenu(null);
+                          }}
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                        >
+                          <span>Dupliquer ce fichier</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tab = openTabs[tabContextMenu.tabIndex];
+                            if (tab) {
+                              navigator.clipboard.writeText(tab.path);
+                              showToast('Chemin absolu copié', 'info');
+                            }
+                            setTabContextMenu(null);
+                          }}
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                        >
+                          <span>Copier le chemin absolu</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1409,6 +1737,38 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           <TerminalIcon className="w-2.5 h-2.5" />
                           <span>Terminal</span>
                         </button>
+
+                        {/* Diff with disk */}
+                        {activeTabItem.isDirty && onOpenMonacoStudio && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenMonacoStudio({
+                              mode: 'diff',
+                              filePath: activeTabItem.path,
+                              originalContent: activeTabItem.originalContent,
+                              modifiedContent: activeTabItem.content,
+                              workspace: currentWorkspace,
+                            })}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"
+                            title="Comparer les modifications avec la version enregistrée sur disque"
+                          >
+                            <SplitSquareVertical className="w-2.5 h-2.5" />
+                            <span>Diff</span>
+                          </button>
+                        )}
+
+                        {/* Revert changes */}
+                        {activeTabItem.isDirty && (
+                          <button
+                            type="button"
+                            onClick={handleRevertActiveTab}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:bg-rose-500/10 text-rose-400 border-rose-500/30"
+                            title="Annuler toutes les modifications non enregistrées"
+                          >
+                            <RotateCcw className="w-2.5 h-2.5" />
+                            <span>Annuler</span>
+                          </button>
+                        )}
 
                         {!activeTabItem.isBinary && (
                           <button

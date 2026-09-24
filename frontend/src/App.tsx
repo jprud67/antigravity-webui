@@ -20,6 +20,8 @@ const AnalyticsModal = lazy(() => import('./components/AnalyticsModal').then(m =
 const ContextCompactorModal = lazy(() => import('./components/ContextCompactorModal').then(m => ({ default: m.ContextCompactorModal })));
 const SessionBranchModal = lazy(() => import('./components/SessionBranchModal').then(m => ({ default: m.SessionBranchModal })));
 const MonacoStudioModal = lazy(() => import('./components/MonacoStudioModal').then(m => ({ default: m.MonacoStudioModal })));
+const QuickOpenModal = lazy(() => import('./components/QuickOpenModal').then(m => ({ default: m.QuickOpenModal })));
+
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig } from './types';
 import { parseStepsToMessages, cleanUserPrompt } from './utils/transcriptParser';
@@ -214,6 +216,7 @@ export function App() {
   }, []);
 
   const [pendingOpenFile, setPendingOpenFile] = useState<string | null>(null);
+  const [isQuickOpenOpen, setIsQuickOpenOpen] = useState(false);
 
   useEffect(() => {
     const handleOpenFile = (e: any) => {
@@ -227,11 +230,16 @@ export function App() {
       setIsRightPanelOpen(true);
       setRightPanelTab('terminal');
     };
+    const handleQuickOpen = () => {
+      setIsQuickOpenOpen(true);
+    };
     window.addEventListener('open-workspace-file', handleOpenFile);
     window.addEventListener('terminal-run-command', handleRunTerminal);
+    window.addEventListener('open-quick-open', handleQuickOpen);
     return () => {
       window.removeEventListener('open-workspace-file', handleOpenFile);
       window.removeEventListener('terminal-run-command', handleRunTerminal);
+      window.removeEventListener('open-quick-open', handleQuickOpen);
     };
   }, []);
 
@@ -251,6 +259,7 @@ export function App() {
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
   const [isMonacoStudioOpen, setIsMonacoStudioOpen] = useState(false);
   const [monacoStudioConfig, setMonacoStudioConfig] = useState<MonacoStudioConfig>({ mode: 'editor' });
+
   const [sessionBookmarks, setSessionBookmarks] = useState<BookmarkItem[]>([]);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('models');
   const [activeGoogleAccount, setActiveGoogleAccount] = useState<GoogleAccountInfo | null>(null);
@@ -1251,6 +1260,13 @@ export function App() {
         return;
       }
 
+      // Ctrl+P — Quick Open files palette
+      if (mod && !shift && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setIsQuickOpenOpen((prev) => !prev);
+        return;
+      }
+
       // Ctrl+Shift+N — New conversation
       if (mod && shift && e.key === 'N') {
         e.preventDefault();
@@ -1275,6 +1291,7 @@ export function App() {
 
       // Escape — Close active modal
       if (e.key === 'Escape') {
+        if (isQuickOpenOpen) { setIsQuickOpenOpen(false); return; }
         if (isSettingsOpen) { setIsSettingsOpen(false); return; }
         if (isAnalyticsOpen) { setIsAnalyticsOpen(false); return; }
         if (isHelpOpen) { setIsHelpOpen(false); return; }
@@ -1305,6 +1322,7 @@ export function App() {
     isSettingsOpen, isAnalyticsOpen, isHelpOpen, isArtifactsOpen, isWorkspacesOpen,
     isFileExplorerOpen, isTaskDashboardOpen, isCronModalOpen, isRulesModalOpen,
     isSessionMetaOpen, isBranchModalOpen, isRightPanelOpen, isMobileSidebarOpen,
+    isQuickOpenOpen,
   ]);
 
   // Phase 3 Session Handlers (Fork, Pin, Tags, Project, Search)
@@ -2062,6 +2080,20 @@ export function App() {
         onClose={() => setIsRulesModalOpen(false)}
         currentWorkspace={currentWorkspace}
       />
+
+      {isQuickOpenOpen && (
+        <QuickOpenModal
+          isOpen={isQuickOpenOpen}
+          onClose={() => setIsQuickOpenOpen(false)}
+          currentWorkspace={currentWorkspace}
+          onSelectFile={(filePath) => {
+            setIsRightPanelOpen(true);
+            setRightPanelTab('files');
+            setPendingOpenFile(filePath);
+            window.dispatchEvent(new CustomEvent('open-workspace-file', { detail: { path: filePath } }));
+          }}
+        />
+      )}
       </Suspense>
 
       {/* Global Toast & Confirm Dialog containers */}
