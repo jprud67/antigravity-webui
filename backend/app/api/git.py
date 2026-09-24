@@ -493,33 +493,283 @@ def get_git_file_versions(
     }
 
 
+class BranchCheckoutRequest(BaseModel):
+    workspace: str | None = None
+    branch: str
+    create: bool = False
+    start_point: str | None = None
+
+
+class BranchCreateRequest(BaseModel):
+    workspace: str | None = None
+    name: str
+    start_point: str | None = None
+    checkout: bool = True
+
+
+class BranchDeleteRequest(BaseModel):
+    workspace: str | None = None
+    branch: str
+    force: bool = False
+    remote: bool = False
+    remote_name: str = "origin"
+
+
+class BranchMergeRequest(BaseModel):
+    workspace: str | None = None
+    branch: str
+    no_ff: bool = False
+    message: str | None = None
+
+
+class BranchRenameRequest(BaseModel):
+    workspace: str | None = None
+    old_name: str
+    new_name: str
+
+
 @router.get("/branches")
 def get_branches(workspace: str | None = Query(None), _ = Depends(require_auth)):
     target = _validate_workspace(workspace)
-    res = run_git(["branch", "-a"], target)
-    if res.returncode != 0:
-        return {"current": "", "branches": []}
+    
+    curr_res = run_git(["branch", "--show-current"], target)
+    current = curr_res.stdout.strip() or "main"
 
+    ref_format = "%(refname:short)\t%(refname)\t%(HEAD)\t%(upstream:short)\t%(upstream:track)\t%(objectname:short)\t%(authordate:iso-strict)\t%(subject)"
+    res = run_git(["for-each-ref", f"--format={ref_format}", "refs/heads/", "refs/remotes/"], target)
+    
     branches = []
     seen = set()
-    current = "main"
-    for line in res.stdout.strip().split("\n"):
-        clean_line = line.strip()
-        if not clean_line or " -> " in clean_line:
-            continue
-        if clean_line.startswith("* "):
-            current = clean_line[2:].strip()
-            branch_name = current
-        else:
-            branch_name = clean_line
 
-        if branch_name not in seen:
-            seen.add(branch_name)
-            branches.append(branch_name)
+    if res.returncode == 0 and res.stdout.strip():
+        for line in res.stdout.strip().split("\n"):
+            parts = line.split("\t")
+            if len(parts) < 8:
+                continue
+            short_name, full_ref, head_mark, upstream_short, upstream_track, sha, date, subject = parts[:8]
+            if full_ref.endswith("/HEAD"):
+                continue
+
+            is_remote = full_ref.startswith("refs/remotes/")
+            is_current = (head_mark.strip() == "*") or (short_name == current and not is_remote)
+            ahead = 0
+            behind = 0
+            if upstream_track:
+                ahead_m = re.search(r'ahead (\d+)', upstream_track)
+                behind_m = re.search(r'behind (\d+)', upstream_track)
+                if ahead_m:
+                    ahead = int(ahead_m.group(1))
+                if behind_m:
+                    behind = int(behind_m.group(1))
+
+            if short_name not in seen:
+                seen.add(short_name)
+                branches.append({
+                    "name": short_name,
+                    "is_current": is_current,
+                    "is_remote": is_remote,
+                    "upstream": upstream_short or None,
+                    "ahead": ahead,
+                    "behind": behind,
+                    "last_commit_sha": sha or None,
+                    "last_commit_date": date or None,
+                    "last_commit_subject": subject or None,
+                })
+
+    # Fallback si for-each-ref est vide (dépôt vide ou sans commit)
+    if not branches:
+        branches.append({
+            "name": current,
+            "is_current": True,
+            "is_remote": False,
+            "upstream": None,
+            "ahead": 0,
+            "behind": 0,
+            "last_commit_sha": None,
+            "last_commit_date": None,
+            "last_commit_subject": None,
+        })
 
     return {
         "current": current,
         "branches": branches
+    }
+
+
+@router.post("/branches/checkout")
+def checkout_branch(req: BranchCheckoutRequest, _ = Depends(require_auth)):
+    target = _validate_workspace(req.workspace)
+    branch = req.branch.strip()
+    if not branch or branch.startswith("-") or "--" in branch or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
+        raise HTTPException(status_code=400, detail="Nom de branche invalide.")
+
+    # Vérification de l'arbre de travail
+    status_res = run_git(["status", "--porcelain"], target)
+    dirty_files = [line.strip() for line in status_res.stdout.splitlines() if line.strip()]
+
+    args = ["checkout"]
+    if req.create:
+        args.append("-b")
+        args.append(branch)
+        if req.start_point:
+            args.append(req.start_point.strip())
+    else:
+        args.append(branch)
+
+    res = run_git(args, target)
+    if res.returncode != 0:
+        err = res.stderr or res.stdout or "Erreur inconnue lors du checkout."
+        if "overwritten by checkout" in err.lower() or "local changes" in err.lower():
+            raise HTTPException(
+                status_code=409,
+                detail=f"Des modifications locales non enregistrées empêchent la bascule : {_mask_git_output(err)}"
+            )
+        raise HTTPException(status_code=400, detail=f"Échec de la bascule de branche : {_mask_git_output(err)}")
+
+    return {
+        "success": True,
+        "branch": branch,
+        "output": _mask_git_output(res.stdout or res.stderr)
+    }
+
+
+@router.post("/branches/create")
+def create_branch(req: BranchCreateRequest, _ = Depends(require_auth)):
+    target = _validate_workspace(req.workspace)
+    name = req.name.strip()
+    if not name or name.startswith("-") or "--" in name or not re.match(r'^[a-zA-Z0-9_\-\./]+$', name):
+        raise HTTPException(status_code=400, detail="Nom de branche invalide.")
+
+    # Validation via git check-ref-format
+    check_fmt = run_git(["check-ref-format", "--branch", name], target)
+    if check_fmt.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Le format du nom de branche '{name}' est invalide selon Git.")
+
+    args = ["checkout", "-b", name] if req.checkout else ["branch", name]
+    if req.start_point:
+        clean_start = req.start_point.strip()
+        if clean_start.startswith("-") or "--" in clean_start or not re.match(r'^[a-zA-Z0-9_\-\./~^]+$', clean_start):
+            raise HTTPException(status_code=400, detail="Point de départ invalide.")
+        args.append(clean_start)
+
+    res = run_git(args, target)
+    if res.returncode != 0:
+        err = res.stderr or res.stdout or ""
+        if "already exists" in err.lower():
+            raise HTTPException(status_code=409, detail=f"La branche '{name}' existe déjà.")
+        raise HTTPException(status_code=400, detail=f"Échec de création de la branche : {_mask_git_output(err)}")
+
+    return {
+        "success": True,
+        "name": name,
+        "checked_out": req.checkout,
+        "output": _mask_git_output(res.stdout or res.stderr)
+    }
+
+
+@router.delete("/branches")
+def delete_branch(req: BranchDeleteRequest, _ = Depends(require_auth)):
+    target = _validate_workspace(req.workspace)
+    branch = req.branch.strip()
+    if not branch or branch.startswith("-") or "--" in branch or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
+        raise HTTPException(status_code=400, detail="Nom de branche invalide.")
+
+    # Guard 1: Interdiction de supprimer la branche courante
+    curr_res = run_git(["branch", "--show-current"], target)
+    current_branch = curr_res.stdout.strip()
+    if branch == current_branch:
+        raise HTTPException(status_code=400, detail="Impossible de supprimer la branche actuellement active.")
+
+    # Guard 2: Interdiction de supprimer les branches protégées principales
+    if branch.lower() in ["main", "master"]:
+        raise HTTPException(status_code=400, detail=f"La branche '{branch}' est protégée et ne peut être supprimée.")
+
+    if req.remote:
+        remote_name = req.remote_name.strip() if req.remote_name else "origin"
+        if remote_name.startswith("-") or "--" in remote_name or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote_name):
+            raise HTTPException(status_code=400, detail="Nom de remote invalide.")
+        remote_branch = branch.removeprefix(f"{remote_name}/")
+        res = run_git(["push", remote_name, "--delete", remote_branch], target, timeout=35)
+    else:
+        args = ["branch", "-D" if req.force else "-d", branch]
+        res = run_git(args, target)
+
+    if res.returncode != 0:
+        err = res.stderr or res.stdout or ""
+        if "not fully merged" in err.lower():
+            raise HTTPException(
+                status_code=409,
+                detail=f"La branche '{branch}' n'est pas complètement fusionnée. Cochez l'option de suppression forcée pour continuer."
+            )
+        raise HTTPException(status_code=400, detail=f"Échec de la suppression de la branche : {_mask_git_output(err)}")
+
+    return {
+        "success": True,
+        "branch": branch,
+        "remote": req.remote,
+        "output": _mask_git_output(res.stdout or res.stderr)
+    }
+
+
+@router.post("/branches/merge")
+def merge_branch(req: BranchMergeRequest, _ = Depends(require_auth)):
+    target = _validate_workspace(req.workspace)
+    branch = req.branch.strip()
+    if not branch or branch.startswith("-") or "--" in branch or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
+        raise HTTPException(status_code=400, detail="Nom de branche invalide.")
+
+    args = ["merge"]
+    if req.no_ff:
+        args.append("--no-ff")
+    if req.message:
+        clean_msg = _sanitize_git_message(req.message)
+        args.extend(["-m", clean_msg])
+    args.append(branch)
+
+    res = run_git(args, target, timeout=35)
+    if res.returncode != 0:
+        err = res.stderr or res.stdout or ""
+        if "conflict" in err.lower() or "automatic merge failed" in err.lower():
+            conf_res = run_git(["diff", "--name-only", "--diff-filter=U"], target)
+            conf_files = [f.strip() for f in conf_res.stdout.splitlines() if f.strip()]
+            return {
+                "success": False,
+                "has_conflicts": True,
+                "conflicts": conf_files,
+                "message": "Des conflits de fusion sont survenus et doivent être résolus."
+            }
+        raise HTTPException(status_code=400, detail=f"Échec de la fusion : {_mask_git_output(err)}")
+
+    return {
+        "success": True,
+        "has_conflicts": False,
+        "conflicts": [],
+        "output": _mask_git_output(res.stdout or res.stderr)
+    }
+
+
+@router.post("/branches/rename")
+def rename_branch(req: BranchRenameRequest, _ = Depends(require_auth)):
+    target = _validate_workspace(req.workspace)
+    old_name = req.old_name.strip()
+    new_name = req.new_name.strip()
+    for n in (old_name, new_name):
+        if not n or n.startswith("-") or "--" in n or not re.match(r'^[a-zA-Z0-9_\-\./]+$', n):
+            raise HTTPException(status_code=400, detail=f"Nom de branche invalide : '{n}'.")
+
+    check_fmt = run_git(["check-ref-format", "--branch", new_name], target)
+    if check_fmt.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Le nouveau nom '{new_name}' n'est pas valide selon Git.")
+
+    res = run_git(["branch", "-m", old_name, new_name], target)
+    if res.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Échec du renommage : {_mask_git_output(res.stderr or res.stdout)}")
+
+    return {
+        "success": True,
+        "old_name": old_name,
+        "new_name": new_name,
+        "output": _mask_git_output(res.stdout or res.stderr)
     }
 
 def _unstage_sensitive_files(target: Path) -> None:
