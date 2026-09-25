@@ -36,7 +36,6 @@ Loader2,
   Layers,
   Clock,
   ShieldCheck,
-  BarChart3,
   Globe,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon';
@@ -158,9 +157,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   onOpenMonacoStudio,
   onOpenCrons,
   onOpenRules,
-  onOpenAnalytics,
+  onOpenAnalytics: _onOpenAnalytics,
   onOpenBranchTree,
-  onToggleChatSearch,
+  onToggleChatSearch: _onToggleChatSearch,
 }) => {
   const { t } = useI18n();
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -1482,36 +1481,6 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
               <span>{t("rules", "Règles")}</span>
             </button>
           )}
-
-          {/* Analytics Quotas */}
-          {onOpenAnalytics && (
-            <button
-              type="button"
-              onClick={onOpenAnalytics}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50"
-              title={t("analytics_dashboard", "Dashboard Quotas & Analytique (/analytics)")}
-            >
-              <BarChart3 className="w-3.5 h-3.5 text-sky-400" />
-              <span>Quotas</span>
-            </button>
-          )}
-
-          {/* Chat Transcript Search Overlay Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              if (onToggleChatSearch) {
-                onToggleChatSearch();
-              } else {
-                window.dispatchEvent(new CustomEvent('antigravity:toggle-chat-search'));
-              }
-            }}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50"
-            title={t('search_in_conversation', 'Rechercher dans la conversation (Ctrl+F)')}
-          >
-            <Search className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Chat Search</span>
-          </button>
 
           {/* Export Dropdown */}
           {conversationId && (

@@ -30,13 +30,17 @@ interface AnalyticsModalProps {
 }
 
 interface QuotaBucket {
+  id?: string;
   remaining_fraction?: number;
   reset_time?: string;
   name?: string;
+  description?: string;
+  window?: string;
 }
 
 interface QuotaGroup {
   name: string;
+  description?: string;
   buckets?: QuotaBucket[];
 }
 
@@ -445,23 +449,35 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                       <div className="space-y-3">
                         {buckets.map((b, bIdx) => {
                           const frac = typeof b.remaining_fraction === 'number' ? b.remaining_fraction : 1;
-                          const pct = Math.round(frac * 100);
-                          const isHigh = pct > 50;
-                          const isMedium = pct > 20 && pct <= 50;
+                          const pctRaw = frac * 100;
+                          const pctText = frac < 1 && pctRaw > 99 ? pctRaw.toFixed(1) : Math.round(pctRaw).toString();
+                          const pctNum = Math.round(pctRaw);
+                          const isHigh = pctNum > 50;
+                          const isMedium = pctNum > 20 && pctNum <= 50;
                           const colorClass = isHigh
                             ? 'bg-emerald-500 text-emerald-400'
                             : isMedium
                             ? 'bg-amber-500 text-amber-400'
                             : 'bg-rose-500 text-rose-400';
 
+                          const formatResetTime = (iso?: string) => {
+                            if (!iso) return '';
+                            const d = new Date(iso);
+                            const now = new Date();
+                            const isToday = d.toDateString() === now.toDateString();
+                            return isToday 
+                              ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                          };
+
                           return (
-                            <div key={bIdx} className="space-y-1.5">
+                            <div key={bIdx} className="space-y-1.5 p-2 rounded-xl bg-black/10 dark:bg-white/5 border border-white/5">
                               <div className="flex items-center justify-between text-xs">
-                                <span style={{ color: 'var(--text)' }}>
+                                <span className="font-medium" style={{ color: 'var(--text)' }}>
                                   {b.name || 'Fenêtre de quota'}
                                 </span>
                                 <span className={`font-mono font-bold ${colorClass.split(' ')[1]}`}>
-                                  {pct}% restant
+                                  {pctText}% restant
                                 </span>
                               </div>
 
@@ -469,15 +485,21 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                               <div className="h-2 w-full rounded-full bg-black/20 overflow-hidden">
                                 <div
                                   className={`h-full rounded-full transition-all duration-500 ${colorClass.split(' ')[0]}`}
-                                  style={{ width: `${Math.max(5, Math.min(100, pct))}%` }}
+                                  style={{ width: `${Math.max(5, Math.min(100, pctNum))}%` }}
                                 />
                               </div>
+
+                              {b.description && (
+                                <p className="text-[10.5px] italic leading-tight" style={{ color: 'var(--muted)' }}>
+                                  {b.description}
+                                </p>
+                              )}
 
                               {b.reset_time && (
                                 <div className="flex items-center justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
                                   <span>Réinitialisation :</span>
-                                  <span className="font-mono">
-                                    {new Date(b.reset_time).toLocaleTimeString()}
+                                  <span className="font-mono font-medium text-slate-300">
+                                    {formatResetTime(b.reset_time)}
                                   </span>
                                 </div>
                               )}

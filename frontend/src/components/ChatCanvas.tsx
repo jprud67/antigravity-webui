@@ -23,6 +23,8 @@ import {
   Edit3,
   Clock,
   Code2,
+  Search,
+  BarChart3,
   Volume2,
   VolumeX,
   Info,
@@ -785,7 +787,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   onOpenKanban: _onOpenKanban,
   onOpenCrons: _onOpenCrons,
   onOpenRules: _onOpenRules,
-  onOpenAnalytics: _onOpenAnalytics,
+  onOpenAnalytics,
   onOpenBranchTree: _onOpenBranchTree,
   bookmarks,
   onAddBookmark,
@@ -1150,8 +1152,41 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
           )}
         </div>
 
-        {/* Right Side: Volet Latéral Toggle (Seul bouton conservé dans le header principal) */}
+        {/* Right Side: Quotas, Search & Volet Latéral Toggle */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Quotas Button */}
+          {onOpenAnalytics && (
+            <button
+              type="button"
+              onClick={onOpenAnalytics}
+              className="py-1.5 px-2.5 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer border"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)'
+              }}
+              title={t("analytics_dashboard", "Dashboard Quotas & Analytique (/analytics)")}
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-sky-400" />
+              <span className="text-[11px] font-medium hidden sm:inline">Quotas</span>
+            </button>
+          )}
+
+          {/* Conversation Search Toggle Button */}
+          <button
+            type="button"
+            onClick={handleToggleSearch}
+            className="p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border"
+            style={{
+              backgroundColor: isSearchOpen ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+              borderColor: isSearchOpen ? 'var(--accent)' : 'var(--border)',
+              color: isSearchOpen ? 'var(--accent-text)' : 'var(--muted)',
+            }}
+            title={t('search_in_conversation', 'Rechercher dans la conversation (Ctrl+F)')}
+          >
+            <Search className="w-4 h-4" />
+          </button>
+
           {onToggleRightPanel && (
             <button
               onClick={onToggleRightPanel}
