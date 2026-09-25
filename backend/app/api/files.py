@@ -99,7 +99,20 @@ def _validate_path_access(file_path: Path | str, base_dir: Path | str | None = N
     settings = get_settings()
     raw_workspaces = settings.get("trustedWorkspaces", [])
     workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
-    allowed_roots = [Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve()]
+
+    # Toujours inclure DEFAULT_WORKSPACE, GEMINI_DIR, et la racine du dépôt antigravity-webui
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    allowed_roots = [
+        Path(DEFAULT_WORKSPACE).resolve(),
+        Path(GEMINI_DIR).resolve(),
+        repo_root.resolve()
+    ]
+    if settings.get("defaultWorkspace"):
+        try:
+            allowed_roots.append(Path(settings["defaultWorkspace"]).resolve())
+        except Exception:
+            pass
+
     for ws in workspaces:
         try:
             allowed_roots.append(Path(ws).resolve())
@@ -110,7 +123,14 @@ def _validate_path_access(file_path: Path | str, base_dir: Path | str | None = N
     if base_dir:
         try:
             cand_base = Path(base_dir).resolve()
-            if is_safe_path(cand_base, allowed_roots) and not _is_blocked_sensitive_path(cand_base):
+            if not _is_blocked_sensitive_path(cand_base) and (
+                is_safe_path(cand_base, allowed_roots)
+                or (cand_base / ".git").exists()
+                or any((p / ".git").exists() for p in cand_base.parents)
+            ):
+                allowed_roots.append(cand_base)
+                base_root = cand_base
+            elif is_safe_path(cand_base, allowed_roots) and not _is_blocked_sensitive_path(cand_base):
                 base_root = cand_base
         except Exception as e:
             logger.debug(f"Ignored error with candidate base_dir: {e}")
@@ -187,7 +207,7 @@ def get_file_tree(
             target_path.mkdir(parents=True, exist_ok=True)
         except Exception as e:
             logger.warning(f"Could not create default workspace directory {target_path}: {e}")
-    resolved_path = _validate_path_access(target_path)
+    resolved_path = _validate_path_access(target_path, base_dir=path)
     if not resolved_path.exists() or not resolved_path.is_dir():
         raise HTTPException(status_code=400, detail=f"Répertoire invalide : {target_path}")
 
@@ -370,7 +390,8 @@ def rename_file_or_dir(req: RenameFileRequest, _ = Depends(require_auth)):
     settings = get_settings()
     raw_workspaces = settings.get("trustedWorkspaces", [])
     workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
-    allowed_roots = {Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve()}
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    allowed_roots = {Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve(), repo_root.resolve()}
     for ws in workspaces:
         try:
             allowed_roots.add(Path(ws).resolve())
@@ -415,7 +436,8 @@ def delete_file_or_dir(req: DeleteFileRequest, _ = Depends(require_auth)):
     settings = get_settings()
     raw_workspaces = settings.get("trustedWorkspaces", [])
     workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
-    allowed_roots = {Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve()}
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    allowed_roots = {Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve(), repo_root.resolve()}
     for ws in workspaces:
         try:
             allowed_roots.add(Path(ws).resolve())
