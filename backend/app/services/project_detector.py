@@ -388,41 +388,70 @@ def _extract_git_info(p: Path) -> dict[str, Any]:
         "SSH_ASKPASS": "",
     }
 
-    # Branch
     branch: str | None = None
-    try:
-        res = subprocess.run(
-            [git_bin, "branch", "--show-current"],
-            cwd=str(p),
-            capture_output=True,
-            text=True,
-            timeout=1.5,
-            env=git_env,
-        )
-        if res.returncode == 0:
-            branch = res.stdout.strip() or "HEAD (detached)"
-    except Exception:
-        pass
-
-    # Status / Dirty check
     is_dirty = False
     uncommitted_count = 0
+    ahead = 0
+    behind = 0
+
     try:
         res = subprocess.run(
-            [git_bin, "status", "--porcelain", "-uno"],
+            [git_bin, "status", "--porcelain=v1", "-b", "-uno"],
             cwd=str(p),
             capture_output=True,
             text=True,
-            timeout=1.5,
+            timeout=2.0,
             env=git_env,
         )
         if res.returncode == 0:
             lines = [l for l in res.stdout.splitlines() if l.strip()]
             if lines:
-                is_dirty = True
-                uncommitted_count = len(lines)
-    except Exception:
-        pass
+                header = lines[0]
+                if header.startswith("## "):
+                    h_text = header[3:].strip()
+                    if h_text.startswith("No commits yet on "):
+                        branch = h_text.removeprefix("No commits yet on ").strip()
+                    elif h_text.startswith("HEAD ("):
+                        branch = "HEAD (detached)"
+                    else:
+                        parts = h_text.split("...")
+                        branch = parts[0].strip()
+                        if len(parts) > 1:
+                            track_info = parts[1].strip()
+                            if "[" in track_info and "]" in track_info:
+                                b_info = track_info.split("[", 1)[1].split("]", 1)[0]
+                                if "ahead " in b_info:
+                                    try:
+                                        ahead = int(b_info.split("ahead ")[1].split(",")[0].split()[0])
+                                    except Exception:
+                                        pass
+                                if "behind " in b_info:
+                                    try:
+                                        behind = int(b_info.split("behind ")[1].split(",")[0].split()[0])
+                                    except Exception:
+                                        pass
+                dirty_lines = lines[1:]
+                if dirty_lines:
+                    is_dirty = True
+                    uncommitted_count = len(dirty_lines)
+    except Exception as e:
+        logger.debug(f"Git status check failed for {p}: {e}")
+
+    # Fallback for branch if status didn't parse branch
+    if not branch:
+        try:
+            res_b = subprocess.run(
+                [git_bin, "branch", "--show-current"],
+                cwd=str(p),
+                capture_output=True,
+                text=True,
+                timeout=1.5,
+                env=git_env,
+            )
+            if res_b.returncode == 0 and res_b.stdout.strip():
+                branch = res_b.stdout.strip()
+        except Exception:
+            pass
 
     # Remote URL
     remote_url: str | None = None
@@ -462,15 +491,14 @@ def _extract_git_info(p: Path) -> dict[str, Any]:
     except Exception:
         pass
 
-
     return {
         "is_repo": True,
-        "branch": branch,
+        "branch": branch or "HEAD (detached)",
         "is_dirty": is_dirty,
         "uncommitted_count": uncommitted_count,
         "remote_url": remote_url,
-        "ahead": 0,
-        "behind": 0,
+        "ahead": ahead,
+        "behind": behind,
         "last_commit": last_commit,
     }
 

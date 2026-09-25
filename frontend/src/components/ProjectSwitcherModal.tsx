@@ -361,6 +361,12 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                       <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-2 border border-border text-text-main font-mono">
                         <GitBranch className="w-3.5 h-3.5 text-accent" />
                         {activeProject.git.branch || 'detached'}
+                        {((activeProject.git.ahead ?? 0) > 0 || (activeProject.git.behind ?? 0) > 0) && (
+                          <span className="ml-1 text-[11px] font-semibold text-sky-400">
+                            {(activeProject.git.ahead ?? 0) > 0 ? `↑${activeProject.git.ahead}` : ''}
+                            {(activeProject.git.behind ?? 0) > 0 ? `↓${activeProject.git.behind}` : ''}
+                          </span>
+                        )}
                       </span>
                       {activeProject.git.is_dirty ? (
                         <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 font-medium">
@@ -614,6 +620,12 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                             <span className="text-[11px] font-mono text-text-muted px-2 py-0.5 rounded bg-surface-2 border border-border flex items-center gap-1">
                               <GitBranch className="w-3 h-3 text-accent" />
                               {project.git.branch || 'HEAD'}
+                              {((project.git.ahead ?? 0) > 0 || (project.git.behind ?? 0) > 0) && (
+                                <span className="ml-0.5 font-semibold text-sky-400">
+                                  {(project.git.ahead ?? 0) > 0 ? `↑${project.git.ahead}` : ''}
+                                  {(project.git.behind ?? 0) > 0 ? `↓${project.git.behind}` : ''}
+                                </span>
+                              )}
                             </span>
                           )}
                         </div>

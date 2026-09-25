@@ -264,6 +264,12 @@ def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth
         if line.startswith("## "):
             # Branch info: ## main...origin/main [ahead 1, behind 2]
             header = line[3:].strip()
+            if header.startswith("No commits yet on "):
+                branch = header.removeprefix("No commits yet on ").strip()
+                continue
+            if header.startswith("HEAD ("):
+                branch = "HEAD (detached)"
+                continue
             parts = header.split("...")
             branch = parts[0].strip()
             if len(parts) > 1:

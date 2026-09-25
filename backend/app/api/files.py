@@ -485,8 +485,11 @@ def search_files(
     limit = max_results if isinstance(max_results, int) and not isinstance(max_results, bool) else 50
     results = []
 
+    start_time = time.time()
     try:
-        for root, dirs, files in os.walk(resolved_root):
+        for root, dirs, files in os.walk(resolved_root, onerror=lambda err: None):
+            if (time.time() - start_time) > 6.0:
+                break
             try:
                 rel_depth = len(Path(root).relative_to(resolved_root).parts)
             except Exception:
@@ -494,10 +497,13 @@ def search_files(
             if rel_depth >= 4:
                 dirs.clear()
 
-            # Prune ignored directories in-place
+            # Prune ignored directories and symlinked directories in-place to prevent cyclic loops
             dirs[:] = [
                 d for d in dirs
-                if d not in IGNORED_DIRS and not d.startswith(".") and not is_blocked_sensitive_path(Path(root) / d)
+                if d not in IGNORED_DIRS
+                and not d.startswith(".")
+                and not os.path.islink(os.path.join(root, d))
+                and not is_blocked_sensitive_path(Path(root) / d)
             ]
 
             # Check directory names
@@ -518,7 +524,7 @@ def search_files(
                 if f.startswith(".") and f != ".gitignore":
                     continue
                 file_p = Path(root) / f
-                if is_blocked_sensitive_path(file_p):
+                if file_p.is_symlink() or is_blocked_sensitive_path(file_p):
                     continue
                 if query_lower in f.lower():
                     results.append({

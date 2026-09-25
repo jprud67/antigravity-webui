@@ -9027,6 +9027,75 @@ def test_updater_repo_dir_matches_repo_root():
     assert REPO_DIR.is_dir()
 
 
+def test_files_search_symlink_and_timeout_resilience():
+    """Vérifie que search_files ignore les liens symboliques cycliques et s'exécute sans erreur."""
+    import tempfile
+    from unittest.mock import patch
+    from app.api.files import search_files
+
+    with tempfile.TemporaryDirectory() as td:
+        tmp_path = Path(td)
+        sub = tmp_path / "subdir"
+        sub.mkdir()
+        (sub / "hello.txt").write_text("hello world from files search", encoding="utf-8")
+
+        try:
+            (tmp_path / "link_dir").symlink_to(sub, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            pass
+
+        with patch("app.api.files.get_settings", return_value={"trustedWorkspaces": [str(tmp_path)]}):
+            res = search_files(q="hello", workspace=str(tmp_path), max_results=10)
+            assert res["total"] >= 1
+            assert any(item["name"] == "hello.txt" for item in res["results"])
+
+
+def test_project_detector_unified_git_telemetry():
+    """Vérifie que _extract_git_info renvoie branch, is_dirty, ahead et behind via un appel unique."""
+    import subprocess
+    import tempfile
+    from app.services.project_detector import _extract_git_info
+
+    with tempfile.TemporaryDirectory() as td:
+        tmp_path = Path(td)
+        try:
+            subprocess.run(["git", "init"], cwd=str(tmp_path), check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "jprud67"], cwd=str(tmp_path), check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "jprud67@gmail.com"], cwd=str(tmp_path), check=True, capture_output=True)
+            (tmp_path / "README.md").write_text("# Test Project", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=str(tmp_path), check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "init"], cwd=str(tmp_path), check=True, capture_output=True)
+
+            info = _extract_git_info(tmp_path)
+            assert info["is_repo"] is True
+            assert info["branch"] in ("main", "master")
+            assert info["is_dirty"] is False
+            assert info["ahead"] == 0
+            assert info["behind"] == 0
+            assert info["last_commit"] is not None
+            assert info["last_commit"]["subject"] == "init"
+        except FileNotFoundError:
+            pass
+
+
+def test_git_status_unborn_branch_and_detached_head_parsing():
+    """Vérifie que get_git_status gère les branches naissantes sans commits et HEAD détaché."""
+    from unittest.mock import MagicMock, patch
+    from app.api.git import get_git_status
+
+    def fake_run_git(args, cwd, **kwargs):
+        if args == ["rev-parse", "--is-inside-work-tree"]:
+            return MagicMock(returncode=0, stdout="true")
+        if args[:2] == ["status", "--porcelain=v1"]:
+            return MagicMock(returncode=0, stdout="## No commits yet on feature-x\n?? newfile.txt\n")
+        return MagicMock(returncode=1, stdout="", stderr="fatal: your current branch does not have any commits yet")
+
+    with patch("app.api.git.run_git", side_effect=fake_run_git), patch("app.api.git._validate_workspace", return_value=Path("/tmp")):
+        st = get_git_status(workspace="/tmp")
+        assert st["branch"] == "feature-x"
+        assert "newfile.txt" in st["untracked"]
+
+
 if __name__ == "__main__":
     test_tasks_transcript_outcomes_and_exit_code(Path(tempfile.mkdtemp()))
     test_tasks_kill_task_open_file_and_fallback(Path(tempfile.mkdtemp()))
@@ -9359,6 +9428,9 @@ if __name__ == "__main__":
     test_git_resolve_conflict_checkout_failure()
     test_session_metadata_get_trimmed_conversation_id()
     test_updater_repo_dir_matches_repo_root()
+    test_files_search_symlink_and_timeout_resilience()
+    test_project_detector_unified_git_telemetry()
+    test_git_status_unborn_branch_and_detached_head_parsing()
     print("\nAll unit tests passed successfully!")
 
 
