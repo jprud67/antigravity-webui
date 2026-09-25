@@ -19,6 +19,7 @@ import CanvasViewer from './CanvasViewer';
 import type { CanvasDocumentManifest } from '../types';
 import { useI18n } from '../services/i18n';
 import { showToast } from '../services/toast';
+import { showConfirm } from '../services/dialog';
 
 interface CanvasStudioModalProps {
   isOpen: boolean;
@@ -233,7 +234,8 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
 
   const handleDeleteDocument = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm(t('canvas_delete_confirm', 'Supprimer définitivement ce Canvas ?'))) return;
+    const confirmed = await showConfirm(t('canvas_delete_confirm', 'Supprimer définitivement ce Canvas ?'), { destructive: true });
+    if (!confirmed) return;
     try {
       await canvasApi.deleteDocument(id);
       showToast('Canvas supprimé', 'info');

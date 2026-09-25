@@ -3022,7 +3022,7 @@ export const dockerApi = {
     return res.json();
   },
 
-  async executeAction(containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'kill'): Promise<{ status: string; container_id: string; action: string }> {
+  async executeAction(containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'kill' | 'pause' | 'unpause'): Promise<{ status: string; container_id: string; action: string }> {
     const res = await fetch(`${API_BASE}/docker/containers/${encodeURIComponent(containerId)}/action`, {
       method: 'POST',
       headers: getHeaders({ 'Content-Type': 'application/json' }),
@@ -3057,7 +3057,7 @@ export const dockerApi = {
     return res.json();
   },
 
-  async executeComposeAction(composePath: string, action: 'up' | 'down' | 'restart' | 'ps'): Promise<{ status: string; action: string; output: string }> {
+  async executeComposeAction(composePath: string, action: 'up' | 'down' | 'restart' | 'ps' | 'build'): Promise<{ status: string; action: string; output: string }> {
     const res = await fetch(`${API_BASE}/docker/compose/action`, {
       method: 'POST',
       headers: getHeaders({ 'Content-Type': 'application/json' }),

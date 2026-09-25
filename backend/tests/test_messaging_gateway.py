@@ -1,5 +1,4 @@
-"""Unit tests for Messaging Gateway and PIN Pairing service."""
-
+import uuid
 import pytest
 from app.services.messaging_gateway import (
     ALPHABET,
@@ -27,7 +26,7 @@ def test_pairing_code_format():
 
 
 def test_pairing_lifecycle(tmp_path):
-    user_id = f"tg_user_{tmp_path.name}"
+    user_id = f"tg_user_{uuid.uuid4().hex}"
     
     # 1. Initially not approved
     assert not is_user_approved("telegram", user_id)

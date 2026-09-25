@@ -136,6 +136,9 @@ def get_tailscale_status() -> Dict[str, Any]:
 
 def toggle_tailscale_serve(enable: bool, port: int = 8000) -> Dict[str, Any]:
     """Enable or disable Tailscale Serve reverse proxy to local port."""
+    if not (1 <= port <= 65535):
+        raise ValueError(f"Port invalide: {port}")
+
     bin_path = _find_tailscale_binary()
     if not bin_path:
         return {"success": False, "message": "Tailscale introuvable."}

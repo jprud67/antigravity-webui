@@ -20,6 +20,8 @@ from typing import Any, Dict, List, Literal, Optional
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.platform_utils import is_blocked_sensitive_path
+
 logger = logging.getLogger("antigravity.docker_studio")
 
 ContainerEngineType = Literal["docker", "podman", "none"]
@@ -184,7 +186,7 @@ def get_docker_status() -> DockerEngineStatus:
 def scan_workspace_docker_files(workspace_dir: str) -> List[WorkspaceDockerItem]:
     """Scans workspace directory recursively (max depth 3) for Dockerfile and compose files."""
     root = Path(workspace_dir).resolve()
-    if not root.exists() or not root.is_dir():
+    if is_blocked_sensitive_path(root) or not root.exists() or not root.is_dir():
         return []
 
     items: List[WorkspaceDockerItem] = []
@@ -464,13 +466,19 @@ def exec_command_in_container(
 
 def execute_compose_action(compose_file_path: str, action: str) -> Dict[str, Any]:
     """Executes a docker compose action (up -d, down, restart, ps)."""
+    comp_path = Path(compose_file_path).resolve()
+    if is_blocked_sensitive_path(comp_path):
+        raise PermissionError(f"Accès refusé au fichier sensible : {compose_file_path}")
+
+    if comp_path.suffix.lower() not in (".yml", ".yaml"):
+        raise ValueError("Le fichier compose doit être un fichier .yml ou .yaml")
+
+    if not comp_path.exists():
+        raise FileNotFoundError(f"Fichier compose introuvable : {compose_file_path}")
+
     bin_info = resolve_container_binary()
     if not bin_info:
         raise RuntimeError("Aucun moteur Docker/Podman disponible.")
-
-    comp_path = Path(compose_file_path).resolve()
-    if not comp_path.exists():
-        raise FileNotFoundError(f"Fichier compose introuvable : {compose_file_path}")
 
     _, bin_path = bin_info
     cmd = [bin_path, "compose", "-f", str(comp_path)]

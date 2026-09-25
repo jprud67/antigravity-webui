@@ -22,8 +22,10 @@ from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import GEMINI_DIR
+from app.platform_utils import is_blocked_sensitive_path
 
 logger = logging.getLogger("antigravity.canvas_documents")
+
 
 CanvasDocumentKind = Literal["html_bundle", "url_embed", "document", "image", "video_asset"]
 CanvasSurface = Literal["assistant_message", "tool_card", "sidebar"]
@@ -295,6 +297,11 @@ def create_canvas_document(
             source_path = Path(os.path.expanduser(asset.source_path))
             if not source_path.is_absolute():
                 source_path = (ws_dir / source_path).resolve()
+            else:
+                source_path = source_path.resolve()
+
+            if is_blocked_sensitive_path(source_path):
+                raise PermissionError(f"Access denied to sensitive file: {source_path}")
 
             if source_path.exists() and source_path.is_file():
                 shutil.copy2(source_path, target_asset_file)
@@ -334,6 +341,11 @@ def create_canvas_document(
         source_path = Path(os.path.expanduser(entry.value))
         if not source_path.is_absolute():
             source_path = (ws_dir / source_path).resolve()
+        else:
+            source_path = source_path.resolve()
+
+        if is_blocked_sensitive_path(source_path):
+            raise PermissionError(f"Access denied to sensitive file: {source_path}")
 
         if not source_path.exists():
             raise FileNotFoundError(f"Entrypoint file not found: {source_path}")

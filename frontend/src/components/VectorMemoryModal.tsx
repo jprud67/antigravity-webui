@@ -22,6 +22,7 @@ import type {
 } from '../types';
 import { useI18n } from '../services/i18n';
 import { showToast } from '../services/toast';
+import { showConfirm } from '../services/dialog';
 
 interface VectorMemoryModalProps {
   isOpen: boolean;
@@ -142,7 +143,8 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
   };
 
   const handleDeleteMemory = async (id: string) => {
-    if (!window.confirm(t('vector_delete_confirm', 'Supprimer définitivement ce souvenir ?'))) return;
+    const confirmed = await showConfirm(t('vector_delete_confirm', 'Supprimer définitivement ce souvenir ?'), { destructive: true });
+    if (!confirmed) return;
     try {
       await vectorMemoryApi.deleteMemory(id);
       showToast('Souvenir supprimé', 'info');
@@ -156,7 +158,8 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
   };
 
   const handleClearMemories = async () => {
-    if (!window.confirm(t('vector_clear_confirm', 'ATTENTION : Effacer TOUS les souvenirs de la mémoire vectorielle ?'))) return;
+    const confirmed = await showConfirm(t('vector_clear_confirm', 'ATTENTION : Effacer TOUS les souvenirs de la mémoire vectorielle ?'), { destructive: true });
+    if (!confirmed) return;
     try {
       const res = await vectorMemoryApi.clearMemories('default');
       showToast(`Mémoire réinitialisée (${res.deletedCount} éléments)`, 'info');

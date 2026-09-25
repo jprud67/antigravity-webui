@@ -11,6 +11,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from app.config import DEFAULT_WORKSPACE
+from app.platform_utils import is_blocked_sensitive_path
 from app.services.docker_studio import (
     ComposeActionRequest,
     ContainerActionRequest,
@@ -43,6 +44,8 @@ def api_scan_workspace_docker(
 ):
     """Discovers Dockerfile and docker-compose files in current workspace."""
     ws = workspace or DEFAULT_WORKSPACE
+    if is_blocked_sensitive_path(ws):
+        raise HTTPException(status_code=403, detail="Accès au chemin spécifié interdit.")
     return scan_workspace_docker_files(ws)
 
 
@@ -112,6 +115,8 @@ def api_compose_action(payload: ComposeActionRequest):
     """Triggers docker compose up / down / restart."""
     try:
         return execute_compose_action(payload.compose_path, payload.action)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except (FileNotFoundError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:

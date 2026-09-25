@@ -419,6 +419,9 @@ class TranscriptFtsService:
         finally:
             conn.close()
 
+    # Alias for compatibility with doctor and maintenance callers
+    reindex_all = rebuild_all_sessions
+
 
 fts_service = TranscriptFtsService()
 
@@ -428,4 +431,5 @@ def get_fts_stats() -> Dict[str, Any]:
 
 
 def reindex_all_conversations() -> Dict[str, Any]:
-    return fts_service.reindex_all()
+    return fts_service.rebuild_all_sessions()
+

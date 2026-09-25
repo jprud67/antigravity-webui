@@ -173,21 +173,30 @@ def send_web_push_notification(
                 dispatched += 1
             except ImportError:
                 # Fallback: direct HTTP dispatch if supported by service worker or local gateway
+                import urllib.error
                 import urllib.request
                 req = urllib.request.Request(
                     endpoint,
                     data=payload.encode("utf-8"),
                     headers={"Content-Type": "application/json"}
                 )
-                with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310
-                    if resp.status in (200, 201, 202):
-                        dispatched += 1
-                    elif resp.status in (404, 410):
+                try:
+                    with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310
+                        if resp.status in (200, 201, 202):
+                            dispatched += 1
+                        elif resp.status in (404, 410):
+                            remove_subscription(endpoint)
+                            failed += 1
+                        else:
+                            failed += 1
+                except urllib.error.HTTPError as he:
+                    if he.code in (404, 410):
                         remove_subscription(endpoint)
-                        failed += 1
+                    failed += 1
         except Exception as exc:
             logger.debug("web_push: delivery failed for %s: %s", endpoint[:40], exc)
             failed += 1
+
 
     return {
         "dispatched": dispatched,

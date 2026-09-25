@@ -69,15 +69,15 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
       setContainers(containersRes);
       setWorkspaceFiles(filesRes);
 
-      if (containersRes.length > 0 && !selectedContainerId) {
-        setSelectedContainerId(containersRes[0].id);
+      if (containersRes.length > 0) {
+        setSelectedContainerId(prev => prev || containersRes[0].id);
       }
     } catch (err: any) {
       showToast(err.message || 'Error loading Docker environment', 'error');
     } finally {
       setLoading(false);
     }
-  }, [currentWorkspace, selectedContainerId]);
+  }, [currentWorkspace]);
 
   useEffect(() => {
     if (isOpen) {

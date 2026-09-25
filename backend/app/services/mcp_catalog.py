@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 import httpx
 
+from app.config import GEMINI_DIR
 from app.services.agy_subcommand import (
     get_mcp_servers,
     add_mcp_server,
@@ -25,7 +26,7 @@ from app.services.agy_subcommand import (
 logger = logging.getLogger(__name__)
 
 _CATALOG_FILE = Path(__file__).parent / "mcp_catalog_data.json"
-_CONFIG_DIR = Path(os.environ.get("USERPROFILE") or os.environ.get("HOME") or ".") / ".gemini" / "antigravity-ide"
+_CONFIG_DIR = GEMINI_DIR
 _INSTALLED_STATE_FILE = _CONFIG_DIR / "mcp_installed_catalog.json"
 
 

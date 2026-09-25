@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 import uuid
 from pathlib import Path
@@ -80,10 +81,19 @@ def create_subagent_worktree(
     if not repo_root:
         return None
 
-    wt_id = (subagent_id or uuid.uuid4().hex[:8]).replace("/", "-").replace("\\", "-")
+    raw_id = subagent_id or uuid.uuid4().hex[:8]
+    clean_id = re.sub(r"[^a-zA-Z0-9_\-]", "", raw_id)
+    if not clean_id:
+        clean_id = uuid.uuid4().hex[:8]
+    wt_id = clean_id
     wt_name = f"subagent-{wt_id}"
     branch = f"antigravity-subagent/{wt_name}"
-    wt_path = Path(repo_root) / ".worktrees" / wt_name
+    expected_parent = (Path(repo_root) / ".worktrees").resolve()
+    wt_path = (expected_parent / wt_name).resolve()
+
+    if not wt_path.is_relative_to(expected_parent):
+        logger.warning("worktree: path traversal detected for subagent_id: %s", subagent_id)
+        return None
 
     try:
         wt_path.parent.mkdir(parents=True, exist_ok=True)

@@ -201,19 +201,23 @@ async def compute_embedding(text: str, cfg: Optional[AutoRecallConfig] = None) -
         except Exception as e:
             logger.warning(f"OpenAI embedding call failed, falling back to local: {e}")
 
-    elif config.provider == "ollama":
-        api_base = (config.api_base or "http://localhost:11434").rstrip("/")
+    elif config.provider == "gemini" and config.api_key:
+        api_base = (config.api_base or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
+        model = config.model if config.model and "embedding" in config.model else "text-embedding-004"
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.post(
-                    f"{api_base}/api/embeddings",
-                    json={"model": config.model or "nomic-embed-text", "prompt": text},
+                    f"{api_base}/models/{model}:embedContent",
+                    headers={"x-goog-api-key": config.api_key, "Content-Type": "application/json"},
+                    json={"content": {"parts": [{"text": text}]}},
                 )
                 if res.status_code == 200:
                     data = res.json()
-                    return data["embedding"]
+                    embedding_data = data.get("embedding", {})
+                    if "values" in embedding_data:
+                        return embedding_data["values"]
         except Exception as e:
-            logger.warning(f"Ollama embedding call failed, falling back to local: {e}")
+            logger.warning(f"Gemini embedding call failed, falling back to local: {e}")
 
     # Default zero-dependency local embedding
     return generate_local_embedding(text)

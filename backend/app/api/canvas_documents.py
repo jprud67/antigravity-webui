@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
+from app.config import DEFAULT_WORKSPACE
 from app.services.canvas_documents import (
     CanvasDocumentCreateInput,
     CanvasDocumentKind,
@@ -41,10 +42,12 @@ class PreviewRequest(BaseModel):
 def create_document(payload: CanvasDocumentCreateInput):
     """Creates a new Canvas document."""
     try:
-        manifest = create_canvas_document(payload)
+        manifest = create_canvas_document(payload, workspace_dir=DEFAULT_WORKSPACE)
         return manifest
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

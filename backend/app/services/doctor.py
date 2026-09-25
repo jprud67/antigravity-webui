@@ -20,12 +20,14 @@ from typing import Any
 import httpx
 import psutil
 
+from app.config import CONVERSATION_DB
 from app.services.fts_search import get_fts_stats, reindex_all_conversations
 
 logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).resolve().parent.parent.parent / "sessions.db"
 WORKSPACE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+
 
 LLM_PROBES = [
     {"name": "Google Gemini", "url": "https://generativelanguage.googleapis.com", "provider": "google"},
@@ -69,26 +71,38 @@ async def _probe_endpoint(probe: dict[str, str], timeout_s: float = 3.5) -> dict
 
 
 def _check_sqlite_integrity() -> dict[str, Any]:
-    if not DB_PATH.exists():
+    db_paths = [("sessions.db", DB_PATH), ("conversation_summaries.db", CONVERSATION_DB)]
+    total_size_mb = 0.0
+    statuses = []
+    integrities = []
+
+    for db_name, p in db_paths:
+        if not p.exists():
+            continue
+        try:
+            size_mb = round(p.stat().st_size / (1024 * 1024), 2)
+            total_size_mb += size_mb
+            with sqlite3.connect(str(p)) as conn:
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA integrity_check;")
+                row = cursor.fetchone()
+                check_result = row[0] if row else "unknown"
+                statuses.append("ok" if check_result == "ok" else "corrupted")
+                integrities.append(f"{db_name}: {check_result}")
+        except Exception as e:
+            statuses.append("error")
+            integrities.append(f"{db_name}: {e}")
+
+    if not statuses:
         return {"status": "missing", "size_mb": 0, "integrity": "missing"}
-    size_mb = round(DB_PATH.stat().st_size / (1024 * 1024), 2)
-    try:
-        with sqlite3.connect(str(DB_PATH)) as conn:
-            cursor = conn.cursor()
-            cursor.execute("PRAGMA integrity_check;")
-            row = cursor.fetchone()
-            check_result = row[0] if row else "unknown"
-            return {
-                "status": "ok" if check_result == "ok" else "corrupted",
-                "size_mb": size_mb,
-                "integrity": check_result
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "size_mb": size_mb,
-            "integrity": str(e)
-        }
+
+    overall_status = "ok" if all(s == "ok" for s in statuses) else ("error" if "error" in statuses else "corrupted")
+    return {
+        "status": overall_status,
+        "size_mb": round(total_size_mb, 2),
+        "integrity": "; ".join(integrities)
+    }
+
 
 
 def _check_git_status() -> dict[str, Any]:
@@ -204,17 +218,23 @@ async def run_auto_repair() -> dict[str, Any]:
     """Performs automated maintenance and repair operations."""
     repaired_actions: list[str] = []
 
-    # 1. Vacuum SQLite
-    if DB_PATH.exists():
-        try:
-            with sqlite3.connect(str(DB_PATH)) as conn:
-                conn.execute("VACUUM;")
-                conn.execute("ANALYZE;")
-                conn.execute("PRAGMA optimize;")
-                conn.commit()
-            repaired_actions.append("Optimisation et compactage de la base de données SQLite (VACUUM & ANALYZE)")
-        except Exception as e:
-            logger.warning(f"Failed to vacuum SQLite: {e}")
+    # 1. Vacuum SQLite databases
+    target_dbs = [("sessions.db", DB_PATH), ("conversation_summaries.db", CONVERSATION_DB)]
+    vacuumed = []
+    for db_name, p in target_dbs:
+        if p.exists():
+            try:
+                with sqlite3.connect(str(p)) as conn:
+                    conn.execute("VACUUM;")
+                    conn.execute("ANALYZE;")
+                    conn.execute("PRAGMA optimize;")
+                    conn.commit()
+                vacuumed.append(db_name)
+            except Exception as e:
+                logger.warning(f"Failed to vacuum {db_name}: {e}")
+    if vacuumed:
+        repaired_actions.append(f"Optimisation et compactage des bases SQLite ({', '.join(vacuumed)}) (VACUUM & ANALYZE)")
+
 
     # 2. Re-index FTS
     try:

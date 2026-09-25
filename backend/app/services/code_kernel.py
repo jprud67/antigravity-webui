@@ -19,6 +19,8 @@ import time
 import traceback
 from typing import Any, Dict, List, Optional
 
+from app.platform_utils import is_blocked_sensitive_path
+
 logger = logging.getLogger(__name__)
 
 _MAX_OUTPUT_CHARS = 500_000
@@ -54,6 +56,8 @@ class KernelToolProxy:
         end_line: Optional[int] = None
     ) -> str:
         full_path = os.path.normpath(os.path.join(self.cwd, path)) if not os.path.isabs(path) else path
+        if is_blocked_sensitive_path(full_path):
+            raise PermissionError("Accès refusé au fichier sensible")
         if not os.path.isfile(full_path):
             raise FileNotFoundError(f"Fichier introuvable : {full_path}")
         with open(full_path, "r", encoding="utf-8", errors="replace") as f:
@@ -65,12 +69,16 @@ class KernelToolProxy:
 
     def list_dir(self, path: str = ".") -> List[Dict[str, Any]]:
         full_path = os.path.normpath(os.path.join(self.cwd, path)) if not os.path.isabs(path) else path
+        if is_blocked_sensitive_path(full_path):
+            raise PermissionError("Accès refusé au dossier sensible")
         if not os.path.isdir(full_path):
             raise NotADirectoryError(f"Dossier introuvable : {full_path}")
         
         items = []
         for entry in os.scandir(full_path):
             try:
+                if is_blocked_sensitive_path(entry.path):
+                    continue
                 stat = entry.stat()
                 items.append({
                     "name": entry.name,
@@ -84,6 +92,8 @@ class KernelToolProxy:
 
     def grep_search(self, query: str, path: str = ".", is_regex: bool = False) -> List[Dict[str, Any]]:
         full_path = os.path.normpath(os.path.join(self.cwd, path)) if not os.path.isabs(path) else path
+        if is_blocked_sensitive_path(full_path):
+            raise PermissionError("Accès refusé au chemin sensible")
         results = []
         pattern = re.compile(query, re.IGNORECASE) if is_regex else None
 
@@ -92,10 +102,14 @@ class KernelToolProxy:
         else:
             files = []
             for root, _, filenames in os.walk(full_path):
+                if is_blocked_sensitive_path(root):
+                    continue
                 if any(ignored in root for ignored in [".git", "node_modules", "venv", "__pycache__"]):
                     continue
                 for fn in filenames:
-                    files.append(os.path.join(root, fn))
+                    fp = os.path.join(root, fn)
+                    if not is_blocked_sensitive_path(fp):
+                        files.append(fp)
 
         for fp in files:
             try:

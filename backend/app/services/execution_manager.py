@@ -32,6 +32,7 @@ from app.services.storage import (
 )
 from app.services.progress_card import get_progress_card, save_progress_card
 from app.services.link_understanding import enrich_user_prompt_with_links
+from app.services.vector_memory import execute_auto_recall_hook
 
 logger = logging.getLogger("antigravity.execution")
 
@@ -1075,8 +1076,19 @@ class ExecutionManager:
             enriched_prompt, extracted = await enrich_user_prompt_with_links(prompt)
             if extracted:
                 data["prompt"] = enriched_prompt
+                prompt = enriched_prompt
         except Exception as e:
             logger.debug(f"Link understanding enrichment skipped: {e}")
+
+        # Auto-recall vector memory hook: if relevant memories exist, prepend them
+        try:
+            recall_res = await execute_auto_recall_hook(prompt, agent_id=conv_id or "default")
+            if recall_res.should_inject and recall_res.context_block:
+                logger.info(f"Injecting {recall_res.recalled_count} auto-recalled memories into prompt for session {conv_id}")
+                prompt = f"{recall_res.context_block}\n\n{prompt}"
+                data["prompt"] = prompt
+        except Exception as e:
+            logger.debug(f"Auto-recall memory hook skipped: {e}")
 
         session = self.get_or_create_session(conv_id, ws_path, ws=ws)
         if ws is not None:

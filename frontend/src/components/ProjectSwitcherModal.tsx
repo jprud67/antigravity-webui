@@ -27,6 +27,7 @@ import {
 } from '../services/api';
 import type { WorkspaceProjectDetail, ProjectRuntimeInfo } from '../types';
 import { showToast } from '../services/toast';
+import { showConfirm } from '../services/dialog';
 
 export interface ProjectSwitcherModalProps {
   isOpen: boolean;
@@ -175,7 +176,8 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
       showToast('Impossible de retirer le workspace par défaut', 'warning');
       return;
     }
-    if (!window.confirm(`Retirer le projet "${path.split(/[\\/]/).pop()}" de la liste des workspaces ?`)) {
+    const confirmed = await showConfirm(`Retirer le projet "${path.split(/[\\/]/).pop()}" de la liste des workspaces ?`, { destructive: true });
+    if (!confirmed) {
       return;
     }
 
