@@ -32,4 +32,5 @@ Thumbs.db
 # Journaux des automatisations propres au projet
 logs/
 scratch/
+.superpowers/
 *.png
