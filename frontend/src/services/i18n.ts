@@ -2335,32 +2335,22 @@ export function t(key: string, defaultValOrArg?: string | number, ...args: (stri
     }
   }
 
-  // 1. Direct UI translation
-  if (UI_TRANSLATIONS[key]) {
-    const directVal = UI_TRANSLATIONS[key][currentLanguage] ?? UI_TRANSLATIONS[key]['en'];
-    if (directVal !== undefined && directVal !== null) {
-      const valStr = String(directVal);
-      let activeArgs = substArgs;
-      if (activeArgs.length === 0 && fallbackTemplate !== undefined && !/\{\d+\}/.test(fallbackTemplate) && /\{\d+\}/.test(valStr)) {
-        activeArgs = [fallbackTemplate];
-      }
-      if (activeArgs.length > 0 && /\{\d+\}/.test(valStr)) {
-        return valStr.replace(/\{(\d+)\}/g, (match, idx) => {
-          const i = parseInt(idx, 10);
-          return i < activeArgs.length ? String(activeArgs[i]) : match;
-        });
-      }
-      return valStr;
-    }
+  // 1. Check requested language: first UI_TRANSLATIONS, then LOCALES
+  let foundVal: string | undefined = undefined;
+
+  if (UI_TRANSLATIONS[key]?.[currentLanguage] !== undefined && UI_TRANSLATIONS[key][currentLanguage] !== '') {
+    foundVal = UI_TRANSLATIONS[key][currentLanguage];
+  } else if (LOCALES[currentLanguage]?.[key] !== undefined && LOCALES[currentLanguage][key] !== '') {
+    foundVal = LOCALES[currentLanguage][key];
+  } else if (UI_TRANSLATIONS[key]?.['en'] !== undefined && UI_TRANSLATIONS[key]['en'] !== '') {
+    // 2. Graceful fallback to English: first UI_TRANSLATIONS, then LOCALES
+    foundVal = UI_TRANSLATIONS[key]['en'];
+  } else if (LOCALES['en']?.[key] !== undefined && LOCALES['en'][key] !== '') {
+    foundVal = LOCALES['en'][key];
   }
 
-  // 2. Hermes Locales Bundle
-  const dict = LOCALES[currentLanguage] || LOCALES.en || {};
-  const enDict = LOCALES.en || {};
-  const val = dict[key] ?? enDict[key];
-
-  if (val !== undefined && val !== null) {
-    const valStr = String(val);
+  if (foundVal !== undefined && foundVal !== null) {
+    const valStr = String(foundVal);
     let activeArgs = substArgs;
     if (activeArgs.length === 0 && fallbackTemplate !== undefined && !/\{\d+\}/.test(fallbackTemplate) && /\{\d+\}/.test(valStr)) {
       activeArgs = [fallbackTemplate];
