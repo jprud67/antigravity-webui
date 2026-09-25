@@ -352,6 +352,31 @@ body {
   background: var(--accent);
 }
 
+/* Highly Visible & Styled Workspace Header Horizontal Scrollbar */
+.workspace-header-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) var(--surface-subtle);
+}
+.workspace-header-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.workspace-header-scroll::-webkit-scrollbar-track {
+  background: var(--surface-subtle);
+  border-radius: 9999px;
+  margin: 0 4px;
+}
+.workspace-header-scroll::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 9999px;
+}
+.workspace-header-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
 .safe-pb {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }

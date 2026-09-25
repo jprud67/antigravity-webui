@@ -6,6 +6,7 @@ import {
   Terminal as TerminalIcon, 
   GitBranch, 
   ChevronRight, 
+  ChevronLeft,
   ChevronDown,
 RefreshCw, 
   Plus,
@@ -174,6 +175,39 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     return 600;
   });
   const isResizingRef = useRef(false);
+
+  // Horizontal Header Scroll State & Handlers
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollButtons = useCallback(() => {
+    const el = headerScrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = headerScrollRef.current;
+    if (!el) return;
+    updateScrollButtons();
+    el.addEventListener('scroll', updateScrollButtons, { passive: true });
+    window.addEventListener('resize', updateScrollButtons);
+    const timer = setTimeout(updateScrollButtons, 300);
+    return () => {
+      el.removeEventListener('scroll', updateScrollButtons);
+      window.removeEventListener('resize', updateScrollButtons);
+      clearTimeout(timer);
+    };
+  }, [updateScrollButtons, isOpen, panelWidth]);
+
+  const handleHeaderScroll = (direction: 'left' | 'right') => {
+    if (headerScrollRef.current) {
+      const delta = direction === 'left' ? -200 : 200;
+      headerScrollRef.current.scrollBy({ left: delta, behavior: 'smooth' });
+    }
+  };
 
   // Files Tab State
   const [fileTree, setFileTree] = useState<any>(null);
@@ -1290,19 +1324,37 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
           borderColor: 'var(--border)',
         }}
       >
-        {/* Horizontally Scrollable Tab Buttons & Actions */}
-        <div
-          onWheel={(e) => {
-            if (e.deltaY !== 0) {
-              e.currentTarget.scrollLeft += e.deltaY;
-            }
-          }}
-          className="flex items-center gap-1 p-0.5 rounded-xl border overflow-x-auto no-scrollbar touch-scroll min-w-0 flex-1 whitespace-nowrap"
-          style={{
-            backgroundColor: 'var(--surface)',
-            borderColor: 'var(--border)',
-          }}
-        >
+        {/* Horizontally Scrollable Tab Buttons & Actions with Controls */}
+        <div className="relative flex items-center min-w-0 flex-1 group">
+          {canScrollLeft && (
+            <button
+              type="button"
+              onClick={() => handleHeaderScroll('left')}
+              className="absolute left-0 z-30 h-7 w-6 rounded-l-lg flex items-center justify-center transition-all cursor-pointer shadow-md border border-r-0"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border2)',
+                color: 'var(--accent-text)',
+              }}
+              title="Défiler vers la gauche"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          <div
+            ref={headerScrollRef}
+            onWheel={(e) => {
+              if (e.deltaY !== 0) {
+                e.currentTarget.scrollLeft += e.deltaY;
+              }
+            }}
+            className="flex items-center gap-1.5 p-1 pb-2 rounded-xl border workspace-header-scroll touch-scroll min-w-0 flex-1 whitespace-nowrap"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border)',
+            }}
+          >
           <button
             onClick={() => handleTabClick('files')}
             className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
@@ -1536,6 +1588,23 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             </div>
           )}
         </div>
+
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => handleHeaderScroll('right')}
+            className="absolute right-0 z-30 h-7 w-6 rounded-r-lg flex items-center justify-center transition-all cursor-pointer shadow-md border border-l-0"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border2)',
+              color: 'var(--accent-text)',
+            }}
+            title="Défiler vers la droite"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
 
         {/* Header Right Actions: Git Badge & Close */}
         <div className="flex items-center gap-1.5 shrink-0 ml-1">
