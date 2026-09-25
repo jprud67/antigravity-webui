@@ -771,6 +771,29 @@ def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]
         "is_estimated": True
     }
 
+def _safe_atomic_replace(tmp_file: Path, target_path: Path, max_retries: int = 5) -> None:
+    """
+    Remplacement atomique résilient aux verrous de fichiers temporaires sous Windows.
+    Effectue des réessais avec backoff et un repli en écriture directe si le renommage est bloqué.
+    """
+    for attempt in range(max_retries):
+        try:
+            tmp_file.replace(target_path)
+            return
+        except (PermissionError, OSError) as e:
+            if attempt < max_retries - 1:
+                time.sleep(0.05 * (attempt + 1))
+            else:
+                try:
+                    target_path.write_bytes(tmp_file.read_bytes())
+                    try:
+                        tmp_file.unlink()
+                    except Exception:
+                        pass
+                    return
+                except Exception:
+                    raise e
+
 def atomic_write_jsonl(target_path: Path, items: list[dict[str, Any]]) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_file = target_path.parent / f".{target_path.name}.tmp.{uuid.uuid4().hex[:8]}"
@@ -780,7 +803,7 @@ def atomic_write_jsonl(target_path: Path, items: list[dict[str, Any]]) -> None:
         with open(tmp_file, "w", encoding="utf-8") as f:
             f.writelines(json.dumps(item, ensure_ascii=False, default=str) + "\n" for item in items)
         restrict_file_permissions(tmp_file)
-        tmp_file.replace(target_path)
+        _safe_atomic_replace(tmp_file, target_path)
         restrict_file_permissions(target_path)
     except Exception:
         if tmp_file.exists():
@@ -3068,7 +3091,7 @@ def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
         try:
             tmp_file.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
             restrict_file_permissions(tmp_file)
-            tmp_file.replace(SETTINGS_FILE)
+            _safe_atomic_replace(tmp_file, SETTINGS_FILE)
             restrict_file_permissions(SETTINGS_FILE)
             _cached_settings = copy.deepcopy(current)
             try:
