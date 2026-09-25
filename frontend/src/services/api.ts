@@ -39,7 +39,17 @@ import type {
   RebaseStatusResponse,
   WorkspaceProjectDetail,
   ProjectHealthDiagnostic,
-  GitDiffRangesResponse
+  GitDiffRangesResponse,
+  GitRemoteDetail,
+  CreateRemotePayload,
+  UpdateRemotePayload,
+  RemoteActionPayload,
+  GitTagDetail,
+  CreateTagPayload,
+  DeleteTagPayload,
+  ReleaseNotesResponse,
+  PublishReleasePayload,
+  PublishReleaseResponse
 } from '../types';
 
 const API_BASE = '/api';
@@ -842,7 +852,7 @@ export async function gitPull(workspace?: string, remote: string = 'origin', bra
   return res.json();
 }
 
-export async function fetchGitTags(workspace?: string): Promise<{ tags: string[] }> {
+export async function fetchGitTags(workspace?: string): Promise<GitTagDetail[]> {
   const url = workspace ? `${API_BASE}/git/tags?workspace=${encodeURIComponent(workspace)}` : `${API_BASE}/git/tags`;
   const res = await fetch(url, { headers: getHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch Git tags: ${res.statusText}`);
@@ -1995,6 +2005,201 @@ export async function exploreWorkspaceDirectory(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Échec d'exploration du dossier" }));
     throw new Error(err.detail || "Erreur lors de l'exploration du dossier");
+  }
+  return res.json();
+}
+
+// ==========================================
+// Sprint 19: Git Remotes & Tags Client API
+// ==========================================
+
+export async function fetchGitRemotes(workspace?: string): Promise<GitRemoteDetail[]> {
+  const url = workspace ? `${API_BASE}/git/remotes?workspace=${encodeURIComponent(workspace)}` : `${API_BASE}/git/remotes`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la récupération des remotes' }));
+    throw new Error(err.detail || 'Erreur lors de la récupération des remotes');
+  }
+  return res.json();
+}
+
+export async function createGitRemote(payload: CreateRemotePayload): Promise<GitRemoteDetail> {
+  const res = await fetch(`${API_BASE}/git/remotes`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la création du remote' }));
+    throw new Error(err.detail || 'Erreur lors de la création du remote');
+  }
+  return res.json();
+}
+
+export async function updateGitRemote(name: string, payload: UpdateRemotePayload): Promise<GitRemoteDetail> {
+  const res = await fetch(`${API_BASE}/git/remotes/${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la mise à jour du remote' }));
+    throw new Error(err.detail || 'Erreur lors de la mise à jour du remote');
+  }
+  return res.json();
+}
+
+export async function deleteGitRemote(name: string, workspace?: string): Promise<{ success: boolean; message: string }> {
+  const query = workspace ? `?workspace=${encodeURIComponent(workspace)}` : '';
+  const res = await fetch(`${API_BASE}/git/remotes/${encodeURIComponent(name)}${query}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la suppression du remote' }));
+    throw new Error(err.detail || 'Erreur lors de la suppression du remote');
+  }
+  return res.json();
+}
+
+export async function testGitRemoteConnection(
+  name: string,
+  workspace?: string
+): Promise<{ success: boolean; latency_ms: number; output?: string; error?: string }> {
+  const query = workspace ? `?workspace=${encodeURIComponent(workspace)}` : '';
+  const res = await fetch(`${API_BASE}/git/remotes/${encodeURIComponent(name)}/test${query}`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du test de connexion du remote' }));
+    throw new Error(err.detail || 'Erreur lors du test de connexion');
+  }
+  return res.json();
+}
+
+export async function fetchGitRemote(payload: RemoteActionPayload): Promise<{ success: boolean; output: string }> {
+  const res = await fetch(`${API_BASE}/git/remotes/fetch`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du fetch remote' }));
+    throw new Error(err.detail || 'Erreur lors du fetch');
+  }
+  return res.json();
+}
+
+export async function pushGitRemote(payload: RemoteActionPayload): Promise<{ success: boolean; output: string }> {
+  const res = await fetch(`${API_BASE}/git/remotes/push`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du push remote' }));
+    throw new Error(err.detail || 'Erreur lors du push');
+  }
+  return res.json();
+}
+
+export async function createGitTag(payload: CreateTagPayload): Promise<GitTagDetail> {
+  const res = await fetch(`${API_BASE}/git/tags`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la création du tag' }));
+    throw new Error(err.detail || 'Erreur lors de la création du tag');
+  }
+  return res.json();
+}
+
+export async function deleteGitTag(
+  name: string,
+  payload?: DeleteTagPayload
+): Promise<{ success: boolean; message: string }> {
+  const params = new URLSearchParams();
+  if (payload?.delete_remote) params.append('delete_remote', 'true');
+  if (payload?.remote_name) params.append('remote_name', payload.remote_name);
+  if (payload?.workspace) params.append('workspace', payload.workspace);
+  const query = params.toString() ? `?${params.toString()}` : '';
+
+  const res = await fetch(`${API_BASE}/git/tags/${encodeURIComponent(name)}${query}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la suppression du tag' }));
+    throw new Error(err.detail || 'Erreur lors de la suppression du tag');
+  }
+  return res.json();
+}
+
+export async function pushGitTag(
+  name: string,
+  remote: string = 'origin',
+  workspace?: string
+): Promise<{ success: boolean; output: string }> {
+  const params = new URLSearchParams({ remote });
+  if (workspace) params.append('workspace', workspace);
+  const res = await fetch(`${API_BASE}/git/tags/${encodeURIComponent(name)}/push?${params.toString()}`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du push du tag' }));
+    throw new Error(err.detail || 'Erreur lors du push du tag');
+  }
+  return res.json();
+}
+
+export async function pushAllGitTags(
+  remote: string = 'origin',
+  workspace?: string
+): Promise<{ success: boolean; output: string }> {
+  const params = new URLSearchParams({ remote });
+  if (workspace) params.append('workspace', workspace);
+  const res = await fetch(`${API_BASE}/git/tags/push-all?${params.toString()}`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du push de tous les tags' }));
+    throw new Error(err.detail || 'Erreur lors du push des tags');
+  }
+  return res.json();
+}
+
+export async function fetchReleaseNotes(
+  tag: string,
+  fromTag?: string,
+  workspace?: string
+): Promise<ReleaseNotesResponse> {
+  const params = new URLSearchParams({ tag });
+  if (fromTag) params.append('from_tag', fromTag);
+  if (workspace) params.append('workspace', workspace);
+  const res = await fetch(`${API_BASE}/git/releases/notes?${params.toString()}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la génération des notes de version' }));
+    throw new Error(err.detail || 'Erreur lors de la génération des release notes');
+  }
+  return res.json();
+}
+
+export async function publishGitRelease(payload: PublishReleasePayload): Promise<PublishReleaseResponse> {
+  const res = await fetch(`${API_BASE}/git/releases/publish`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la publication de la release' }));
+    throw new Error(err.detail || 'Erreur lors de la publication de la release');
   }
   return res.json();
 }

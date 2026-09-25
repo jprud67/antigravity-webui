@@ -523,4 +523,90 @@ export interface GitDiffRangesResponse {
   summary: GitDiffSummary;
 }
 
+// ==========================================
+// Sprint 19: Git Remotes & Tags Studio Types
+// ==========================================
+
+export interface GitRemoteDetail {
+  name: string;
+  fetch_url: string;
+  push_url: string;
+  is_default: boolean;
+}
+
+export interface CreateRemotePayload {
+  name: string;
+  url: string;
+  push_url?: string;
+  workspace?: string;
+}
+
+export interface UpdateRemotePayload {
+  new_name?: string;
+  url?: string;
+  push_url?: string;
+  workspace?: string;
+}
+
+export interface RemoteActionPayload {
+  remote: string;
+  branch?: string;
+  set_upstream?: boolean;
+  force?: boolean;
+  workspace?: string;
+}
+
+export interface GitTagDetail {
+  name: string;
+  commit_sha: string;
+  commit_short_sha: string;
+  commit_date: string;
+  commit_message: string;
+  is_annotated: boolean;
+  tagger_name?: string | null;
+  tagger_date?: string | null;
+  tag_message?: string | null;
+}
+
+export interface CreateTagPayload {
+  name: string;
+  target_commit?: string;
+  message?: string;
+  push?: boolean;
+  remote?: string;
+  workspace?: string;
+}
+
+export interface DeleteTagPayload {
+  delete_remote?: boolean;
+  remote_name?: string;
+  workspace?: string;
+}
+
+export interface ReleaseNotesResponse {
+  tag: string;
+  previous_tag?: string | null;
+  commit_count: number;
+  suggested_title: string;
+  changelog_markdown: string;
+  github_release_url?: string | null;
+  has_gh_cli: boolean;
+}
+
+export interface PublishReleasePayload {
+  tag: string;
+  title: string;
+  notes: string;
+  draft?: boolean;
+  prerelease?: boolean;
+  workspace?: string;
+}
+
+export interface PublishReleaseResponse {
+  success: boolean;
+  mode: 'cli' | 'web';
+  url?: string | null;
+  message: string;
+}
+
 
