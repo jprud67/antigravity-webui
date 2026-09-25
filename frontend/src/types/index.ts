@@ -84,6 +84,9 @@ export interface AppSettings {
   trustedWorkspaces?: string[];
   defaultWorkspace?: string;
   ecoMode?: boolean;
+  contextBudgetTokens?: number;
+  autoCompactContext?: boolean;
+  preserveLastNTurns?: number;
 }
 
 export interface WorkspaceFolder {

@@ -84,6 +84,7 @@ interface ChatInputProps {
   onOpenBranchTree?: () => void;
   onAddBookmark?: (label?: string) => void;
   onOpenMonacoStudio?: (config: MonacoStudioConfig) => void;
+  contextBudgetTokens?: number;
 }
 
 export interface AttachmentItem {
@@ -142,7 +143,8 @@ export const ChatInput = React.memo<ChatInputProps>(({
   isCompacting,
   onOpenBranchTree,
   onAddBookmark,
-  onOpenMonacoStudio
+  onOpenMonacoStudio,
+  contextBudgetTokens
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -768,6 +770,16 @@ export const ChatInput = React.memo<ChatInputProps>(({
           onCompact();
         } else {
           showToast('Assistant d\'élagage non disponible.', 'info');
+        }
+        return true;
+
+      case '/budget':
+        if (onOpenCompactor) {
+          onOpenCompactor();
+        } else if (onCompact) {
+          onCompact();
+        } else {
+          showToast('Gestionnaire de budget non disponible.', 'info');
         }
         return true;
 
@@ -1811,6 +1823,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
               onCompact={onCompact}
               onOpenCompactor={onOpenCompactor}
               isCompacting={isCompacting}
+              contextBudgetTokens={contextBudgetTokens}
             />
           </div>
 

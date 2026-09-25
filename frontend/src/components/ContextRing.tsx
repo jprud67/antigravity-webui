@@ -18,6 +18,7 @@ interface ContextRingProps {
   onCompact?: () => void;
   onOpenCompactor?: () => void;
   isCompacting?: boolean;
+  contextBudgetTokens?: number;
 }
 
 export const ContextRing: React.FC<ContextRingProps> = ({ 
@@ -27,7 +28,8 @@ export const ContextRing: React.FC<ContextRingProps> = ({
   onNewChat,
   onCompact,
   onOpenCompactor,
-  isCompacting
+  isCompacting,
+  contextBudgetTokens = 35_000
 }) => {
   const { t } = useI18n();
   const [showPopover, setShowPopover] = useState(false);
@@ -62,22 +64,26 @@ export const ContextRing: React.FC<ContextRingProps> = ({
   const totalInput = baseInput + promptTokens;
   const total = totalInput + rawOutput;
 
-  const percent = Math.min(100, Math.max(0, (total / contextLimit) * 100));
-  const displayPercent = percent < 0.1 && total > 0 ? '<0.1%' : `${percent.toFixed(1)}%`;
+  // Context Budget Ceiling (Tokens re-ingested per turn)
+  const budgetCeiling = contextBudgetTokens > 0 ? contextBudgetTokens : 35_000;
+  const budgetPercent = Math.min(100, Math.max(0, (totalInput / budgetCeiling) * 100));
+  const isOverBudget = totalInput > budgetCeiling;
+  const isContextHeavy = totalInput > budgetCeiling * 0.75 || isOverBudget;
 
-  // SVG ring parameters
+  const displayPercent = `${budgetPercent.toFixed(0)}%`;
+
+  // SVG ring parameters (tracked against the Context Budget)
   const radius = 9;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (percent / 100) * circumference;
+  const strokeDashoffset = circumference - (budgetPercent / 100) * circumference;
 
-  const isContextHeavy = totalInput > 50_000 || percent > 25;
-  let ringColor = '#10b981'; // Emerald
+  let ringColor = '#10b981'; // Emerald (<70%)
   let badgeColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-  if (percent > 80) {
-    ringColor = '#f43f5e'; // Rose
+  if (isOverBudget) {
+    ringColor = '#f43f5e'; // Rose (>100%)
     badgeColor = 'text-rose-400 bg-rose-500/10 border-rose-500/20';
-  } else if (percent > 50 || isContextHeavy) {
-    ringColor = '#f59e0b'; // Amber
+  } else if (isContextHeavy) {
+    ringColor = '#f59e0b'; // Amber (75-100%)
     badgeColor = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
   }
 
@@ -140,7 +146,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
           </svg>
         </div>
 
-        <span>{formatNum(total)}</span>
+        <span>{formatNum(totalInput)} / {formatNum(budgetCeiling)}</span>
         <span className="text-[9px] opacity-75 font-sans">({displayPercent})</span>
       </button>
 
@@ -149,7 +155,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
         <div
           onMouseEnter={() => setShowPopover(true)}
           onMouseLeave={() => setShowPopover(false)}
-          className="absolute bottom-full mb-2 right-0 w-72 p-3.5 rounded-2xl shadow-2xl text-xs z-50 animate-fadeIn space-y-3 backdrop-blur-xl border"
+          className="absolute bottom-full mb-2 right-0 w-80 p-3.5 rounded-2xl shadow-2xl text-xs z-50 animate-fadeIn space-y-3 backdrop-blur-xl border"
           style={{
             backgroundColor: 'var(--surface)',
             borderColor: 'var(--border)',
@@ -159,11 +165,11 @@ export const ContextRing: React.FC<ContextRingProps> = ({
           <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: 'var(--border)' }}>
             <div className="flex items-center gap-1.5 font-semibold" style={{ color: 'var(--strong)' }}>
               <Gauge className="w-3.5 h-3.5 text-sky-500" />
-              <span>{t('context_consumed', 'Consumed Context')}</span>
+              <span>{t('context_budget_heading', 'Budget de Contexte & Quota')}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${isEstimated ? 'bg-sky-500/10 text-sky-500 border border-sky-500/20' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'}`}>
-                {isEstimated ? t('estimated', 'Estimated') : t('api_live', 'API Live')}
+                {isEstimated ? t('estimated', 'Estimé') : t('api_live', 'API Live')}
               </span>
               <span className="font-mono text-[10px]" style={{ color: 'var(--muted)' }}>
                 {displayPercent}
@@ -171,18 +177,29 @@ export const ContextRing: React.FC<ContextRingProps> = ({
             </div>
           </div>
 
-          {/* Progress bar */}
-          <div className="space-y-1">
+          {/* Progress bar towards Context Budget */}
+          <div className="space-y-1.5 p-2.5 rounded-xl border" style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}>
+            <div className="flex justify-between items-center text-[10px]">
+              <span className="font-semibold text-sky-400 flex items-center gap-1">
+                <Zap className="w-3 h-3 text-sky-400" />
+                {t('budget_ceiling_label', 'Tokens par tour (Parité IDE)')} :
+              </span>
+              <span className="font-mono font-bold" style={{ color: isOverBudget ? '#f43f5e' : 'var(--strong)' }}>
+                {formatNum(totalInput)} / {formatNum(budgetCeiling)}
+              </span>
+            </div>
             <div className="w-full rounded-full h-1.5 overflow-hidden" style={{ backgroundColor: 'var(--border)' }}>
               <div
-                style={{ width: `${Math.max(2, percent)}%`, backgroundColor: ringColor }}
+                style={{ width: `${Math.max(2, budgetPercent)}%`, backgroundColor: ringColor }}
                 className="h-full rounded-full transition-all duration-300"
               />
             </div>
-              <div className="flex justify-between text-[10px] font-mono" style={{ color: 'var(--muted)' }}>
-                <span>{t('tokens_used', '{0} used').replace('{0}', formatNum(total))}</span>
-                <span>{t('tokens_max', 'Max: {0}').replace('{0}', formatNum(contextLimit))}</span>
-              </div>
+            <div className="flex justify-between text-[9px]" style={{ color: 'var(--muted)' }}>
+              <span className={isOverBudget ? 'text-rose-400 font-semibold' : 'text-emerald-400 font-semibold'}>
+                {isOverBudget ? t('over_budget_warn', '⚠️ Dépassement de budget') : t('under_budget_ok', '✓ Contexte sous contrôle')}
+              </span>
+              <span>{t('tokens_max', 'Max Modèle : {0}').replace('{0}', formatNum(contextLimit))}</span>
+            </div>
           </div>
 
           {/* Token Breakdown - Exact Mathematical Consistency */}
@@ -257,12 +274,17 @@ export const ContextRing: React.FC<ContextRingProps> = ({
           {/* Context Actions (Compaction, Pruning & Purge) */}
           {(isContextHeavy || onCompact || onOpenCompactor) && (
             <div className="pt-2 mt-2 border-t flex flex-col gap-1.5" style={{ borderColor: 'var(--border)' }}>
-              {isContextHeavy && (
+              {isOverBudget ? (
+                <div className="flex items-start gap-1.5 text-[11px] text-rose-400 font-medium mb-1">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{t('context_over_budget_warning', 'Plafond de budget dépassé : compactez le contexte pour préserver vos quotas de tokens.')}</span>
+                </div>
+              ) : isContextHeavy ? (
                 <div className="flex items-start gap-1.5 text-[11px] text-amber-400 font-medium mb-1">
                   <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span>{t('context_heavy_warning', 'Contexte lourd : les prochains tours réinjecteront un volume élevé de tokens.')}</span>
+                  <span>{t('context_heavy_warning', 'Contexte élevé (>75% du budget) : réinjection importante de tokens.')}</span>
                 </div>
-              )}
+              ) : null}
               {onOpenCompactor && (
                 <button
                   type="button"

@@ -9,9 +9,16 @@ import {
   Terminal, 
   FileText, 
   Search, 
-  Cpu
+  Gauge
 } from 'lucide-react';
-import { fetchConversationTranscript, pruneConversation, type PruneResult } from '../services/api';
+import { 
+  fetchConversationTranscript, 
+  pruneConversation, 
+  getContextBudget, 
+  enforceContextBudget, 
+  type PruneResult,
+  type ContextBudgetInfo
+} from '../services/api';
 import { useI18n } from '../services/i18n';
 import type { TokenUsageData } from './ContextRing';
 
@@ -49,6 +56,7 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
   const [pruning, setPruning] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<PruneResult | null>(null);
+  const [budgetInfo, setBudgetInfo] = useState<ContextBudgetInfo | null>(null);
 
   const [steps, setSteps] = useState<StepItem[]>([]);
   const [mode, setMode] = useState<'turn' | 'selective'>('turn');
@@ -121,10 +129,48 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
         if (active) setLoading(false);
       });
 
+    getContextBudget(conversationId)
+      .then((b) => {
+        if (active) setBudgetInfo(b);
+      })
+      .catch((e) => console.debug("Error loading context budget:", e));
+
     return () => {
       active = false;
     };
   }, [isOpen, conversationId, reloadKey, t]);
+
+  const handleApplyBudget = async () => {
+    if (!conversationId) return;
+    setPruning(true);
+    setError(null);
+    try {
+      const res = await enforceContextBudget(conversationId);
+      if (res.action_taken && res.tokens_saved > 0) {
+        const dummyResult: PruneResult = {
+          status: 'ok',
+          conversation_id: conversationId,
+          pruned_steps: res.compacted_steps,
+          chars_saved: 0,
+          tokens_saved: res.tokens_saved,
+          reduction_pct: res.reduction_pct
+        };
+        setSuccessResult(dummyResult);
+        if (onPruneSuccess) {
+          onPruneSuccess(dummyResult);
+        }
+      } else {
+        setError(t('budget_already_optimal', 'Le contexte respecte déjà le budget configuré. Aucun compactage supplémentaire requis.'));
+      }
+      setTimeout(() => {
+        setReloadKey((k) => k + 1);
+      }, 300);
+    } catch (e: any) {
+      setError(e.message || "Échec de l'application du budget");
+    } finally {
+      setPruning(false);
+    }
+  };
 
   // Model context limit estimation
   const contextMaxTokens = useMemo(() => {
@@ -306,12 +352,14 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
           >
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
-                <Cpu className="w-3.5 h-3.5 text-sky-400" />
-                <span className="font-semibold">{t('context_window_usage', 'Utilisation de la fenêtre de contexte')}</span>
+                <Gauge className="w-3.5 h-3.5 text-sky-400" />
+                <span className="font-semibold">{t('context_budget_ceiling', 'Budget de Contexte par Tour (Parité IDE)')}</span>
               </div>
               <div className="font-mono text-xs">
-                <span className="font-bold text-sky-400">~{currentTokens.toLocaleString()}</span>
-                <span className="opacity-60"> / {contextMaxTokens.toLocaleString()} tokens ({contextPct}%)</span>
+                <span className={`font-bold ${budgetInfo?.is_over_budget ? 'text-rose-400' : 'text-sky-400'}`}>
+                  ~{(budgetInfo?.estimated_input_tokens || currentTokens).toLocaleString()}
+                </span>
+                <span className="opacity-60"> / {(budgetInfo?.budget_tokens || 35000).toLocaleString()} tokens ({budgetInfo ? `${budgetInfo.budget_usage_pct}%` : `${contextPct}%`})</span>
               </div>
             </div>
 
@@ -319,9 +367,9 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
             <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden relative">
               <div
                 className={`h-full transition-all duration-500 rounded-full ${
-                  contextPct > 80 ? 'bg-red-500' : contextPct > 50 ? 'bg-amber-400' : 'bg-sky-400'
+                  (budgetInfo?.budget_usage_pct ?? 0) > 100 || contextPct > 80 ? 'bg-rose-500' : (budgetInfo?.budget_usage_pct ?? 0) > 75 ? 'bg-amber-400' : 'bg-sky-400'
                 }`}
-                style={{ width: `${Math.max(2, contextPct)}%` }}
+                style={{ width: `${Math.min(100, Math.max(2, budgetInfo?.budget_usage_pct || contextPct))}%` }}
               />
             </div>
 
@@ -531,6 +579,17 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
               className="px-3 py-1.5 rounded-xl border border-slate-700 hover:bg-white/5 text-xs font-medium transition-colors cursor-pointer"
             >
               {t('cancel', 'Annuler')}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleApplyBudget}
+              disabled={pruning}
+              className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+              title="Plafonne et compresse automatiquement le contexte selon le budget configuré (Parité IDE)"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>{t('apply_budget_manager', 'Appliquer le Budget')}</span>
             </button>
 
             <button

@@ -48,7 +48,8 @@ import {
   FolderGit2,
   GitCompare,
   Code2,
-  Wand2
+  Wand2,
+  Gauge
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -193,6 +194,15 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'action',
     icon: Scissors,
     color: 'text-cyan-400',
+    isAction: true
+  },
+  {
+    cmd: '/budget',
+    descKey: 'cmd_desc_budget',
+    desc: 'Afficher et gérer le budget de contexte (Parité IDE & anti-gaspillage)',
+    category: 'action',
+    icon: Gauge,
+    color: 'text-sky-400',
     isAction: true
   },
   {

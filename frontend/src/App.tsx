@@ -23,7 +23,7 @@ const MonacoStudioModal = lazy(() => import('./components/MonacoStudioModal').th
 const QuickOpenModal = lazy(() => import('./components/QuickOpenModal').then(m => ({ default: m.QuickOpenModal })));
 
 import type { TokenUsageData } from './components/ContextRing';
-import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig } from './types';
+import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig, AppSettings } from './types';
 import { parseStepsToMessages, cleanUserPrompt } from './utils/transcriptParser';
 import { 
   fetchConversations, 
@@ -32,7 +32,7 @@ import {
   fetchSettings,
   checkAuthStatus,
   clearAuthToken,
-  compactConversation,
+  enforceContextBudget,
   forkConversation,
   updateConversationMetadata,
   updateConversationTitle,
@@ -278,6 +278,7 @@ export function App() {
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('models');
   const [activeGoogleAccount, setActiveGoogleAccount] = useState<GoogleAccountInfo | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
+  const [appSettings, setAppSettings] = useState<AppSettings>({});
 
   const handleGoogleAccountChanged = useCallback((acc: GoogleAccountInfo | null) => {
     setActiveGoogleAccount(acc);
@@ -392,6 +393,7 @@ export function App() {
       if (googleRes?.active_account) {
         setActiveGoogleAccount(googleRes.active_account);
       }
+      setAppSettings(settings);
 
       // Harmonize model selection from settings
       if (settings.model && mods.length > 0) {
@@ -1438,8 +1440,16 @@ export function App() {
     }
     try {
       setIsCompacting(true);
-      const res = await compactConversation(activeConversationId);
-      showToast(`Contexte compacté : -${res.tokens_saved.toLocaleString()} tokens (-${res.reduction_pct}%) !`, 'success');
+      const res = await enforceContextBudget(
+        activeConversationId,
+        appSettings.contextBudgetTokens,
+        appSettings.preserveLastNTurns
+      );
+      if (res.action_taken && res.tokens_saved > 0) {
+        showToast(`Budget de contexte appliqué : -${res.tokens_saved.toLocaleString()} tokens (-${res.reduction_pct}%) !`, 'success');
+      } else {
+        showToast("Le contexte respecte déjà le budget configuré. Historique optimal.", 'info');
+      }
       const freshData = await fetchConversationTranscript(activeConversationId);
       const parsed = parseStepsToMessages(freshData?.steps || []);
       setMessages(parsed);
@@ -1454,7 +1464,7 @@ export function App() {
     } finally {
       setIsCompacting(false);
     }
-  }, [activeConversationId]);
+  }, [activeConversationId, appSettings.contextBudgetTokens, appSettings.preserveLastNTurns]);
 
   const handlePruneSuccess = useCallback(async (result: PruneResult) => {
     if (!activeConversationId) return;
@@ -1936,6 +1946,7 @@ export function App() {
           onCompact={handleCompactConversation}
           onOpenCompactor={() => setIsContextCompactorOpen(true)}
           isCompacting={isCompacting}
+          contextBudgetTokens={appSettings.contextBudgetTokens}
           onOpenBranchTree={() => setIsBranchModalOpen(true)}
           onAddBookmark={(label) => {
             const lastStep = messages.length > 0 ? (messages[messages.length - 1].stepIndex ?? messages.length - 1) : 0;

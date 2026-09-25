@@ -35,6 +35,10 @@ from app.services.storage import (
     update_conversation_summary_fields,
     update_conversation_title,
 )
+from app.services.context_budget import (
+    enforce_context_budget,
+    get_conversation_context_budget_info,
+)
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 logger = logging.getLogger(__name__)
@@ -514,6 +518,49 @@ def prune_session(conversation_id: str, req: PruneRequest = Body(default_factory
     except Exception as e:
         logger.error(f"Error pruning conversation {conversation_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Échec de l'élagage : {e!s}")
+
+
+@router.get("/{conversation_id}/context-budget")
+def get_session_context_budget(
+    conversation_id: str,
+    budget_tokens: int | None = Query(None, description="Plafond de tokens à tester"),
+    _ = Depends(require_auth)
+):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
+    try:
+        return get_conversation_context_budget_info(conversation_id, budget_tokens=budget_tokens)
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Error getting context budget for {conversation_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur d'analyse du budget de contexte : {e!s}")
+
+
+class ContextBudgetEnforceRequest(BaseModel):
+    budget_tokens: int | None = None
+    preserve_last_n_turns: int | None = None
+
+
+@router.post("/{conversation_id}/context-budget/enforce")
+def enforce_session_context_budget(
+    conversation_id: str,
+    req: ContextBudgetEnforceRequest = Body(default_factory=ContextBudgetEnforceRequest),
+    _ = Depends(require_auth)
+):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
+    try:
+        return enforce_context_budget(
+            conversation_id,
+            max_tokens=req.budget_tokens,
+            preserve_last_n_turns=req.preserve_last_n_turns
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Error enforcing context budget for {conversation_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Échec de l'application du budget de contexte : {e!s}")
 
 
 @router.get("/{conversation_id}/branches")

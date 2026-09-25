@@ -39,7 +39,8 @@ import {
   Copy,
   Eye,
   EyeOff,
-  Leaf
+  Leaf,
+  Gauge
 } from 'lucide-react';
 import type { AppSettings, ModelOption, Conversation } from '../types';
 import { 
@@ -1512,6 +1513,125 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     />
                     <div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
                   </label>
+                </div>
+              </div>
+
+              {/* Context Budget Manager Settings */}
+              <div
+                className="p-4 rounded-2xl border space-y-4 shadow-xs"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                }}
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0 mt-0.5">
+                      <Gauge className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-xs block" style={{ color: 'var(--strong)' }}>
+                        {t('context_budget_title', 'Gestionnaire de Budget de Contexte (Parité IDE)')}
+                      </span>
+                      <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'var(--muted)' }}>
+                        {t('context_budget_desc', "Plafonne les tokens d'entrée réingérés à chaque tour pour éliminer l'explosion quadratique du contexte et préserver vos quotas.")}
+                      </p>
+                    </div>
+                  </div>
+
+                  <label className="relative inline-flex items-center cursor-pointer select-none shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={settings.autoCompactContext ?? true}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setSettings((prev) => ({ ...prev, autoCompactContext: next }));
+                        saveSettings({ ...settings, autoCompactContext: next }).catch((err) => {
+                          console.error("Failed to save autoCompactContext setting:", err);
+                        });
+                        showToast(next ? t('auto_compact_enabled', 'Compactage de contexte actif') : t('auto_compact_disabled', 'Compactage automatique désactivé'), 'info');
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
+                  </label>
+                </div>
+
+                {/* Preset Token Ceilings */}
+                <div className="space-y-2 pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium" style={{ color: 'var(--strong)' }}>
+                      {t('token_budget_ceiling', "Plafond de Tokens d'Entrée par Tour")}
+                    </span>
+                    <span className="text-[11px] font-mono font-bold text-sky-400">
+                      {(settings.contextBudgetTokens ?? 35000).toLocaleString()} tokens
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { val: 20000, label: '20k', sub: 'Éco' },
+                      { val: 35000, label: '35k', sub: 'Recommandé' },
+                      { val: 60000, label: '60k', sub: 'Confort' },
+                      { val: 100000, label: '100k', sub: 'Étendu' },
+                    ].map((opt) => {
+                      const isSel = (settings.contextBudgetTokens ?? 35000) === opt.val;
+                      return (
+                        <button
+                          key={opt.val}
+                          type="button"
+                          onClick={() => {
+                            setSettings((prev) => ({ ...prev, contextBudgetTokens: opt.val }));
+                            saveSettings({ ...settings, contextBudgetTokens: opt.val }).catch(console.error);
+                            showToast(`Plafond de contexte défini à ${opt.label} tokens`, 'info');
+                          }}
+                          className={`p-2 rounded-xl text-center border transition-all cursor-pointer ${
+                            isSel ? 'border-sky-500/80 bg-sky-500/15 text-sky-400 font-semibold' : 'hover:border-sky-500/30 text-xs'
+                          }`}
+                          style={{
+                            backgroundColor: isSel ? undefined : 'var(--surface-subtle)',
+                            borderColor: isSel ? undefined : 'var(--border)',
+                          }}
+                        >
+                          <div className="font-mono font-bold text-xs">{opt.label}</div>
+                          <div className="text-[10px] opacity-70">{opt.sub}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Preserved Turns */}
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <span className="text-[11px] font-medium block" style={{ color: 'var(--strong)' }}>
+                      {t('preserved_turns_label', 'Tours récents préservés intégraux')}
+                    </span>
+                    <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                      {t('preserved_turns_desc', "Les N derniers tours restent 100% intacts (sans compactage).")}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 p-1 rounded-xl border" style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}>
+                    {[1, 2, 3].map((n) => {
+                      const isSel = (settings.preserveLastNTurns ?? 2) === n;
+                      return (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => {
+                            setSettings((prev) => ({ ...prev, preserveLastNTurns: n }));
+                            saveSettings({ ...settings, preserveLastNTurns: n }).catch(console.error);
+                          }}
+                          className="px-2.5 py-0.5 rounded-lg text-xs font-mono font-medium transition-all cursor-pointer"
+                          style={{
+                            backgroundColor: isSel ? 'var(--accent)' : 'transparent',
+                            color: isSel ? '#FFFFFF' : 'var(--muted)',
+                          }}
+                        >
+                          {n}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>

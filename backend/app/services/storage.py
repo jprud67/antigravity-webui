@@ -3052,6 +3052,9 @@ def get_settings() -> dict[str, Any]:
         "trustedWorkspaces": [DEFAULT_WORKSPACE],
         "defaultWorkspace": DEFAULT_WORKSPACE,
         "ecoMode": True,
+        "contextBudgetTokens": 35000,
+        "autoCompactContext": True,
+        "preserveLastNTurns": 2,
     }
     with _settings_lock:
         if not SETTINGS_FILE.exists():
@@ -3074,6 +3077,12 @@ def get_settings() -> dict[str, Any]:
                 res["defaultWorkspace"] = DEFAULT_WORKSPACE
             if "ecoMode" not in res:
                 res["ecoMode"] = True
+            if "contextBudgetTokens" not in res:
+                res["contextBudgetTokens"] = 35000
+            if "autoCompactContext" not in res:
+                res["autoCompactContext"] = True
+            if "preserveLastNTurns" not in res:
+                res["preserveLastNTurns"] = 2
             _cached_settings = copy.deepcopy(res)
             _cached_settings_mtime = mtime
             return copy.deepcopy(res)

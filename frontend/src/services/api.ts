@@ -349,6 +349,76 @@ export async function pruneConversation(
   return res.json();
 }
 
+export interface ContextBudgetInfo {
+  conversation_id: string;
+  budget_tokens: number;
+  estimated_input_tokens: number;
+  transcript_tokens: number;
+  base_system_tokens: number;
+  is_over_budget: boolean;
+  budget_usage_pct: number;
+  user_turns_count: number;
+  total_steps_count: number;
+  breakdown: {
+    user_chars?: number;
+    user_tokens?: number;
+    assistant_chars?: number;
+    assistant_tokens?: number;
+    tool_chars?: number;
+    tool_tokens?: number;
+    thinking_chars?: number;
+    thinking_tokens?: number;
+  };
+  recommendation: string;
+}
+
+export interface ContextBudgetEnforceResult {
+  status: string;
+  conversation_id: string;
+  action_taken: boolean;
+  initial_tokens: number;
+  final_tokens: number;
+  tokens_saved: number;
+  reduction_pct: number;
+  stages_applied: string[];
+  compacted_steps: number;
+}
+
+export async function getContextBudget(
+  conversationId: string,
+  budgetTokens?: number
+): Promise<ContextBudgetInfo> {
+  const query = budgetTokens ? `?budget_tokens=${encodeURIComponent(budgetTokens)}` : '';
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/context-budget${query}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de récupération du budget de contexte' }));
+    throw new Error(err.detail || 'Impossible de récupérer le budget de contexte');
+  }
+  return res.json();
+}
+
+export async function enforceContextBudget(
+  conversationId: string,
+  budgetTokens?: number,
+  preserveLastNTurns?: number
+): Promise<ContextBudgetEnforceResult> {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/context-budget/enforce`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      budget_tokens: budgetTokens,
+      preserve_last_n_turns: preserveLastNTurns
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'application du budget de contexte" }));
+    throw new Error(err.detail || "Impossible d'appliquer le budget de contexte");
+  }
+  return res.json();
+}
+
 export interface BulkActionPayload {
   action: 'delete' | 'pin' | 'unpin' | 'archive' | 'unarchive' | 'tag' | 'project' | 'export';
   conversation_ids: string[];

@@ -28,6 +28,9 @@ from app.services.storage import (
     is_safe_conversation_id,
     save_settings,
 )
+from app.services.context_budget import (
+    enforce_context_budget,
+)
 
 logger = logging.getLogger("antigravity.execution")
 
@@ -440,20 +443,29 @@ class ExecutionSession:
 
                 try:
                     active_cid = self.conversation_id or conv_id
-                    # Proactive Auto-Compaction (IDE Token Parity):
-                    # In Antigravity IDE, older turns have their tool outputs pruned before prompt execution.
-                    # In WebUI, compact steps prior to the last 2 turns in transcript.jsonl
-                    # to prevent massive re-ingestion of stale input tokens on every turn.
+                    # Context Budget Manager (IDE Token Parity & Cumulative Bloat Prevention):
+                    # In Antigravity IDE, history is strictly constrained to avoid quadratic token explosion.
+                    # In WebUI, we enforce a strict token ceiling via multi-stage progressive compaction
+                    # (tool outputs, thinking blocks, assistant condensation, and sliding window).
                     if active_cid:
                         try:
-                            comp_res = compact_conversation_in_place(active_cid, preserve_last_n_turns=2)
-                            if comp_res.get("compacted_steps", 0) > 0:
-                                logger.info(
-                                    f"[Session {active_cid}] Auto-compacted {comp_res['compacted_steps']} older tool steps "
-                                    f"(~{comp_res.get('tokens_saved', 0)} tokens saved)."
+                            auto_compact = settings.get("autoCompactContext", True)
+                            if auto_compact:
+                                budget_tokens = int(settings.get("contextBudgetTokens", 35000))
+                                preserve_turns = int(settings.get("preserveLastNTurns", 2))
+                                budget_res = enforce_context_budget(
+                                    active_cid,
+                                    max_tokens=budget_tokens,
+                                    preserve_last_n_turns=preserve_turns
                                 )
+                                if budget_res.get("action_taken"):
+                                    logger.info(
+                                        f"[Session {active_cid}] Context Budget Manager applied {budget_res.get('stages_applied')}: "
+                                        f"{budget_res.get('initial_tokens'):,} -> {budget_res.get('final_tokens'):,} tokens "
+                                        f"(-{budget_res.get('tokens_saved'):,} tokens saved, {budget_res.get('compacted_steps')} steps)."
+                                    )
                         except Exception as cp_err:
-                            logger.debug(f"Proactive compaction error: {cp_err}")
+                            logger.debug(f"Context budget manager error: {cp_err}")
 
                     logger.info(f"[Session {active_cid}] Starting turn in background (attempt {attempt}, model={current_model}, effort={current_effort})...")
                     async for event in stream_turn(
