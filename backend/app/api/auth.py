@@ -28,6 +28,12 @@ class AuthToggleRequest(BaseModel):
 class CreateApiKeyRequest(BaseModel):
     name: str = "Application Externe"
 
+class BulkDeleteApiKeysRequest(BaseModel):
+    key_ids: list[str]
+
+class BulkRotateApiKeysRequest(BaseModel):
+    key_ids: list[str]
+
 def get_current_token(
     authorization: str | None = Header(None),
     x_api_key: str | None = Header(None, alias="X-API-Key"),
@@ -99,6 +105,28 @@ def remove_api_key(key_id: str, _ = Depends(require_auth)):
     if not success:
         raise HTTPException(status_code=404, detail="Clé d'API introuvable.")
     return {"success": True, "message": "Clé d'API supprimée avec succès."}
+
+@router.post("/api-keys/bulk-delete")
+def remove_api_keys_bulk(req: BulkDeleteApiKeysRequest, _ = Depends(require_auth)):
+    from app.services.auth import delete_api_keys_bulk, get_api_keys
+    deleted_count, deleted_ids = delete_api_keys_bulk(req.key_ids)
+    remaining_keys = get_api_keys()
+    return {
+        "success": True,
+        "deleted_count": deleted_count,
+        "deleted_ids": deleted_ids,
+        "remaining_count": len(remaining_keys)
+    }
+
+@router.post("/api-keys/bulk-rotate")
+def rotate_api_keys_bulk_endpoint(req: BulkRotateApiKeysRequest, _ = Depends(require_auth)):
+    from app.services.auth import rotate_api_keys_bulk
+    rotated = rotate_api_keys_bulk(req.key_ids)
+    return {
+        "success": True,
+        "rotated_keys": rotated,
+        "count": len(rotated)
+    }
 
 
 @router.post("/login")

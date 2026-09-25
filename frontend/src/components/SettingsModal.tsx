@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   X, 
   Settings as SettingsIcon, 
@@ -40,7 +40,12 @@ import {
   Eye,
   EyeOff,
   Leaf,
-  Gauge
+  Gauge,
+  CheckSquare,
+  Square,
+  RotateCw,
+  Search,
+  FileCode2
 } from 'lucide-react';
 import type { AppSettings, ModelOption, Conversation } from '../types';
 import { 
@@ -68,6 +73,8 @@ import {
   fetchApiKeys,
   createApiKey,
   deleteApiKey,
+  bulkDeleteApiKeys,
+  bulkRotateApiKeys,
   type ApiKeyItem,
   type GoogleAccountInfo,
   type GoogleAccountsResponse,
@@ -385,6 +392,173 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [loadingApiKeys, setLoadingApiKeys] = useState(false);
   const [creatingApiKey, setCreatingApiKey] = useState(false);
   const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
+  const [selectedKeyIds, setSelectedKeyIds] = useState<Set<string>>(new Set());
+  const [keySearch, setKeySearch] = useState('');
+  const [keyFilter, setKeyFilter] = useState<'all' | 'used' | 'unused'>('all');
+  const [bulkOperating, setBulkOperating] = useState(false);
+
+  const filteredApiKeys = useMemo(() => {
+    return apiKeys.filter(k => {
+      const q = keySearch.toLowerCase().trim();
+      const matchesSearch = !q || 
+        k.name.toLowerCase().includes(q) || 
+        k.masked_key.toLowerCase().includes(q) ||
+        k.id.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+      if (keyFilter === 'used') return !!k.last_used_at;
+      if (keyFilter === 'unused') return !k.last_used_at;
+      return true;
+    });
+  }, [apiKeys, keySearch, keyFilter]);
+
+  const handleToggleSelectKey = (id: string) => {
+    setSelectedKeyIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllKeys = () => {
+    const allFilteredSelected = filteredApiKeys.length > 0 && filteredApiKeys.every(k => selectedKeyIds.has(k.id));
+    if (allFilteredSelected) {
+      setSelectedKeyIds(prev => {
+        const next = new Set(prev);
+        filteredApiKeys.forEach(k => next.delete(k.id));
+        return next;
+      });
+    } else {
+      setSelectedKeyIds(prev => {
+        const next = new Set(prev);
+        filteredApiKeys.forEach(k => next.add(k.id));
+        return next;
+      });
+    }
+  };
+
+  const handleBulkDeleteKeys = async () => {
+    const ids = Array.from(selectedKeyIds);
+    if (ids.length === 0) return;
+    const ok = await showConfirm({
+      title: t('confirm_bulk_revoke_title', 'Révoquer les clés sélectionnées'),
+      message: t('confirm_bulk_revoke_msg', 'Voulez-vous vraiment révoquer définitivement {0} clé(s) d\'API sélectionnée(s) ? Les applications externes connectées perdront immédiatement l\'accès.').replace('{0}', String(ids.length)),
+      confirmText: t('revoke_btn', 'Révoquer'),
+      destructive: true
+    });
+    if (!ok) return;
+
+    setBulkOperating(true);
+    try {
+      const res = await bulkDeleteApiKeys(ids);
+      showToast(t('toast_bulk_delete_success', '{0} clé(s) d\'API révoquée(s) avec succès').replace('{0}', String(res.deleted_count)), 'success');
+      setSelectedKeyIds(prev => {
+        const next = new Set(prev);
+        ids.forEach(id => next.delete(id));
+        return next;
+      });
+      await loadApiKeys();
+    } catch (e: any) {
+      showToast(t('err_bulk_delete', 'Erreur révocation groupée: {0}').replace('{0}', e.message), 'error');
+    } finally {
+      setBulkOperating(false);
+    }
+  };
+
+  const handleBulkRotateKeys = async () => {
+    const ids = Array.from(selectedKeyIds);
+    if (ids.length === 0) return;
+    const ok = await showConfirm({
+      title: t('confirm_bulk_rotate_title', 'Régénérer les clés sélectionnées'),
+      message: t('confirm_bulk_rotate_msg', 'Une nouvelle valeur secrète sera générée pour {0} clé(s) d\'API sélectionnée(s). Les anciennes clés deviendront immédiatement invalides. Continuer ?').replace('{0}', String(ids.length)),
+      confirmText: t('rotate_btn', 'Régénérer'),
+      destructive: false
+    });
+    if (!ok) return;
+
+    setBulkOperating(true);
+    try {
+      const res = await bulkRotateApiKeys(ids);
+      showToast(t('toast_bulk_rotate_success', '{0} clé(s) d\'API régénérée(s) avec succès').replace('{0}', String(res.count)), 'success');
+      // Automatically reveal rotated keys so the user can copy the new values
+      const newReveals: Record<string, boolean> = {};
+      res.rotated_keys.forEach(k => { newReveals[k.id] = true; });
+      setRevealedKeys(prev => ({ ...prev, ...newReveals }));
+      await loadApiKeys();
+    } catch (e: any) {
+      showToast(t('err_bulk_rotate', 'Erreur régénération groupée: {0}').replace('{0}', e.message), 'error');
+    } finally {
+      setBulkOperating(false);
+    }
+  };
+
+  const handleBulkCopyKeys = async (format: 'env' | 'list') => {
+    const selected = apiKeys.filter(k => selectedKeyIds.has(k.id));
+    if (selected.length === 0) return;
+    let text = '';
+    const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/v1` : 'http://localhost:8000/v1';
+    if (format === 'env') {
+      text = selected.map(k => {
+        const varPrefix = k.name.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+        return `# ${k.name} (Antigravity Gateway)\n${varPrefix}_BASE_URL="${baseUrl}"\n${varPrefix}_API_KEY="${k.key}"`;
+      }).join('\n\n');
+    } else {
+      text = selected.map(k => `${k.name}: ${k.key}`).join('\n');
+    }
+    await handleCopyText(text, format === 'env' ? t('env_config_bulk', 'Configuration .env groupée') : t('keys_bulk', 'Clés d\'API sélectionnées'));
+  };
+
+  const handleBulkExportKeys = (format: 'env' | 'json') => {
+    const selected = apiKeys.filter(k => selectedKeyIds.has(k.id));
+    if (selected.length === 0) return;
+    const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/v1` : 'http://localhost:8000/v1';
+    let content = '';
+    let filename = `antigravity-api-keys-${new Date().toISOString().slice(0, 10)}`;
+    let mime = 'text/plain';
+
+    if (format === 'json') {
+      filename += '.json';
+      mime = 'application/json';
+      content = JSON.stringify({
+        exported_at: new Date().toISOString(),
+        base_url_openai: baseUrl,
+        base_url_native: typeof window !== 'undefined' ? `${window.location.origin}/api/v1/agent/run` : 'http://localhost:8000/api/v1/agent/run',
+        keys: selected.map(k => ({
+          id: k.id,
+          name: k.name,
+          key: k.key,
+          created_at: k.created_at,
+          last_used_at: k.last_used_at
+        }))
+      }, null, 2);
+    } else {
+      filename += '.env';
+      content = `# Antigravity Universal API Gateway Configuration\n# Exported: ${new Date().toISOString()}\n\nOPENAI_BASE_URL="${baseUrl}"\n\n` +
+        selected.map(k => {
+          const varPrefix = k.name.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+          return `# ${k.name}\n${varPrefix}_API_KEY="${k.key}"`;
+        }).join('\n\n');
+    }
+
+    const blob = new Blob([content], { type: mime });
+    triggerFileDownload(blob, filename);
+    showToast(t('toast_keys_exported', 'Fichier {0} exporté avec succès').replace('{0}', filename), 'success');
+  };
+
+  const handleBulkToggleReveal = () => {
+    const selected = apiKeys.filter(k => selectedKeyIds.has(k.id));
+    const allRevealed = selected.length > 0 && selected.every(k => !!revealedKeys[k.id]);
+    setRevealedKeys(prev => {
+      const next = { ...prev };
+      selected.forEach(k => {
+        next[k.id] = !allRevealed;
+      });
+      return next;
+    });
+  };
 
   const loadApiKeys = useCallback(async () => {
     setLoadingApiKeys(true);
@@ -427,6 +601,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
       await deleteApiKey(keyId);
       showToast(t('toast_key_revoked', 'API key revoked successfully.'), 'success');
+      setSelectedKeyIds(prev => {
+        const next = new Set(prev);
+        next.delete(keyId);
+        return next;
+      });
       await loadApiKeys();
     } catch (e: any) {
       showToast(t('err_key_revoke', 'Error revoking key: {0}').replace('{0}', e.message), 'error');
@@ -3001,78 +3180,267 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   borderColor: 'var(--border)',
                 }}
               >
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-bold" style={{ color: 'var(--strong)' }}>
-                    {t('active_api_keys_count', "Clés d'API Actives ({0})").replace('{0}', String(apiKeys.length))}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs font-bold" style={{ color: 'var(--strong)' }}>
+                      {t('active_api_keys_count', "Clés d'API Actives ({0})").replace('{0}', String(apiKeys.length))}
+                    </div>
+                    {filteredApiKeys.length !== apiKeys.length && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-medium">
+                        {filteredApiKeys.length} {t('filtered_count', 'filtrée(s)')}
+                      </span>
+                    )}
                   </div>
-                  <button
-                    onClick={loadApiKeys}
-                    disabled={loadingApiKeys}
-                    className="text-[11px] text-slate-400 hover:text-slate-200 flex items-center gap-1 transition-colors"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${loadingApiKeys ? 'animate-spin' : ''}`} />
-                    <span>{t('refresh', 'Actualiser')}</span>
-                  </button>
+
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    {filteredApiKeys.length > 0 && (
+                      <button
+                        onClick={handleSelectAllKeys}
+                        className="text-[11px] px-2.5 py-1 rounded-lg border border-slate-700/50 hover:bg-black/5 dark:hover:bg-white/5 text-slate-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        {filteredApiKeys.length > 0 && filteredApiKeys.every(k => selectedKeyIds.has(k.id)) ? (
+                          <>
+                            <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>{t('deselect_all', 'Tout désélectionner')}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Square className="w-3.5 h-3.5 opacity-60" />
+                            <span>{t('select_all', 'Tout sélectionner')}</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={loadApiKeys}
+                      disabled={loadingApiKeys}
+                      className="text-[11px] text-slate-400 hover:text-slate-200 flex items-center gap-1 transition-colors px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${loadingApiKeys ? 'animate-spin' : ''}`} />
+                      <span>{t('refresh', 'Actualiser')}</span>
+                    </button>
+                  </div>
                 </div>
+
+                {/* Search & Filter Bar (shown if keys exist) */}
+                {apiKeys.length > 0 && (
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                    <div className="relative flex-1">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder={t('search_api_keys_placeholder', "Rechercher une clé par nom, token masqué...")}
+                        value={keySearch}
+                        onChange={(e) => setKeySearch(e.target.value)}
+                        className="w-full pl-8 pr-7 py-1.5 rounded-xl text-xs border outline-none transition-all font-mono"
+                        style={{
+                          backgroundColor: 'var(--surface)',
+                          borderColor: 'var(--border)',
+                          color: 'var(--text)',
+                        }}
+                      />
+                      {keySearch && (
+                        <button
+                          onClick={() => setKeySearch('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-0.5 cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0 bg-black/10 dark:bg-white/5 p-1 rounded-xl border border-black/5 dark:border-white/10 text-[11px]">
+                      <button
+                        onClick={() => setKeyFilter('all')}
+                        className={`px-2.5 py-1 rounded-lg transition-colors font-medium cursor-pointer ${keyFilter === 'all' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                      >
+                        {t('filter_all', 'Toutes')} ({apiKeys.length})
+                      </button>
+                      <button
+                        onClick={() => setKeyFilter('used')}
+                        className={`px-2.5 py-1 rounded-lg transition-colors font-medium cursor-pointer ${keyFilter === 'used' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                      >
+                        {t('filter_used', 'Utilisées')} ({apiKeys.filter(k => !!k.last_used_at).length})
+                      </button>
+                      <button
+                        onClick={() => setKeyFilter('unused')}
+                        className={`px-2.5 py-1 rounded-lg transition-colors font-medium cursor-pointer ${keyFilter === 'unused' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                      >
+                        {t('filter_unused', 'Inactives')} ({apiKeys.filter(k => !k.last_used_at).length})
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Bulk Action Bar (Visible when >= 1 key is selected) */}
+                {selectedKeyIds.size > 0 && (
+                  <div
+                    className="p-3 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-150"
+                    style={{
+                      backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                      borderColor: 'rgba(16, 185, 129, 0.35)',
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                        <CheckSquare className="w-4 h-4 text-emerald-400" />
+                        <span>{t('bulk_selected_count', '{0} clé(s) sélectionnée(s)').replace('{0}', String(selectedKeyIds.size))}</span>
+                      </span>
+                      <button
+                        onClick={() => setSelectedKeyIds(new Set())}
+                        className="text-[11px] text-slate-400 hover:text-slate-200 underline ml-1 cursor-pointer"
+                      >
+                        {t('clear_selection', 'Désélectionner')}
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Bulk Reveal / Hide */}
+                      <button
+                        onClick={handleBulkToggleReveal}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-black/10 dark:hover:bg-white/10 text-slate-300 text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title={t('bulk_toggle_reveal_tooltip', 'Afficher ou masquer toutes les clés sélectionnées')}
+                      >
+                        <Eye className="w-3.5 h-3.5 text-slate-300" />
+                        <span>{t('bulk_reveal_hide', 'Afficher/Masquer')}</span>
+                      </button>
+
+                      {/* Bulk Copy .env */}
+                      <button
+                        onClick={() => handleBulkCopyKeys('env')}
+                        className="px-2.5 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title={t('bulk_copy_env_tooltip', 'Copier la configuration au format .env')}
+                      >
+                        <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>{t('bulk_copy_env', 'Copier .env')}</span>
+                      </button>
+
+                      {/* Bulk Export .env file */}
+                      <button
+                        onClick={() => handleBulkExportKeys('env')}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-black/10 dark:hover:bg-white/10 text-slate-300 text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title={t('bulk_export_env_file', 'Télécharger fichier .env')}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>.env</span>
+                      </button>
+
+                      {/* Bulk Export .json file */}
+                      <button
+                        onClick={() => handleBulkExportKeys('json')}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-black/10 dark:hover:bg-white/10 text-slate-300 text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title={t('bulk_export_json_file', 'Télécharger fichier .json')}
+                      >
+                        <FileCode2 className="w-3.5 h-3.5" />
+                        <span>.json</span>
+                      </button>
+
+                      {/* Bulk Rotate */}
+                      <button
+                        onClick={handleBulkRotateKeys}
+                        disabled={bulkOperating}
+                        className="px-2.5 py-1.5 rounded-lg border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                        title={t('bulk_rotate_tooltip', 'Régénérer les tokens secrets des clés sélectionnées')}
+                      >
+                        <RotateCw className={`w-3.5 h-3.5 text-sky-400 ${bulkOperating ? 'animate-spin' : ''}`} />
+                        <span>{t('bulk_rotate', 'Régénérer')}</span>
+                      </button>
+
+                      {/* Bulk Revoke / Delete */}
+                      <button
+                        onClick={handleBulkDeleteKeys}
+                        disabled={bulkOperating}
+                        className="px-2.5 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                        title={t('bulk_revoke_tooltip', 'Révoquer définitivement les clés sélectionnées')}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <span>{t('bulk_revoke', 'Révoquer')}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {loadingApiKeys && apiKeys.length === 0 ? (
                   <div className="py-8 text-center text-xs opacity-50">{t('loading_api_keys', "Chargement des clés d'API...")}</div>
                 ) : apiKeys.length === 0 ? (
                   <div className="py-8 text-center text-xs opacity-50">{t('no_api_keys_configured', "Aucune clé d'API configurée.")}</div>
+                ) : filteredApiKeys.length === 0 ? (
+                  <div className="py-8 text-center text-xs opacity-50">{t('no_matching_api_keys', "Aucune clé ne correspond à votre recherche ou filtre.")}</div>
                 ) : (
                   <div className="space-y-2.5">
-                    {apiKeys.map((k) => {
+                    {filteredApiKeys.map((k) => {
                       const isRevealed = !!revealedKeys[k.id];
+                      const isSelected = selectedKeyIds.has(k.id);
                       return (
                         <div
                           key={k.id}
-                          className="p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                          className="p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-all"
                           style={{
-                            backgroundColor: 'var(--surface)',
-                            borderColor: 'var(--border-subtle)',
+                            backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.05)' : 'var(--surface)',
+                            borderColor: isSelected ? 'rgba(16, 185, 129, 0.4)' : 'var(--border-subtle)',
                           }}
                         >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-xs" style={{ color: 'var(--text)' }}>
-                                {k.name}
-                              </span>
-                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold">
-                                {t('active_caps', 'ACTIVE')}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 mt-1.5">
-                              <code className="font-mono text-xs bg-black/10 dark:bg-white/5 px-2 py-0.5 rounded border border-black/5 dark:border-white/10 text-emerald-600 dark:text-emerald-400 select-all">
-                                {isRevealed ? k.key : k.masked_key}
-                              </code>
-                              <button
-                                onClick={() => setRevealedKeys(prev => ({ ...prev, [k.id]: !prev[k.id] }))}
-                                className="p-1 text-slate-400 hover:text-slate-200 transition-colors"
-                                title={isRevealed ? t('hide_key', 'Masquer la clé') : t('show_key', 'Afficher la clé')}
-                              >
-                                {isRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                              </button>
-                              <button
-                                onClick={() => handleCopyText(k.key, t('api_key_named', 'Clé d\'API "{0}"').replace('{0}', k.name))}
-                                className="p-1 text-slate-400 hover:text-slate-200 transition-colors"
-                                title={t('copy_key', 'Copier la clé')}
-                              >
-                                <Copy className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                            <div className="text-[10px] opacity-40 mt-1">
-                              {t('created_on', 'Créée le')} {new Date(k.created_at * 1000).toLocaleDateString()}
-                              {k.last_used_at ? ` • ${t('last_used', 'Dernière utilisation')} : ${new Date(k.last_used_at * 1000).toLocaleString()}` : ` • ${t('never_used', 'Jamais utilisée')}`}
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            {/* Checkbox */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSelectKey(k.id)}
+                              className="mt-0.5 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer shrink-0"
+                              title={isSelected ? t('deselect', 'Désélectionner') : t('select', 'Sélectionner')}
+                            >
+                              {isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-emerald-400" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-500 hover:text-slate-400" />
+                              )}
+                            </button>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs" style={{ color: 'var(--text)' }}>
+                                  {k.name}
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold">
+                                  {t('active_caps', 'ACTIVE')}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                <code className="font-mono text-xs bg-black/10 dark:bg-white/5 px-2 py-0.5 rounded border border-black/5 dark:border-white/10 text-emerald-600 dark:text-emerald-400 select-all break-all">
+                                  {isRevealed ? k.key : k.masked_key}
+                                </code>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setRevealedKeys(prev => ({ ...prev, [k.id]: !prev[k.id] }))}
+                                    className="p-1 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                                    title={isRevealed ? t('hide_key', 'Masquer la clé') : t('show_key', 'Afficher la clé')}
+                                  >
+                                    {isRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                  </button>
+                                  <button
+                                    onClick={() => handleCopyText(k.key, t('api_key_named', 'Clé d\'API "{0}"').replace('{0}', k.name))}
+                                    className="p-1 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                                    title={t('copy_key', 'Copier la clé')}
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="text-[10px] opacity-40 mt-1">
+                                {t('created_on', 'Créée le')} {new Date(k.created_at * 1000).toLocaleDateString()}
+                                {k.last_used_at ? ` • ${t('last_used', 'Dernière utilisation')} : ${new Date(k.last_used_at * 1000).toLocaleString()}` : ` • ${t('never_used', 'Jamais utilisée')}`}
+                              </div>
                             </div>
                           </div>
 
-                          <button
-                            onClick={() => handleDeleteApiKey(k.id, k.name)}
-                            className="p-2 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-transparent hover:border-rose-500/20 transition-colors self-end sm:self-center shrink-0 cursor-pointer"
-                            title={t('revoke_this_key', 'Révoquer cette clé')}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1 self-end sm:self-center shrink-0">
+                            <button
+                              onClick={() => handleDeleteApiKey(k.id, k.name)}
+                              className="p-2 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-transparent hover:border-rose-500/20 transition-colors shrink-0 cursor-pointer"
+                              title={t('revoke_this_key', 'Révoquer cette clé')}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}

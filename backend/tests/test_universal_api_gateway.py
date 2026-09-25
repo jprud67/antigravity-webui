@@ -358,3 +358,49 @@ def test_native_agent_interrupt_and_steer_guards(setup_api_auth):
     # Steer with empty instruction raises 400
     steer_resp = client.post("/api/v1/agent/steer", json={"instruction": ""}, headers=headers)
     assert steer_resp.status_code == 400
+
+
+def test_api_keys_bulk_delete_and_rotate(setup_api_auth):
+    """Verify bulk delete and bulk rotate endpoints for API gateway keys."""
+    from app.services.auth import create_access_token, create_api_key, get_api_keys
+
+    admin_token = create_access_token()
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    k1 = create_api_key("App 1")
+    k2 = create_api_key("App 2")
+    k3 = create_api_key("App 3")
+
+    # Test Bulk Rotate
+    rotate_resp = client.post(
+        "/api/auth/api-keys/bulk-rotate",
+        json={"key_ids": [k1["id"], k2["id"]]},
+        headers=admin_headers
+    )
+    assert rotate_resp.status_code == 200
+    r_data = rotate_resp.json()
+    assert r_data["success"] is True
+    assert r_data["count"] == 2
+    rotated_map = {item["id"]: item["key"] for item in r_data["rotated_keys"]}
+    assert rotated_map[k1["id"]] != k1["key"]
+    assert rotated_map[k2["id"]] != k2["key"]
+    assert rotated_map[k1["id"]].startswith("agy_sk_")
+
+    # Test Bulk Delete
+    del_resp = client.post(
+        "/api/auth/api-keys/bulk-delete",
+        json={"key_ids": [k1["id"], k3["id"]]},
+        headers=admin_headers
+    )
+    assert del_resp.status_code == 200
+    del_data = del_resp.json()
+    assert del_data["success"] is True
+    assert del_data["deleted_count"] == 2
+    assert set(del_data["deleted_ids"]) == {k1["id"], k3["id"]}
+
+    # Verify k1 and k3 are gone, k2 remains
+    remaining_keys = get_api_keys()
+    remaining_ids = {item["id"] for item in remaining_keys}
+    assert k1["id"] not in remaining_ids
+    assert k3["id"] not in remaining_ids
+    assert k2["id"] in remaining_ids

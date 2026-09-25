@@ -175,6 +175,41 @@ export async function deleteApiKey(keyId: string): Promise<{ success: boolean }>
   return res.json();
 }
 
+export async function bulkDeleteApiKeys(keyIds: string[]): Promise<{
+  success: boolean;
+  deleted_count: number;
+  deleted_ids: string[];
+  remaining_count: number;
+}> {
+  const res = await fetch(`${API_BASE}/auth/api-keys/bulk-delete`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ key_ids: keyIds })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la suppression groupée des clés' }));
+    throw new Error(err.detail || 'Erreur lors de la suppression groupée des clés');
+  }
+  return res.json();
+}
+
+export async function bulkRotateApiKeys(keyIds: string[]): Promise<{
+  success: boolean;
+  rotated_keys: ApiKeyItem[];
+  count: number;
+}> {
+  const res = await fetch(`${API_BASE}/auth/api-keys/bulk-rotate`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ key_ids: keyIds })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la rotation groupée des clés' }));
+    throw new Error(err.detail || 'Erreur lors de la rotation groupée des clés');
+  }
+  return res.json();
+}
+
 // Conversations
 export async function fetchConversations(limit = 100, q?: string): Promise<Conversation[]> {
   const url = q && q.trim() 

@@ -331,6 +331,56 @@ def delete_api_key(key_id: str) -> bool:
         return False
 
 
+def delete_api_keys_bulk(key_ids: list[str]) -> tuple[int, list[str]]:
+    """Supprime un ensemble de clés d'API en une seule opération atomique."""
+    if not key_ids:
+        return 0, []
+    target_ids = {str(k).strip() for k in key_ids if str(k).strip()}
+    if not target_ids:
+        return 0, []
+    with _auth_lock:
+        config = get_auth_config()
+        keys = _ensure_api_keys_storage(config)
+        deleted_ids = [k.get("id") for k in keys if k.get("id") in target_ids]
+        if not deleted_ids:
+            return 0, []
+        new_keys = [k for k in keys if k.get("id") not in target_ids]
+        config["api_keys"] = new_keys
+        save_auth_config(config)
+        return len(deleted_ids), deleted_ids
+
+
+def rotate_api_keys_bulk(key_ids: list[str]) -> list[dict[str, Any]]:
+    """Régénère le secret token pour chaque clé spécifiée en conservant son nom et identifiant."""
+    if not key_ids:
+        return []
+    target_ids = {str(k).strip() for k in key_ids if str(k).strip()}
+    if not target_ids:
+        return []
+    rotated = []
+    with _auth_lock:
+        config = get_auth_config()
+        keys = _ensure_api_keys_storage(config)
+        for k in keys:
+            if k.get("id") in target_ids:
+                new_key = f"agy_sk_{secrets.token_hex(24)}"
+                k["key"] = new_key
+                k["last_used_at"] = None
+                masked = f"{new_key[:10]}...{new_key[-4:]}"
+                rotated.append({
+                    "id": k.get("id"),
+                    "name": k.get("name"),
+                    "key": new_key,
+                    "masked_key": masked,
+                    "created_at": k.get("created_at"),
+                    "last_used_at": None,
+                })
+        if rotated:
+            config["api_keys"] = keys
+            save_auth_config(config)
+        return rotated
+
+
 def verify_api_key(key: str | None) -> bool:
     """
     Vérifie si la clé passée correspond à l'environnement ANTIGRAVITY_API_KEY
