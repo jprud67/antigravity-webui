@@ -16,6 +16,9 @@ from app.services.agy_driver import (
     resolve_model_and_effort,
     stream_turn,
 )
+from app.services.context_budget import (
+    enforce_context_budget,
+)
 from app.services.google_auth import (
     get_active_account,
     is_quota_error,
@@ -23,13 +26,9 @@ from app.services.google_auth import (
 )
 from app.services.storage import (
     auto_truncate_transcript,
-    compact_conversation_in_place,
     get_settings,
     is_safe_conversation_id,
     save_settings,
-)
-from app.services.context_budget import (
-    enforce_context_budget,
 )
 
 logger = logging.getLogger("antigravity.execution")

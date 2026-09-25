@@ -39,7 +39,7 @@ def detect_project_details(
     if is_blocked_sensitive_path(resolved_path) or not resolved_path.is_dir():
         return _empty_project_detail(str(resolved_path), is_default, is_active)
 
-    cache_key = f"{str(resolved_path)}::{is_default}::{is_active}"
+    cache_key = f"{resolved_path!s}::{is_default}::{is_active}"
     now = time.time()
     with _cache_lock:
         if cache_key in _cache:
@@ -499,8 +499,7 @@ def _extract_stats(p: Path) -> dict[str, Any]:
                 st = entry.stat()
                 total_bytes += st.st_size
                 count += 1
-                if st.st_mtime > last_modified_ts:
-                    last_modified_ts = st.st_mtime
+                last_modified_ts = max(last_modified_ts, st.st_mtime)
             except Exception:
                 continue
         file_count = count

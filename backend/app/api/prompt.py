@@ -1,8 +1,8 @@
 import logging
 import math
 import re
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
@@ -38,7 +38,7 @@ class PromptAnalysisRequest(BaseModel):
 
 
 class DetectedElements(BaseModel):
-    files: List[str]
+    files: list[str]
     has_error_logs: bool
     has_code_block: bool
     has_constraints: bool
@@ -58,14 +58,14 @@ class PromptAnalysisResponse(BaseModel):
     estimated_tokens: int
     clarity_score: int
     breakdown: BreakdownScore
-    suggestions: List[str]
+    suggestions: list[str]
     detected_elements: DetectedElements
 
 
 class PromptOptimizationRequest(BaseModel):
     prompt: str
-    preset: Optional[str] = "general"
-    model: Optional[str] = None
+    preset: str | None = "general"
+    model: str | None = None
 
 
 class PromptOptimizationResponse(BaseModel):
@@ -77,13 +77,13 @@ class PromptOptimizationResponse(BaseModel):
     improvement_factor: float
 
 
-def _extract_detected_files(text: str) -> List[str]:
+def _extract_detected_files(text: str) -> list[str]:
     files = set()
     for match in _FILE_RE.finditer(text):
         f = match.group(1) or match.group(2)
         if f and not f.startswith("http://") and not f.startswith("https://"):
             files.add(f.strip("`"))
-    return sorted(list(files))
+    return sorted(files)
 
 
 def _estimate_tokens(text: str) -> int:

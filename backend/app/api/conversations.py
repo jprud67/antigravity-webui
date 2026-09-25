@@ -6,6 +6,10 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
+from app.services.context_budget import (
+    enforce_context_budget,
+    get_conversation_context_budget_info,
+)
 from app.services.execution_manager import execution_manager
 from app.services.session_metadata import (
     bulk_update_session_meta,
@@ -34,10 +38,6 @@ from app.services.storage import (
     undo_conversation_turn,
     update_conversation_summary_fields,
     update_conversation_title,
-)
-from app.services.context_budget import (
-    enforce_context_budget,
-    get_conversation_context_budget_info,
 )
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
@@ -249,10 +249,10 @@ def bulk_export(req: BulkActionRequest, _ = Depends(require_auth)):
 
 def _do_zip_export(conversation_ids: list[str] | None = None) -> Response:
     """Export conversations as a ZIP archive of Markdown files."""
-    import zipfile
+    import datetime
     import io
     import re
-    import datetime
+    import zipfile
 
     target_ids = conversation_ids if conversation_ids else []
     if not target_ids:
@@ -294,7 +294,7 @@ def _do_zip_export(conversation_ids: list[str] | None = None) -> Response:
                 continue
 
     zip_buffer.seek(0)
-    today_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    today_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
     return Response(
         content=zip_buffer.getvalue(),
         media_type="application/zip",

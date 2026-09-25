@@ -8,16 +8,15 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
-from app.config import DEFAULT_WORKSPACE, GEMINI_DIR
+from app.config import DEFAULT_WORKSPACE, GEMINI_DIR, REPO_ROOT
 from app.platform_utils import is_blocked_sensitive_path, is_safe_path
 from app.services.storage import _safe_atomic_replace, get_settings
-
-
 
 logger = logging.getLogger("antigravity.files")
 router = APIRouter(prefix="/api/files", tags=["files"])
@@ -103,11 +102,10 @@ def _validate_path_access(file_path: Path | str, base_dir: Path | str | None = N
     workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
 
     # Toujours inclure DEFAULT_WORKSPACE, GEMINI_DIR, et la racine du dépôt antigravity-webui
-    repo_root = Path(__file__).resolve().parent.parent.parent.parent
     allowed_roots = [
         Path(DEFAULT_WORKSPACE).resolve(),
         Path(GEMINI_DIR).resolve(),
-        repo_root.resolve()
+        REPO_ROOT.resolve()
     ]
     if settings.get("defaultWorkspace"):
         try:
@@ -392,8 +390,7 @@ def rename_file_or_dir(req: RenameFileRequest, _ = Depends(require_auth)):
     settings = get_settings()
     raw_workspaces = settings.get("trustedWorkspaces", [])
     workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
-    repo_root = Path(__file__).resolve().parent.parent.parent.parent
-    allowed_roots = {Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve(), repo_root.resolve()}
+    allowed_roots = {Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve(), REPO_ROOT.resolve()}
     for ws in workspaces:
         try:
             allowed_roots.add(Path(ws).resolve())
@@ -438,8 +435,7 @@ def delete_file_or_dir(req: DeleteFileRequest, _ = Depends(require_auth)):
     settings = get_settings()
     raw_workspaces = settings.get("trustedWorkspaces", [])
     workspaces = list(raw_workspaces) if isinstance(raw_workspaces, list) else []
-    repo_root = Path(__file__).resolve().parent.parent.parent.parent
-    allowed_roots = {Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve(), repo_root.resolve()}
+    allowed_roots = {Path(DEFAULT_WORKSPACE).resolve(), Path(GEMINI_DIR).resolve(), REPO_ROOT.resolve()}
     for ws in workspaces:
         try:
             allowed_roots.add(Path(ws).resolve())
@@ -630,11 +626,11 @@ async def upload_file(
     total_bytes = 0
     chunk_size = 64 * 1024
     try:
-        with open(resolved_target, "wb") as out_f:
+        async with aiofiles.open(resolved_target, "wb") as out_f:
             while chunk := await file.read(chunk_size):
                 total_bytes += len(chunk)
                 if total_bytes > MAX_UPLOAD_SIZE:
-                    out_f.close()
+                    await out_f.close()
                     try:
                         resolved_target.unlink(missing_ok=True)
                     except Exception:
@@ -643,7 +639,7 @@ async def upload_file(
                         status_code=413,
                         detail="Fichier trop volumineux (taille maximale de 50 Mo dépassée)."
                     )
-                out_f.write(chunk)
+                await out_f.write(chunk)
     except HTTPException:
         raise
     except Exception as e:
@@ -978,10 +974,13 @@ def workspace_replace(req: WorkspaceReplaceRequest, _ = Depends(require_auth)):
             ))
 
             if not req.dry_run:
-                tmp_file = file_p.with_suffix(file_p.suffix + f".tmp_{uuid.uuid4().hex[:6]}")
-                with open(tmp_file, "w", encoding="utf-8") as f_out:
-                    f_out.write(modified)
-                _safe_atomic_replace(tmp_file, file_p)
+                tmp_file = file_p.parent / f".{file_p.name}.tmp_{uuid.uuid4().hex[:8]}"
+                try:
+                    with open(tmp_file, "w", encoding="utf-8") as f_out:
+                        f_out.write(modified)
+                    _safe_atomic_replace(tmp_file, file_p)
+                finally:
+                    tmp_file.unlink(missing_ok=True)
 
 
         except (OSError, PermissionError) as e:
@@ -1038,10 +1037,13 @@ def single_replace(req: SingleReplaceRequest, _ = Depends(require_auth)):
     lines[req.line_number - 1] = new_line
     modified_content = "".join(lines)
 
-    tmp_file = p.with_suffix(p.suffix + f".tmp_{uuid.uuid4().hex[:6]}")
-    with open(tmp_file, "w", encoding="utf-8") as f_out:
-        f_out.write(modified_content)
-    _safe_atomic_replace(tmp_file, p)
+    tmp_file = p.parent / f".{p.name}.tmp_{uuid.uuid4().hex[:8]}"
+    try:
+        with open(tmp_file, "w", encoding="utf-8") as f_out:
+            f_out.write(modified_content)
+        _safe_atomic_replace(tmp_file, p)
+    finally:
+        tmp_file.unlink(missing_ok=True)
 
 
     return {

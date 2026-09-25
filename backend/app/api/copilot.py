@@ -1,11 +1,9 @@
-import asyncio
 import hashlib
 import logging
 import re
 import threading
 import time
 from collections import OrderedDict
-from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -26,7 +24,7 @@ class InlineSuggestRequest(BaseModel):
     prefix: str
     suffix: str = ""
     language: str = "text"
-    file_path: Optional[str] = None
+    file_path: str | None = None
     max_tokens: int = 120
     temperature: float = 0.2
 
@@ -42,15 +40,15 @@ class CopilotActionRequest(BaseModel):
     action: str  # "refactor", "types", "docstring", "tests"
     code: str
     language: str = "text"
-    file_path: Optional[str] = None
-    user_instruction: Optional[str] = None
+    file_path: str | None = None
+    user_instruction: str | None = None
 
 
 class CopilotActionResponse(BaseModel):
     action: str
     result_code: str
     explanation: str
-    diff: Optional[str] = None
+    diff: str | None = None
 
 
 class CopilotStatusResponse(BaseModel):
@@ -87,7 +85,7 @@ def _make_cache_key(prefix: str, suffix: str, language: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _get_from_cache(key: str) -> Optional[str]:
+def _get_from_cache(key: str) -> str | None:
     with _cache_lock:
         if key in _lru_cache:
             _lru_cache.move_to_end(key)
@@ -112,7 +110,7 @@ def _generate_llm_completion(
     language: str,
     max_tokens: int,
     temperature: float,
-    file_path: Optional[str] = None
+    file_path: str | None = None
 ) -> str:
     """
     Point d'entrée d'inférence LLM pour la complétion FIM (Fill-in-the-Middle).
@@ -150,8 +148,8 @@ def _generate_llm_action(
     action: str,
     code: str,
     language: str,
-    user_instruction: Optional[str] = None
-) -> Dict[str, str]:
+    user_instruction: str | None = None
+) -> dict[str, str]:
     """
     Point d'entrée pour les Code Actions (refactor, types, docstring, tests).
     Peut être mocké dans les tests unitaires.
@@ -188,12 +186,12 @@ def _generate_llm_action(
     elif action == "tests":
         if language in ("python", "py"):
             return {
-                "result_code": f"import pytest\n\ndef test_feature():\n    assert True\n",
+                "result_code": "import pytest\n\ndef test_feature():\n    assert True\n",
                 "explanation": "Suite de tests unitaires pytest générée."
             }
         else:
             return {
-                "result_code": f"import {{ describe, it, expect }} from 'vitest';\n\ndescribe('feature', () => {{\n  it('should work', () => {{\n    expect(true).toBe(true);\n  }});\n}});\n",
+                "result_code": "import { describe, it, expect } from 'vitest';\n\ndescribe('feature', () => {\n  it('should work', () => {\n    expect(true).toBe(true);\n  });\n});\n",
                 "explanation": "Suite de tests unitaires Vitest générée."
             }
 
@@ -208,7 +206,7 @@ async def get_copilot_status(_auth=Depends(require_auth)):
         cached_count = len(_lru_cache)
 
     return CopilotStatusResponse(
-        available=True,
+        available=bool(account) if account is not None else True,
         default_model="gemini-3.8-flash",
         cached_items=cached_count
     )
@@ -283,7 +281,7 @@ async def copilot_action(payload: CopilotActionRequest, _auth=Depends(require_au
     if action not in valid_actions:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Action invalide: '{action}'. Actions valides: {sorted(list(valid_actions))}"
+            detail=f"Action invalide: '{action}'. Actions valides: {sorted(valid_actions)}"
         )
 
     if not payload.code or not payload.code.strip():

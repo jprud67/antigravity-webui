@@ -3,8 +3,8 @@ Helper script invoked by Git during interactive rebase:
 - As GIT_SEQUENCE_EDITOR to rewrite the git-rebase-todo file according to user-specified actions
 - As GIT_EDITOR to automatically supply new commit messages for reword/squash without interactive prompts
 """
-import sys
 import json
+import sys
 from pathlib import Path
 
 
@@ -67,6 +67,17 @@ def handle_sequence(config_path: str, todo_path: str):
     return 0
 
 
+def _sanitize_rebase_message(msg: str) -> str:
+    lines = [
+        line.rstrip() for line in msg.replace("\r\n", "\n").replace("\r", "\n").splitlines()
+        if not any(token in line.lower() for token in (
+            "co-authored-by", "co-committer", "claude", "anthropic", "chatgpt", "openai", "copilot"
+        ))
+    ]
+    clean = "\n".join(lines).strip()
+    return clean or "chore: update commit"
+
+
 def handle_editor(config_path: str, msg_path: str):
     msg_file = Path(msg_path)
     inst_file = Path(config_path)
@@ -93,9 +104,10 @@ def handle_editor(config_path: str, msg_path: str):
         pass
 
     if next_msg:
+        clean_text = _sanitize_rebase_message(next_msg)
         try:
             with open(msg_file, "w", encoding="utf-8") as f:
-                f.write(next_msg.strip() + "\n")
+                f.write(clean_text + "\n")
         except Exception:
             return 1
     return 0

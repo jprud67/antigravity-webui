@@ -776,23 +776,27 @@ def _safe_atomic_replace(tmp_file: Path, target_path: Path, max_retries: int = 5
     Remplacement atomique résilient aux verrous de fichiers temporaires sous Windows.
     Effectue des réessais avec backoff et un repli en écriture directe si le renommage est bloqué.
     """
-    for attempt in range(max_retries):
-        try:
-            tmp_file.replace(target_path)
-            return
-        except (PermissionError, OSError) as e:
-            if attempt < max_retries - 1:
-                time.sleep(0.05 * (attempt + 1))
-            else:
-                try:
-                    target_path.write_bytes(tmp_file.read_bytes())
+    try:
+        for attempt in range(max_retries):
+            try:
+                tmp_file.replace(target_path)
+                return
+            except (PermissionError, OSError) as e:
+                if attempt < max_retries - 1:
+                    time.sleep(0.05 * (attempt + 1))
+                else:
                     try:
-                        tmp_file.unlink()
+                        target_path.write_bytes(tmp_file.read_bytes())
+                        return
                     except Exception:
-                        pass
-                    return
-                except Exception:
-                    raise e
+                        raise e
+    finally:
+        try:
+            if tmp_file.exists() and tmp_file.resolve() != target_path.resolve():
+                tmp_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+
 
 def atomic_write_jsonl(target_path: Path, items: list[dict[str, Any]]) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)

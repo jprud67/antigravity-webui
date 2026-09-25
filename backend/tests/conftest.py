@@ -5,7 +5,6 @@ the host's ~/.gemini/antigravity-cli configuration or live user data.
 """
 import os
 import shutil
-import tempfile
 from pathlib import Path
 
 # Setup isolated ANTIGRAVITY_DATA_DIR before any app module import
@@ -15,13 +14,10 @@ os.environ["ANTIGRAVITY_DATA_DIR"] = str(_TEST_DATA_DIR)
 os.environ["WEBUI_PASSWORD"] = "antigravity2026"
 
 import pytest
-from fastapi.testclient import TestClient
 
-from app.main import app
 from app.services.auth import (
     DEFAULT_PASSWORD,
     create_access_token,
-    get_auth_config,
     hash_password,
     save_auth_config,
 )

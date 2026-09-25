@@ -1,6 +1,7 @@
-import pytest
 from pathlib import Path
+
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
@@ -21,6 +22,7 @@ def test_unauthenticated_crud():
     assert res.status_code in (401, 403)
 
 import uuid
+
 
 def test_create_read_rename_delete_cycle(tmp_path):
     headers = get_auth_headers()
@@ -100,3 +102,23 @@ def test_delete_root_is_forbidden():
     headers = get_auth_headers()
     res = client.post("/api/files/delete", json={"path": "."}, headers=headers)
     assert res.status_code in (400, 403)
+
+
+def test_safe_atomic_replace_cleanup(tmp_path):
+    from unittest.mock import patch
+
+    from app.services.storage import _safe_atomic_replace
+
+    tmp_file = tmp_path / "temp_file.tmp"
+    tmp_file.write_text("temporary data", encoding="utf-8")
+    target = tmp_path / "dest.txt"
+
+    with patch.object(Path, "replace", side_effect=PermissionError("locked")), \
+         patch.object(Path, "write_bytes", side_effect=PermissionError("denied")):
+        try:
+            _safe_atomic_replace(tmp_file, target, max_retries=1)
+        except PermissionError:
+            pass
+
+    assert not tmp_file.exists()
+

@@ -10,14 +10,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlencode
 
-
-
 from fastapi import APIRouter, Depends, HTTPException, Query
-
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
-from app.config import DEFAULT_WORKSPACE
+from app.config import DEFAULT_WORKSPACE, REPO_ROOT
 from app.platform_utils import is_safe_path
 from app.services.storage import get_settings
 
@@ -94,7 +91,7 @@ def _validate_workspace(workspace: str | None) -> Path:
     allowed_roots = [
         Path(DEFAULT_WORKSPACE).resolve(), 
         Path.cwd().resolve(),
-        Path(__file__).resolve().parent.parent.parent.parent
+        REPO_ROOT.resolve()
     ]
     for ws in workspaces:
         try:
@@ -582,7 +579,7 @@ def get_file_diff_ranges(
             m = _HUNK_HEADER_RE.match(line)
             if not m:
                 continue
-            old_start = int(m.group(1))
+            _old_start = int(m.group(1))
             old_count = int(m.group(2)) if m.group(2) is not None else 1
             new_start = int(m.group(3))
             new_count = int(m.group(4)) if m.group(4) is not None else 1
@@ -765,10 +762,6 @@ def checkout_branch(req: BranchCheckoutRequest, _ = Depends(require_auth)):
     branch = req.branch.strip()
     if not branch or branch.startswith("-") or "--" in branch or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
         raise HTTPException(status_code=400, detail="Nom de branche invalide.")
-
-    # Vérification de l'arbre de travail
-    status_res = run_git(["status", "--porcelain"], target)
-    dirty_files = [line.strip() for line in status_res.stdout.splitlines() if line.strip()]
 
     args = ["checkout"]
     if req.create:
@@ -1073,7 +1066,7 @@ def execute_rebase(req: RebaseExecuteRequest, _ = Depends(require_auth)):
         with open(config_file, "w", encoding="utf-8") as f:
             json.dump(config_data, f, ensure_ascii=False)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur d'initialisation du rebase : {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur d'initialisation du rebase : {e!s}")
 
     python_bin = sys.executable
     helper_script = str(REBASE_HELPER_PATH)
@@ -2237,7 +2230,7 @@ def get_release_notes(
             continue
         commits_count += 1
         parts = line.split("|", 3)
-        sha = parts[0]
+        _sha = parts[0]
         short_sha = parts[1]
         author = parts[2]
         subject = parts[3]

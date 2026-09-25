@@ -1,18 +1,16 @@
 import json
 import logging
-import re
 from typing import Any
-from pathlib import Path
 
 from app.config import BRAIN_DIR
 from app.services.storage import (
     TOOL_STEP_TYPES,
-    is_tool_output_content,
-    clean_user_prompt,
-    is_safe_conversation_id,
-    atomic_write_jsonl,
     _notify_transcript_changed,
+    atomic_write_jsonl,
+    clean_user_prompt,
     get_settings,
+    is_safe_conversation_id,
+    is_tool_output_content,
 )
 
 logger = logging.getLogger("antigravity.context_budget")

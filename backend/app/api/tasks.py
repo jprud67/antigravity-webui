@@ -192,10 +192,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                         elif "status: failed" in lower_preview or "the command exited with code 1" in lower_preview:
                             status = "failed"
                             exit_code = 1
-                        elif has_finish_marker:
-                            status = "completed"
-                            exit_code = 0
-                        elif (now_ts - stat_mtime) > 300 and not is_active_process:
+                        elif has_finish_marker or (now_ts - stat_mtime) > 300 and not is_active_process:
                             status = "completed"
                             exit_code = 0
                         else:

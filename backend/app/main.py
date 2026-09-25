@@ -13,6 +13,7 @@ from app.api.artifacts import router as art_router
 from app.api.auth import router as auth_router
 from app.api.chat import router as chat_router
 from app.api.conversations import router as conv_router
+from app.api.copilot import router as copilot_router
 from app.api.crons import router as crons_router
 from app.api.events import router as events_router
 from app.api.files import router as files_router
@@ -20,6 +21,7 @@ from app.api.git import router as git_router
 from app.api.google_accounts import router as google_router
 from app.api.kanban import router as kanban_router
 from app.api.openai_compat import router as openai_router
+from app.api.prompt import router as prompt_router
 from app.api.rules import router as rules_router
 from app.api.settings import router as set_router
 from app.api.skills import router as skills_router
@@ -28,8 +30,6 @@ from app.api.terminal import close_all_terminal_sessions
 from app.api.terminal import router as terminal_router
 from app.api.updater import router as updater_router
 from app.api.workspaces import router as ws_router
-from app.api.prompt import router as prompt_router
-from app.api.copilot import router as copilot_router
 from app.config import BRAIN_DIR, CONVERSATION_DB
 from app.services.cron_ticker import cron_ticker_loop
 from app.services.execution_manager import execution_manager

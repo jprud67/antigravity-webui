@@ -1,5 +1,4 @@
 import json
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -160,6 +159,7 @@ def test_detect_project_health_standalone():
 
 
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
@@ -193,7 +193,7 @@ def test_api_get_workspaces_health():
         tmp_path = Path(tmp_dir)
         (tmp_path / "package.json").write_text('{"name": "api-health-test"}', encoding="utf-8")
 
-        res = client.get(f"/api/workspaces/health?path={str(tmp_path)}", headers=headers)
+        res = client.get(f"/api/workspaces/health?path={tmp_path!s}", headers=headers)
         assert res.status_code == 200
         data = res.json()
         assert "status" in data
@@ -208,7 +208,7 @@ def test_api_set_default_workspace():
     headers = get_auth_headers()
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
-        res = client.post(f"/api/workspaces/default?path={str(tmp_path)}", headers=headers)
+        res = client.post(f"/api/workspaces/default?path={tmp_path!s}", headers=headers)
         assert res.status_code == 200
         data = res.json()
         assert data.get("status") == "ok"

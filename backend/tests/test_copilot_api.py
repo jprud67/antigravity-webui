@@ -1,9 +1,10 @@
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 
-from app.main import app
 from app.api.auth import require_auth
+from app.main import app
 
 client = TestClient(app)
 

@@ -1,13 +1,12 @@
-import os
 import shutil
-import pytest
+import uuid
 from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-
-import uuid
 from app.config import DEFAULT_WORKSPACE
+from app.main import app
 
 client = TestClient(app)
 
@@ -212,3 +211,66 @@ def test_single_replace():
     # Check file content on disk
     new_content = (TEMP_TEST_DIR / "file2.ts").read_text(encoding="utf-8")
     assert "export const GREETING = 'Bonjour World';" in new_content
+
+
+def test_replace_extensionless_and_dotfile():
+    headers = get_auth_headers()
+    dockerfile = TEMP_TEST_DIR / "Dockerfile"
+    dockerfile.write_text("FROM node:20\nENV APP_ENV=production\n", encoding="utf-8")
+
+    gitignore = TEMP_TEST_DIR / ".gitignore"
+    gitignore.write_text("node_modules/\n.cache_old/\n", encoding="utf-8")
+
+    payload = {
+        "query": "APP_ENV=production",
+        "replace_text": "APP_ENV=staging",
+        "workspace": str(TEMP_TEST_DIR),
+        "file_paths": [str(dockerfile)],
+        "dry_run": False
+    }
+    res = client.post("/api/files/workspace-replace", json=payload, headers=headers)
+    assert res.status_code == 200
+    assert dockerfile.exists()
+    assert dockerfile.name == "Dockerfile"
+    assert "APP_ENV=staging" in dockerfile.read_text(encoding="utf-8")
+
+    # Single replace on dotfile
+    line1 = gitignore.read_text(encoding="utf-8").splitlines()[1]
+    col = line1.find(".cache_old")
+    single_payload = {
+        "file_path": str(gitignore),
+        "workspace": str(TEMP_TEST_DIR),
+        "line_number": 2,
+        "column": col + 1,
+        "match_length": len(".cache_old"),
+        "replace_text": ".cache_new",
+        "expected_match": ".cache_old"
+    }
+    res_single = client.post("/api/files/single-replace", json=single_payload, headers=headers)
+    assert res_single.status_code == 200
+    assert gitignore.exists()
+    assert gitignore.name == ".gitignore"
+    assert ".cache_new/" in gitignore.read_text(encoding="utf-8")
+
+    # Assert no temporary files were left in directory
+    leftovers = [f.name for f in TEMP_TEST_DIR.iterdir() if ".tmp" in f.name]
+    assert len(leftovers) == 0
+
+
+def test_rebase_helper_sanitizes_message():
+    from app.services.git_rebase_helper import _sanitize_rebase_message
+
+    dirty_msg = (
+        "feat(core): update core subsystem\n\n"
+        "Co-Authored-By: Claude <noreply@anthropic.com>\n"
+        "Co-Committer: Claude <claude@anthropic.com>\n"
+        "assisted-by: ai\n"
+        "Some legitimate body text\n"
+    )
+    clean = _sanitize_rebase_message(dirty_msg)
+    assert "Co-Authored-By" not in clean
+    assert "Claude" not in clean
+    assert "claude" not in clean
+    assert "Some legitimate body text" in clean
+    assert "feat(core): update core subsystem" in clean
+

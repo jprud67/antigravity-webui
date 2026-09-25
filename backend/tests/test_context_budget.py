@@ -1,18 +1,16 @@
 import json
 import shutil
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.config import BRAIN_DIR
 from app.main import app
 from app.services.context_budget import (
-    calculate_conversation_context_size,
-    get_conversation_context_budget_info,
-    enforce_context_budget,
     BASE_SYSTEM_TOKENS,
+    calculate_conversation_context_size,
+    enforce_context_budget,
+    get_conversation_context_budget_info,
 )
 from app.services.storage import atomic_write_jsonl
 
@@ -250,6 +248,7 @@ class TestContextBudgetAPI:
 
     def test_api_get_context_budget_invalid_id(self):
         from fastapi import HTTPException
+
         from app.api.conversations import get_session_context_budget
         with pytest.raises(HTTPException) as exc_info:
             get_session_context_budget("../bad..id")
