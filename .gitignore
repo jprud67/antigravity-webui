@@ -34,3 +34,6 @@ logs/
 scratch/
 .superpowers/
 *.png
+.test_tmp*
+backend/tests/.test_env_data/
+

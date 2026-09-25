@@ -15,7 +15,9 @@ from pydantic import BaseModel
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE, GEMINI_DIR
 from app.platform_utils import is_blocked_sensitive_path, is_safe_path
-from app.services.storage import get_settings
+from app.services.storage import _safe_atomic_replace, get_settings
+
+
 
 logger = logging.getLogger("antigravity.files")
 router = APIRouter(prefix="/api/files", tags=["files"])
@@ -979,7 +981,8 @@ def workspace_replace(req: WorkspaceReplaceRequest, _ = Depends(require_auth)):
                 tmp_file = file_p.with_suffix(file_p.suffix + f".tmp_{uuid.uuid4().hex[:6]}")
                 with open(tmp_file, "w", encoding="utf-8") as f_out:
                     f_out.write(modified)
-                os.replace(tmp_file, file_p)
+                _safe_atomic_replace(tmp_file, file_p)
+
 
         except (OSError, PermissionError) as e:
             logger.warning(f"Could not replace in file {file_p}: {e}")
@@ -1038,7 +1041,8 @@ def single_replace(req: SingleReplaceRequest, _ = Depends(require_auth)):
     tmp_file = p.with_suffix(p.suffix + f".tmp_{uuid.uuid4().hex[:6]}")
     with open(tmp_file, "w", encoding="utf-8") as f_out:
         f_out.write(modified_content)
-    os.replace(tmp_file, p)
+    _safe_atomic_replace(tmp_file, p)
+
 
     return {
         "success": True,

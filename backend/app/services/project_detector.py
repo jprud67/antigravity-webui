@@ -381,6 +381,12 @@ def _extract_git_info(p: Path) -> dict[str, Any]:
         }
 
     git_bin = shutil.which("git") or "git"
+    git_env = {
+        **os.environ,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ASKPASS": "",
+        "SSH_ASKPASS": "",
+    }
 
     # Branch
     branch: str | None = None
@@ -391,6 +397,7 @@ def _extract_git_info(p: Path) -> dict[str, Any]:
             capture_output=True,
             text=True,
             timeout=1.5,
+            env=git_env,
         )
         if res.returncode == 0:
             branch = res.stdout.strip() or "HEAD (detached)"
@@ -407,6 +414,7 @@ def _extract_git_info(p: Path) -> dict[str, Any]:
             capture_output=True,
             text=True,
             timeout=1.5,
+            env=git_env,
         )
         if res.returncode == 0:
             lines = [l for l in res.stdout.splitlines() if l.strip()]
@@ -425,6 +433,7 @@ def _extract_git_info(p: Path) -> dict[str, Any]:
             capture_output=True,
             text=True,
             timeout=1.5,
+            env=git_env,
         )
         if res.returncode == 0:
             remote_url = res.stdout.strip()
@@ -440,6 +449,7 @@ def _extract_git_info(p: Path) -> dict[str, Any]:
             capture_output=True,
             text=True,
             timeout=1.5,
+            env=git_env,
         )
         if res.returncode == 0 and res.stdout.strip():
             parts = res.stdout.strip().split("|", 2)
@@ -451,6 +461,7 @@ def _extract_git_info(p: Path) -> dict[str, Any]:
                 }
     except Exception:
         pass
+
 
     return {
         "is_repo": True,

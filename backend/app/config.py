@@ -18,6 +18,7 @@ if not Path(AGY_BIN).exists():
     if resolved:
         AGY_BIN = resolved
 
+<<<<<<< HEAD
 def _detect_default_workspace() -> Path:
     env_ws = os.environ.get("ANTIGRAVITY_DEFAULT_WORKSPACE")
     if env_ws and Path(env_ws).exists():
@@ -38,3 +39,13 @@ def _detect_default_workspace() -> Path:
 
 # Workspace par défaut : dépôt Git parent le plus proche, racine du projet webui, ou dossier utilisateur (surchargeable via ANTIGRAVITY_DEFAULT_WORKSPACE)
 DEFAULT_WORKSPACE = os.environ.get("ANTIGRAVITY_DEFAULT_WORKSPACE") or str(_detect_default_workspace())
+=======
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+
+# Workspace par défaut : répertoire de travail actuel s'il contient un dépôt Git, sinon racine du projet, sinon dossier utilisateur (surchargeable via ANTIGRAVITY_DEFAULT_WORKSPACE)
+DEFAULT_WORKSPACE = (
+    os.environ.get("ANTIGRAVITY_DEFAULT_WORKSPACE")
+    or (str(Path.cwd()) if (Path.cwd() / ".git").exists() else (str(REPO_ROOT) if (REPO_ROOT / ".git").exists() else str(HOME)))
+)
+
+>>>>>>> 43c60e5 (fix(core): hermetic test isolation, git query normalization and safe file replacement)

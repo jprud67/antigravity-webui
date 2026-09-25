@@ -66,6 +66,8 @@ def save_all_session_metadata(metadata: dict[str, dict[str, Any]]) -> None:
             if not replace_ok and last_err:
                 raise last_err
 
+
+
             restrict_file_permissions(SESSION_METADATA_FILE)
             _cached_meta = copy.deepcopy(metadata)
             _cached_mtime = SESSION_METADATA_FILE.stat().st_mtime

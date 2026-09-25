@@ -7,9 +7,13 @@ import sys
 import time
 import unicodedata
 from pathlib import Path
+from typing import Any
 from urllib.parse import unquote, urlencode
 
+
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
@@ -57,10 +61,12 @@ def _sanitize_git_message(msg: str) -> str:
     clean = re.sub(r'\n{3,}', '\n\n', clean)
     return clean or "chore: update repository"
 
-def _normalize_workspace_str(ws: str | None) -> str | None:
-    if not ws:
-        return ws
+def _normalize_workspace_str(ws: Any) -> str | None:
+    if ws is None or not isinstance(ws, str):
+        return None
     cleaned = ws.strip()
+    if not cleaned:
+        return None
     # Normalize URL leading slash for Windows drives: /C:/foo -> C:/foo or /C:\foo -> C:\foo
     if re.match(r"^/[a-zA-Z]:", cleaned):
         cleaned = cleaned[1:]
@@ -68,6 +74,7 @@ def _normalize_workspace_str(ws: str | None) -> str | None:
     if re.match(r"^[a-zA-Z]:[^/\\]", cleaned):
         cleaned = cleaned[:2] + "/" + cleaned[2:]
     return cleaned
+
 
 def _validate_workspace(workspace: str | None) -> Path:
     ws_norm = _normalize_workspace_str(workspace)

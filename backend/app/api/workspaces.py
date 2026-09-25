@@ -35,11 +35,12 @@ def list_workspace_details(active_path: str | None = Query(None), _ = Depends(re
         norm_default = default_ws
 
     norm_active = None
-    if active_path:
+    if active_path and isinstance(active_path, str) and active_path.strip():
         try:
-            norm_active = str(Path(active_path).resolve())
+            norm_active = str(Path(active_path.strip()).resolve())
         except Exception:
-            norm_active = active_path
+            norm_active = active_path.strip()
+
 
     results = []
     for w in workspaces:
