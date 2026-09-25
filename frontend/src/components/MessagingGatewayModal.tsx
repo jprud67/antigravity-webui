@@ -89,7 +89,10 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
 
   useEffect(() => {
     if (isOpen) {
-      loadData();
+      const timer = setTimeout(() => {
+        loadData();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, loadData]);
 

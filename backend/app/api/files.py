@@ -636,7 +636,11 @@ async def upload_file(
         safe_name = f"uploaded_{uuid.uuid4().hex[:6]}"
 
     target_file = resolved_dir / safe_name
+    if target_file.is_symlink():
+        raise HTTPException(status_code=400, detail="Impossible d'écraser un lien symbolique.")
     resolved_target = _validate_path_access(target_file, base_dir=workspace)
+    if resolved_target.is_symlink():
+        raise HTTPException(status_code=400, detail="Impossible d'écraser un lien symbolique.")
 
     total_bytes = 0
     chunk_size = 64 * 1024
@@ -675,11 +679,18 @@ class DuplicateFileRequest(BaseModel):
 @router.post("/duplicate")
 def duplicate_file(req: DuplicateFileRequest, _ = Depends(require_auth)):
     file_path = Path(req.path)
+    base_root = Path(req.workspace).resolve() if req.workspace else Path(DEFAULT_WORKSPACE).resolve()
+    raw_path = file_path if file_path.is_absolute() else (base_root / file_path)
+    if raw_path.is_symlink():
+        raise HTTPException(status_code=400, detail="La duplication des liens symboliques n'est pas supportée.")
+
     resolved_path = _validate_path_access(file_path, base_dir=req.workspace)
     if not resolved_path.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
     if resolved_path.is_dir():
         raise HTTPException(status_code=400, detail="La duplication des dossiers n'est pas supportée.")
+    if resolved_path.is_symlink():
+        raise HTTPException(status_code=400, detail="La duplication des liens symboliques n'est pas supportée.")
 
     stem = resolved_path.stem
     suffix = resolved_path.suffix
@@ -689,7 +700,7 @@ def duplicate_file(req: DuplicateFileRequest, _ = Depends(require_auth)):
     candidate_name = f"{stem}_copy{suffix}"
     candidate_path = parent / candidate_name
     counter = 1
-    while candidate_path.exists():
+    while candidate_path.exists() or candidate_path.is_symlink():
         candidate_name = f"{stem}_copy_{counter}{suffix}"
         candidate_path = parent / candidate_name
         counter += 1

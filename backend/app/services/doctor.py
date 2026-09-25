@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import platform
 import shutil
 import sqlite3
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 import httpx
 import psutil
 

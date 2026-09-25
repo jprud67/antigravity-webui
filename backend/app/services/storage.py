@@ -1762,6 +1762,7 @@ def update_conversation_summary_fields(
         if project_id is not None:
             meta_updates["project"] = project_id.strip()
         if title is not None:
+            meta_updates["customTitle"] = title.strip()
             meta_updates["custom_title"] = title.strip()
         if meta_updates:
             update_session_meta(conversation_id, meta_updates)

@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
 from app.services.progress_card import (
     get_progress_card,

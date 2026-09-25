@@ -13,14 +13,13 @@ import os
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 import httpx
 
 from app.services.agy_subcommand import (
     get_mcp_servers,
     add_mcp_server,
-    remove_mcp_server,
-    toggle_mcp_server
+    remove_mcp_server
 )
 
 logger = logging.getLogger(__name__)

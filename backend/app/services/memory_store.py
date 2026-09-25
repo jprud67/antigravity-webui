@@ -20,10 +20,8 @@ from __future__ import annotations
 import logging
 import os
 import re
-import sys
 import threading
 from contextlib import contextmanager, suppress
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -151,25 +149,21 @@ class MemoryStore:
             with suppress(Exception):
                 lock_path.write_text(" ", encoding="utf-8")
 
-        fd = None
-        try:
-            fd = open(lock_path, "r+" if msvcrt else "a+", encoding="utf-8")
-            if fcntl:
-                fcntl.flock(fd, fcntl.LOCK_EX)
-            elif msvcrt:
-                fd.seek(0)
-                msvcrt.locking(fd.fileno(), msvcrt.LK_LOCK, 1)
-            yield
-        finally:
-            if fd:
+        with open(lock_path, "r+" if msvcrt else "a+", encoding="utf-8") as fd:
+            try:
+                if fcntl:
+                    fcntl.flock(fd, fcntl.LOCK_EX)
+                elif msvcrt:
+                    fd.seek(0)
+                    msvcrt.locking(fd.fileno(), msvcrt.LK_LOCK, 1)
+                yield
+            finally:
                 with suppress(Exception):
                     if fcntl:
                         fcntl.flock(fd, fcntl.LOCK_UN)
                     elif msvcrt:
                         fd.seek(0)
                         msvcrt.locking(fd.fileno(), msvcrt.LK_UNLCK, 1)
-                with suppress(Exception):
-                    fd.close()
 
     def _parse_entries(self, text: str) -> List[str]:
         """Découpe le texte markdown en entrées distinctes."""

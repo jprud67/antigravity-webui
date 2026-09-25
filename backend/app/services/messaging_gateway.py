@@ -9,7 +9,6 @@ Provides:
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import secrets
@@ -152,7 +151,7 @@ def request_pairing(platform: str, user_id: str, user_name: Optional[str] = None
         """, (rate_key, now))
         conn.commit()
 
-    return True, f"Code de couplage généré. Veuillez le valider dans Antigravity WebUI.", code
+    return True, "Code de couplage généré. Veuillez le valider dans Antigravity WebUI.", code
 
 
 def approve_pairing_code(code: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:

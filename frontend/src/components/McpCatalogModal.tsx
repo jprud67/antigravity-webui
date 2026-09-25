@@ -73,7 +73,10 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadCatalog();
+      const timer = setTimeout(() => {
+        loadCatalog();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, loadCatalog]);
 

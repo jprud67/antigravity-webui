@@ -1,6 +1,6 @@
 """API router for Persistent Code Kernel and Tool RPC."""
 
-from typing import Any, Dict, Optional
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 

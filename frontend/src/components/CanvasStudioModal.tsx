@@ -191,7 +191,10 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadDocuments();
+      const timer = setTimeout(() => {
+        loadDocuments();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, loadDocuments]);
 

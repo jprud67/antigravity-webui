@@ -54,7 +54,10 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadData();
+      const timer = setTimeout(() => {
+        loadData();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, loadData]);
 

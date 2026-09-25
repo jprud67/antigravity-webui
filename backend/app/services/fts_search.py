@@ -18,7 +18,6 @@ import sqlite3
 import threading
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.config import BRAIN_DIR, CONVERSATION_DB
@@ -268,8 +267,7 @@ class TranscriptFtsService:
                         )
                         indexed_count += 1
 
-                    if step_idx > max_step:
-                        max_step = step_idx
+                    max_step = max(max_step, step_idx)
 
             with _fts_lock:
                 conn.execute(
@@ -325,21 +323,14 @@ class TranscriptFtsService:
             where_sql = " AND ".join(clauses)
             
             # Utilise snippet(session_transcript_fts, 5, '<mark class="fts-match">', '</mark>', '...', 28)
-            # Colonne 5 correspond à text (0=session_id, 1=message_id, 2=role, 3=project, 4=timestamp, 5=text)
-            sql = f"""
-                SELECT 
-                    session_id,
-                    message_id,
-                    role,
-                    project,
-                    timestamp,
-                    snippet(session_transcript_fts, 5, '<mark class="fts-match">', '</mark>', '...', 28) AS snippet_text,
-                    bm25(session_transcript_fts) AS rank_score
-                FROM session_transcript_fts
-                WHERE {where_sql}
-                ORDER BY rank_score ASC
-                LIMIT ?
-            """
+            sql = (
+                "SELECT session_id, message_id, role, project, timestamp, "
+                "snippet(session_transcript_fts, 5, '<mark class=\"fts-match\">', '</mark>', '...', 28) AS snippet_text, "
+                "bm25(session_transcript_fts) AS rank_score "
+                "FROM session_transcript_fts "
+                f"WHERE {where_sql} "  # nosec B608
+                "ORDER BY rank_score ASC LIMIT ?"
+            )
             params.append(max(1, min(limit, 200)))
 
             cursor = conn.execute(sql, params)
@@ -352,7 +343,7 @@ class TranscriptFtsService:
                 try:
                     placeholders = ",".join("?" * len(session_ids))
                     title_rows = conn.execute(
-                        f"SELECT conversation_id, title FROM conversation_summaries WHERE conversation_id IN ({placeholders})",
+                        f"SELECT conversation_id, title FROM conversation_summaries WHERE conversation_id IN ({placeholders})",  # nosec B608
                         session_ids
                     ).fetchall()
                     for tr in title_rows:

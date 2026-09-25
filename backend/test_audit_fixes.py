@@ -9096,6 +9096,82 @@ def test_git_status_unborn_branch_and_detached_head_parsing():
         assert "newfile.txt" in st["untracked"]
 
 
+def test_link_understanding_ssrf_and_redirect_validation():
+    from app.services.link_understanding import is_safe_public_url
+    assert is_safe_public_url("https://github.com") is True
+    assert is_safe_public_url("http://127.0.0.1:8000") is False
+    assert is_safe_public_url("http://localhost:3000") is False
+    assert is_safe_public_url("http://169.254.169.254/latest/meta-data") is False
+    assert is_safe_public_url("file:///etc/passwd") is False
+
+
+def test_web_push_endpoint_validation():
+    from app.services.web_push import is_safe_push_endpoint
+    assert is_safe_push_endpoint("https://fcm.googleapis.com/fcm/send/foo") is True
+    assert is_safe_push_endpoint("https://updates.push.services.mozilla.com/wpush/v2/bar") is True
+    assert is_safe_push_endpoint("http://localhost:8000/push") is True
+    assert is_safe_push_endpoint("http://127.0.0.1:8000/push") is True
+    assert is_safe_push_endpoint("file:///etc/shadow") is False
+    assert is_safe_push_endpoint("http://192.168.1.100/push") is False
+    assert is_safe_push_endpoint("javascript:alert(1)") is False
+
+
+def test_session_metadata_custom_title_harmonization():
+    from app.services.session_metadata import _normalize_meta
+    meta1 = _normalize_meta({"custom_title": "Projet Alpha"})
+    assert meta1["customTitle"] == "Projet Alpha"
+    assert meta1["custom_title"] == "Projet Alpha"
+
+    meta2 = _normalize_meta({"customTitle": "Projet Beta"})
+    assert meta2["customTitle"] == "Projet Beta"
+    assert meta2["custom_title"] == "Projet Beta"
+
+
+def test_vector_memory_fips_md5_and_context_formatting():
+    import math
+    from app.services.vector_memory import (
+        MemoryEntry,
+        MemorySearchResult,
+        format_recalled_memories_context,
+        generate_local_embedding,
+    )
+    v1 = generate_local_embedding("Docker orchestration with compose")
+    assert len(v1) == 384
+    norm = math.sqrt(sum(x * x for x in v1))
+    assert abs(norm - 1.0) < 0.001
+
+    entry = MemoryEntry(
+        id="mem-1",
+        agent_id="default",
+        text="FastAPI backend runs on port 8000",
+        importance=0.9,
+        category="fact",
+        created_at=1700000000.0,
+    )
+    result = MemorySearchResult(entry=entry, score=0.88, similarity=0.88)
+    formatted = format_recalled_memories_context([result], max_chars=1000)
+    assert "<recalled_memories>" in formatted
+    assert "FastAPI backend runs on port 8000" in formatted
+    assert "88% match" in formatted
+    assert "</recalled_memories>" in formatted
+
+
+def test_files_upload_and_duplicate_symlink_protection(tmp_path: Path):
+    from fastapi import HTTPException
+    from app.api.files import DuplicateFileRequest, duplicate_file
+
+    real_file = tmp_path / "real_file.txt"
+    real_file.write_text("Hello World", encoding="utf-8")
+    symlink_file = tmp_path / "symlink_file.txt"
+    symlink_file.symlink_to(real_file)
+
+    req = DuplicateFileRequest(path=str(symlink_file), workspace=str(tmp_path))
+    with pytest.raises(HTTPException) as exc_info:
+        duplicate_file(req)
+    assert exc_info.value.status_code == 400
+    assert "symboliques" in exc_info.value.detail.lower()
+
+
 if __name__ == "__main__":
     test_tasks_transcript_outcomes_and_exit_code(Path(tempfile.mkdtemp()))
     test_tasks_kill_task_open_file_and_fallback(Path(tempfile.mkdtemp()))
@@ -9431,6 +9507,12 @@ if __name__ == "__main__":
     test_files_search_symlink_and_timeout_resilience()
     test_project_detector_unified_git_telemetry()
     test_git_status_unborn_branch_and_detached_head_parsing()
+    test_link_understanding_ssrf_and_redirect_validation()
+    test_web_push_endpoint_validation()
+    test_session_metadata_custom_title_harmonization()
+    test_vector_memory_fips_md5_and_context_formatting()
+    with tempfile.TemporaryDirectory() as td:
+        test_files_upload_and_duplicate_symlink_protection(Path(td))
     print("\nAll unit tests passed successfully!")
 
 

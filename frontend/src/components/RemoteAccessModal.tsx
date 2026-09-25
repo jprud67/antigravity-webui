@@ -37,7 +37,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
   const [tailscale, setTailscale] = useState<TailscaleStatus | null>(null);
   const [loadingTailscale, setLoadingTailscale] = useState(false);
   const [togglingServe, setTogglingServe] = useState(false);
-  const [pushSupported, setPushSupported] = useState(false);
+  const [pushSupported] = useState(() => typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof window !== 'undefined' && 'PushManager' in window);
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [subscribingPush, setSubscribingPush] = useState(false);
   const [subscriptions, setSubscriptions] = useState<WebPushSubscriptionItem[]>([]);
@@ -62,14 +62,16 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
 
   useEffect(() => {
     if (isOpen) {
-      loadData();
+      const timer = setTimeout(() => {
+        loadData();
+      }, 0);
       if ('serviceWorker' in navigator && 'PushManager' in window) {
-        setPushSupported(true);
         navigator.serviceWorker.ready.then(async (reg) => {
           const sub = await reg.pushManager.getSubscription();
           setPushSubscribed(!!sub);
         }).catch(() => {});
       }
+      return () => clearTimeout(timer);
     }
   }, [isOpen, loadData]);
 

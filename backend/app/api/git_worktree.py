@@ -1,6 +1,6 @@
 """API router for subagent Git Worktree isolation."""
 
-from typing import Any, Dict, Optional
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 

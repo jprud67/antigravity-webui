@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, HttpUrl
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from app.services.link_understanding import (
     fetch_and_extract_url,

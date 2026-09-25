@@ -16,7 +16,7 @@ import socket
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from urllib.parse import urlparse
 import httpx
 
@@ -171,7 +171,20 @@ async def fetch_and_extract_url(url: str, force_refresh: bool = False) -> dict[s
         "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8"
     }
 
-    async with httpx.AsyncClient(timeout=6.0, follow_redirects=True, verify=False) as client:
+    def _validate_redirect(response: httpx.Response):
+        if response.is_redirect:
+            loc = response.headers.get("location")
+            if loc:
+                target_url = str(response.url.join(loc))
+                if not is_safe_public_url(target_url):
+                    raise ValueError(f"Redirection vers une URL non autorisée (SSRF) : {target_url}")
+
+    async with httpx.AsyncClient(
+        timeout=6.0,
+        follow_redirects=True,
+        verify=True,
+        event_hooks={"response": [_validate_redirect]}
+    ) as client:
         resp = await client.get(url, headers=headers)
         if resp.status_code >= 400:
             raise RuntimeError(f"Échec HTTP {resp.status_code} lors de la lecture du lien.")

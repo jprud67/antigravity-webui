@@ -46,8 +46,11 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadReport();
-      setRepairResult(null);
+      const timer = setTimeout(() => {
+        loadReport();
+        setRepairResult(null);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, loadReport]);
 

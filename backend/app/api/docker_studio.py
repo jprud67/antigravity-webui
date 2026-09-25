@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
 
 from app.config import DEFAULT_WORKSPACE
 from app.services.docker_studio import (

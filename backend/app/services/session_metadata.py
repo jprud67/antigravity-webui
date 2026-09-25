@@ -131,7 +131,9 @@ def _normalize_meta(meta: dict[str, Any]) -> dict[str, Any]:
     raw_project_id = str(meta.get("project_id") or "").strip()
     meta["project"] = raw_project or raw_project_id
     meta["projectColor"] = str(meta.get("projectColor") or "").strip()
-    meta["customTitle"] = str(meta.get("customTitle") or "").strip()
+    raw_custom_title = str(meta.get("customTitle") or meta.get("custom_title") or "").strip()
+    meta["customTitle"] = raw_custom_title
+    meta["custom_title"] = raw_custom_title
     meta["group_id"] = str(meta.get("group_id") or "").strip()
     meta["project_id"] = raw_project_id or raw_project
     return meta

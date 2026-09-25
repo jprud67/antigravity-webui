@@ -1,7 +1,7 @@
 """API router for Tailscale Remote Access."""
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.services.tailscale import (

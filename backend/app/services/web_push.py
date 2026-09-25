@@ -14,12 +14,25 @@ import os
 import secrets
 import sqlite3
 import time
-from pathlib import Path
+import urllib.parse
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "sessions.db")
+
+
+def is_safe_push_endpoint(endpoint: str) -> bool:
+    """Valide que l'endpoint de push est conforme aux spécifications Web Push (HTTPS ou local)."""
+    try:
+        parsed = urllib.parse.urlparse(endpoint)
+        if parsed.scheme == "https":
+            return bool(parsed.hostname)
+        if parsed.scheme == "http" and parsed.hostname in ("127.0.0.1", "localhost", "::1"):
+            return True
+        return False
+    except Exception:
+        return False
 
 
 def _get_db() -> sqlite3.Connection:
@@ -75,6 +88,9 @@ def get_or_create_vapid_keys() -> Dict[str, str]:
 
 def save_subscription(endpoint: str, p256dh: str, auth: str, user_agent: Optional[str] = None) -> bool:
     """Register or update a client push subscription."""
+    if not is_safe_push_endpoint(endpoint):
+        logger.warning("web_push: rejet d'un endpoint push non sécurisé ou invalide : %s", endpoint[:40])
+        return False
     ensure_web_push_schema()
     with _get_db() as conn:
         conn.execute("""
@@ -134,6 +150,9 @@ def send_web_push_notification(
 
     for sub in subs:
         endpoint = sub["endpoint"]
+        if not is_safe_push_endpoint(endpoint):
+            failed += 1
+            continue
         try:
             # If pywebpush is installed, use native VAPID encryption
             try:
@@ -160,7 +179,7 @@ def send_web_push_notification(
                     data=payload.encode("utf-8"),
                     headers={"Content-Type": "application/json"}
                 )
-                with urllib.request.urlopen(req, timeout=3) as resp:
+                with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310
                     if resp.status in (200, 201, 202):
                         dispatched += 1
                     elif resp.status in (404, 410):

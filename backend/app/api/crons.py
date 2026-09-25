@@ -100,7 +100,6 @@ def create_cron_job(req: CreateCronJobRequest, _ = Depends(require_auth)):
             detail=f"Expression de planification invalide : '{sched_raw}'. Utilisez un format cron (ex: '*/15 * * * *') ou un intervalle (ex: 'every 30m')."
         )
 
-    from croniter import croniter
     job_id = uuid.uuid4().hex[:8]
     schedule_dict = {
         "kind": "cron" if croniter.is_valid(sched_raw) else "interval",
@@ -151,8 +150,6 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
         raise HTTPException(status_code=400, detail="Le nom du job ne peut pas être vide")
     if req.prompt is not None and not req.prompt.strip():
         raise HTTPException(status_code=400, detail="L'instruction du prompt ne peut pas être vide")
-
-    from croniter import croniter
 
     def _modify(data):
         jobs = data.get("jobs", [])

@@ -223,9 +223,8 @@ def scan_workspace_docker_files(workspace_dir: str) -> List[WorkspaceDockerItem]
                 )
             elif (
                 fl_lower in ("docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml")
-                or fl_lower.startswith("docker-compose.")
-                or fl_lower.startswith("compose.")
-            ) and (fl_lower.endswith(".yml") or fl_lower.endswith(".yaml")):
+                or fl_lower.startswith(("docker-compose.", "compose."))
+            ) and fl_lower.endswith((".yml", ".yaml")):
                 # Parse compose services
                 services: List[ComposeServiceSummary] = []
                 try:

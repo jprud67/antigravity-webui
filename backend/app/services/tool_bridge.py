@@ -407,7 +407,7 @@ def normalize_decision(
 
     if content:
         from app.services.tool_repair import tool_repair_engine
-        cleaned_text, repaired_calls, was_repaired = tool_repair_engine.repair_and_extract(
+        _cleaned_text, repaired_calls, was_repaired = tool_repair_engine.repair_and_extract(
             content, list(allowed_lower.values())
         )
         if was_repaired and repaired_calls:
@@ -552,7 +552,7 @@ async def run_turn(
                 decision = normalize_decision(parsed, allowed_lower, usage, thinking)
             elif raw_response.strip():
                 from app.services.tool_repair import tool_repair_engine
-                cleaned_text, repaired_calls, was_repaired = tool_repair_engine.repair_and_extract(
+                _cleaned_text, repaired_calls, was_repaired = tool_repair_engine.repair_and_extract(
                     raw_response, list(allowed_lower.values())
                 )
                 if was_repaired and repaired_calls:

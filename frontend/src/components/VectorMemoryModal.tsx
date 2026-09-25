@@ -87,7 +87,10 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadData();
+      const timer = setTimeout(() => {
+        loadData();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, loadData]);
 
@@ -95,8 +98,10 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
   useEffect(() => {
     const query = searchQuery.trim();
     if (!query) {
-      setSearchResults([]);
-      return;
+      const timer = setTimeout(() => {
+        setSearchResults([]);
+      }, 0);
+      return () => clearTimeout(timer);
     }
 
     const timer = setTimeout(async () => {

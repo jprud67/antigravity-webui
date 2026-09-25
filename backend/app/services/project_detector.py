@@ -341,7 +341,13 @@ def _extract_runtimes_and_health(p: Path) -> tuple[list[dict[str, Any]], dict[st
         })
 
     # 6. Docker detection
-    if (p / "Dockerfile").is_file() or (p / "docker-compose.yml").is_file() or (p / "compose.yaml").is_file():
+    if (
+        (p / "Dockerfile").is_file()
+        or (p / "docker-compose.yml").is_file()
+        or (p / "docker-compose.yaml").is_file()
+        or (p / "compose.yml").is_file()
+        or (p / "compose.yaml").is_file()
+    ):
         runtimes.append({
             "type": "docker",
             "version": None,
@@ -524,7 +530,7 @@ def _extract_stats(p: Path) -> dict[str, Any]:
             if entry.name in ["node_modules", "venv", ".venv", "vendor", "dist", "build", "__pycache__"]:
                 continue
             try:
-                st = entry.stat()
+                st = entry.stat(follow_symlinks=False)
                 total_bytes += st.st_size
                 count += 1
                 last_modified_ts = max(last_modified_ts, st.st_mtime)

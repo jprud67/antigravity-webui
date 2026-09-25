@@ -81,7 +81,10 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadData();
+      const timer = setTimeout(() => {
+        loadData();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, loadData]);
 
@@ -101,7 +104,10 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
 
   useEffect(() => {
     if (isOpen && activeTab === 'logs' && selectedContainerId) {
-      loadContainerLogs(selectedContainerId, logsTail);
+      const timer = setTimeout(() => {
+        loadContainerLogs(selectedContainerId, logsTail);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, activeTab, selectedContainerId, logsTail, loadContainerLogs]);
 

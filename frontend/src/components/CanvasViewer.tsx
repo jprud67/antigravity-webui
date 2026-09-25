@@ -41,8 +41,9 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   const [refreshKey, setRefreshKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const effectiveId = doc?.id || docId;
-  const effectiveTitle = title || doc?.title || 'Canvas Widget';
+  const activeDoc = propDoc || doc;
+  const effectiveId = activeDoc?.id || docId;
+  const effectiveTitle = title || activeDoc?.title || 'Canvas Widget';
 
   // Load document metadata if docId provided without full manifest
   useEffect(() => {
@@ -50,14 +51,12 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
       canvasApi.getDocument(docId).then(setDoc).catch((err) => {
         console.error('Failed to load canvas document:', err);
       });
-    } else if (propDoc) {
-      setDoc(propDoc);
     }
   }, [docId, propDoc]);
 
   // Determine iframe source URL
   const iframeSrc = effectiveId 
-    ? canvasApi.getServeUrl(effectiveId, doc?.localEntrypoint || 'index.html') 
+    ? canvasApi.getServeUrl(effectiveId, activeDoc?.localEntrypoint || 'index.html') 
     : undefined;
 
   // Listen to height and theme message events from sandboxed iframe
@@ -150,9 +149,9 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
         <div className="flex items-center gap-2 font-medium text-foreground">
           <Layers className="w-3.5 h-3.5 text-accent" />
           <span className="truncate max-w-[200px] sm:max-w-xs">{effectiveTitle}</span>
-          {doc?.kind && (
+          {activeDoc?.kind && (
             <span className="px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-mono uppercase tracking-wider">
-              {doc.kind.replace('_', ' ')}
+              {activeDoc.kind.replace('_', ' ')}
             </span>
           )}
         </div>

@@ -12,12 +12,11 @@ import hashlib
 import json
 import logging
 import math
-import os
 import re
 import sqlite3
 import time
 import uuid
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -160,7 +159,7 @@ def generate_local_embedding(text: str, dim: int = 384) -> List[float]:
     
     # 1. Word hashing
     for word in words:
-        h = int(hashlib.md5(word.encode("utf-8")).hexdigest(), 16)
+        h = int(hashlib.md5(word.encode("utf-8"), usedforsecurity=False).hexdigest(), 16)
         idx = h % dim
         sign = 1.0 if ((h >> 8) & 1) else -1.0
         vec[idx] += sign * 1.5
@@ -169,7 +168,7 @@ def generate_local_embedding(text: str, dim: int = 384) -> List[float]:
     if len(clean_text) >= 3:
         for i in range(len(clean_text) - 2):
             trigram = clean_text[i : i + 3]
-            h = int(hashlib.md5(trigram.encode("utf-8")).hexdigest(), 16)
+            h = int(hashlib.md5(trigram.encode("utf-8"), usedforsecurity=False).hexdigest(), 16)
             idx = h % dim
             sign = 1.0 if ((h >> 8) & 1) else -1.0
             vec[idx] += sign * 0.5
@@ -384,7 +383,7 @@ def format_recalled_memories_context(memories: List[MemorySearchResult], max_cha
 
     lines = ["<recalled_memories>"]
     lines.append("The following relevant user memories and project facts were automatically retrieved:")
-    current_len = sum(len(l) for l in lines)
+    current_len = sum(len(line_str) for line_str in lines)
 
     for i, mem in enumerate(memories, 1):
         rel_pct = int(mem.similarity * 100)

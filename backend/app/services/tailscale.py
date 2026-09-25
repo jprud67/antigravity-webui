@@ -130,7 +130,7 @@ def get_tailscale_status() -> Dict[str, Any]:
             "serve_active": False,
             "serve_url": None,
             "funnel_active": False,
-            "message": f"Erreur de communication avec le démon Tailscale : {str(exc)}"
+            "message": f"Erreur de communication avec le démon Tailscale : {exc!s}"
         }
 
 

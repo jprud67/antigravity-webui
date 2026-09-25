@@ -11,16 +11,13 @@ from __future__ import annotations
 
 import contextlib
 import io
-import json
 import logging
 import os
 import re
-import socket
-import sys
 import threading
 import time
 import traceback
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +166,7 @@ class PersistentPythonKernel:
                 try:
                     with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
                         compiled = compile(code, f"<cell-{current_exec_count}>", "exec")
-                        exec(compiled, self.globals)
+                        exec(compiled, self.globals)  # nosec B102
                 except SystemExit as se:
                     status = "exit"
                     tb = f"SystemExit: {se.code}"
