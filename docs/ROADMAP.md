@@ -175,18 +175,31 @@ This roadmap outlines the strategic direction for **Antigravity‑webui**, the f
 ### 📌 Sprint 23 (v0.2.27 – Prochaine étape)
 | Milestone | Description | Owner | Target | Status |
 |---|---|---|---|---|
-| **Option A : Integrated Docker & Container Management Studio** *(Recommandé)* | Détection automatique des `Dockerfile` et `docker-compose.yml`, inspection visuelle de l'état des conteneurs en cours d'exécution, affichage des logs de conteneur en streaming temps réel, terminal interactif dans les conteneurs et contrôles de cycle de vie (start, stop, restart, rebuild, prune). | DevOps / IDE | 2027‑02‑23 | ⏳ Planned |
-| **Option B : Database Explorer & Visual SQL Query Studio** | Explorateur intégré pour bases de données locales et distantes (SQLite, PostgreSQL, MySQL), inspection des schémas de tables, exécuteur de requêtes SQL interactif avec pagination et export CSV/JSON, et visualisation des migrations de données. | Data / Web | 2027‑02‑26 | ⏳ Planned |
-| **Option C : Global Workspace Task Runner & Pipeline Orchestrator** | Détection automatique des scripts de build / test (`npm`, `pytest`, `cargo`, `make`), lanceur de tâches unifié avec exécution parallèle/séquentielle, inspection de statut et journalisation en temps réel. | DevOps / IDE | 2027‑03‑01 | ⏳ Planned |
+| **Mémoire Persistante Curatée & Profil Utilisateur Dynamique (`USER.md` + `MEMORY.md`)** | Architecture de mémoire à deux niveaux inspirée de Hermes Agent : `USER.md` (profil, préférences et habitudes de code de l'utilisateur) et `MEMORY.md` (connaissances et spécificités techniques apprises par l'agent sur le projet). Injection en snapshot immuable (*frozen snapshot*) au démarrage de session pour préserver intégralement le prompt cache Gemini/Anthropic, outil agent `memory` (add/replace/remove) pour apprentissage autonome en cours de session, et onglet de gestion visuelle dans les Paramètres. | Core / AI | 2027‑02‑23 | ⏳ Planned |
+| **Moteur de Recherche Plein-Texte Cross-Sessions (SQLite FTS5 + Trigram)** | Indexation automatique temps réel de l'intégralité des messages, appels d'outils et résultats dans une base SQLite locale avec extensions FTS5 et tokenizer Trigram. Recherche instantanée ultra-rapide (< 10 ms) à travers toutes les conversations historiques avec surlignage d'extraits (*snippets* contextuels) et filtres par modèle, outil, date et projet. | Core / Search | 2027‑02‑25 | ⏳ Planned |
+| **Auto-Curator de Compétences & Gestionnaire de Cycle de Vie des Skills** | Orchestrateur de maintenance des compétences déclenché en période d'inactivité : suivi d'activité (`last_used_at`, `use_count`), transitions automatiques non-destructives (`active` ➔ `stale` après 14j ➔ `archived` après 30j), consolidation intelligente des compétences redondantes et protection des skills épinglés. | Core / Skills | 2027‑02‑27 | ⏳ Planned |
+
+### 📌 Sprint 24 (v0.2.28)
+| Milestone | Description | Owner | Target | Status |
+|---|---|---|---|---|
+| **Catalogue Visuel de Serveurs MCP Clés en Main (Store 1-Clic)** | Bibliothèque visuelle intégrée de plus de 70 serveurs MCP pré-configurés (GitHub, GitLab, Docker, Supabase, Vercel, Stripe, Linear, Notion, PostgreSQL, Cloudflare, Sentry, etc.). Activation et configuration assistée en 1-clic sans manipulation JSON manuelle, détection des transports (`http` / `stdio`), test de connectivité en direct (*ping test*) et navigateur visuel des schémas d'outils exposés. | Core / MCP | 2027‑03‑02 | ⏳ Planned |
+| **Centre de Diagnostics Système & Outil de Réparation ("Doctor")** | Tableau de bord de santé unifié dans les Paramètres : monitoring de la RAM, de l'espace disque résiduel, de l'intégrité de l'environnement Python/Git et de la latence réseau en direct vers les API LLM (Google Cloud, OpenAI, Anthropic, OpenRouter). Détecteur d'anomalies avec réparation automatique en un clic (*Auto-Doctor*). | DevOps / IDE | 2027‑03‑05 | ⏳ Planned |
+| **Coffre-Fort de Secrets Chiffré & Masquage Proactif (`Vault Store`)** | Chiffrement local sécurisé des clés d'API et secrets externes, injection sécurisée sans fuite dans les prompts et masquage proactif systématique (`[REDACTED_SECRET]`) dans les logs, le flux WebSocket et le transcript JSONL. | Security / Core | 2027‑03‑07 | ⏳ Planned |
+
+### 📌 Sprint 25 (v0.2.29)
+| Milestone | Description | Owner | Target | Status |
+|---|---|---|---|---|
+| **Passerelle Omnicanale & Compagnonnage Mobile (Telegram / Discord)** | Passerelle de messagerie sécurisée permettant de piloter Antigravity depuis un smartphone via Telegram ou Discord. Appairage d'appareil par code PIN à 6 chiffres, notifications push lors de la fin de longues tâches, et approbation interactive à distance de commandes sensibles. | Core / Gateway | 2027‑03‑10 | ⏳ Planned |
+| **Code Kernel Persistant avec RPC de Tools** | Interpréteur Python persistant interactif permettant à l'agent d'exécuter des pipelines d'automatisation complexes en appelant ses propres outils (`view_file`, `list_dir`, `replace_file_content`) directement via RPC local, réduisant la consommation de tokens de 80% sur les tâches de masse. | Core / Runtimes | 2027‑03‑13 | ⏳ Planned |
 
 ### 📌 Long‑Term (v0.4 – 3‑6 months)
 | Milestone | Description |
 |---|---|
-| **Full IDE Integration** – Embed code editor (Monaco) with live linting, file explorer, and terminal view. |
+| **Integrated Docker & Container Management Studio** – Détection automatique des Dockerfiles/Compose, logs streaming et terminal interactif. |
+| **Database Explorer & Visual SQL Query Studio** – Explorateur SQLite/PostgreSQL/MySQL avec pagination et export CSV/JSON. |
 | **Collaborative Editing** – Real‑time shared sessions via WebSocket + CRDT. |
-| **Marketplace** – Allow community‑built plugins/themes to be published and installed from within the UI. |
-| **AI‑Assisted Coding** – Deep integration with Antigravity’s LLM back‑end for code suggestions, refactoring, and documentation generation. |
-| **Enterprise Security** – SSO, granular permissions, audit logs. |
-| **Release v0.4 – Premium‑grade Web IDE** |
+| **Full IDE Integration** – Monaco avec live linting étendu, terminal split-view et orchestration multi-agents. |
+| **Release v0.4 – Premium‑grade Web IDE & Autonomous Agent Cockpit** |
+
 
 
