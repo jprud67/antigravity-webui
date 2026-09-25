@@ -337,17 +337,21 @@ def get_git_diff(
     commit: str | None = Query(None),
     _ = Depends(require_auth)
 ):
-    target = _validate_workspace(workspace)
+    target = _validate_workspace(workspace if isinstance(workspace, str) else None)
     MAX_DIFF_BYTES = 2 * 1024 * 1024  # 2 Mo
     truncated = False
 
+    path_val = path if isinstance(path, str) else None
+    staged_val = staged if isinstance(staged, bool) else False
+    commit_val = commit if isinstance(commit, str) else None
+
     norm_path = None
-    if path:
-        norm_path = _resolve_relative_git_path(path, target)
+    if path_val:
+        norm_path = _resolve_relative_git_path(path_val, target)
 
     # Si un commit est spécifié, afficher le diff de ce commit (git show)
-    if commit:
-        clean_commit = commit.strip()
+    if commit_val:
+        clean_commit = commit_val.strip()
         if clean_commit.startswith("-") or "--" in clean_commit or not re.match(r'^[a-zA-Z0-9_\-\./~^]+$', clean_commit):
             raise HTTPException(status_code=400, detail="Identifiant de commit Git invalide.")
         show_args = ["show", "--format=", clean_commit]
@@ -362,14 +366,14 @@ def get_git_diff(
             truncated = True
         return {
             "workspace": str(target.resolve()),
-            "path": norm_path or path,
+            "path": norm_path or path_val,
             "commit": clean_commit,
             "diff": _mask_git_output(diff_text),
             "truncated": truncated
         }
 
     args = ["diff"]
-    if staged:
+    if staged_val:
         args.append("--cached")
     if norm_path:
         args.extend(["--", norm_path])
