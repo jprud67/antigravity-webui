@@ -777,7 +777,7 @@ def workspace_search(req: WorkspaceSearchRequest, _ = Depends(require_auth)):
 
     start_time = time.time()
     target_path = Path(req.workspace) if req.workspace else Path(DEFAULT_WORKSPACE)
-    resolved_root = _validate_path_access(target_path)
+    resolved_root = _validate_path_access(target_path, base_dir=req.workspace)
     if not resolved_root.exists() or not resolved_root.is_dir():
         raise HTTPException(status_code=400, detail="Répertoire workspace invalide.")
 
@@ -802,7 +802,10 @@ def workspace_search(req: WorkspaceSearchRequest, _ = Depends(require_auth)):
 
             dirs[:] = [
                 d for d in dirs
-                if d not in IGNORED_DIRS and not d.startswith(".") and not os.path.islink(os.path.join(root, d))
+                if d not in IGNORED_DIRS
+                and not d.startswith(".")
+                and not os.path.islink(os.path.join(root, d))
+                and not is_blocked_sensitive_path(Path(root) / d)
             ]
 
             for f in files:
@@ -810,6 +813,8 @@ def workspace_search(req: WorkspaceSearchRequest, _ = Depends(require_auth)):
                     continue
 
                 full_file_p = Path(root) / f
+                if is_blocked_sensitive_path(full_file_p):
+                    continue
                 try:
                     rel_path = str(full_file_p.relative_to(resolved_root))
                 except Exception:
@@ -920,7 +925,7 @@ def workspace_replace(req: WorkspaceReplaceRequest, _ = Depends(require_auth)):
 
     start_time = time.time()
     target_path = Path(req.workspace) if req.workspace else Path(DEFAULT_WORKSPACE)
-    resolved_root = _validate_path_access(target_path)
+    resolved_root = _validate_path_access(target_path, base_dir=req.workspace)
     if not resolved_root.exists() or not resolved_root.is_dir():
         raise HTTPException(status_code=400, detail="Répertoire workspace invalide.")
 
@@ -936,9 +941,14 @@ def workspace_replace(req: WorkspaceReplaceRequest, _ = Depends(require_auth)):
     files_to_check: list[Path] = []
     if req.file_paths:
         for fp in req.file_paths:
-            p = _validate_path_access(Path(fp), base_dir=str(resolved_root))
-            if p.exists() and p.is_file():
-                files_to_check.append(p)
+            try:
+                p = _validate_path_access(Path(fp), base_dir=str(resolved_root))
+                if is_blocked_sensitive_path(p):
+                    continue
+                if p.exists() and p.is_file():
+                    files_to_check.append(p)
+            except HTTPException:
+                continue
     else:
         for root, dirs, files in os.walk(resolved_root, onerror=lambda err: None):
             try:
@@ -947,11 +957,19 @@ def workspace_replace(req: WorkspaceReplaceRequest, _ = Depends(require_auth)):
                 rel_depth = 0
             if rel_depth >= 6:
                 dirs.clear()
-            dirs[:] = [d for d in dirs if d not in IGNORED_DIRS and not d.startswith(".") and not os.path.islink(os.path.join(root, d))]
+            dirs[:] = [
+                d for d in dirs
+                if d not in IGNORED_DIRS
+                and not d.startswith(".")
+                and not os.path.islink(os.path.join(root, d))
+                and not is_blocked_sensitive_path(Path(root) / d)
+            ]
             for f in files:
                 if f.startswith(".") and f != ".gitignore":
                     continue
                 full_p = Path(root) / f
+                if is_blocked_sensitive_path(full_p):
+                    continue
                 try:
                     rel = str(full_p.relative_to(resolved_root))
                 except Exception:
@@ -1032,6 +1050,8 @@ class SingleReplaceRequest(BaseModel):
 @router.post("/single-replace")
 def single_replace(req: SingleReplaceRequest, _ = Depends(require_auth)):
     p = _validate_path_access(Path(req.file_path), base_dir=req.workspace)
+    if is_blocked_sensitive_path(p):
+        raise HTTPException(status_code=403, detail="Accès refusé : fichier ou répertoire restreint.")
     if not p.exists() or not p.is_file():
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
 

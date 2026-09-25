@@ -8766,15 +8766,20 @@ def test_rules_payload_limit_and_read_only_flags():
 
 def test_git_publish_release_and_tags_sanitization():
     """Vérifie la protection contre l'injection d'options CLI dans publish_release, tags et stash."""
-    from app.api.git import (
-        publish_release, PublishReleaseRequest,
-        create_tag, CreateTagRequest,
-        delete_tag, push_tag, push_all_tags,
-        StashActionRequest,
-    )
-    from fastapi import HTTPException
     import pytest
+    from fastapi import HTTPException
     from pydantic import ValidationError
+
+    from app.api.git import (
+        CreateTagRequest,
+        PublishReleaseRequest,
+        StashActionRequest,
+        create_tag,
+        delete_tag,
+        publish_release,
+        push_all_tags,
+        push_tag,
+    )
 
     # Test StashActionRequest rejects negative index
     with pytest.raises(ValidationError):
@@ -8819,8 +8824,8 @@ def test_git_publish_release_and_tags_sanitization():
 
 def test_files_search_workspace_and_sensitive_exclusion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Vérifie que /api/files/search prend en charge le paramètre workspace et filtre les fichiers sensibles."""
-    from app.api.files import search_files
     import app.api.files as files_mod
+    from app.api.files import search_files
 
     ws_dir = tmp_path / "custom_ws"
     ws_dir.mkdir(parents=True, exist_ok=True)
@@ -8840,6 +8845,107 @@ def test_files_search_workspace_and_sensitive_exclusion(tmp_path: Path, monkeypa
 
     res_path = search_files(q="hello", path=str(ws_dir))
     assert any(r["name"] == "index.ts" for r in res_path["results"])
+
+
+def test_workspace_search_and_replace_sensitive_path_exclusion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Vérifie que workspace_search et workspace_replace excluent strictement les fichiers/répertoires sensibles."""
+    import pytest
+    from fastapi import HTTPException
+
+    import app.api.files as files_mod
+    from app.api.files import (
+        SingleReplaceRequest,
+        WorkspaceReplaceRequest,
+        WorkspaceSearchRequest,
+        single_replace,
+        workspace_replace,
+        workspace_search,
+    )
+
+    ws_dir = tmp_path / "secure_ws"
+    ws_dir.mkdir(parents=True, exist_ok=True)
+
+    # Legitimate code files
+    code_file = ws_dir / "app.py"
+    code_file.write_text("TARGET_KEY = 'normal_val'\nprint(TARGET_KEY)", encoding="utf-8")
+
+    sub_dir = ws_dir / "src"
+    sub_dir.mkdir(parents=True, exist_ok=True)
+    sub_code = sub_dir / "utils.py"
+    sub_code.write_text("TARGET_KEY = 'helper_val'", encoding="utf-8")
+
+    # Sensitive files that should NEVER be searched or replaced
+    env_file = ws_dir / ".env"
+    env_file.write_text("TARGET_KEY = 'secret_env_token'", encoding="utf-8")
+
+    cred_file = ws_dir / "credentials.json"
+    cred_file.write_text('{"TARGET_KEY": "super_secret_credentials"}', encoding="utf-8")
+
+    auth_file = ws_dir / "webui_auth.json"
+    auth_file.write_text('{"TARGET_KEY": "auth_token"}', encoding="utf-8")
+
+    ssh_dir = ws_dir / ".ssh"
+    ssh_dir.mkdir(parents=True, exist_ok=True)
+    ssh_key = ssh_dir / "id_rsa"
+    ssh_key.write_text("TARGET_KEY = 'private_rsa'", encoding="utf-8")
+
+    monkeypatch.setattr(files_mod, "get_settings", lambda: {"trustedWorkspaces": [str(ws_dir)]})
+
+    # 1. Test workspace_search excludes sensitive files and sensitive dirs
+    search_req = WorkspaceSearchRequest(query="TARGET_KEY", workspace=str(ws_dir))
+    search_res = workspace_search(search_req)
+
+    found_files = [f.relative_path.replace("\\", "/") for f in search_res.files]
+    assert "app.py" in found_files
+    assert "src/utils.py" in found_files
+    assert ".env" not in found_files
+    assert "credentials.json" not in found_files
+    assert "webui_auth.json" not in found_files
+    assert any(".ssh" in f for f in found_files) is False
+
+    # 2. Test workspace_replace in walk mode excludes sensitive files
+    replace_req = WorkspaceReplaceRequest(
+        query="TARGET_KEY",
+        replace_text="REPLACED_VAL",
+        workspace=str(ws_dir),
+        dry_run=False
+    )
+    workspace_replace(replace_req)
+
+    # Check that app.py and src/utils.py were modified
+    assert "REPLACED_VAL" in code_file.read_text(encoding="utf-8")
+    assert "REPLACED_VAL" in sub_code.read_text(encoding="utf-8")
+
+    # Check that sensitive files were completely untouched
+    assert "TARGET_KEY = 'secret_env_token'" == env_file.read_text(encoding="utf-8")
+    assert '{"TARGET_KEY": "super_secret_credentials"}' == cred_file.read_text(encoding="utf-8")
+    assert '{"TARGET_KEY": "auth_token"}' == auth_file.read_text(encoding="utf-8")
+    assert "TARGET_KEY = 'private_rsa'" == ssh_key.read_text(encoding="utf-8")
+
+    # 3. Test workspace_replace with explicit file_paths rejects/ignores sensitive paths
+    explicit_replace_req = WorkspaceReplaceRequest(
+        query="TARGET_KEY",
+        replace_text="MALICIOUS_REPLACE",
+        workspace=str(ws_dir),
+        file_paths=[str(cred_file), str(env_file), str(code_file)],
+        dry_run=False
+    )
+    workspace_replace(explicit_replace_req)
+    assert '{"TARGET_KEY": "super_secret_credentials"}' == cred_file.read_text(encoding="utf-8")
+    assert "TARGET_KEY = 'secret_env_token'" == env_file.read_text(encoding="utf-8")
+
+    # 4. Test single_replace rejects sensitive paths
+    single_req = SingleReplaceRequest(
+        file_path=str(env_file),
+        workspace=str(ws_dir),
+        line_number=1,
+        column=1,
+        match_length=10,
+        replace_text="HACKED"
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        single_replace(single_req)
+    assert exc_info.value.status_code == 403
 
 
 def test_cron_compute_next_run_interval_dict_variants():
@@ -9182,6 +9288,7 @@ if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as td:
         test_files_search_workspace_and_sensitive_exclusion(Path(td), monkeypatch=pytest.MonkeyPatch())
+        test_workspace_search_and_replace_sensitive_path_exclusion(Path(td), monkeypatch=pytest.MonkeyPatch())
     test_cron_compute_next_run_interval_dict_variants()
     print("\nAll unit tests passed successfully!")
 
