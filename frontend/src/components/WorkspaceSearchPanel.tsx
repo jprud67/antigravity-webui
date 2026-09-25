@@ -101,16 +101,35 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
     }
   }, [query, currentWorkspace, isCaseSensitive, isWholeWord, isRegex, includePattern, excludePattern]);
 
-  const hasTriggeredInitial = useRef(false);
+  const prevInitialQueryRef = useRef<string | null>(null);
   useEffect(() => {
-    if (initialQuery.trim() && !hasTriggeredInitial.current) {
-      hasTriggeredInitial.current = true;
-      const timer = setTimeout(() => {
-        handleExecuteSearch(initialQuery);
-      }, 0);
-      return () => clearTimeout(timer);
+    if (prevInitialQueryRef.current === null) {
+      prevInitialQueryRef.current = initialQuery;
+      if (initialQuery.trim()) {
+        const timer = setTimeout(() => {
+          handleExecuteSearch(initialQuery);
+        }, 0);
+        return () => clearTimeout(timer);
+      }
+    } else if (initialQuery !== prevInitialQueryRef.current) {
+      prevInitialQueryRef.current = initialQuery;
+      setQuery(initialQuery);
+      if (initialQuery.trim()) {
+        const timer = setTimeout(() => {
+          handleExecuteSearch(initialQuery);
+        }, 0);
+        return () => clearTimeout(timer);
+      }
     }
   }, [initialQuery, handleExecuteSearch]);
+
+  const prevInitialModeRef = useRef(initialMode);
+  useEffect(() => {
+    if (initialMode !== prevInitialModeRef.current) {
+      prevInitialModeRef.current = initialMode;
+      setIsReplaceOpen(initialMode === 'replace');
+    }
+  }, [initialMode]);
 
   // Toggle Collapse for a single file
   const toggleFileCollapse = useCallback((relPath: string) => {

@@ -2073,12 +2073,16 @@ def push_remote(
     _ = Depends(require_auth)
 ):
     remote_name = (name or (req.remote if req else None) or "origin").strip()
+    if remote_name.startswith("-") or "--" in remote_name or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote_name):
+        raise HTTPException(status_code=400, detail="Nom de remote Git invalide.")
     ws = req.workspace if (req and req.workspace) else workspace
     target = _validate_workspace(ws)
-    branch = req.branch if (req and req.branch) else ""
+    branch = req.branch.strip() if (req and req.branch) else ""
     if not branch:
-        res_br = run_git(["rev-parse", "--abbrev-ref", "HEAD"], target)
+        res_br = run_git(["branch", "--show-current"], target)
         branch = res_br.stdout.strip() or "main"
+    if branch.startswith("-") or "--" in branch or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
+        raise HTTPException(status_code=400, detail="Nom de branche Git invalide.")
     args = ["push", remote_name, branch]
     if req and req.set_upstream:
         args.append("-u")
@@ -2222,6 +2226,22 @@ def push_all_tags(
     return {"success": True, "output": res.stdout or res.stderr or "Tous les tags ont été poussés avec succès."}
 
 
+def _build_github_release_url(owner_repo: str, tag: str, title: str, body: str, prerelease: bool = False) -> str:
+    # Cap body length so that overall query string stays well within browser and web proxy limits
+    max_body_len = 1500
+    safe_body = body
+    if len(safe_body) > max_body_len:
+        safe_body = safe_body[:max_body_len].rstrip() + "\n\n... [Notes tronquées pour la limite d'URL Web GitHub]"
+    params = {
+        "tag": tag,
+        "title": title,
+        "body": safe_body,
+    }
+    if prerelease:
+        params["prerelease"] = "1"
+    return f"https://github.com/{owner_repo}/releases/new?{urlencode(params)}"
+
+
 @router.get("/releases/notes", response_model=ReleaseNotesResponse)
 def get_release_notes(
     tag: str = Query(...),
@@ -2305,12 +2325,12 @@ def get_release_notes(
     notes_md = "\n".join(md_sections).strip()
     github_release_url = None
     if owner_repo:
-        params = {
-            "tag": current_tag,
-            "title": f"Release {current_tag}",
-            "body": notes_md
-        }
-        github_release_url = f"https://github.com/{owner_repo}/releases/new?{urlencode(params)}"
+        github_release_url = _build_github_release_url(
+            owner_repo=owner_repo,
+            tag=current_tag,
+            title=f"Release {current_tag}",
+            body=notes_md
+        )
 
     return ReleaseNotesResponse(
         tag=current_tag,
@@ -2366,13 +2386,13 @@ def publish_release(
         owner_repo = f"{match.group(1)}/{match.group(2)}"
 
     if owner_repo:
-        params = {
-            "tag": req.tag,
-            "title": req.title,
-            "body": body_text,
-            "prerelease": "1" if req.prerelease else "0"
-        }
-        web_url = f"https://github.com/{owner_repo}/releases/new?{urlencode(params)}"
+        web_url = _build_github_release_url(
+            owner_repo=owner_repo,
+            tag=req.tag,
+            title=req.title,
+            body=body_text,
+            prerelease=bool(req.prerelease)
+        )
         return PublishReleaseResponse(
             success=True,
             method="web_url",

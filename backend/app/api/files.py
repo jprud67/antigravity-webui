@@ -697,7 +697,14 @@ def _matches_pattern(rel_path: str, filename: str, pattern: str) -> bool:
     tokens = [p.strip() for p in pattern.split(",") if p.strip()]
     norm_rel = rel_path.replace("\\", "/")
     for token in tokens:
-        if fnmatch.fnmatch(filename, token) or fnmatch.fnmatch(norm_rel, token) or fnmatch.fnmatch(norm_rel, f"*{token}*"):
+        clean_token = token.replace("\\", "/")
+        if fnmatch.fnmatch(filename, clean_token):
+            return True
+        if fnmatch.fnmatch(norm_rel, clean_token):
+            return True
+        if fnmatch.fnmatch(norm_rel, f"*/{clean_token.lstrip('/')}"):
+            return True
+        if fnmatch.fnmatch(norm_rel, f"*{clean_token}*"):
             return True
     return False
 

@@ -22,7 +22,25 @@ export const SUPPORTED_LANGUAGES = [
 
 export function detectLanguage(filePath?: string, fallback = 'plaintext'): string {
   if (!filePath) return fallback;
-  const ext = filePath.split('.').pop()?.toLowerCase();
+  const normalized = filePath.replace(/\\/g, '/');
+  const basename = (normalized.split('/').pop() || '').toLowerCase();
+  if (!basename) return fallback;
+
+  // Exact filename matches or prefix matches for files without standard extensions
+  if (basename === 'dockerfile' || basename.startsWith('dockerfile.')) {
+    return 'dockerfile';
+  }
+  if (basename === 'makefile' || basename === 'gnumakefile') {
+    return 'shell';
+  }
+  if (basename === '.gitignore' || basename === '.dockerignore' || basename === '.bashrc' || basename === '.zshrc' || basename.startsWith('.env')) {
+    return 'shell';
+  }
+
+  // Check extension from basename
+  const dotIndex = basename.lastIndexOf('.');
+  const ext = dotIndex !== -1 ? basename.slice(dotIndex + 1) : '';
+
   switch (ext) {
     case 'ts':
     case 'tsx':
@@ -34,15 +52,19 @@ export function detectLanguage(filePath?: string, fallback = 'plaintext'): strin
       return 'javascript';
     case 'py':
     case 'py3':
+    case 'pyw':
       return 'python';
     case 'html':
     case 'htm':
+    case 'svg':
+    case 'xml':
       return 'html';
     case 'css':
     case 'scss':
     case 'less':
       return 'css';
     case 'json':
+    case 'jsonc':
       return 'json';
     case 'md':
     case 'markdown':
@@ -68,6 +90,7 @@ export function detectLanguage(filePath?: string, fallback = 'plaintext'): strin
     case 'cxx':
     case 'h':
     case 'hpp':
+    case 'c':
       return 'cpp';
     case 'cs':
       return 'csharp';
