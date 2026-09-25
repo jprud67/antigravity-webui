@@ -2,8 +2,8 @@
 
 Implements embedded semantic vector memory, local fallback vectorizer,
 configurable embedding providers (local hash/n-gram, OpenAI, Ollama),
-and the auto-recall prompt hook (inspired by OpenClaw extensions/memory-lancedb
-and Hermes agent/memory_manager.py).
+and the auto-recall prompt hook (inspired by Antigravity Core extensions/memory-lancedb
+and Agent Antigravity/memory_manager.py).
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ logger = logging.getLogger("antigravity.vector_memory")
 MemoryCategory = Literal["core", "daily", "preference", "fact", "convention", "general"]
 EmbeddingProvider = Literal["local", "openai", "ollama", "gemini"]
 
-# Trivial prompts regex adapted from Hermes agent/memory_provider.py
+# Trivial prompts regex adapted from Agent Antigravity/memory_provider.py
 TRIVIAL_PROMPT_RE = re.compile(
     r"^(yes|no|ok|okay|sure|thanks|thank you|y|n|yep|nope|yeah|nah|"
     r"hi|hey|hello|yo|sup|"

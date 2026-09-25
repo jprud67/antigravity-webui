@@ -7,7 +7,7 @@
 ## ✨ Nouveautés
 
 - **🧩 Tool Calling OpenAI sur la passerelle `/v1` :**
-  - Les clients agentiques (**Hermes**, SDK OpenAI avec `tools=[...]`, agents autonomes) reçoivent désormais de vrais **`tool_calls`** : l'agent Antigravity est converti en « modèle sans état » (sortie contrainte par schéma JSON) qui demande les appels d'outils — **sans jamais exécuter ses propres outils** côté serveur.
+  - Les clients agentiques (SDK OpenAI avec `tools=[...]`, agents autonomes, extensions IDE) reçoivent désormais de vrais **`tool_calls`** : l'agent Antigravity est converti en « modèle sans état » (sortie contrainte par schéma JSON) qui demande les appels d'outils — **sans jamais exécuter ses propres outils** côté serveur.
   - Boucle complète vérifiée de bout en bout (appel d'outil → exécution côté client → résultat → réponse finale), **streaming SSE** et **bascule automatique de compte Google** incluses.
   - Guide complet : [`docs/API_EXTERNAL.md`](docs/API_EXTERNAL.md#tool-calling-function-calling).
 
@@ -16,7 +16,7 @@
   - Bascule immédiate vers un **compte non épuisé** puis **relance automatique de la tâche** — pour le chat **et** les tâches planifiées.
   - Le compte fautif est mis de côté 30 min ; si aucun compte sain n'existe, un message clair vous invite à patienter ou à ajouter un compte.
 
-- **🚀 Recherche de mise à jour automatique (principe Hermes) :**
+- **🚀 Recherche de mise à jour automatique :**
   - Vérification en arrière-plan (cache 6 h) + bouton « Rechercher les mises à jour » ; badge **« MàJ »** dans la sidebar et onglet dédié dans les Paramètres.
   - Commandes `/update` et `/check-update`.
   - Application en 1 clic : `git pull --ff-only`, rebuild du frontend, **rollback automatique** si le build échoue, puis redémarrage du service. Marqueur anti-interruption inclus.

@@ -24,6 +24,7 @@ import {
 } from '../services/api';
 import type { MessagingGatewayStatus, PairingCodeItem, ApprovedDeviceItem } from '../types';
 import { showToast } from '../services/toast';
+import { useI18n } from '../services/i18n';
 
 interface MessagingGatewayModalProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ const getRemainingMinutes = (expiresAt: number): number => {
 };
 
 export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ isOpen, onClose }) => {
+  const { t } = useI18n();
   const [tab, setTab] = useState<'pairing' | 'telegram' | 'discord'>('pairing');
   const [status, setStatus] = useState<MessagingGatewayStatus | null>(null);
   const [pending, setPending] = useState<PairingCodeItem[]>([]);
@@ -79,11 +81,11 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
         setDcNotifyComplete(st.configs.discord.notify_on_complete);
       }
     } catch {
-      showToast('Impossible de charger les données de messagerie', 'error');
+      showToast(t('messaging_data_load_failed', 'Impossible de charger les données de messagerie'), 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (isOpen) {
@@ -99,7 +101,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
       setManualCode('');
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Code invalide', 'error');
+      showToast(err.message || t('invalid_code', 'Code invalide'), 'error');
     } finally {
       setApproving(false);
     }
@@ -108,16 +110,16 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
   const handleRevoke = async (platform: string, userId: string) => {
     try {
       await revokeDevice(platform, userId);
-      showToast('Appareil révoqué', 'info');
+      showToast(t('device_revoked', 'Appareil révoqué'), 'info');
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Échec de révocation', 'error');
+      showToast(err.message || t('revoke_failed', 'Échec de révocation'), 'error');
     }
   };
 
   const handleSaveTelegram = async () => {
     if (!tgToken && !status?.configs.telegram?.has_token) {
-      showToast('Veuillez renseigner le token du Bot Telegram', 'warning');
+      showToast(t('telegram_token_required', 'Veuillez renseigner le token du Bot Telegram'), 'warning');
       return;
     }
     setSavingBot(true);
@@ -130,10 +132,10 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
         notify_on_approval: tgNotifyApproval,
         notify_on_complete: tgNotifyComplete
       });
-      showToast('Configuration Telegram enregistrée avec succès !', 'success');
+      showToast(t('telegram_config_saved', 'Configuration Telegram enregistrée avec succès !'), 'success');
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Erreur enregistrement', 'error');
+      showToast(err.message || t('save_error', 'Erreur enregistrement'), 'error');
     } finally {
       setSavingBot(false);
     }
@@ -141,7 +143,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
 
   const handleSaveDiscord = async () => {
     if (!dcToken && !status?.configs.discord?.has_token) {
-      showToast('Veuillez renseigner le token du Bot Discord', 'warning');
+      showToast(t('discord_token_required', 'Veuillez renseigner le token du Bot Discord'), 'warning');
       return;
     }
     setSavingBot(true);
@@ -154,10 +156,10 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
         notify_on_approval: dcNotifyApproval,
         notify_on_complete: dcNotifyComplete
       });
-      showToast('Configuration Discord enregistrée avec succès !', 'success');
+      showToast(t('discord_config_saved', 'Configuration Discord enregistrée avec succès !'), 'success');
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Erreur enregistrement', 'error');
+      showToast(err.message || t('save_error', 'Erreur enregistrement'), 'error');
     } finally {
       setSavingBot(false);
     }
@@ -183,13 +185,13 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                Passerelle Telegram & Discord
+                {t('messaging_gateway_title', 'Passerelle Telegram & Discord')}
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
-                  Sprint 25
+                  {t('pin_pairing_badge', 'Appairage PIN Sécurisé')}
                 </span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Appairez vos appareils mobiles par code PIN et pilotez Antigravity à distance.
+                {t('messaging_gateway_desc', 'Appairez vos appareils mobiles par code PIN et pilotez Antigravity à distance.')}
               </p>
             </div>
           </div>
@@ -199,7 +201,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
               disabled={loading}
               className="p-1.5 rounded-lg border hover:bg-slate-500/10 transition-colors text-slate-400 hover:text-slate-200 cursor-pointer"
               style={{ borderColor: 'var(--border)' }}
-              title="Rafraîchir"
+              title={t('refresh', 'Rafraîchir')}
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -216,16 +218,16 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
         {/* Tab Navigation */}
         <div className="px-5 pt-3 border-b flex items-center gap-2 shrink-0 bg-black/10" style={{ borderColor: 'var(--border)' }}>
           {[
-            { id: 'pairing', label: `Appairage PIN (${pending.length})`, icon: Key },
-            { id: 'telegram', label: 'Bot Telegram', icon: Send },
-            { id: 'discord', label: 'Bot Discord', icon: MessageSquare }
-          ].map((t) => {
-            const Icon = t.icon;
-            const active = tab === t.id;
+            { id: 'pairing', label: t('tab_pin_pairing', 'Appairage PIN ({0})').replace('{0}', String(pending.length)), icon: Key },
+            { id: 'telegram', label: t('tab_telegram', 'Bot Telegram'), icon: Send },
+            { id: 'discord', label: t('tab_discord', 'Bot Discord'), icon: MessageSquare }
+          ].map((tabItem) => {
+            const Icon = tabItem.icon;
+            const active = tab === tabItem.id;
             return (
               <button
-                key={t.id}
-                onClick={() => setTab(t.id as any)}
+                key={tabItem.id}
+                onClick={() => setTab(tabItem.id as any)}
                 className={`px-3 py-2 text-xs font-semibold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
                   active 
                     ? 'border-indigo-500 text-indigo-400' 
@@ -233,7 +235,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
-                <span>{t.label}</span>
+                <span>{tabItem.label}</span>
               </button>
             );
           })}
@@ -247,7 +249,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
               <div className="p-4 rounded-xl border space-y-3" style={{ backgroundColor: 'var(--surface-subtle, rgba(255,255,255,0.02))', borderColor: 'var(--border)' }}>
                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
                   <Lock className="w-4 h-4 text-indigo-400" />
-                  <span>Saisir un code de couplage (8 caractères)</span>
+                  <span>{t('enter_pairing_code', 'Saisir un code de couplage (8 caractères)')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -269,7 +271,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                   >
                     {approving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     <Check className="w-3.5 h-3.5" />
-                    <span>Valider</span>
+                    <span>{t('validate', 'Valider')}</span>
                   </button>
                 </div>
               </div>
@@ -277,13 +279,13 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
               {/* Pending Requests */}
               <div className="space-y-2">
                 <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                  <span>Demandes en attente ({pending.length})</span>
-                  <span className="text-[10px] text-slate-500">Expire après 1 heure</span>
+                  <span>{t('pending_requests', 'Demandes en attente')} ({pending.length})</span>
+                  <span className="text-[10px] text-slate-500">{t('expires_after_1h', 'Expire après 1 heure')}</span>
                 </div>
 
                 {pending.length === 0 ? (
                   <div className="p-4 rounded-xl border border-dashed text-center text-xs text-slate-500" style={{ borderColor: 'var(--border)' }}>
-                    Aucun code de couplage en attente. Envoyez un premier message au bot Telegram ou Discord pour générer un code.
+                    {t('no_pending_pairing_codes', 'Aucun code de couplage en attente. Envoyez un premier message au bot Telegram ou Discord pour générer un code.')}
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -308,7 +310,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                             <span className="text-slate-600">•</span>
                             <Clock className="w-3 h-3 text-slate-500" />
                             <span className="text-[11px] text-slate-500">
-                              expire dans {getRemainingMinutes(p.expires_at)} min
+                              {t('expires_in_minutes', 'expire dans {0} min').replace('{0}', String(getRemainingMinutes(p.expires_at)))}
                             </span>
                           </div>
                         </div>
@@ -319,7 +321,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                           className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
                         >
                           <Check className="w-3.5 h-3.5" />
-                          <span>Approuver</span>
+                          <span>{t('approve', 'Approuver')}</span>
                         </button>
                       </div>
                     ))}
@@ -330,12 +332,12 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
               {/* Approved Devices */}
               <div className="space-y-2">
                 <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Appareils et Utilisateurs Approuvés ({approved.length})
+                  {t('approved_devices_title', 'Appareils et Utilisateurs Approuvés')} ({approved.length})
                 </div>
 
                 {approved.length === 0 ? (
                   <div className="p-4 rounded-xl border border-dashed text-center text-xs text-slate-500" style={{ borderColor: 'var(--border)' }}>
-                    Aucun appareil approuvé pour le moment.
+                    {t('no_approved_devices', 'Aucun appareil approuvé pour le moment.')}
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -360,7 +362,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                         <button
                           onClick={() => handleRevoke(dev.platform, dev.user_id)}
                           className="p-1.5 rounded-lg border text-rose-400 hover:bg-rose-500/10 border-rose-500/30 transition-colors cursor-pointer"
-                          title="Révoquer cet appareil"
+                          title={t('revoke_device_title', 'Révoquer cet appareil')}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -377,7 +379,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold block mb-1 text-slate-300">
-                    Token du Bot Telegram (@BotFather) :
+                    {t('telegram_bot_token_label', 'Token du Bot Telegram (@BotFather) :')}
                   </label>
                   <input
                     type="password"
@@ -395,7 +397,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
 
                 <div>
                   <label className="text-xs font-semibold block mb-1 text-slate-300">
-                    Chat ID par défaut (Optionnel) :
+                    {t('default_chat_id_label', 'Chat ID par défaut (Optionnel) :')}
                   </label>
                   <input
                     type="text"
@@ -419,7 +421,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                       onChange={(e) => setTgNotifyApproval(e.target.checked)}
                       className="rounded"
                     />
-                    <span>Recevoir les demandes d'approbation interactive de commandes sensibles</span>
+                    <span>{t('tg_notify_approval_label', "Recevoir les demandes d'approbation interactive de commandes sensibles")}</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
                     <input
@@ -428,7 +430,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                       onChange={(e) => setTgNotifyComplete(e.target.checked)}
                       className="rounded"
                     />
-                    <span>Recevoir une notification à la fin des tâches longues</span>
+                    <span>{t('tg_notify_complete_label', 'Recevoir une notification à la fin des tâches longues')}</span>
                   </label>
                 </div>
               </div>
@@ -440,7 +442,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
                 >
                   {savingBot && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Enregistrer Telegram</span>
+                  <span>{t('save_telegram', 'Enregistrer Telegram')}</span>
                 </button>
               </div>
             </div>
@@ -451,7 +453,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold block mb-1 text-slate-300">
-                    Token du Bot Discord (Developer Portal) :
+                    {t('discord_bot_token_label', 'Token du Bot Discord (Developer Portal) :')}
                   </label>
                   <input
                     type="password"
@@ -469,7 +471,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
 
                 <div>
                   <label className="text-xs font-semibold block mb-1 text-slate-300">
-                    Channel ID par défaut :
+                    {t('discord_channel_id_label', 'Channel ID par défaut :')}
                   </label>
                   <input
                     type="text"
@@ -493,7 +495,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                       onChange={(e) => setDcNotifyApproval(e.target.checked)}
                       className="rounded"
                     />
-                    <span>Recevoir les demandes d'approbation avec boutons interactifs</span>
+                    <span>{t('discord_notify_approval_label', "Recevoir les demandes d'approbation avec boutons interactifs")}</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
                     <input
@@ -502,7 +504,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                       onChange={(e) => setDcNotifyComplete(e.target.checked)}
                       className="rounded"
                     />
-                    <span>Notifier les fins de tâches autonomes</span>
+                    <span>{t('discord_notify_complete_label', 'Notifier les fins de tâches autonomes')}</span>
                   </label>
                 </div>
               </div>
@@ -514,7 +516,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
                 >
                   {savingBot && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Enregistrer Discord</span>
+                  <span>{t('save_discord', 'Enregistrer Discord')}</span>
                 </button>
               </div>
             </div>
@@ -525,14 +527,14 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
         <div className="p-4 border-t flex items-center justify-between shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Sécurité NIST SP 800-63-4 avec limitation de taux</span>
+            <span>{t('security_nist_hint', 'Sécurité NIST SP 800-63-4 avec limitation de taux')}</span>
           </div>
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl text-xs font-medium border hover:bg-slate-500/10 transition-colors cursor-pointer text-slate-300"
             style={{ borderColor: 'var(--border)' }}
           >
-            Fermer
+            {t('close', 'Fermer')}
           </button>
         </div>
       </div>

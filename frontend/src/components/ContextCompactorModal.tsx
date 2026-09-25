@@ -294,7 +294,7 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
                   {t('context_compactor_title', 'Assistant d\'Élagage & Compactage de Contexte')}
                 </h3>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 font-mono font-medium border border-sky-500/30">
-                  Hermes Studio
+                  Optimiseur LLM
                 </span>
               </div>
               <p className="text-xs opacity-70">

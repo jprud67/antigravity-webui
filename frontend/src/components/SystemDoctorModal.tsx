@@ -15,6 +15,7 @@ import {
 import { fetchSystemDiagnostics, executeDoctorRepair } from '../services/api';
 import type { SystemDiagnosticsReport } from '../types';
 import { showToast } from '../services/toast';
+import { useI18n } from '../services/i18n';
 
 interface SystemDoctorModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
   isOpen,
   onClose
 }) => {
+  const { t } = useI18n();
   const [report, setReport] = useState<SystemDiagnosticsReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [repairing, setRepairing] = useState(false);
@@ -36,11 +38,11 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
       const data = await fetchSystemDiagnostics();
       setReport(data);
     } catch (e: any) {
-      showToast(e.message || 'Erreur lors du diagnostic', 'error');
+      showToast(e.message || t('doctor_load_failed', 'Erreur lors du diagnostic'), 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (isOpen) {
@@ -55,9 +57,9 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
       const res = await executeDoctorRepair();
       setRepairResult({ actions: res.actions_taken });
       setReport(res.post_repair_diagnostics);
-      showToast('Auto-Doctor : réparations appliquées avec succès !', 'success');
+      showToast(t('doctor_repair_success', 'Auto-Doctor : réparations appliquées avec succès !'), 'success');
     } catch (e: any) {
-      showToast(e.message || 'Erreur lors de la réparation', 'error');
+      showToast(e.message || t('doctor_repair_failed', 'Erreur lors de la réparation'), 'error');
     } finally {
       setRepairing(false);
     }
@@ -80,7 +82,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                  Centre de Diagnostics Système & Auto-Doctor
+                  {t('doctor_title', 'Diagnostics Système & Auto-Doctor')}
                 </h2>
                 {report && (
                   <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
@@ -95,7 +97,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Monitoring matériel, intégrité SQLite, statut Git et connectivité temps réel des API LLM
+                {t('doctor_desc', 'Monitoring matériel, intégrité SQLite, statut Git et connectivité temps réel des API LLM')}
               </p>
             </div>
           </div>
@@ -108,7 +110,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
               className="py-1.5 px-3 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               {repairing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}
-              <span>{repairing ? 'Réparation...' : 'Auto-Doctor'}</span>
+              <span>{repairing ? t('doctor_repairing', 'Réparation...') : t('doctor_run_repair_btn', 'Auto-Doctor')}</span>
             </button>
             <button
               type="button"
@@ -133,7 +135,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
           {loading && !report ? (
             <div className="flex flex-col items-center justify-center p-12 text-slate-400 space-y-2">
               <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-              <p className="text-xs">Exécution de l'audit système complet...</p>
+              <p className="text-xs">{t('doctor_audit_running', "Exécution de l'audit système complet...")}</p>
             </div>
           ) : report ? (
             <>
@@ -142,7 +144,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                 <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
                   <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Actions de réparation exécutées :</span>
+                    <span>{t('doctor_actions_executed', 'Actions de réparation exécutées :')}</span>
                   </div>
                   <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-1 list-disc list-inside">
                     {repairResult.actions.map((act, idx) => (
@@ -157,7 +159,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                 <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-1.5">
                   <div className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400">
                     <AlertTriangle className="w-4 h-4" />
-                    <span>Points d'attention détectés ({report.anomalies.length})</span>
+                    <span>{t('doctor_points_attention', "Points d'attention détectés ({0})", report.anomalies.length)}</span>
                   </div>
                   <div className="space-y-1">
                     {report.anomalies.map((anom, idx) => (
@@ -172,7 +174,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
               {/* Grid 1: System Hardware Metrics */}
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                  <Cpu className="w-3.5 h-3.5" /> Métriques Matérielles & Système
+                  <Cpu className="w-3.5 h-3.5" /> {t('doctor_hardware_telemetry', 'Métriques Matérielles & Système')}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {/* RAM */}
@@ -235,7 +237,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
               {/* Grid 2: LLM Live Endpoints Latencies */}
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                  <Globe className="w-3.5 h-3.5" /> Connectivité API LLM en Direct
+                  <Globe className="w-3.5 h-3.5" /> {t('doctor_llm_connectivity', 'Connectivité API LLM en Direct')}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {report.llm_connectivity.map((llm) => {
@@ -251,7 +253,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                           <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500 animate-ping'}`} />
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-500">Latence</span>
+                          <span className="text-slate-500">{t('latency', 'Latence')}</span>
                           <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
                             {llm.latency_ms} ms
                           </span>
@@ -268,21 +270,21 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
               {/* Grid 3: Database & Runtimes */}
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                  <Database className="w-3.5 h-3.5" /> Intégrité Données & Environnements
+                  <Database className="w-3.5 h-3.5" /> {t('doctor_data_integrity', 'Intégrité Données & Environnements')}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* SQLite */}
                   <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                        <Database className="w-4 h-4 text-indigo-500" /> Base de Données SQLite
+                        <Database className="w-4 h-4 text-indigo-500" /> {t('doctor_sqlite_db', 'Base de Données SQLite')}
                       </span>
                       <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
                         report.database.integrity === 'ok' 
                           ? 'bg-emerald-500/15 text-emerald-500' 
                           : 'bg-rose-500/15 text-rose-500'
                       }`}>
-                        {report.database.integrity === 'ok' ? 'Intègre' : 'Erreur'}
+                        {report.database.integrity === 'ok' ? t('status_ok', 'Intègre') : t('status_error', 'Erreur')}
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-500">
@@ -294,7 +296,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                   <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                        <GitBranch className="w-4 h-4 text-purple-500" /> Git & Environnement Python
+                        <GitBranch className="w-4 h-4 text-purple-500" /> {t('doctor_git_python', 'Git & Environnement Python')}
                       </span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-500 font-bold">
                         {report.runtimes.git.branch || 'main'}

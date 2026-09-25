@@ -1266,7 +1266,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
             >
               <div className="flex items-center gap-2">
                 <Slash className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
-                <span className="uppercase tracking-wider">{t('antigravity_hermes_commands', 'Commandes Antigravity & Hermes')}</span>
+                <span className="uppercase tracking-wider">{t('slash_commands_catalog', 'Commandes Slash Antigravity')}</span>
               </div>
               <span className="text-[10px] font-mono opacity-70">{t('nav_insert_close_hint', '↑↓ naviguer · ↵ insérer · esc fermer')}</span>
             </div>

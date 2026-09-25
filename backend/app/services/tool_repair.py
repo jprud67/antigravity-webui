@@ -1,6 +1,6 @@
 """
 tool_repair.py — Moteur de normalisation et réparation d'appels d'outils pour modèles locaux & compacts.
-Inspiré directement de OpenClaw (stream-normalizer & grammar-repair).
+Inspiré directement de Antigravity Core (stream-normalizer & grammar-repair).
 
 Fonctionnalités :
   1. Détection des tool calls fuyant dans le texte markdown brut :

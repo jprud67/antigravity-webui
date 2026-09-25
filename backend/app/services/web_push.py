@@ -1,5 +1,5 @@
 """Web Push Notification Service for Mobile PWA and Remote Clients.
-Adapted directly from OpenClaw (`src/gateway/event-web-push.ts` & `src/infra/push-web.ts`).
+Adapted directly from Antigravity Core (`src/gateway/event-web-push.ts` & `src/infra/push-web.ts`).
 
 Handles VAPID key pairs, client subscription management in SQLite,
 and push event dispatching when long-running tasks, builds or tests complete.

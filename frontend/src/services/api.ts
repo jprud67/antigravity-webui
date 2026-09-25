@@ -78,7 +78,11 @@ import type {
   MemorySearchResult,
   AutoRecallConfig,
   RecallHookResult,
-  MemoryCategory
+  MemoryCategory,
+  ContainerSummary,
+  DockerEngineStatus,
+  WorkspaceDockerItem,
+  ContainerExecResult
 } from '../types';
 
 const API_BASE = '/api';
@@ -1199,7 +1203,7 @@ export async function continueCherryPick(
   return res.json();
 }
 
-// Sprint 16: Branch Management API
+// Branch Management API
 export async function checkoutGitBranch(payload: BranchCheckoutRequest): Promise<BranchActionResponse> {
   const res = await fetch(`${API_BASE}/git/branches/checkout`, {
     method: 'POST',
@@ -1265,7 +1269,7 @@ export async function renameGitBranch(payload: BranchRenameRequest): Promise<Bra
   return res.json();
 }
 
-// Sprint 16: Interactive Rebase API
+// Interactive Rebase API
 export async function fetchRebaseTodo(base: string, workspace?: string): Promise<RebaseTodoResponse> {
   const params = new URLSearchParams({ base });
   if (workspace) params.append('workspace', workspace);
@@ -2022,7 +2026,7 @@ export async function replaceSingleOccurrence(
 }
 
 // ==========================================
-// Sprint 15: AI Inline Copilot & Ghost Text
+// AI Inline Copilot & Ghost Text
 // ==========================================
 
 export async function fetchInlineCompletion(
@@ -2144,7 +2148,7 @@ export async function exploreWorkspaceDirectory(
 }
 
 // ==========================================
-// Sprint 19: Git Remotes & Tags Client API
+// Git Remotes & Tags Client API
 // ==========================================
 
 export async function fetchGitRemotes(workspace?: string): Promise<GitRemoteDetail[]> {
@@ -2341,7 +2345,7 @@ export async function publishGitRelease(payload: PublishReleasePayload): Promise
 }
 
 // ==========================================
-// Sprint 23: Continuous Memory (USER.md / MEMORY.md)
+// Continuous Memory (USER.md / MEMORY.md)
 // ==========================================
 
 export async function fetchMemoryStatus(): Promise<ContinuousMemoryStatus> {
@@ -2390,7 +2394,7 @@ export async function executeMemoryOperation(payload: MemoryOperationPayload): P
 }
 
 // ==========================================
-// Sprint 23: Cross-Sessions FTS5 Search
+// Cross-Sessions FTS5 Search
 // ==========================================
 
 export async function searchFts(
@@ -2437,7 +2441,7 @@ export async function getFtsStats(): Promise<{ total_indexed_rows: number; index
 }
 
 // ==========================================
-// Sprint 23: Tool Call Repair
+// Tool Call Repair
 // ==========================================
 
 export async function previewToolRepair(text: string, allowedTools?: string[]): Promise<ToolRepairPreviewResponse> {
@@ -2463,7 +2467,7 @@ export async function getToolRepairStats(): Promise<{ total_scanned: number; tot
 }
 
 // ==========================================
-// Sprint 23: Skill Curator & Lifecycle
+// Skill Curator & Lifecycle
 // ==========================================
 
 export async function fetchSkillCuratorStatus(): Promise<SkillTelemetry[]> {
@@ -2511,7 +2515,7 @@ export async function fetchSkillCuratorLedger(limit: number = 50): Promise<Skill
 }
 
 // ==========================================
-// Sprint 24: MCP Catalog Store API
+// MCP Catalog Store API
 // ==========================================
 
 export async function fetchMcpCatalog(query?: string, category?: string): Promise<{ total: number; items: McpCatalogItem[] }> {
@@ -2564,7 +2568,7 @@ export async function testMcpServer(slug: string): Promise<McpTestResult> {
 }
 
 // ==========================================
-// Sprint 24: Session Progress Card API
+// Session Progress Card API
 // ==========================================
 
 export async function fetchProgressCard(conversationId: string): Promise<{ exists: boolean; card: ProgressCardData | null }> {
@@ -2601,7 +2605,7 @@ export async function deleteProgressCard(conversationId: string): Promise<{ succ
 }
 
 // ==========================================
-// Sprint 24: System Doctor & Auto-Repair API
+// System Doctor & Auto-Repair API
 // ==========================================
 
 export async function fetchSystemDiagnostics(): Promise<SystemDiagnosticsReport> {
@@ -2626,7 +2630,7 @@ export async function executeDoctorRepair(): Promise<{ success: boolean; actions
 }
 
 // ==========================================
-// Sprint 24: Link Understanding API
+// Link Understanding API
 // ==========================================
 
 export async function extractLinkPreview(url: string, forceRefresh: boolean = false): Promise<LinkExtractionResult> {
@@ -2643,7 +2647,7 @@ export async function extractLinkPreview(url: string, forceRefresh: boolean = fa
 }
 
 // ==========================================
-// Sprint 25: Git Worktree Isolation
+// Git Worktree Isolation
 // ==========================================
 
 export async function fetchWorktrees(cwd?: string): Promise<{ repo_root: string | null; worktrees: GitWorktreeItem[] }> {
@@ -2684,7 +2688,7 @@ export async function removeWorktree(params: { path: string; branch?: string; re
 }
 
 // ==========================================
-// Sprint 25: Persistent Code Kernel & Tool RPC
+// Persistent Code Kernel & Tool RPC
 // ==========================================
 
 export async function executeKernelCode(code: string, sessionId?: string, cwd?: string, timeout?: number): Promise<KernelExecutionResult> {
@@ -2717,7 +2721,7 @@ export async function fetchKernelStatus(): Promise<{ active_kernels: any[]; tota
 }
 
 // ==========================================
-// Sprint 25: Tailscale & Web Push PWA
+// Tailscale & Web Push PWA
 // ==========================================
 
 export async function fetchTailscaleStatus(): Promise<TailscaleStatus> {
@@ -2779,7 +2783,7 @@ export async function sendTestWebPush(title?: string, body?: string): Promise<an
 }
 
 // ==========================================
-// Sprint 25: Messaging Gateway & PIN Pairing
+// Messaging Gateway & PIN Pairing
 // ==========================================
 
 export async function fetchGatewayStatus(): Promise<MessagingGatewayStatus> {
@@ -2978,6 +2982,91 @@ export const vectorMemoryApi = {
       body: JSON.stringify({ agent_id: agentId }),
     });
     if (!res.ok) throw new Error(`Échec d'effacement des mémoires: ${res.statusText}`);
+    return res.json();
+  },
+};
+
+// ==================== DOCKER STUDIO API ====================
+export const dockerApi = {
+  async getStatus(): Promise<DockerEngineStatus> {
+    const res = await fetch(`${API_BASE}/docker/status`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Échec statut Docker: ${res.statusText}`);
+    return res.json();
+  },
+
+  async scanWorkspace(workspace?: string): Promise<WorkspaceDockerItem[]> {
+    const params = new URLSearchParams();
+    if (workspace) params.set('workspace', workspace);
+    const res = await fetch(`${API_BASE}/docker/workspace?${params.toString()}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Échec scan Docker: ${res.statusText}`);
+    return res.json();
+  },
+
+  async listContainers(includeStopped: boolean = true): Promise<ContainerSummary[]> {
+    const res = await fetch(`${API_BASE}/docker/containers?all=${includeStopped}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Échec conteneurs: ${res.statusText}`);
+    return res.json();
+  },
+
+  async inspectContainer(containerId: string): Promise<Record<string, any>> {
+    const res = await fetch(`${API_BASE}/docker/containers/${encodeURIComponent(containerId)}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Échec inspection conteneur: ${res.statusText}`);
+    return res.json();
+  },
+
+  async executeAction(containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'kill'): Promise<{ status: string; container_id: string; action: string }> {
+    const res = await fetch(`${API_BASE}/docker/containers/${encodeURIComponent(containerId)}/action`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ action }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || 'Action conteneur échouée');
+    }
+    return res.json();
+  },
+
+  async getLogs(containerId: string, tail: number = 200, timestamps: boolean = true): Promise<{ logs: string; container_id: string }> {
+    const params = new URLSearchParams({ tail: String(tail), timestamps: String(timestamps) });
+    const res = await fetch(`${API_BASE}/docker/containers/${encodeURIComponent(containerId)}/logs?${params.toString()}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Échec logs conteneur: ${res.statusText}`);
+    return res.json();
+  },
+
+  async execCommand(containerId: string, command: string, workdir?: string): Promise<ContainerExecResult> {
+    const res = await fetch(`${API_BASE}/docker/containers/${encodeURIComponent(containerId)}/exec`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ command, workdir }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || 'Exécution commande conteneur échouée');
+    }
+    return res.json();
+  },
+
+  async executeComposeAction(composePath: string, action: 'up' | 'down' | 'restart' | 'ps'): Promise<{ status: string; action: string; output: string }> {
+    const res = await fetch(`${API_BASE}/docker/compose/action`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ compose_path: composePath, action }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || 'Action compose échouée');
+    }
     return res.json();
   },
 };

@@ -1,7 +1,7 @@
 """Link Understanding & Automatic URL Readability Extraction Service.
 
-Directly adapted from OpenClaw (src/gateway/link-understanding.product.test.ts,
-src/agents/tools/web-fetch.ts) and Hermes Agent (tools/web_tools_extract.py).
+Directly adapted from Antigravity Core (src/gateway/link-understanding.product.test.ts,
+src/agents/tools/web-fetch.ts) and Agent Antigravity (tools/web_tools_extract.py).
 Intercepts bare URLs in chat, fetches clean readability content in background,
 applies SSRF safety filtering, and enriches prompt context without clutter.
 """
@@ -48,7 +48,7 @@ def ensure_link_cache_schema():
 
 
 def is_safe_public_url(url: str) -> bool:
-    """SSRF Guard adapted from OpenClaw fetch-guard."""
+    """SSRF Guard adapted from Antigravity Core fetch-guard."""
     try:
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https"):

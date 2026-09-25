@@ -216,7 +216,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
                     color: 'var(--accent-text)'
                   }}
                 >
-                  Hermes
+                  {t('rules_badge_system', 'Système')}
                 </span>
               </h2>
               <p className="text-[10px] sm:text-[11px] truncate hidden sm:block" style={{ color: 'var(--muted)' }}>
@@ -425,7 +425,7 @@ export const RulesEditorModal: React.FC<RulesEditorModalProps> = ({
             {currentFileMeta?.read_only ? (
               <>
                 <Lock className="w-4 h-4 text-amber-400" />
-                <span className="text-amber-400/90">{t('hermes_read_only_notice', 'This memory file is protected and read-only. Direct modification is restricted.')}</span>
+                <span className="text-amber-400/90">{t('system_read_only_notice', 'Ce fichier système est protégé en lecture seule. La modification directe est restreinte.')}</span>
               </>
             ) : (
               <>

@@ -91,13 +91,13 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
   const [isLoadingFile, setIsLoadingFile] = useState<boolean>(needsFetchFile);
   const [theme, setTheme] = useState<'vs-dark' | 'light'>(getInitialMonacoTheme);
 
-  // Sprint 15: Copilot Inline Ghost Text & AI Code Actions state
+  // Copilot Inline Ghost Text & AI Code Actions state
   const [copilotActive, setCopilotActive] = useState<boolean>(isCopilotEnabled);
   const [copilotStatus, setCopilotStatus] = useState<'idle' | 'generating' | 'suggested' | 'disabled'>('idle');
   const [copilotLatency, setCopilotLatency] = useState<number | null>(null);
   const [isActionModalOpen, setIsActionModalOpen] = useState<boolean>(false);
 
-  // Sprint 18: Multi-Cursor & Git Diff Annotations state
+  // Multi-Cursor & Git Diff Annotations state
   const [cursorCount, setCursorCount] = useState<number>(1);
   const [diffRanges, setDiffRanges] = useState<GitDiffRange[]>([]);
   const [diffSummary, setDiffSummary] = useState<GitDiffSummary | null>(null);

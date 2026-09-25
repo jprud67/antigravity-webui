@@ -1,7 +1,7 @@
 """System Doctor and Diagnostics Service for Antigravity WebUI.
 
-Directly adapted from OpenClaw (src/commands/doctor.ts, src/plugin-sdk/runtime-doctor.ts)
-and Hermes Agent (tools/computer_use/doctor.py).
+Directly adapted from Antigravity Core (src/commands/doctor.ts, src/plugin-sdk/runtime-doctor.ts)
+and Agent Antigravity (tools/computer_use/doctor.py).
 Provides full-stack health monitoring (RAM, CPU, disk, SQLite integrity, Git, LLM latency)
 and one-click automated repairs (Auto-Doctor).
 """

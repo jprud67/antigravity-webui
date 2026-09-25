@@ -128,7 +128,7 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
         },
         {
             "id": "hermes_arch",
-            "name": "ARCHITECTURE_STATE.md (Mémoire Hermes)",
+            "name": "ARCHITECTURE_STATE.md (Mémoire Système)",
             "description": "Synthèse architecturale et état consolidé du serveur",
             "path": str(ARCH_STATE_FILE),
             "syntax": "markdown",
@@ -139,7 +139,7 @@ def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(requi
         },
         {
             "id": "hermes_journal",
-            "name": f"server_actions_{journal_month}.md (Journal Hermes)",
+            "name": f"server_actions_{journal_month}.md (Journal Système)",
             "description": "Journal mensuel horodaté des actions et interventions serveur",
             "path": str(journal_path),
             "syntax": "markdown",

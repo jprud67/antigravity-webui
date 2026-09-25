@@ -1294,6 +1294,891 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     cs: 'Aktivní pracovní prostor: {0}',
     vi: 'Không gian làm việc đang hoạt động: {0}',
   },
+
+  approve: {
+    en: 'Approve',
+    fr: 'Approuver',
+  },
+  approved_devices_title: {
+    en: 'Authorized Devices & Channels',
+    fr: 'Appareils & Canaux Autorisés',
+  },
+  canvas_code_editor: {
+    en: 'HTML / JS Source Code',
+    fr: 'Code Source HTML / JS',
+  },
+  canvas_create_first: {
+    en: 'Create your first widget',
+    fr: 'Créer votre premier widget',
+  },
+  canvas_delete_confirm: {
+    en: 'Permanently delete this Canvas?',
+    fr: 'Supprimer définitivement ce Canvas ?',
+  },
+  canvas_doc_title_placeholder: {
+    en: 'Widget title...',
+    fr: 'Titre du widget...',
+  },
+  canvas_filter_placeholder: {
+    en: 'Search canvas documents...',
+    fr: 'Filtrer les documents canvas...',
+  },
+  canvas_live_preview: {
+    en: 'Live Sandboxed Preview',
+    fr: 'Aperçu Isolé en Direct',
+  },
+  canvas_no_docs: {
+    en: 'No canvas documents yet.',
+    fr: 'Aucun document canvas pour le moment.',
+  },
+  canvas_open_tab: {
+    en: 'Open in new tab',
+    fr: 'Ouvrir dans un nouvel onglet',
+  },
+  canvas_save_btn: {
+    en: 'Save Canvas',
+    fr: 'Enregistrer Canvas',
+  },
+  canvas_saved_success: {
+    en: 'Canvas Saved!',
+    fr: 'Canvas Enregistré !',
+  },
+  canvas_saving: {
+    en: 'Saving...',
+    fr: 'Enregistrement...',
+  },
+  canvas_studio_desc: {
+    en: 'Sandboxed iframe web widgets with live theme bridge and auto-resize.',
+    fr: 'Widgets React/HTML isolés dans iframe sandboxed avec bridge de thème et auto-resize.',
+  },
+  canvas_studio_title: {
+    en: 'Living Canvas & Interactive Documents',
+    fr: 'Canvas Vivant & Documents Interactifs',
+  },
+  canvas_tab_gallery: {
+    en: 'Gallery ({0})',
+    fr: 'Galerie ({0})',
+  },
+  canvas_tab_studio: {
+    en: 'Interactive Studio',
+    fr: 'Studio Interactif',
+  },
+  canvas_template_select: {
+    en: 'Template...',
+    fr: 'Modèle...',
+  },
+  collapse_studios: {
+    en: 'Collapse Studios',
+    fr: 'Réduire les studios',
+  },
+  continuous_memory_desc: {
+    en: 'Persistent knowledge injected as an immutable snapshot without breaking LLM prompt caching.',
+    fr: 'Connaissances persistantes injectées en snapshot immuable sans rompre le cache de prompt.',
+  },
+  continuous_memory_title: {
+    en: 'Curated Continuous Memory',
+    fr: 'Mémoire Continue Curatée',
+  },
+  copied_to_clipboard: {
+    en: 'Copied to clipboard!',
+    fr: 'Copié dans le presse-papier !',
+  },
+  default_chat_id_label: {
+    en: 'Default Chat ID / Channel ID',
+    fr: 'Chat ID / Channel ID par défaut',
+  },
+  delete_permanently: {
+    en: 'Force Delete',
+    fr: 'Supprimer',
+  },
+  device_revoked: {
+    en: 'Paired device revoked',
+    fr: 'Appareil appairé révoqué',
+  },
+  devices_registered: {
+    en: 'registered device(s)',
+    fr: 'appareil(s) enregistré(s)',
+  },
+  disable_serve: {
+    en: 'Disable HTTPS Serve',
+    fr: 'Désactiver Serve HTTPS',
+  },
+  disconnected: {
+    en: 'Disconnected',
+    fr: 'Déconnecté',
+  },
+  discord_bot_token_label: {
+    en: 'Discord Bot Token (from Discord Dev Portal)',
+    fr: 'Token Bot Discord (obtenu via Discord Dev Portal)',
+  },
+  discord_channel_id_label: {
+    en: 'Default Discord Channel ID',
+    fr: 'Channel ID Discord par défaut',
+  },
+  discord_config_saved: {
+    en: 'Discord configuration saved',
+    fr: 'Configuration Discord enregistrée',
+  },
+  discord_notify_approval_label: {
+    en: 'Send approval requests with Yes/No buttons',
+    fr: 'Envoyer les demandes d\'approbation avec boutons',
+  },
+  discord_notify_complete_label: {
+    en: 'Send task completion summaries',
+    fr: 'Envoyer les résumés de fin de tâche',
+  },
+  discord_token_required: {
+    en: 'Discord bot token is required',
+    fr: 'Le token du bot Discord est requis',
+  },
+  docker_action_remove: {
+    en: 'Remove',
+    fr: 'Supprimer',
+  },
+  docker_action_restart: {
+    en: 'Restart',
+    fr: 'Redémarrer',
+  },
+  docker_action_start: {
+    en: 'Start',
+    fr: 'Démarrer',
+  },
+  docker_action_stop: {
+    en: 'Stop',
+    fr: 'Arrêter',
+  },
+  docker_compose_active: {
+    en: 'Compose Available',
+    fr: 'Compose Disponible',
+  },
+  docker_compose_down_btn: {
+    en: 'Compose Down',
+    fr: 'Arrêter Compose Down',
+  },
+  docker_compose_up_btn: {
+    en: 'Compose Up',
+    fr: 'Lancer Compose Up',
+  },
+  docker_daemon_active: {
+    en: 'Docker Daemon Operational',
+    fr: 'Démon Docker Opérationnel',
+  },
+  docker_daemon_inactive: {
+    en: 'Docker Daemon Offline / Not Installed',
+    fr: 'Démon Docker Hors-Ligne / Non Installé',
+  },
+  docker_detected_files: {
+    en: 'Detected Docker & Compose Configurations',
+    fr: 'Fichiers Docker & Compose Détectés',
+  },
+  docker_exec_btn: {
+    en: 'Run Command',
+    fr: 'Exécuter',
+  },
+  docker_exec_command_placeholder: {
+    en: 'Command to run (e.g. ls -la, python --version)...',
+    fr: 'Commande à exécuter (ex: ls -la, python --version)...',
+  },
+  docker_logs_tail_label: {
+    en: 'Tail lines:',
+    fr: 'Lignes :',
+  },
+  docker_no_containers: {
+    en: 'No Docker containers found.',
+    fr: 'Aucun conteneur Docker détecté.',
+  },
+  docker_refresh: {
+    en: 'Refresh',
+    fr: 'Actualiser',
+  },
+  docker_studio_desc: {
+    en: 'Inspect, manage containers, execute commands, view logs, and orchestrate Docker Compose services directly from Antigravity.',
+    fr: 'Inspectez, gérez vos conteneurs, exécutez des commandes, consultez les logs et orchestrez Docker Compose directement depuis Antigravity.',
+  },
+  docker_studio_title: {
+    en: 'Docker & Container Management Studio',
+    fr: 'Studio de Gestion Docker & Conteneurs',
+  },
+  docker_tab_compose: {
+    en: 'Compose & Workspace',
+    fr: 'Compose & Projet',
+  },
+  docker_tab_containers: {
+    en: 'Containers ({0})',
+    fr: 'Conteneurs ({0})',
+  },
+  docker_tab_logs: {
+    en: 'Logs & Console',
+    fr: 'Logs & Console',
+  },
+  doctor_checks_title: {
+    en: 'Diagnostic Checks ({0})',
+    fr: 'Points de Contrôle ({0})',
+  },
+  doctor_cpu_usage: {
+    en: 'CPU Utilization',
+    fr: 'Utilisation CPU',
+  },
+  doctor_desc: {
+    en: 'Hardware telemetry, SQLite database integrity, Git health, and real-time LLM API probes.',
+    fr: 'Monitoring matériel, intégrité SQLite, statut Git et connectivité temps réel des API LLM.',
+  },
+  doctor_disk_free: {
+    en: 'Free Disk Space',
+    fr: 'Espace Disque Libre',
+  },
+  doctor_hardware_telemetry: {
+    en: 'Hardware & OS Telemetry',
+    fr: 'Télémétrie Matériel & OS',
+  },
+  doctor_memory_ram: {
+    en: 'RAM Usage',
+    fr: 'Mémoire Vive (RAM)',
+  },
+  doctor_no_issues: {
+    en: 'All subsystem checks passed with zero warnings.',
+    fr: 'Tous les points de contrôle sont validés sans avertissement.',
+  },
+  doctor_recheck_btn: {
+    en: 'Recheck Diagnostics',
+    fr: 'Réanalyser',
+  },
+  doctor_repair_success: {
+    en: 'Auto-Doctor: repairs applied successfully!',
+    fr: 'Auto-Doctor : réparations appliquées avec succès !',
+  },
+  doctor_repairing: {
+    en: 'Repairing System...',
+    fr: 'Réparation en cours...',
+  },
+  doctor_run_repair_btn: {
+    en: 'Run Auto-Doctor Repair',
+    fr: 'Lancer Auto-Doctor Réparation',
+  },
+  doctor_status_critical: {
+    en: 'Critical Issue',
+    fr: 'Anomalie Critique',
+  },
+  doctor_status_healthy: {
+    en: 'Operational & Healthy',
+    fr: 'Opérationnel & Sain',
+  },
+  doctor_status_warning: {
+    en: 'Warning Detected',
+    fr: 'Avertissement Détecté',
+  },
+  doctor_title: {
+    en: 'System Diagnostics & Auto-Doctor',
+    fr: 'Diagnostics Système & Auto-Doctor',
+  },
+  enable_on_device: {
+    en: 'Enable Push on this Device',
+    fr: 'Activer Push sur cet appareil',
+  },
+  enable_serve: {
+    en: 'Enable HTTPS Serve',
+    fr: 'Activer Serve HTTPS',
+  },
+  encryption_wireguard_hint: {
+    en: 'Private WireGuard tunnel: traffic never transits through third-party servers.',
+    fr: 'Tunnel WireGuard privé : le trafic ne transite jamais par des serveurs tiers.',
+  },
+  enter_pairing_code: {
+    en: 'Enter 6-digit code...',
+    fr: 'Saisir le code à 6 chiffres...',
+  },
+  expand_studios: {
+    en: 'Show all tools and studios ({0})',
+    fr: 'Afficher tous les outils et studios ({0})',
+  },
+  expires_after_1h: {
+    en: 'Expires in 1 hour',
+    fr: 'Expire après 1 heure',
+  },
+  expires_in_minutes: {
+    en: 'Expires in {0}m',
+    fr: 'Expire dans {0} min',
+  },
+  finalize: {
+    en: 'Finalize / Prune',
+    fr: 'Finaliser / Prune',
+  },
+  finalize_hint: {
+    en: 'Safely removes worktree if no uncommitted or unmerged changes exist',
+    fr: 'Supprime en toute sécurité si aucun commit non fusionné n\'est présent',
+  },
+  fts_filter_all: {
+    en: 'All Messages',
+    fr: 'Tous les messages',
+  },
+  fts_filter_assistant: {
+    en: 'Assistant Only',
+    fr: 'Assistant uniquement',
+  },
+  fts_filter_user: {
+    en: 'User Only',
+    fr: 'Utilisateur uniquement',
+  },
+  fts_jump_to_discussion: {
+    en: 'Open discussion',
+    fr: 'Ouvrir la discussion',
+  },
+  fts_no_results: {
+    en: 'No messages match your query.',
+    fr: 'Aucun message ne correspond à votre recherche.',
+  },
+  fts_reindex_btn: {
+    en: 'Rebuild FTS Index',
+    fr: 'Reconstruire l\'index FTS',
+  },
+  fts_reindexing: {
+    en: 'Reindexing...',
+    fr: 'Réindexation...',
+  },
+  fts_results_count: {
+    en: '{0} match(es) in {1} ms',
+    fr: '{0} résultat(s) en {1} ms',
+  },
+  fts_search_placeholder: {
+    en: 'Search through all chat messages, code blocks, and tool results...',
+    fr: 'Rechercher dans tous les messages, blocs de code et résultats d\'outils...',
+  },
+  fts_search_title: {
+    en: 'Full-Text Search across Discussions (FTS5)',
+    fr: 'Recherche Plein Texte dans les Discussions (FTS5)',
+  },
+  generate_isolated_worktree: {
+    en: 'Generate New Worktree',
+    fr: 'Générer Nouveau Worktree',
+  },
+  invalid_code: {
+    en: 'Please enter a valid 6-digit PIN code',
+    fr: 'Veuillez saisir un code PIN valide à 6 chiffres',
+  },
+  magicdns_hostname: {
+    en: 'MagicDNS Hostname',
+    fr: 'Nom d\'hôte MagicDNS',
+  },
+  mcp_all_categories: {
+    en: 'All Categories',
+    fr: 'Toutes les catégories',
+  },
+  mcp_cancel: {
+    en: 'Cancel',
+    fr: 'Annuler',
+  },
+  mcp_catalog_desc: {
+    en: 'Install verified Model Context Protocol tools and servers in 1 click.',
+    fr: 'Installez des serveurs et outils Model Context Protocol vérifiés en 1 clic.',
+  },
+  mcp_catalog_title: {
+    en: 'MCP Extensions Store & Connectors',
+    fr: 'Store d\'Extensions MCP & Connecteurs',
+  },
+  mcp_confirm_install: {
+    en: 'Confirm Installation',
+    fr: 'Confirmer l\'installation',
+  },
+  mcp_env_dialog_desc: {
+    en: 'This MCP connector requires an API key or configuration token to operate.',
+    fr: 'Ce connecteur MCP nécessite une clé API ou un token pour fonctionner.',
+  },
+  mcp_env_dialog_title: {
+    en: 'Configure API Key / Environment',
+    fr: 'Configurer Clé API / Environnement',
+  },
+  mcp_install_btn: {
+    en: 'Install 1-Click',
+    fr: 'Installer 1-Clic',
+  },
+  mcp_installed_badge: {
+    en: 'Installed',
+    fr: 'Installé',
+  },
+  mcp_official_badge: {
+    en: 'Certified',
+    fr: 'Certifié',
+  },
+  mcp_search_placeholder: {
+    en: 'Search 50+ MCP servers, databases, tools...',
+    fr: 'Rechercher parmi 50+ serveurs MCP, bases de données, outils...',
+  },
+  mcp_test_btn: {
+    en: 'Test Ping',
+    fr: 'Tester Ping',
+  },
+  mcp_uninstall_btn: {
+    en: 'Uninstall',
+    fr: 'Désinstaller',
+  },
+  memory_add_btn: {
+    en: 'Add Memory',
+    fr: 'Ajouter au profil',
+  },
+  memory_add_entry_placeholder: {
+    en: 'Add a persistent memory (convention, preference, key architectural fact)...',
+    fr: 'Ajouter un souvenir persistant (convention, préférence, fait d\'architecture)...',
+  },
+  memory_delete_confirm: {
+    en: 'Delete this entry from persistent memory?',
+    fr: 'Supprimer cette entrée de la mémoire persistante ?',
+  },
+  memory_entry_added: {
+    en: 'Memory entry added successfully!',
+    fr: 'Entrée ajoutée avec succès !',
+  },
+  memory_loading: {
+    en: 'Loading persistent memory...',
+    fr: 'Chargement de la mémoire persistante...',
+  },
+  memory_no_entries: {
+    en: 'No memories recorded yet in this file.',
+    fr: 'Aucun souvenir enregistré dans ce fichier.',
+  },
+  memory_quota_label: {
+    en: 'Token Quota Used',
+    fr: 'Quota de Tokens Utilisé',
+  },
+  memory_refresh_snapshot: {
+    en: 'Refresh Snapshot',
+    fr: 'Rafraîchir Snapshot',
+  },
+  memory_refreshing: {
+    en: 'Refreshing...',
+    fr: 'Actualisation...',
+  },
+  memory_save_raw: {
+    en: 'Save Raw File',
+    fr: 'Enregistrer le fichier',
+  },
+  memory_snapshot_updated: {
+    en: 'Immutable snapshot updated in LLM system prompt',
+    fr: 'Snapshot gelé mis à jour dans le prompt système',
+  },
+  memory_target_user: {
+    en: 'Developer Profile (USER.md)',
+    fr: 'Profil Développeur (USER.md)',
+  },
+  memory_target_workspace: {
+    en: 'Workspace Memory (MEMORY.md)',
+    fr: 'Mémoire Workspace (MEMORY.md)',
+  },
+  memory_view_cards: {
+    en: 'Curated Cards',
+    fr: 'Cartes Curatées',
+  },
+  memory_view_raw: {
+    en: 'Raw Markdown',
+    fr: 'Markdown Brut',
+  },
+  messaging_data_load_failed: {
+    en: 'Unable to load messaging gateway status',
+    fr: 'Impossible de charger le statut de la passerelle',
+  },
+  messaging_gateway_desc: {
+    en: 'Control Antigravity from Telegram, Discord, or mobile with PIN verification (NIST SP 800-63B compliant).',
+    fr: 'Pilotez Antigravity depuis Telegram, Discord ou mobile avec vérification PIN (conforme NIST SP 800-63B).',
+  },
+  messaging_gateway_title: {
+    en: 'Unified Messaging Gateway & PIN Pairing',
+    fr: 'Passerelle de Messagerie & Appairage PIN',
+  },
+  mobile_web_push_title: {
+    en: 'Native Web Push & Mobile PWA',
+    fr: 'Web Push Natif & Mobile PWA',
+  },
+  modified_dirty: {
+    en: 'Dirty (Uncommitted Changes)',
+    fr: 'Modifié (Changements non commités)',
+  },
+  no_active_worktrees: {
+    en: 'No active isolated worktrees.',
+    fr: 'Aucun worktree isolé actif.',
+  },
+  no_approved_devices: {
+    en: 'No authorized devices yet.',
+    fr: 'Aucun appareil autorisé pour le moment.',
+  },
+  no_pending_pairing_codes: {
+    en: 'No pending pairing codes.',
+    fr: 'Aucun code d\'appairage en attente.',
+  },
+  not_installed: {
+    en: 'Not Installed',
+    fr: 'Non Installé',
+  },
+  notification_permission_denied: {
+    en: 'Notification permission denied by browser',
+    fr: 'Permission de notification refusée par le navigateur',
+  },
+  pending_requests: {
+    en: 'Pending Pairing Requests',
+    fr: 'Demandes d\'appairage en attente',
+  },
+  pin_pairing_badge: {
+    en: 'Secure PIN Pairing',
+    fr: 'Appairage PIN Sécurisé',
+  },
+  push_activated: {
+    en: 'Mobile Web Push activated!',
+    fr: 'Web Push mobile activé !',
+  },
+  push_activation_error: {
+    en: 'Push activation failed',
+    fr: 'Échec de l\'activation push',
+  },
+  push_disabled_this_browser: {
+    en: 'Push notifications inactive on this browser',
+    fr: 'Notifications push inactives sur ce navigateur',
+  },
+  push_enabled_this_browser: {
+    en: 'Push notifications active on this browser',
+    fr: 'Notifications push actives sur ce navigateur',
+  },
+  push_subscribed: {
+    en: 'Subscribed to Push',
+    fr: 'Abonné aux Push',
+  },
+  push_test_body: {
+    en: 'Antigravity WebUI remote notification is functional!',
+    fr: 'Notification distante Antigravity WebUI opérationnelle !',
+  },
+  pwa_push_desc: {
+    en: 'Receive instant background alerts when a long task, build, or test finishes on your phone.',
+    fr: 'Recevez des alertes instantanées en arrière-plan lorsqu\'une tâche longue, un build ou un test se termine.',
+  },
+  remote_access_badge: {
+    en: 'Tailscale & PWA',
+    fr: 'Tailscale & PWA',
+  },
+  remote_access_desc: {
+    en: 'Access your Antigravity WebUI from any smartphone or laptop via Tailscale MagicDNS and receive native Web Push alerts.',
+    fr: 'Accédez à votre Antigravity WebUI depuis n\'importe quel smartphone ou poste distant via Tailscale MagicDNS et recevez des alertes Web Push natives.',
+  },
+  remote_access_title: {
+    en: 'Secure Remote Access & Push Notifications',
+    fr: 'Accès Distant Sécurisé & Notifications Push',
+  },
+  remote_status_load_failed: {
+    en: 'Failed to load remote status',
+    fr: 'Impossible de charger le statut distant',
+  },
+  revoke_device_title: {
+    en: 'Revoke this device',
+    fr: 'Révoquer cet appareil',
+  },
+  revoke_failed: {
+    en: 'Failed to revoke device',
+    fr: 'Échec de la révocation de l\'appareil',
+  },
+  save_discord: {
+    en: 'Save Discord Settings',
+    fr: 'Enregistrer Discord',
+  },
+  save_telegram: {
+    en: 'Save Telegram Settings',
+    fr: 'Enregistrer Telegram',
+  },
+  secure_https_url: {
+    en: 'Secure HTTPS URL (Tailscale Serve)',
+    fr: 'URL HTTPS Sécurisée (Tailscale Serve)',
+  },
+  security_nist_hint: {
+    en: 'NIST SP 800-63B compliant: 6-digit rate-limited codes with cryptographic hash storage.',
+    fr: 'Conformité NIST SP 800-63B : codes à 6 chiffres avec limitation de débit et hash sécurisé.',
+  },
+  serve_active_desc: {
+    en: 'Traffic encrypted end-to-end via your private Tailnet.',
+    fr: 'Trafic chiffré de bout en bout via votre Tailnet privé.',
+  },
+  serve_inactive_desc: {
+    en: 'Activate Tailscale Serve to generate a public valid HTTPS certificate on your private network.',
+    fr: 'Activez Tailscale Serve pour générer un certificat HTTPS valide sur votre réseau privé.',
+  },
+  studio_canvas: {
+    en: 'Canvas',
+    fr: 'Canvas',
+  },
+  studio_docker: {
+    en: 'Docker Studio',
+    fr: 'Docker Studio',
+  },
+  studio_doctor: {
+    en: 'Doctor',
+    fr: 'Doctor',
+  },
+  studio_documents: {
+    en: 'Documents',
+    fr: 'Documents',
+  },
+  studio_gateway: {
+    en: 'Gateway',
+    fr: 'Passerelle',
+  },
+  studio_mcp_store: {
+    en: 'MCP Store',
+    fr: 'Store MCP',
+  },
+  studio_quotas: {
+    en: 'Quotas',
+    fr: 'Quotas',
+  },
+  studio_remote_access: {
+    en: 'Remote Access',
+    fr: 'Accès Distant',
+  },
+  studio_studios: {
+    en: 'Studios',
+    fr: 'Studios',
+  },
+  studio_tasks: {
+    en: 'Tasks & Sub',
+    fr: 'Tâches & Subs',
+  },
+  studio_vector_memory: {
+    en: 'Vector Memory',
+    fr: 'Mémoire Vec',
+  },
+  studio_workspace: {
+    en: 'Workspace',
+    fr: 'Workspace',
+  },
+  studio_worktrees: {
+    en: 'Worktrees',
+    fr: 'Worktrees',
+  },
+  switcher_add_project: {
+    en: 'Add Project Directory',
+    fr: 'Ajouter un Répertoire',
+  },
+  switcher_all_projects: {
+    en: 'All Projects',
+    fr: 'Tous les projets',
+  },
+  switcher_search_placeholder: {
+    en: 'Search workspace or project...',
+    fr: 'Rechercher un workspace ou projet...',
+  },
+  switcher_switched_toast: {
+    en: 'Active workspace switched to {0}',
+    fr: 'Workspace actif basculé vers {0}',
+  },
+  switcher_title: {
+    en: 'Workspace Switcher & Explorer',
+    fr: 'Sélecteur & Explorateur de Workspaces',
+  },
+  tab_discord: {
+    en: 'Discord Bot',
+    fr: 'Bot Discord',
+  },
+  tab_pin_pairing: {
+    en: 'PIN Pairing',
+    fr: 'Appairage PIN',
+  },
+  tab_telegram: {
+    en: 'Telegram Bot',
+    fr: 'Bot Telegram',
+  },
+  tailnet_connected: {
+    en: 'Tailnet Connected',
+    fr: 'Tailnet Connecté',
+  },
+  tailscale_ip: {
+    en: 'Tailscale IP (IPv4)',
+    fr: 'IP Tailscale (IPv4)',
+  },
+  tailscale_network_title: {
+    en: 'Zero-Config Mesh (Tailscale MagicDNS)',
+    fr: 'Réseau Maillé Zéro-Config (Tailscale MagicDNS)',
+  },
+  tailscale_not_active_warning: {
+    en: 'Tailscale daemon is not active on this host. Run tailscale up to enable zero-config remote access.',
+    fr: 'Le démon Tailscale n\'est pas actif sur cette machine. Lancez tailscale up pour activer l\'accès distant.',
+  },
+  tailscale_serve_disabled: {
+    en: 'Tailscale Serve disabled',
+    fr: 'Tailscale Serve désactivé',
+  },
+  tailscale_serve_enabled: {
+    en: 'Tailscale Serve activated successfully!',
+    fr: 'Tailscale Serve activé avec succès !',
+  },
+  tailscale_serve_error: {
+    en: 'Tailscale Serve error',
+    fr: 'Erreur Tailscale Serve',
+  },
+  telegram_bot_token_label: {
+    en: 'Telegram Bot Token (from @BotFather)',
+    fr: 'Token Bot Telegram (obtenu via @BotFather)',
+  },
+  telegram_config_saved: {
+    en: 'Telegram configuration saved',
+    fr: 'Configuration Telegram enregistrée',
+  },
+  telegram_token_required: {
+    en: 'Telegram bot token is required',
+    fr: 'Le token du bot Telegram est requis',
+  },
+  test_push_btn: {
+    en: 'Send Test Push',
+    fr: 'Envoyer Test Push',
+  },
+  test_push_failed: {
+    en: 'Push test error',
+    fr: 'Erreur test push',
+  },
+  test_push_sent: {
+    en: 'Test push sent to all registered devices',
+    fr: 'Push test envoyé à tous les appareils enregistrés',
+  },
+  tg_notify_approval_label: {
+    en: 'Send interactive approval notifications',
+    fr: 'Envoyer les notifications d\'approbation interactives',
+  },
+  tg_notify_complete_label: {
+    en: 'Send task completion notifications',
+    fr: 'Envoyer les notifications de tâche terminée',
+  },
+  toggle_error: {
+    en: 'Toggle error',
+    fr: 'Erreur de bascule',
+  },
+  validate: {
+    en: 'Validate',
+    fr: 'Valider',
+  },
+  vector_add_btn: {
+    en: 'Vectorize & Store',
+    fr: 'Vectoriser & Mémoriser',
+  },
+  vector_all_categories: {
+    en: 'All Categories',
+    fr: 'Toutes les catégories',
+  },
+  vector_category_label: {
+    en: 'Category',
+    fr: 'Catégorie',
+  },
+  vector_delete_confirm: {
+    en: 'Permanently remove this vector memory?',
+    fr: 'Supprimer définitivement ce souvenir vectoriel ?',
+  },
+  vector_importance_label: {
+    en: 'Importance Weight',
+    fr: 'Poids d\'importance',
+  },
+  vector_memory_desc: {
+    en: 'Embedded semantic search with automatic context recall before each model turn.',
+    fr: 'Recherche sémantique embarquée et injection automatique des souvenirs pertinents par prompt.',
+  },
+  vector_memory_title: {
+    en: 'Vector Memory & Auto-Recall Hook',
+    fr: 'Mémoire Vectorielle & Auto-Recall Hook',
+  },
+  vector_new_memory_placeholder: {
+    en: 'New semantic memory to vectorize (facts, rules, architecture notes)...',
+    fr: 'Nouveau souvenir sémantique à vectoriser (faits, règles, notes d\'architecture)...',
+  },
+  vector_no_memories: {
+    en: 'No vector memories stored yet.',
+    fr: 'Aucun souvenir vectoriel mémorisé pour le moment.',
+  },
+  vector_save_config_btn: {
+    en: 'Save Embeddings Settings',
+    fr: 'Enregistrer la Configuration',
+  },
+  vector_search_placeholder: {
+    en: 'Real-time semantic search test...',
+    fr: 'Test de recherche sémantique en temps réel...',
+  },
+  vector_searching: {
+    en: 'Embedding...',
+    fr: 'Vectorisation...',
+  },
+  vector_sim_prompt_label: {
+    en: 'User prompt to evaluate for recall:',
+    fr: 'Prompt utilisateur à évaluer pour le rappel :',
+  },
+  vector_sim_test_btn: {
+    en: 'Simulate Recall Hook',
+    fr: 'Simuler le Hook de Rappel',
+  },
+  vector_sim_title: {
+    en: 'Auto-Recall Simulator',
+    fr: 'Simulateur d\'Auto-Recall',
+  },
+  vector_tab_memories: {
+    en: 'Memories ({0})',
+    fr: 'Souvenirs ({0})',
+  },
+  vector_tab_settings: {
+    en: 'Hook & Embeddings',
+    fr: 'Hook & Embeddings',
+  },
+  worktree_create_failed: {
+    en: 'Failed to create worktree',
+    fr: 'Échec de la création du worktree',
+  },
+  worktree_created: {
+    en: 'Isolated worktree created successfully for sub-agent',
+    fr: 'Worktree isolé créé avec succès pour le sous-agent',
+  },
+  worktree_deleted: {
+    en: 'Worktree deleted',
+    fr: 'Worktree supprimé',
+  },
+  worktree_finalize_failed: {
+    en: 'Failed to finalize worktree',
+    fr: 'Échec de la finalisation du worktree',
+  },
+  worktree_isolation_desc: {
+    en: 'Zero interference: each sub-agent executes in an isolated Git worktree without modifying your open files in Monaco.',
+    fr: 'Zéro interférence : chaque sous-agent s\'exécute dans un worktree Git isolé sans modifier vos fichiers ouverts dans Monaco.',
+  },
+  worktree_isolation_title: {
+    en: 'Sub-agent Isolation & Worktrees',
+    fr: 'Isolation des Sous-Agents & Worktrees',
+  },
+  worktree_kept: {
+    en: 'Worktree has unmerged commits and was preserved',
+    fr: 'Le worktree contient des commits non fusionnés et a été préservé',
+  },
+  worktree_load_failed: {
+    en: 'Unable to load Git worktrees',
+    fr: 'Impossible de charger les worktrees Git',
+  },
+  worktree_not_a_repo: {
+    en: 'Current workspace is not a Git repository.',
+    fr: 'Le workspace actuel n\'est pas un dépôt Git.',
+  },
+  worktree_protection_hint: {
+    en: 'Safe auto-cleanup: worktrees with pending commits are never deleted without your approval.',
+    fr: 'Protection auto-clean : les worktrees ayant des commits en attente ne sont jamais supprimés sans votre accord.',
+  },
+  worktree_pruned: {
+    en: 'Clean worktrees pruned automatically',
+    fr: 'Worktrees propres nettoyés automatiquement',
+  },
+  worktree_remove_failed: {
+    en: 'Failed to remove worktree',
+    fr: 'Échec de la suppression du worktree',
+  },
+  worktree_sandbox_badge: {
+    en: 'Multi-Agent Sandbox',
+    fr: 'Sandbox Multi-Agents',
+  },
+  worktree_task_placeholder: {
+    en: 'Sub-agent ID or task name (e.g. task-oauth-fix)...',
+    fr: 'ID du sous-agent ou nom de tâche (ex: task-oauth-fix)...',
+  },
+  worktree_title: {
+    en: 'Git Worktree Manager',
+    fr: 'Gestionnaire de Worktrees Git',
+  },
+  worktrees_detected: {
+    en: 'Worktrees detected',
+    fr: 'Worktrees détectés',
+  },
 };
 
 const STORAGE_KEY = 'antigravity-lang';

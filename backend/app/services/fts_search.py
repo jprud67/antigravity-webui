@@ -1,6 +1,6 @@
 """
 fts_search.py — Moteur de recherche plein-texte cross-sessions haute performance (SQLite FTS5 + Trigram).
-Inspiré directement de l'architecture OpenClaw (session-transcript-fts & openclaw-agent-transcript-fts-schema).
+Inspiré directement de l'architecture Antigravity Core (session-transcript-fts & Antigravity Core-agent-transcript-fts-schema).
 
 Fournit :
   - Indexation en temps réel des messages de sessions (rôle, contenu texte, appels d'outils, timestamp, projet).

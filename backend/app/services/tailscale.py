@@ -1,5 +1,5 @@
 """Tailscale Zero-Config Remote Access Service.
-Adapted directly from OpenClaw (`src/infra/tailscale.ts` & `src/shared/tailscale-status.ts`).
+Adapted directly from Antigravity Core (`src/infra/tailscale.ts` & `src/shared/tailscale-status.ts`).
 
 Enables secure remote access to Antigravity WebUI via Tailscale MagicDNS and Tailscale Serve
 without opening router firewall ports.
@@ -55,7 +55,7 @@ def _run_tailscale_command(args: List[str], timeout: int = 5) -> subprocess.Comp
 def get_tailscale_status() -> Dict[str, Any]:
     """Probe Tailscale status, MagicDNS hostname, and Tailscale IPs.
     
-    Equivalent to OpenClaw extractTailnetHostFromStatusJson & extractTailscaleServeGatewayUrls.
+    Equivalent to Antigravity Core extractTailnetHostFromStatusJson & extractTailscaleServeGatewayUrls.
     """
     bin_path = _find_tailscale_binary()
     if not bin_path:

@@ -1,6 +1,6 @@
 """Progress Card Service for Antigravity WebUI.
 
-Directly adapted from OpenClaw's dynamic replace-on-write progress card architecture
+Directly adapted from Antigravity Core's dynamic replace-on-write progress card architecture
 (src/session-cards/progress-card-store.ts & src/session-cards/progress-card-input.ts).
 Provides structured, non-spammy real-time tracking for multi-step agent plans.
 """

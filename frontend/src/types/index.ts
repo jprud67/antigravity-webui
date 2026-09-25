@@ -347,7 +347,7 @@ export interface CopilotStatusResponse {
   cached_items: number;
 }
 
-// Sprint 16: Visual Branch Manager & Interactive Rebase Types
+// Visual Branch Manager & Interactive Rebase Types
 export interface GitBranchDetail {
   name: string;
   is_current: boolean;
@@ -527,7 +527,7 @@ export interface GitDiffRangesResponse {
 }
 
 // ==========================================
-// Sprint 19: Git Remotes & Tags Studio Types
+// Git Remotes & Tags Studio Types
 // ==========================================
 
 export interface GitRemoteDetail {
@@ -612,7 +612,7 @@ export interface PublishReleaseResponse {
   message: string;
 }
 
-// Sprint 23: Continuous Memory, FTS5 Search & Skill Curator
+// Continuous Memory, FTS5 Search & Skill Curator
 export interface MemoryTargetStatus {
   path: string;
   exists: boolean;
@@ -697,7 +697,7 @@ export interface ToolRepairPreviewResponse {
   repaired_count: number;
 }
 
-// Sprint 24 Types: MCP Catalog, Progress Card, Doctor, Link Understanding
+// Types: MCP Catalog, Progress Card, Doctor, Link Understanding
 export interface McpCatalogItem {
   slug: string;
   name: string;
@@ -972,6 +972,55 @@ export interface RecallHookResult {
   recalledCount: number;
   contextBlock: string;
   memories: MemorySearchResult[];
+}
+
+// --- Docker & Container Management Studio ---
+export type ContainerEngineType = 'docker' | 'podman' | 'none';
+export type ContainerState = 'running' | 'exited' | 'paused' | 'restarting' | 'dead' | 'unknown';
+
+export interface ContainerSummary {
+  id: string;
+  names: string[];
+  image: string;
+  state: ContainerState;
+  status: string;
+  createdAt: string;
+  ports: string[];
+  command?: string;
+}
+
+export interface ComposeServiceSummary {
+  name: string;
+  image?: string;
+  build?: string;
+  ports: string[];
+  environment: string[];
+  volumes: string[];
+}
+
+export interface WorkspaceDockerItem {
+  path: string;
+  filename: string;
+  kind: 'dockerfile' | 'compose' | 'dockerignore';
+  services?: ComposeServiceSummary[];
+}
+
+export interface DockerEngineStatus {
+  isAvailable: boolean;
+  engine: ContainerEngineType;
+  binaryPath?: string;
+  version?: string;
+  containersCount: number;
+  runningCount: number;
+  serverInfo: Record<string, any>;
+  error?: string;
+}
+
+export interface ContainerExecResult {
+  exit_code: number;
+  stdout: string;
+  stderr: string;
+  success: boolean;
 }
 
 

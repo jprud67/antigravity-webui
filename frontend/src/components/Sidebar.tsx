@@ -38,7 +38,9 @@ import {
   Package,
   Radio,
   Layers,
-  Brain
+  Brain,
+  Container,
+  ChevronDown
 } from 'lucide-react';
 import type { Conversation } from '../types';
 import { AntigravityIcon } from './AntigravityLogo';
@@ -139,6 +141,7 @@ interface SidebarProps {
   onOpenWorktreeDashboard?: () => void;
   onOpenCanvasStudio?: () => void;
   onOpenVectorMemory?: () => void;
+  onOpenDockerStudio?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = React.memo(({
@@ -176,6 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   onOpenWorktreeDashboard,
   onOpenCanvasStudio,
   onOpenVectorMemory,
+  onOpenDockerStudio,
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -200,6 +204,25 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   // Bulk mode states
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedConvIds, setSelectedConvIds] = useState<Set<string>>(new Set());
+
+  // Collapsible Studios & Tools Drawer in footer (defaults to collapsed for maximum discussion space)
+  const [isToolsExpanded, setIsToolsExpanded] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('antigravity_sidebar_tools_expanded') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleToolsExpanded = useCallback(() => {
+    setIsToolsExpanded((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('antigravity_sidebar_tools_expanded', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
   const [isBulkLoading, setIsBulkLoading] = useState(false);
   const [showBulkTagModal, setShowBulkTagModal] = useState(false);
   const [bulkTagMode, setBulkTagMode] = useState<'add' | 'replace'>('add');
@@ -1536,7 +1559,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       )}
 
       {/* Grouped Conversation List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-3 scrollbar-thin">
         {filtered.length === 0 ? (
           <div className="p-6 text-center text-xs text-slate-500">
             {searchFilter || activeFilterCount > 0 ? t('no_sessions_match_filters', 'No sessions match filters.') : t('no_sessions_found', 'No sessions found.')}
@@ -1760,243 +1783,293 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         )}
       </div>
 
-      {/* Footer Navigation */}
+      {/* Footer Navigation: Compact, Space-Optimized & Collapsible */}
       <div
-        className="p-3 border-t space-y-1 transition-colors shrink-0"
+        className="border-t transition-colors shrink-0 flex flex-col"
         style={{
           backgroundColor: 'var(--surface-subtle)',
           borderColor: 'var(--border)',
         }}
       >
-        {onOpenFiles && (
-          <button
-            onClick={onOpenFiles}
-            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ color: 'var(--text)' }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
-                <HardDrive className="w-3 h-3 text-sky-500" />
-              </div>
-              <span className="font-medium text-[11px]">{t('workspace_explorer', 'Explorateur Workspace')}</span>
-            </div>
-            <span className="text-[10px] text-sky-500 group-hover:translate-x-0.5 transition-transform">→</span>
-          </button>
-        )}
-
-        {onOpenTasks && (
-          <button
-            onClick={onOpenTasks}
-            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ color: 'var(--text)' }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-                <Activity className="w-3 h-3 text-indigo-500" />
-              </div>
-              <span className="font-medium text-[11px]">{t('tasks_and_subagents', 'Tasks & Sub-agents')}</span>
-            </div>
-            <span className="text-[10px] text-indigo-500 group-hover:translate-x-0.5 transition-transform">→</span>
-          </button>
-        )}
-
-        <button
-          onClick={onOpenArtifacts}
-          className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
-          style={{ color: 'var(--text)' }}
-        >
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <FileText className="w-3 h-3 text-emerald-500" />
-            </div>
-            <span className="font-medium text-[11px]">{t('documents_and_artifacts', 'Documents & Artifacts')}</span>
+        {/* Tier 1: Quick Tools Strip (Takes only 34px!) */}
+        <div className="p-1.5 flex items-center justify-between gap-1 border-b" style={{ borderColor: 'var(--border)' }}>
+          <div className="flex items-center gap-1 min-w-0">
+            {onOpenFiles && (
+              <button
+                type="button"
+                onClick={onOpenFiles}
+                className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                title={t('workspace_explorer', 'Explorateur Workspace')}
+              >
+                <HardDrive className="w-3.5 h-3.5 text-sky-500" />
+              </button>
+            )}
+            {onOpenTasks && (
+              <button
+                type="button"
+                onClick={onOpenTasks}
+                className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                title={t('tasks_and_subagents', 'Tasks & Sub-agents')}
+              >
+                <Activity className="w-3.5 h-3.5 text-indigo-500" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onOpenArtifacts}
+              className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+              title={t('documents_and_artifacts', 'Documents & Artifacts')}
+            >
+              <FileText className="w-3.5 h-3.5 text-emerald-500" />
+            </button>
+            {onOpenCanvasStudio && (
+              <button
+                type="button"
+                onClick={onOpenCanvasStudio}
+                className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                title={t('canvas_documents', 'Canvas Documents Vivants')}
+              >
+                <Layers className="w-3.5 h-3.5 text-blue-500" />
+              </button>
+            )}
+            {onOpenMcpCatalog && (
+              <button
+                type="button"
+                onClick={onOpenMcpCatalog}
+                className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                title={t('mcp_store', 'Store MCP (73)')}
+              >
+                <Package className="w-3.5 h-3.5 text-purple-500" />
+              </button>
+            )}
           </div>
-          <span className="text-[10px] text-emerald-500 group-hover:translate-x-0.5 transition-transform">→</span>
-        </button>
 
-        {onOpenAnalytics && (
+          {/* Toggle All Studios & Tools Button */}
           <button
-            onClick={onOpenAnalytics}
-            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ color: 'var(--text)' }}
+            type="button"
+            onClick={toggleToolsExpanded}
+            className={`px-2 py-1 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition-all cursor-pointer border ${
+              isToolsExpanded
+                ? 'bg-sky-500/10 text-sky-500 border-sky-500/30'
+                : 'hover:bg-black/5 dark:hover:bg-white/5 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+            title={isToolsExpanded ? t('collapse_studios', 'Réduire les studios') : t('expand_studios', 'Afficher tous les outils et studios (12)')}
           >
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                <BarChart3 className="w-3 h-3 text-amber-500" />
-              </div>
-              <span className="font-medium text-[11px]">{t('analytics_and_quotas', 'Quotas & Analytique')}</span>
-            </div>
-            <span className="text-[10px] text-amber-500 group-hover:translate-x-0.5 transition-transform">→</span>
+            <span>Studios</span>
+            <span className="text-[9px] px-1 rounded-full bg-black/5 dark:bg-white/10 font-mono">12</span>
+            <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isToolsExpanded ? 'rotate-180' : ''}`} />
           </button>
+        </div>
+
+        {/* Tier 2: Expandable Studios Panel (2-column grid, max-h-52 so discussions never get squashed) */}
+        {isToolsExpanded && (
+          <div
+            className="p-2 border-b grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto animate-fadeIn text-xs scrollbar-thin"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            {onOpenFiles && (
+              <button
+                type="button"
+                onClick={onOpenFiles}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-sky-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
+                  <HardDrive className="w-3 h-3 text-sky-500" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_workspace', 'Workspace')}</span>
+              </button>
+            )}
+
+            {onOpenTasks && (
+              <button
+                type="button"
+                onClick={onOpenTasks}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-indigo-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                  <Activity className="w-3 h-3 text-indigo-500" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_tasks', 'Tasks & Sub')}</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onOpenArtifacts}
+              className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-emerald-500/20"
+              style={{ color: 'var(--text)' }}
+            >
+              <div className="w-5 h-5 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <FileText className="w-3 h-3 text-emerald-500" />
+              </div>
+              <span className="font-medium text-[11px] truncate">{t('studio_documents', 'Documents')}</span>
+            </button>
+
+            {onOpenCanvasStudio && (
+              <button
+                type="button"
+                onClick={onOpenCanvasStudio}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-blue-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                  <Layers className="w-3 h-3 text-blue-500" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_canvas', 'Canvas')}</span>
+              </button>
+            )}
+
+            {onOpenVectorMemory && (
+              <button
+                type="button"
+                onClick={onOpenVectorMemory}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-purple-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
+                  <Brain className="w-3 h-3 text-purple-400" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_vector_memory', 'Mémoire Vec')}</span>
+              </button>
+            )}
+
+            {onOpenMcpCatalog && (
+              <button
+                type="button"
+                onClick={onOpenMcpCatalog}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-purple-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
+                  <Package className="w-3 h-3 text-purple-500" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_mcp_store', 'Store MCP')}</span>
+              </button>
+            )}
+
+            {onOpenDoctor && (
+              <button
+                type="button"
+                onClick={onOpenDoctor}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-cyan-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
+                  <Activity className="w-3 h-3 text-cyan-500" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_doctor', 'Doctor')}</span>
+              </button>
+            )}
+
+            {onOpenAnalytics && (
+              <button
+                type="button"
+                onClick={onOpenAnalytics}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-amber-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                  <BarChart3 className="w-3 h-3 text-amber-500" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_quotas', 'Quotas')}</span>
+              </button>
+            )}
+
+            {onOpenRemoteAccess && (
+              <button
+                type="button"
+                onClick={onOpenRemoteAccess}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-teal-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-teal-500/10 border border-teal-500/20 flex items-center justify-center shrink-0">
+                  <Radio className="w-3 h-3 text-teal-400" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_remote_access', 'Accès Distant')}</span>
+              </button>
+            )}
+
+            {onOpenGateway && (
+              <button
+                type="button"
+                onClick={onOpenGateway}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-indigo-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                  <MessageSquare className="w-3 h-3 text-indigo-400" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_gateway', 'Passerelle')}</span>
+              </button>
+            )}
+
+            {onOpenWorktreeDashboard && (
+              <button
+                type="button"
+                onClick={onOpenWorktreeDashboard}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-amber-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                  <FolderGit2 className="w-3 h-3 text-amber-400" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_worktrees', 'Worktrees')}</span>
+              </button>
+            )}
+
+            {onOpenDockerStudio && (
+              <button
+                type="button"
+                onClick={onOpenDockerStudio}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-sky-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
+                  <Container className="w-3 h-3 text-sky-400" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_docker', 'Docker Studio')}</span>
+              </button>
+            )}
+          </div>
         )}
 
-        {onOpenMcpCatalog && (
+        {/* Compact Account & Model Bar */}
+        <div className="px-2.5 py-1.5 flex items-center justify-between text-[11px] border-b" style={{ borderColor: 'var(--border)' }}>
           <button
-            onClick={onOpenMcpCatalog}
-            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ color: 'var(--text)' }}
+            type="button"
+            onClick={onOpenGoogleAccount || onOpenSettings}
+            className="flex items-center gap-1.5 py-0.5 px-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer min-w-0 max-w-[55%]"
+            title={activeGoogleAccount?.email ? t('active_google_account', 'Active Google account: {0}').replace('{0}', activeGoogleAccount.email) : t('manage_google_accounts', 'Manage Google accounts')}
           >
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                <Package className="w-3 h-3 text-purple-500" />
-              </div>
-              <span className="font-medium text-[11px]">{t('mcp_store', 'Store MCP (73)')}</span>
-            </div>
-            <span className="text-[10px] text-purple-500 group-hover:translate-x-0.5 transition-transform">→</span>
-          </button>
-        )}
-
-        {onOpenDoctor && (
-          <button
-            onClick={onOpenDoctor}
-            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ color: 'var(--text)' }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
-                <Activity className="w-3 h-3 text-cyan-500" />
-              </div>
-              <span className="font-medium text-[11px]">{t('system_doctor', 'Diagnostics & Doctor')}</span>
-            </div>
-            <span className="text-[10px] text-cyan-500 group-hover:translate-x-0.5 transition-transform">→</span>
-          </button>
-        )}
-
-        {onOpenRemoteAccess && (
-          <button
-            onClick={onOpenRemoteAccess}
-            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ color: 'var(--text)' }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-                <Radio className="w-3 h-3 text-teal-400" />
-              </div>
-              <span className="font-medium text-[11px]">{t('remote_access', 'Accès Distant & Push')}</span>
-            </div>
-            <span className="text-[10px] text-teal-400 group-hover:translate-x-0.5 transition-transform">→</span>
-          </button>
-        )}
-
-        {onOpenGateway && (
-          <button
-            onClick={onOpenGateway}
-            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ color: 'var(--text)' }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-                <MessageSquare className="w-3 h-3 text-indigo-400" />
-              </div>
-              <span className="font-medium text-[11px]">{t('messaging_gateway', 'Telegram & Discord')}</span>
-            </div>
-            <span className="text-[10px] text-indigo-400 group-hover:translate-x-0.5 transition-transform">→</span>
-          </button>
-        )}
-
-        {onOpenWorktreeDashboard && (
-          <button
-            onClick={onOpenWorktreeDashboard}
-            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ color: 'var(--text)' }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                <FolderGit2 className="w-3 h-3 text-amber-400" />
-              </div>
-              <span className="font-medium text-[11px]">{t('worktrees_isolation', 'Worktrees Sous-Agents')}</span>
-            </div>
-            <span className="text-[10px] text-amber-400 group-hover:translate-x-0.5 transition-transform">→</span>
-          </button>
-        )}
-
-        {onOpenCanvasStudio && (
-          <button
-            onClick={onOpenCanvasStudio}
-            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ color: 'var(--text)' }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                <Layers className="w-3 h-3 text-blue-400" />
-              </div>
-              <span className="font-medium text-[11px]">{t('canvas_documents', 'Canvas Documents Vivants')}</span>
-            </div>
-            <span className="text-[10px] text-blue-400 group-hover:translate-x-0.5 transition-transform">→</span>
-          </button>
-        )}
-
-        {onOpenVectorMemory && (
-          <button
-            onClick={onOpenVectorMemory}
-            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ color: 'var(--text)' }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                <Brain className="w-3 h-3 text-purple-400" />
-              </div>
-              <span className="font-medium text-[11px]">{t('vector_memory', 'Mémoire Vectorielle & Recall')}</span>
-            </div>
-            <span className="text-[10px] text-purple-400 group-hover:translate-x-0.5 transition-transform">→</span>
-          </button>
-        )}
-
-        {/* Google Account Switcher Widget */}
-        <button
-          onClick={onOpenGoogleAccount || onOpenSettings}
-          className="w-full mt-2 p-2 rounded-xl border flex items-center justify-between transition-all group cursor-pointer text-left hover:border-blue-500/40"
-          style={{
-            backgroundColor: 'var(--surface-subtle)',
-            borderColor: 'var(--border)',
-          }}
-          title={activeGoogleAccount?.email ? t('active_google_account', 'Active Google account: {0}').replace('{0}', activeGoogleAccount.email) : t('manage_google_accounts', 'Manage Google accounts')}
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 bg-white shadow-xs p-0.5">
-              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5">
+            <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 bg-white shadow-xs p-0.5">
+              <svg viewBox="0 0 24 24" className="w-2.5 h-2.5">
                 <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
                 <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
                 <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
                 <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
               </svg>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] truncate font-medium" style={{ color: 'var(--muted)' }}>
-                Compte Google
-              </div>
-              <div className="text-[11px] font-mono truncate font-medium" style={{ color: 'var(--text)' }}>
-                {activeGoogleAccount?.email || t('not_connected', 'Not connected')}
-              </div>
-            </div>
-          </div>
-          <span className="text-[10px] font-medium text-blue-500 opacity-80 group-hover:opacity-100 shrink-0 ml-1">
-            Changer
-          </span>
-        </button>
-
-        {/* Active Model Indicator */}
-        <div
-          className="pt-2 border-t mt-2 flex items-center justify-between text-[10px] font-mono px-1 shrink-0"
-          style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
-        >
-          <span className="truncate">{activeModel}</span>
-          {activeEffort && (
-            <span
-              className="text-[9px] px-1.5 py-0.2 rounded border font-bold uppercase"
-              style={{
-                backgroundColor: 'var(--accent-bg)',
-                borderColor: 'var(--accent)',
-                color: 'var(--accent)',
-              }}
-            >
-              {activeEffort}
+            <span className="truncate font-mono text-[10px]" style={{ color: 'var(--text)' }}>
+              {activeGoogleAccount?.email ? activeGoogleAccount.email.split('@')[0] : 'Google'}
             </span>
-          )}
+          </button>
+
+          <div className="flex items-center gap-1 font-mono text-[10px] shrink-0" style={{ color: 'var(--muted)' }}>
+            <span className="truncate max-w-[85px]" title={activeModel}>{activeModel.replace('Gemini ', '')}</span>
+            {activeEffort && (
+              <span className="px-1 py-0.2 rounded border text-[8px] font-bold uppercase" style={{ backgroundColor: 'var(--accent-bg)', borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+                {activeEffort}
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="pt-1.5 flex items-center justify-between text-xs shrink-0">
+        {/* Bottom System Actions Bar */}
+        <div className="p-2 flex items-center justify-between text-xs shrink-0">
           <button
+            type="button"
             onClick={updateAvailable && onOpenUpdates ? onOpenUpdates : onOpenSettings}
             className="p-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 relative"
             style={{ color: 'var(--muted)' }}
@@ -2020,6 +2093,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             {/* 15-Language Selector Button */}
             {onOpenLanguages && (
               <button
+                type="button"
                 onClick={onOpenLanguages}
                 className="p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 hover:bg-black/5 dark:hover:bg-white/5"
                 style={{ color: 'var(--muted)' }}
@@ -2033,6 +2107,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             {/* Help & Shortcuts Button */}
             {onOpenHelp && (
               <button
+                type="button"
                 onClick={onOpenHelp}
                 className="p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
                 style={{ color: 'var(--muted)' }}
@@ -2043,6 +2118,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             )}
 
             <button
+              type="button"
               onClick={() => setIsThemePopoverOpen((prev) => !prev)}
               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                 isThemePopoverOpen ? 'bg-amber-500/20 text-amber-400' : 'hover:bg-black/5 dark:hover:bg-white/5'
@@ -2055,6 +2131,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
 
             {onLogout && (
               <button
+                type="button"
                 onClick={onLogout}
                 className="p-1.5 rounded-lg transition-colors cursor-pointer hover:text-rose-500 hover:bg-rose-500/10"
                 style={{ color: 'var(--muted)' }}

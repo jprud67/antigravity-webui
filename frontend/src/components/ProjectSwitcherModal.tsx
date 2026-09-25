@@ -292,7 +292,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                   Studio Projets & Workspaces
                 </h2>
                 <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
-                  Sprint 17 • v0.2.21
+                  v0.2.21 • Hub
                 </span>
               </div>
               <p className="text-xs text-text-muted">

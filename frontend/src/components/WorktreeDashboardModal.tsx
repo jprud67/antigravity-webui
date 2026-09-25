@@ -18,6 +18,7 @@ import {
 } from '../services/api';
 import type { GitWorktreeItem } from '../types';
 import { showToast } from '../services/toast';
+import { useI18n } from '../services/i18n';
 
 interface WorktreeDashboardModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
   onClose,
   currentWorkspace
 }) => {
+  const { t } = useI18n();
   const [worktrees, setWorktrees] = useState<GitWorktreeItem[]>([]);
   const [repoRoot, setRepoRoot] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,11 +46,11 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
       setRepoRoot(res.repo_root);
       setWorktrees(res.worktrees);
     } catch {
-      showToast('Impossible de charger les worktrees Git', 'error');
+      showToast(t('worktree_load_failed', 'Impossible de charger les worktrees Git'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [currentWorkspace]);
+  }, [currentWorkspace, t]);
 
   useEffect(() => {
     if (isOpen) {
@@ -60,11 +62,11 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
     setCreating(true);
     try {
       const res = await createWorktree(currentWorkspace, newSubagentId.trim() || undefined);
-      showToast(`Worktree isolé créé : ${res.branch}`, 'success');
+      showToast(t('worktree_created', 'Worktree isolé créé : {0}').replace('{0}', res.branch), 'success');
       setNewSubagentId('');
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Échec de création', 'error');
+      showToast(err.message || t('worktree_create_failed', 'Échec de création'), 'error');
     } finally {
       setCreating(false);
     }
@@ -80,13 +82,18 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
         prune: true
       });
       if (res.pruned) {
-        showToast('Worktree nettoyé avec succès (aucun commit, arbre propre)', 'info');
+        showToast(t('worktree_pruned', 'Worktree nettoyé avec succès (aucun commit, arbre propre)'), 'info');
       } else {
-        showToast(`Worktree conservé (${res.commits} commits, modifié=${res.dirty})`, 'warning');
+        showToast(
+          t('worktree_kept', 'Worktree conservé ({0} commits, modifié={1})')
+            .replace('{0}', String(res.commits))
+            .replace('{1}', String(res.dirty)),
+          'warning'
+        );
       }
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Erreur finalisation', 'error');
+      showToast(err.message || t('worktree_finalize_failed', 'Erreur finalisation'), 'error');
     } finally {
       setActionInProgress(null);
     }
@@ -100,10 +107,10 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
         branch: wt.branch,
         repo_root: repoRoot || undefined
       });
-      showToast('Worktree supprimé', 'success');
+      showToast(t('worktree_deleted', 'Worktree supprimé'), 'success');
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Erreur suppression', 'error');
+      showToast(err.message || t('worktree_remove_failed', 'Erreur suppression'), 'error');
     } finally {
       setActionInProgress(null);
     }
@@ -129,13 +136,13 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                Isolation Git Worktrees
+                {t('worktree_isolation_title', 'Isolation Git Worktrees')}
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                  Sprint 25
+                  {t('worktree_sandbox_badge', 'Sandbox Multi-Agents')}
                 </span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Chaque sous-agent opère dans un répertoire isolé sans impacter vos fichiers de travail.
+                {t('worktree_isolation_desc', 'Chaque sous-agent opère dans un répertoire isolé sans impacter vos fichiers de travail.')}
               </p>
             </div>
           </div>
@@ -145,7 +152,7 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
               disabled={loading}
               className="p-1.5 rounded-lg border hover:bg-slate-500/10 transition-colors text-slate-400 hover:text-slate-200 cursor-pointer"
               style={{ borderColor: 'var(--border)' }}
-              title="Rafraîchir"
+              title={t('refresh', 'Rafraîchir')}
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -165,12 +172,12 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
           <div className="p-4 rounded-xl border space-y-3" style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}>
             <div className="text-xs font-semibold text-slate-300 flex items-center gap-2">
               <GitBranch className="w-4 h-4 text-amber-400" />
-              <span>Générer un Worktree Isolé pour un Sous-Agent</span>
+              <span>{t('generate_isolated_worktree', 'Générer un Worktree Isolé pour un Sous-Agent')}</span>
             </div>
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                placeholder="ID ou nom de la tâche (ex: refactor-auth, test-runner)"
+                placeholder={t('worktree_task_placeholder', 'ID ou nom de la tâche (ex: refactor-auth, test-runner)')}
                 value={newSubagentId}
                 onChange={(e) => setNewSubagentId(e.target.value)}
                 className="flex-1 px-3.5 py-2 rounded-xl text-xs font-mono focus:outline-none"
@@ -187,12 +194,12 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
               >
                 {creating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <Plus className="w-3.5 h-3.5" />
-                <span>Créer</span>
+                <span>{t('create', 'Créer')}</span>
               </button>
             </div>
             {!repoRoot && (
               <p className="text-[11px] text-amber-400/90">
-                L'espace de travail actif n'est pas un dépôt Git initialisé.
+                {t('worktree_not_a_repo', "L'espace de travail actif n'est pas un dépôt Git initialisé.")}
               </p>
             )}
           </div>
@@ -200,13 +207,13 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
           {/* List of active worktrees */}
           <div className="space-y-3">
             <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Worktrees Détectés ({worktrees.length})</span>
+              <span>{t('worktrees_detected', 'Worktrees Détectés')} ({worktrees.length})</span>
               {repoRoot && <span className="text-[11px] font-mono text-slate-500 truncate max-w-xs">{repoRoot}</span>}
             </div>
 
             {worktrees.length === 0 ? (
               <div className="p-6 rounded-xl border border-dashed text-center text-xs text-slate-500" style={{ borderColor: 'var(--border)' }}>
-                Aucun sous-agent n'utilise de worktree actuellement. Les worktrees sont automatiquement créés lors des délégations complexes.
+                {t('no_active_worktrees', "Aucun sous-agent n'utilise de worktree actuellement. Les worktrees sont automatiquement créés lors des délégations complexes.")}
               </div>
             ) : (
               <div className="space-y-2">
@@ -228,7 +235,7 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
                               ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' 
                               : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                           }`}>
-                            {wt.dirty ? 'Modifié (dirty)' : 'Propre'}
+                            {wt.dirty ? t('modified_dirty', 'Modifié (dirty)') : t('clean', 'Propre')}
                           </span>
                         </div>
                         <div className="text-[11px] text-slate-400 font-mono truncate mt-1">
@@ -242,16 +249,17 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
                           disabled={isBusy}
                           className="px-2.5 py-1.5 rounded-lg border text-xs font-medium text-slate-300 hover:bg-slate-500/10 transition-colors flex items-center gap-1 cursor-pointer"
                           style={{ borderColor: 'var(--border)' }}
-                          title="Vérifier et nettoyer si propre"
+                          title={t('finalize_hint', 'Vérifier et nettoyer si propre')}
                         >
                           {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
-                          <span className="hidden sm:inline">Finaliser</span>
+                          <span className="hidden sm:inline">{t('finalize', 'Finaliser')}</span>
                         </button>
                         <button
                           onClick={() => handleRemove(wt)}
                           disabled={isBusy}
                           className="p-1.5 rounded-lg border text-rose-400 hover:bg-rose-500/10 border-rose-500/30 transition-colors cursor-pointer"
-                          title="Supprimer définitivement"
+                          style={{ borderColor: 'var(--border)' }}
+                          title={t('delete_permanently', 'Supprimer définitivement')}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -268,14 +276,14 @@ export const WorktreeDashboardModal: React.FC<WorktreeDashboardModalProps> = ({
         <div className="p-4 border-t flex items-center justify-between shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Protection stricte des fichiers et de l'éditeur Monaco</span>
+            <span>{t('worktree_protection_hint', "Protection stricte des fichiers et de l'éditeur Monaco")}</span>
           </div>
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl text-xs font-medium border hover:bg-slate-500/10 transition-colors cursor-pointer text-slate-300"
             style={{ borderColor: 'var(--border)' }}
           >
-            Fermer
+            {t('close', 'Fermer')}
           </button>
         </div>
       </div>

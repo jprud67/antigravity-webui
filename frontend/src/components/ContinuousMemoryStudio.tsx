@@ -22,12 +22,14 @@ import {
 import type { ContinuousMemoryStatus } from '../types';
 import { showToast } from '../services/toast';
 import { copyText } from '../utils/codeBlockUtils';
+import { useI18n } from '../services/i18n';
 
 interface ContinuousMemoryStudioProps {
   onSnapshotUpdated?: () => void;
 }
 
 export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ onSnapshotUpdated }) => {
+  const { t } = useI18n();
   const [status, setStatus] = useState<ContinuousMemoryStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTarget, setActiveTarget] = useState<'user' | 'memory'>('user');
@@ -60,11 +62,11 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
         setRawText(data.memory.raw);
       }
     } catch (e: any) {
-      showToast(e.message || 'Erreur lors du chargement de la mémoire', 'error');
+      showToast(e.message || t('memory_load_failed', 'Erreur lors du chargement de la mémoire'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [activeTarget]);
+  }, [activeTarget, t]);
 
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect
@@ -91,11 +93,11 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
         action: 'add',
         content: newContent.trim(),
       });
-      showToast(res.message || 'Entrée ajoutée avec succès !', 'success');
+      showToast(res.message || t('memory_entry_added', 'Entrée ajoutée avec succès !'), 'success');
       setNewContent('');
       await loadStatus();
     } catch (e: any) {
-      showToast(e.message || "Erreur lors de l'ajout", 'error');
+      showToast(e.message || t('memory_add_failed', "Erreur lors de l'ajout"), 'error');
     } finally {
       setAdding(false);
     }
@@ -116,11 +118,11 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
         old_text: oldText,
         new_content: editContent.trim(),
       });
-      showToast(res.message || 'Entrée mise à jour', 'success');
+      showToast(res.message || t('memory_entry_updated', 'Entrée mise à jour'), 'success');
       setEditingIndex(null);
       await loadStatus();
     } catch (e: any) {
-      showToast(e.message || 'Erreur modification', 'error');
+      showToast(e.message || t('memory_edit_failed', 'Erreur modification'), 'error');
     } finally {
       setSavingEdit(false);
     }
@@ -133,10 +135,10 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
         action: 'remove',
         old_text: text,
       });
-      showToast(res.message || 'Entrée supprimée', 'info');
+      showToast(res.message || t('memory_entry_deleted', 'Entrée supprimée'), 'info');
       await loadStatus();
     } catch (e: any) {
-      showToast(e.message || 'Erreur suppression', 'error');
+      showToast(e.message || t('memory_delete_failed', 'Erreur suppression'), 'error');
     }
   };
 
@@ -148,10 +150,10 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
         action: 'save_raw',
         raw_markdown: rawText,
       });
-      showToast(res.message || 'Fichier brut enregistré', 'success');
+      showToast(res.message || t('memory_raw_saved', 'Fichier brut enregistré'), 'success');
       await loadStatus();
     } catch (e: any) {
-      showToast(e.message || "Erreur d'enregistrement brut", 'error');
+      showToast(e.message || t('memory_raw_save_failed', "Erreur d'enregistrement brut"), 'error');
     } finally {
       setSavingRaw(false);
     }
@@ -161,10 +163,10 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
     try {
       setRefreshingSnapshot(true);
       const res = await refreshMemorySnapshot();
-      showToast(res.message || 'Snapshot gelé mis à jour dans le prompt système', 'success');
+      showToast(res.message || t('memory_snapshot_updated', 'Snapshot gelé mis à jour dans le prompt système'), 'success');
       if (onSnapshotUpdated) onSnapshotUpdated();
     } catch (e: any) {
-      showToast(e.message || 'Erreur mise à jour snapshot', 'error');
+      showToast(e.message || t('memory_snapshot_update_failed', 'Erreur mise à jour snapshot'), 'error');
     } finally {
       setRefreshingSnapshot(false);
     }
@@ -174,7 +176,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
     return (
       <div className="flex flex-col items-center justify-center p-12 text-slate-400 gap-3">
         <RefreshCw className="w-8 h-8 animate-spin text-cyan-500" />
-        <p className="text-sm font-medium">Chargement de la mémoire persistante...</p>
+        <p className="text-sm font-medium">{t('memory_loading', 'Chargement de la mémoire persistante...')}</p>
       </div>
     );
   }
@@ -192,13 +194,13 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
           </div>
           <div>
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              Mémoire Continue Curatée
+              {t('continuous_memory_title', 'Mémoire Continue Curatée')}
               <span className="text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded">
-                Hermes Architecture
+                Persistent Memory
               </span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Connaissances persistantes injectées en snapshot immuable sans rompre le cache de prompt.
+              {t('continuous_memory_desc', 'Connaissances persistantes injectées en snapshot immuable sans rompre le cache de prompt.')}
             </p>
           </div>
         </div>
@@ -210,7 +212,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
           title="Met à jour le snapshot gelé utilisé pour les prochaines requêtes au modèle"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${refreshingSnapshot ? 'animate-spin' : ''}`} />
-          <span>{refreshingSnapshot ? 'Actualisation...' : 'Rafraîchir Snapshot'}</span>
+          <span>{refreshingSnapshot ? t('memory_refreshing', 'Actualisation...') : t('memory_refresh_snapshot', 'Rafraîchir Snapshot')}</span>
         </button>
       </div>
 
@@ -226,7 +228,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
             }`}
           >
             <User className="w-3.5 h-3.5" />
-            <span>Profil Développeur (USER.md)</span>
+            <span>{t('memory_target_user', 'Profil Développeur (USER.md)')}</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800 font-mono">
               {status?.user.entry_count || 0}
             </span>
@@ -241,7 +243,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
             }`}
           >
             <FolderGit2 className="w-3.5 h-3.5" />
-            <span>Mémoire Workspace (MEMORY.md)</span>
+            <span>{t('memory_target_workspace', 'Mémoire Workspace (MEMORY.md)')}</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800 font-mono">
               {status?.memory.entry_count || 0}
             </span>
@@ -258,7 +260,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            Entrées ({currentTargetData?.entry_count || 0})
+            {t('memory_view_cards', 'Cartes Curatées')} ({currentTargetData?.entry_count || 0})
           </button>
           <button
             onClick={() => setViewMode('raw')}
@@ -268,7 +270,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            Markdown Brut
+            {t('memory_view_raw', 'Markdown Brut')}
           </button>
         </div>
       </div>
@@ -335,8 +337,8 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
               }}
               placeholder={
                 activeTarget === 'user'
-                  ? 'Ex: Préfère les fonctions pures, TypeScript strict et les composants modulaires...'
-                  : 'Ex: Le projet utilise une base SQLite FTS5 et un proxy WebSocket local...'
+                  ? t('memory_placeholder_user', 'Ex: Préfère les fonctions pures, TypeScript strict et les composants modulaires...')
+                  : t('memory_placeholder_workspace', 'Ex: Le projet utilise une base SQLite FTS5 et un proxy WebSocket local...')
               }
               className="flex-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-cyan-500"
             />
@@ -346,7 +348,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
               className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
             >
               <Plus className="w-4 h-4" />
-              <span>{adding ? 'Ajout...' : 'Ajouter'}</span>
+              <span>{adding ? t('adding', 'Ajout...') : t('memory_add_btn', 'Ajouter')}</span>
             </button>
           </div>
 
@@ -373,7 +375,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
                             onClick={() => setEditingIndex(null)}
                             className="px-2.5 py-1 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
                           >
-                            Annuler
+                            {t('cancel', 'Annuler')}
                           </button>
                           <button
                             onClick={() => handleSaveEdit(entry)}
@@ -381,7 +383,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
                             className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-md text-xs font-medium flex items-center gap-1"
                           >
                             <Check className="w-3.5 h-3.5" />
-                            <span>{savingEdit ? 'Sauvegarde...' : 'Enregistrer'}</span>
+                            <span>{savingEdit ? t('saving', 'Sauvegarde...') : t('save', 'Enregistrer')}</span>
                           </button>
                         </div>
                       </div>
@@ -400,21 +402,21 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
                           <button
                             onClick={() => copyText(entry)}
                             className="p-1.5 text-slate-400 hover:text-cyan-500 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Copier le texte"
+                            title={t('copy', 'Copier le texte')}
                           >
                             <Copy className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleStartEdit(idx, entry)}
                             className="p-1.5 text-slate-400 hover:text-amber-500 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Modifier cette entrée"
+                            title={t('edit', 'Modifier cette entrée')}
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteEntry(entry)}
                             className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Supprimer cette entrée"
+                            title={t('delete', 'Supprimer cette entrée')}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -428,9 +430,9 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
           ) : (
             <div className="py-12 text-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <Sparkles className="w-8 h-8 text-cyan-500/40 mx-auto" />
-              <p className="text-xs font-medium">Aucun souvenir enregistré dans cette catégorie.</p>
+              <p className="text-xs font-medium">{t('memory_no_entries', 'Aucun souvenir enregistré dans cette catégorie.')}</p>
               <p className="text-[11px] text-slate-500">
-                Utilisez le formulaire ci-dessus ou laissez l'agent mémoriser automatiquement via l'outil <code>memory</code>.
+                {t('memory_no_entries_hint', "Utilisez le formulaire ci-dessus ou laissez l'agent mémoriser automatiquement via l'outil memory.")}
               </p>
             </div>
           )}
@@ -443,7 +445,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span className="flex items-center gap-1">
               <Info className="w-3.5 h-3.5 text-cyan-500" />
-              Édition directe du fichier markdown. Les entrées sont séparées par <code>§</code> ou puces markdown.
+              {t('memory_raw_info', 'Édition directe du fichier markdown. Les entrées sont séparées par § ou puces markdown.')}
             </span>
             <button
               onClick={handleSaveRaw}
@@ -451,7 +453,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
               className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{savingRaw ? 'Enregistrement...' : 'Enregistrer le fichier'}</span>
+              <span>{savingRaw ? t('saving', 'Enregistrement...') : t('memory_save_raw', 'Enregistrer le fichier')}</span>
             </button>
           </div>
 

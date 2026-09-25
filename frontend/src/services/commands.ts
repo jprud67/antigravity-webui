@@ -550,7 +550,7 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
   {
     cmd: '/update',
     descKey: 'cmd_desc_update',
-    desc: 'Vérifier et installer les mises à jour Antigravity WebUI (Système Hermes)',
+    desc: 'Vérifier et installer les mises à jour Antigravity WebUI',
     category: 'system',
     icon: RefreshCw,
     color: 'text-sky-400',

@@ -44,6 +44,7 @@ from app.api.web_push import router as web_push_router
 from app.api.messaging_gateway import router as messaging_gateway_router
 from app.api.canvas_documents import router as canvas_documents_router
 from app.api.vector_memory import router as vector_memory_router
+from app.api.docker_studio import router as docker_studio_router
 from app.config import BRAIN_DIR, CONVERSATION_DB
 from app.services.cron_ticker import cron_ticker_loop
 from app.services.execution_manager import execution_manager
@@ -153,7 +154,7 @@ app.include_router(crons_router)
 app.include_router(rules_router)
 app.include_router(google_router)
 app.include_router(events_router)  # SSE real-time sync CLI ↔ WebUI
-app.include_router(updater_router)  # Hermes-style update check & apply
+app.include_router(updater_router)  # Seamless git update check & apply
 app.include_router(prompt_router)
 app.include_router(copilot_router)
 app.include_router(memory_router)   # Continuous memory & user profile (USER.md / MEMORY.md)
@@ -170,6 +171,7 @@ app.include_router(web_push_router)  # Web Push Notifications
 app.include_router(messaging_gateway_router)  # Telegram & Discord Gateway with PIN Pairing
 app.include_router(canvas_documents_router)  # Sandboxed Canvas Documents & Widgets
 app.include_router(vector_memory_router)  # Vector Memory & Auto-Recall Hook
+app.include_router(docker_studio_router)  # Docker & Container Management Studio
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])

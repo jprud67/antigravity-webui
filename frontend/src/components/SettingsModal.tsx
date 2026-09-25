@@ -1551,7 +1551,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             {t('import_json', 'Importer JSON (.json)')}
                           </span>
                           <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
-                            {t('import_json_desc', 'Format Antigravity ou Hermes')}
+                            {t('import_json_desc', 'Format JSON Antigravity')}
                           </span>
                         </div>
                       </button>
@@ -2407,11 +2407,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* Section 2: Nuances & Accents (Skins Hermes) */}
+              {/* Section 2: Nuances & Accents */}
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                   <Boxes className="w-4 h-4 text-sky-500" />
-                  <span>{t("visual_accents_skins", "Nuances & Visual Accents (Hermes Skins)")}</span>
+                  <span>{t("visual_accents_skins", "Nuances & Accents Visuels")}</span>
                 </h3>
                 <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>
                   {t("skins_desc", "Select accent palette and specific surfaces. Combines with light or dark mode selected above.")}
@@ -2561,7 +2561,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                   <Globe className="w-4 h-4 text-cyan-500" />
-                  <span>{t('interface_languages_title', "Langues de l'interface (15 langues Hermes WebUI)")}</span>
+                  <span>{t('interface_languages_title', "Langues de l'interface (15 langues disponibles)")}</span>
                 </h3>
                 <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>
                   {t("language_select_desc", "Select display and text-to-speech language. Entire console is updated instantly.")}
@@ -2936,7 +2936,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                     <RefreshCw className="w-4 h-4 text-sky-500" />
-                    <span>{t("antigravity_webui_updates", "Antigravity WebUI Updates (Hermes System)")}</span>
+                    <span>{t("antigravity_webui_updates", "Antigravity WebUI Updates")}</span>
                   </h3>
                   <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
                     {t("async_search_deploy_desc", "Asynchronous search and instant deployment of improvements from official GitHub repo.")}
@@ -3143,7 +3143,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Terminal className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-semibold text-sky-400">{t('sync_update_arch_title', 'Architecture de mise à jour synchronisée :')} </span>
-                  {t('sync_update_arch_desc', "Ce module reprend le protocole d'Hermes Agent : les vérifications s'exécutent de façon asynchrone en arrière-plan sans bloquer l'UI, avec un cache local de 1 heure pour préserver le réseau. La mise à jour effectue un pull sécurisé, recompile le frontend Vite et relance le service systemd.")}
+                  {t('sync_update_arch_desc', "Les vérifications s'exécutent de façon asynchrone en arrière-plan sans bloquer l'UI, avec un cache local de 1 heure pour préserver le réseau. La mise à jour effectue un pull sécurisé, recompile le frontend Vite et relance le service applicatif.")}
                 </div>
               </div>
             </div>

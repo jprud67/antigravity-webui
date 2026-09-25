@@ -11,6 +11,7 @@ import {
 import { searchFts, reindexFts, getFtsStats } from '../services/api';
 import type { FtsSearchResultItem, FtsSearchResponse } from '../types';
 import { showToast } from '../services/toast';
+import { useI18n } from '../services/i18n';
 
 interface FtsSearchModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
   onClose,
   onSelectConversation
 }) => {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -99,7 +101,7 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400 font-bold text-sm">
               <Search className="w-4 h-4" />
-              <span>Recherche Plein-Texte Cross-Sessions (SQLite FTS5)</span>
+              <span>{t('fts_search_title', 'Recherche Plein-Texte Cross-Sessions (SQLite FTS5)')}</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -110,7 +112,7 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
                 title="Reconstruire l'index FTS5 depuis les conversations"
               >
                 <RefreshCw className={`w-3 h-3 ${reindexing ? 'animate-spin' : ''}`} />
-                <span>{reindexing ? 'Indexation...' : 'Réindexer'}</span>
+                <span>{reindexing ? t('fts_reindexing', 'Indexation...') : t('fts_reindex_btn', 'Réindexer')}</span>
               </button>
 
               <button
@@ -130,7 +132,7 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
               type="text"
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
-              placeholder="Rechercher du code, des messages, des appels d'outils (ex: FastAPI, git rebase, sqlite)..."
+              placeholder={t('fts_search_placeholder', "Rechercher du code, des messages, des appels d'outils (ex: FastAPI, git rebase, sqlite)...")}
               className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-cyan-500 transition-all font-mono"
             />
             {query && (
@@ -147,13 +149,13 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-1.5">
               <span className="text-slate-400 text-[11px] font-medium mr-1 flex items-center gap-1">
-                <Filter className="w-3 h-3" /> Filtrer :
+                <Filter className="w-3 h-3" /> {t('filter', 'Filtrer :')}
               </span>
               {[
-                { id: '', label: 'Tous les rôles' },
-                { id: 'user', label: 'Utilisateur' },
-                { id: 'assistant', label: 'Assistant' },
-                { id: 'system', label: 'Système & Outils' },
+                { id: '', label: t('fts_filter_all', 'Tous les rôles') },
+                { id: 'user', label: t('fts_filter_user', 'Utilisateur') },
+                { id: 'assistant', label: t('fts_filter_assistant', 'Assistant') },
+                { id: 'system', label: t('fts_filter_system', 'Système & Outils') },
               ].map((rf) => (
                 <button
                   key={rf.id}
@@ -171,7 +173,7 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
 
             {results && (
               <div className="text-[11px] text-slate-400 font-mono">
-                {results.total_matches} résultat{results.total_matches > 1 ? 's' : ''} en <span className="text-cyan-500 font-bold">{results.took_ms} ms</span>
+                {t('fts_results_count', '{0} résultat(s) en {1} ms', results.total_matches, results.took_ms)}
               </div>
             )}
           </div>
@@ -233,13 +235,13 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
           ) : query.trim() ? (
             <div className="py-16 text-center text-slate-400 space-y-2">
               <Sparkles className="w-8 h-8 text-slate-500 mx-auto" />
-              <p className="text-xs font-medium">Aucun résultat trouvé pour "{query}".</p>
-              <p className="text-[11px] text-slate-500">Essayez un mot-clé différent ou lancez une réindexation.</p>
+              <p className="text-xs font-medium">{t('fts_no_results', 'Aucun message ne correspond à votre recherche.')}</p>
+              <p className="text-[11px] text-slate-500">{t('fts_no_results_hint', 'Essayez un mot-clé différent ou lancez une réindexation.')}</p>
             </div>
           ) : (
             <div className="py-16 text-center text-slate-400 space-y-3">
               <Search className="w-8 h-8 text-cyan-500/40 mx-auto" />
-              <p className="text-xs font-medium">Recherche plein-texte ultra-rapide à travers toutes vos conversations.</p>
+              <p className="text-xs font-medium">{t('fts_empty_prompt', 'Recherche plein-texte ultra-rapide à travers toutes vos conversations.')}</p>
               {stats && (
                 <p className="text-[11px] text-slate-500 font-mono">
                   Base FTS : {stats.total_indexed_rows.toLocaleString()} messages indexés dans {stats.indexed_sessions} sessions.

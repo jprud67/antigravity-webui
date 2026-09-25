@@ -18,6 +18,7 @@ import type {
   AutoRecallConfig,
   RecallHookResult 
 } from '../types';
+import { useI18n } from '../services/i18n';
 
 interface VectorMemoryModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'memories' | 'settings'>('memories');
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
   const [_loading, setLoading] = useState(false);
@@ -200,13 +202,13 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                Mémoire Vectorielle & Auto-Recall Hook
+                {t('vector_memory_title', 'Mémoire Vectorielle & Auto-Recall Hook')}
                 <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 font-normal">
                   LanceDB Compatible
                 </span>
               </h2>
               <p className="text-xs text-muted-foreground">
-                Recherche sémantique embarquée et injection automatique des souvenirs pertinents par prompt
+                {t('vector_memory_desc', 'Recherche sémantique embarquée et injection automatique des souvenirs pertinents par prompt')}
               </p>
             </div>
           </div>
@@ -221,7 +223,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Souvenirs ({memories.length})
+                {t('vector_tab_memories', 'Souvenirs ({0})', memories.length)}
               </button>
               <button
                 onClick={() => setActiveTab('settings')}
@@ -232,7 +234,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                 }`}
               >
                 <Settings2 className="w-3.5 h-3.5" />
-                Hook & Embeddings
+                {t('vector_tab_settings', 'Hook & Embeddings')}
               </button>
             </div>
 
@@ -257,14 +259,14 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                     <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
                     <input
                       type="text"
-                      placeholder="Test de recherche sémantique en temps réel..."
+                      placeholder={t('vector_search_placeholder', 'Test de recherche sémantique en temps réel...')}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-xl text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-purple-500"
                     />
                     {searching && (
                       <span className="absolute right-3 top-2.5 text-[10px] text-purple-400 animate-pulse font-mono">
-                        Vectorisation...
+                        {t('vector_searching', 'Vectorisation...')}
                       </span>
                     )}
                   </div>
@@ -279,7 +281,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                           : 'bg-muted/60 text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      Tous
+                      {t('vector_all_categories', 'Tous')}
                     </button>
                     {CATEGORIES.map((cat) => (
                       <button
@@ -305,7 +307,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-destructive/30 text-destructive text-xs hover:bg-destructive/10 transition-colors disabled:opacity-40"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    Effacer tous les souvenirs
+                    {t('vector_clear_all', 'Effacer tous les souvenirs')}
                   </button>
                 </div>
               </div>
@@ -314,7 +316,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
               <form onSubmit={handleAddMemory} className="p-3.5 bg-muted/20 border border-border/80 rounded-xl mb-4 flex flex-wrap items-center gap-3">
                 <input
                   type="text"
-                  placeholder="Nouveau fait, préférence, ou instruction à mémoriser..."
+                  placeholder={t('vector_new_memory_placeholder', 'Nouveau fait, préférence, ou instruction à mémoriser...')}
                   value={newText}
                   onChange={(e) => setNewText(e.target.value)}
                   className="flex-1 min-w-[260px] px-3 py-1.5 bg-background border border-border rounded-lg text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-purple-500"
@@ -333,7 +335,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                 </select>
 
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className="text-[11px]">Importance:</span>
+                  <span className="text-[11px]">{t('vector_importance_label', 'Importance:')}</span>
                   <input
                     type="range"
                     min="0.1"
@@ -352,7 +354,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-500 transition-colors disabled:opacity-50"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  Mémoriser
+                  {addingMemory ? t('adding', 'Mémorisation...') : t('vector_add_btn', 'Mémoriser')}
                 </button>
               </form>
 
@@ -361,7 +363,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                 {searchQuery.trim() ? (
                   searchResults.length === 0 ? (
                     <div className="text-center py-8 text-xs text-muted-foreground">
-                      Aucune correspondance sémantique pour &quot;{searchQuery}&quot;
+                      {t('vector_no_search_results', 'Aucune correspondance sémantique pour')} &quot;{searchQuery}&quot;
                     </div>
                   ) : (
                     searchResults.map((res) => (
@@ -386,7 +388,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                         <button
                           onClick={() => handleDeleteMemory(res.entry.id)}
                           className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                          title="Supprimer"
+                          title={t('delete', 'Supprimer')}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -396,7 +398,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                 ) : memories.length === 0 ? (
                   <div className="text-center py-12 text-xs text-muted-foreground">
                     <Brain className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-                    Aucun souvenir enregistré. Ajoutez votre première instruction ci-dessus.
+                    {t('vector_no_memories', 'Aucun souvenir enregistré. Ajoutez votre première instruction ci-dessus.')}
                   </div>
                 ) : (
                   memories.map((mem) => (
@@ -410,7 +412,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                             {mem.category}
                           </span>
                           <span className="text-[10px] text-muted-foreground font-mono">
-                            Importance: {(mem.importance * 100).toFixed(0)}%
+                            {t('vector_importance_label', 'Importance:')} {(mem.importance * 100).toFixed(0)}%
                           </span>
                           <span className="text-[10px] text-muted-foreground">
                             {new Date(mem.createdAt * 1000).toLocaleDateString()}
@@ -421,7 +423,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                       <button
                         onClick={() => handleDeleteMemory(mem.id)}
                         className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                        title="Supprimer"
+                        title={t('delete', 'Supprimer')}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

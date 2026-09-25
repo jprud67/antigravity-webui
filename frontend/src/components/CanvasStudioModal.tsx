@@ -14,6 +14,7 @@ import {
 import { canvasApi } from '../services/api';
 import CanvasViewer from './CanvasViewer';
 import type { CanvasDocumentManifest } from '../types';
+import { useI18n } from '../services/i18n';
 
 interface CanvasStudioModalProps {
   isOpen: boolean;
@@ -150,6 +151,7 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
   onClose,
   initialDocId,
 }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'studio' | 'gallery'>('studio');
   const [htmlCode, setHtmlCode] = useState<string>(TEMPLATES.kpi_dashboard.html);
   const [docTitle, setDocTitle] = useState<string>(TEMPLATES.kpi_dashboard.title);
@@ -221,7 +223,7 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
 
   const handleDeleteDocument = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Supprimer définitivement ce Canvas ?')) return;
+    if (!window.confirm(t('canvas_delete_confirm', 'Supprimer définitivement ce Canvas ?'))) return;
     try {
       await canvasApi.deleteDocument(id);
       if (selectedDoc?.id === id) {
@@ -253,13 +255,13 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                Canvas Vivant & Documents Interactifs
+                {t('canvas_studio_title', 'Canvas Vivant & Documents Interactifs')}
                 <span className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-normal">
                   v0.3.0
                 </span>
               </h2>
               <p className="text-xs text-muted-foreground">
-                Widgets React/HTML isolés dans iframe sandboxed avec bridge de thème et auto-resize
+                {t('canvas_studio_desc', 'Widgets React/HTML isolés dans iframe sandboxed avec bridge de thème et auto-resize')}
               </p>
             </div>
           </div>
@@ -274,7 +276,7 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Studio Interactif
+                {t('canvas_tab_studio', 'Studio Interactif')}
               </button>
               <button
                 onClick={() => setActiveTab('gallery')}
@@ -285,7 +287,7 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                 }`}
               >
                 <FolderOpen className="w-3.5 h-3.5" />
-                Galerie ({documents.length})
+                {t('canvas_tab_gallery', 'Galerie ({0})', documents.length)}
               </button>
             </div>
 
@@ -311,7 +313,7 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                       type="text"
                       value={docTitle}
                       onChange={(e) => setDocTitle(e.target.value)}
-                      placeholder="Titre du widget..."
+                      placeholder={t('canvas_doc_title_placeholder', 'Titre du widget...')}
                       className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                     />
                   </div>
@@ -335,12 +337,12 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                       {savedSuccess ? (
                         <>
                           <Check className="w-3.5 h-3.5" />
-                          Sauvegardé !
+                          {t('canvas_saved_success', 'Sauvegardé !')}
                         </>
                       ) : (
                         <>
                           <Save className="w-3.5 h-3.5" />
-                          {saving ? 'Enregistrement...' : 'Sauvegarder'}
+                          {saving ? t('canvas_saving', 'Enregistrement...') : t('canvas_save_btn', 'Sauvegarder')}
                         </>
                       )}
                     </button>
@@ -350,7 +352,7 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                 {/* HTML Textarea */}
                 <div className="flex-1 p-3 overflow-hidden flex flex-col">
                   <div className="text-[11px] text-muted-foreground font-mono mb-2 flex items-center justify-between">
-                    <span>CODE HTML / JS EMBARQUÉ</span>
+                    <span>{t('canvas_code_editor', 'CODE HTML / JS EMBARQUÉ')}</span>
                     <span className="text-[10px] text-accent/80">Supporte styles CSS variables & postMessage</span>
                   </div>
                   <textarea
@@ -368,7 +370,7 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                 <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-3.5 h-3.5 text-accent" />
-                    <span>APERÇU EN DIRECT (IFRAME SANDBOXÉE)</span>
+                    <span>{t('canvas_live_preview', 'APERÇU EN DIRECT (IFRAME SANDBOXÉE)')}</span>
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground font-mono">
                     CSP: allow-scripts
@@ -392,7 +394,7 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                   <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
                   <input
                     type="text"
-                    placeholder="Rechercher un Canvas..."
+                    placeholder={t('canvas_filter_placeholder', 'Rechercher un Canvas...')}
                     value={filterQuery}
                     onChange={(e) => setFilterQuery(e.target.value)}
                     className="w-full pl-9 pr-3 py-1.5 bg-background border border-border rounded-xl text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
@@ -404,26 +406,26 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-accent-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  Nouveau Canvas
+                  {t('canvas_create_first', 'Nouveau Canvas')}
                 </button>
               </div>
 
               {loading ? (
                 <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground">
-                  Chargement des documents Canvas...
+                  {t('loading', 'Chargement des documents Canvas...')}
                 </div>
               ) : filteredDocs.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-border rounded-2xl">
                   <Layers className="w-10 h-10 text-muted-foreground/40 mb-3" />
-                  <h3 className="text-sm font-semibold text-foreground">Aucun Canvas trouvé</h3>
+                  <h3 className="text-sm font-semibold text-foreground">{t('canvas_no_docs', 'Aucun Canvas trouvé')}</h3>
                   <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-4">
-                    Créez votre premier widget interactif dans le Studio ou demandez à l'agent d'en générer un.
+                    {t('canvas_no_docs_hint', "Créez votre premier widget interactif dans le Studio ou demandez à l'agent d'en générer un.")}
                   </p>
                   <button
                     onClick={() => setActiveTab('studio')}
                     className="px-4 py-2 rounded-xl bg-accent text-accent-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
                   >
-                    Créer dans le Studio
+                    {t('canvas_tab_studio', 'Créer dans le Studio')}
                   </button>
                 </div>
               ) : (

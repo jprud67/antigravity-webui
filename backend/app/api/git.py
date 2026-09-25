@@ -83,7 +83,12 @@ def _validate_workspace(workspace: str | None) -> Path:
         raise HTTPException(status_code=400, detail="Chemin de workspace invalide.")
     
     if not resolved.exists() or not resolved.is_dir():
-        raise HTTPException(status_code=400, detail=f"Dossier introuvable : {resolved}")
+        default_resolved = Path(DEFAULT_WORKSPACE).resolve()
+        if default_resolved.exists() and default_resolved.is_dir():
+            logger.warning(f"Workspace introuvable ({resolved}), repli automatique sur le workspace par défaut: {default_resolved}")
+            resolved = default_resolved
+        else:
+            raise HTTPException(status_code=400, detail=f"Dossier introuvable : {resolved}")
         
     settings = get_settings()
     raw_workspaces = settings.get("trustedWorkspaces", [])

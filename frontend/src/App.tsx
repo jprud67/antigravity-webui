@@ -29,6 +29,7 @@ const MessagingGatewayModal = lazy(() => import('./components/MessagingGatewayMo
 const WorktreeDashboardModal = lazy(() => import('./components/WorktreeDashboardModal').then(m => ({ default: m.WorktreeDashboardModal })));
 const CanvasStudioModal = lazy(() => import('./components/CanvasStudioModal').then(m => ({ default: m.CanvasStudioModal })));
 const VectorMemoryModal = lazy(() => import('./components/VectorMemoryModal').then(m => ({ default: m.VectorMemoryModal })));
+const DockerStudioModal = lazy(() => import('./components/DockerStudioModal').then(m => ({ default: m.DockerStudioModal })));
 
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig, AppSettings, ProgressCardData } from './types';
@@ -290,6 +291,7 @@ export function App() {
   const [isWorktreeOpen, setIsWorktreeOpen] = useState(false);
   const [isCanvasStudioOpen, setIsCanvasStudioOpen] = useState(false);
   const [isVectorMemoryOpen, setIsVectorMemoryOpen] = useState(false);
+  const [isDockerStudioOpen, setIsDockerStudioOpen] = useState(false);
   const [activeProgressCard, setActiveProgressCard] = useState<ProgressCardData | null>(null);
 
   // Global FTS search shortcut (Ctrl+Shift+K or Cmd+Shift+K)
@@ -1700,7 +1702,7 @@ export function App() {
     const loadingMsg: ChatMessage = {
       id: loadingId,
       role: 'assistant',
-      content: '🔄 **Recherche de mises à jour Antigravity WebUI (Protocole Git Hermes)...**',
+      content: '🔄 **Recherche de mises à jour Antigravity WebUI...**',
       isLive: true,
       timestamp: new Date().toISOString()
     };
@@ -1916,6 +1918,7 @@ export function App() {
         onOpenWorktreeDashboard={() => setIsWorktreeOpen(true)}
         onOpenCanvasStudio={() => setIsCanvasStudioOpen(true)}
         onOpenVectorMemory={() => setIsVectorMemoryOpen(true)}
+        onOpenDockerStudio={() => setIsDockerStudioOpen(true)}
       />
 
       {/* Main Chat Area */}
@@ -2279,6 +2282,14 @@ export function App() {
         <VectorMemoryModal
           isOpen={isVectorMemoryOpen}
           onClose={() => setIsVectorMemoryOpen(false)}
+        />
+      )}
+
+      {isDockerStudioOpen && (
+        <DockerStudioModal
+          isOpen={isDockerStudioOpen}
+          onClose={() => setIsDockerStudioOpen(false)}
+          currentWorkspace={currentWorkspace}
         />
       )}
       </Suspense>

@@ -37,9 +37,9 @@ export const AVAILABLE_THEMES: { id: ThemeMode; name: string; nameKey?: string; 
 export const AVAILABLE_SKINS: SkinOption[] = [
   {
     id: 'default',
-    name: 'Default (Hermes Gold)',
+    name: 'Default (Antigravity Gold)',
     nameKey: 'skin_default',
-    desc: 'Hermes original warm and understated gold accent.',
+    desc: 'Antigravity warm and understated gold accent.',
     descKey: 'skin_default_desc',
     colors: ['#FFD700', '#FFBF00', '#CD7F32']
   },
@@ -159,7 +159,7 @@ export const AVAILABLE_SKINS: SkinOption[] = [
     id: 'zeus',
     name: 'Zeus (OLED Black & Gold)',
     nameKey: 'skin_zeus',
-    desc: 'Deep OLED pure black surfaces with Hermes gold accents.',
+    desc: 'Deep OLED pure black surfaces with Antigravity gold accents.',
     descKey: 'skin_zeus_desc',
     colors: ['#FFD700', '#FFBF00', '#1A1A00'],
     isDarkOnly: true

@@ -35,6 +35,11 @@ self.addEventListener('activate', (event) => {
 
 // Fetch: Strategy depending on request type
 self.addEventListener('fetch', (event) => {
+  // Only handle standard HTTP/HTTPS requests (ignore chrome-extension://, moz-extension://, etc.)
+  if (!event.request.url.startsWith('http://') && !event.request.url.startsWith('https://')) {
+    return;
+  }
+
   const url = new URL(event.request.url);
 
   // 1. Bypass Service Worker entirely for backend API, streaming, and WebSockets

@@ -1,7 +1,7 @@
 {
   "name": "Antigravity WebUI",
   "short_name": "Antigravity",
-  "description": "Cockpit WebUI haute performance pour Antigravity & Hermes",
+  "description": "Cockpit WebUI haute performance pour Antigravity",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0d14",

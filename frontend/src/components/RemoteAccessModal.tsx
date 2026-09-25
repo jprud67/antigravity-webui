@@ -25,6 +25,7 @@ import {
 } from '../services/api';
 import type { TailscaleStatus, WebPushSubscriptionItem } from '../types';
 import { showToast } from '../services/toast';
+import { useI18n } from '../services/i18n';
 
 interface RemoteAccessModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ interface RemoteAccessModalProps {
 }
 
 export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, onClose }) => {
+  const { t } = useI18n();
   const [tailscale, setTailscale] = useState<TailscaleStatus | null>(null);
   const [loadingTailscale, setLoadingTailscale] = useState(false);
   const [togglingServe, setTogglingServe] = useState(false);
@@ -52,11 +54,11 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
       setTailscale(tsStatus);
       setSubscriptions(subs.subscriptions);
     } catch {
-      showToast('Impossible de charger les statuts distants', 'error');
+      showToast(t('remote_status_load_failed', 'Impossible de charger les statuts distants'), 'error');
     } finally {
       setLoadingTailscale(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (isOpen) {
@@ -79,15 +81,15 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
       const res = await toggleTailscaleServe(willEnable);
       if (res.success) {
         showToast(
-          willEnable ? 'Tailscale Serve activé (HTTPS)' : 'Tailscale Serve désactivé',
+          willEnable ? t('tailscale_serve_enabled', 'Tailscale Serve activé (HTTPS)') : t('tailscale_serve_disabled', 'Tailscale Serve désactivé'),
           'success'
         );
         setTailscale(res.status);
       } else {
-        showToast(res.message || 'Erreur Tailscale Serve', 'error');
+        showToast(res.message || t('tailscale_serve_error', 'Erreur Tailscale Serve'), 'error');
       }
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de la bascule', 'error');
+      showToast(err.message || t('toggle_error', 'Erreur lors de la bascule'), 'error');
     } finally {
       setTogglingServe(false);
     }
@@ -99,7 +101,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
     try {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        showToast('Permission de notification refusée par le navigateur', 'warning');
+        showToast(t('notification_permission_denied', 'Permission de notification refusée par le navigateur'), 'warning');
         return;
       }
 
@@ -128,10 +130,10 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
       });
 
       setPushSubscribed(true);
-      showToast('Notifications Web Push activées sur cet appareil !', 'success');
+      showToast(t('push_activated', 'Notifications Web Push activées sur cet appareil !'), 'success');
       loadData();
     } catch (err: any) {
-      showToast(`Erreur d'activation push : ${err.message}`, 'error');
+      showToast(`${t('push_activation_error', "Erreur d'activation push")} : ${err.message}`, 'error');
     } finally {
       setSubscribingPush(false);
     }
@@ -142,11 +144,11 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
     try {
       const res = await sendTestWebPush(
         'Antigravity Mobile',
-        'Connexion distante opérationnelle via PWA Web Push !'
+        t('push_test_body', 'Connexion distante opérationnelle via PWA Web Push !')
       );
-      showToast(res.message || 'Notification test envoyée', 'info');
+      showToast(res.message || t('test_push_sent', 'Notification test envoyée'), 'info');
     } catch {
-      showToast('Échec de notification test', 'error');
+      showToast(t('test_push_failed', 'Échec de notification test'), 'error');
     } finally {
       setTestingPush(false);
     }
@@ -156,7 +158,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
     navigator.clipboard.writeText(url);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
-    showToast('Lien copié dans le presse-papiers !', 'success');
+    showToast(t('copied_to_clipboard', 'Lien copié dans le presse-papiers !'), 'success');
   };
 
   if (!isOpen) return null;
@@ -179,13 +181,13 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                Accès Distant & Web Push
+                {t('remote_access_title', 'Accès Distant & Web Push')}
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-400 border border-teal-500/30">
-                  Sprint 25
+                  {t('remote_access_badge', 'Tailscale & PWA')}
                 </span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Accédez à Antigravity WebUI depuis votre smartphone en toute sécurité sans ouvrir de ports.
+                {t('remote_access_desc', 'Accédez à Antigravity WebUI depuis votre smartphone en toute sécurité sans ouvrir de ports.')}
               </p>
             </div>
           </div>
@@ -195,7 +197,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
               disabled={loadingTailscale}
               className="p-1.5 rounded-lg border hover:bg-slate-500/10 transition-colors text-slate-400 hover:text-slate-200 cursor-pointer"
               style={{ borderColor: 'var(--border)' }}
-              title="Rafraîchir"
+              title={t('refresh', 'Rafraîchir')}
             >
               <RefreshCw className={`w-4 h-4 ${loadingTailscale ? 'animate-spin' : ''}`} />
             </button>
@@ -217,7 +219,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
               <div className="flex items-center gap-2.5">
                 <Globe className="w-4 h-4 text-teal-400" />
                 <span className="font-semibold text-xs tracking-wide uppercase text-slate-400">
-                  Réseau Privé Tailscale (MagicDNS)
+                  {t('tailscale_network_title', 'Réseau Privé Tailscale (MagicDNS)')}
                 </span>
               </div>
               <span className={`text-[11px] font-mono px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 ${
@@ -226,7 +228,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
                   : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${tailscale?.running ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                {tailscale?.running ? 'Connecté au Tailnet' : (tailscale?.installed ? 'Déconnecté' : 'Non installé')}
+                {tailscale?.running ? t('tailnet_connected', 'Connecté au Tailnet') : (tailscale?.installed ? t('disconnected', 'Déconnecté') : t('not_installed', 'Non installé'))}
               </span>
             </div>
 
@@ -234,13 +236,13 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
               <div className="space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="p-3 rounded-xl border bg-black/20" style={{ borderColor: 'var(--border)' }}>
-                    <div className="text-[10px] text-slate-400 uppercase font-mono">Nom d'hôte MagicDNS</div>
+                    <div className="text-[10px] text-slate-400 uppercase font-mono">{t('magicdns_hostname', "Nom d'hôte MagicDNS")}</div>
                     <div className="text-xs font-mono font-semibold text-teal-400 truncate mt-0.5">
                       {tailscale.magicdns || 'N/A'}
                     </div>
                   </div>
                   <div className="p-3 rounded-xl border bg-black/20" style={{ borderColor: 'var(--border)' }}>
-                    <div className="text-[10px] text-slate-400 uppercase font-mono">Adresse IP Tailscale</div>
+                    <div className="text-[10px] text-slate-400 uppercase font-mono">{t('tailscale_ip', 'Adresse IP Tailscale')}</div>
                     <div className="text-xs font-mono font-semibold text-slate-200 truncate mt-0.5">
                       {tailscale.tailscale_ip || 'N/A'}
                     </div>
@@ -250,7 +252,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
                 {tailscale.serve_url && (
                   <div className="p-3 rounded-xl border border-teal-500/30 bg-teal-500/10 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[10px] text-teal-300 uppercase font-bold tracking-wider">URL HTTPS Sécurisée</div>
+                      <div className="text-[10px] text-teal-300 uppercase font-bold tracking-wider">{t('secure_https_url', 'URL HTTPS Sécurisée')}</div>
                       <a 
                         href={tailscale.serve_url} 
                         target="_blank" 
@@ -266,7 +268,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
                       className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium text-xs flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors shadow-xs"
                     >
                       {copiedUrl ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedUrl ? 'Copié' : 'Copier'}</span>
+                      <span>{copiedUrl ? t('copied', 'Copié') : t('copy', 'Copier')}</span>
                     </button>
                   </div>
                 )}
@@ -274,8 +276,8 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-xs text-slate-400">
                     {tailscale.serve_active 
-                      ? 'Serveur HTTPS actif sur le port 8000 via Tailscale Serve' 
-                      : 'Activer le partage HTTPS chiffré vers les machines de votre Tailnet'}
+                      ? t('serve_active_desc', 'Serveur HTTPS actif sur le port 8000 via Tailscale Serve') 
+                      : t('serve_inactive_desc', 'Activer le partage HTTPS chiffré vers les machines de votre Tailnet')}
                   </span>
                   <button
                     onClick={handleToggleServe}
@@ -287,7 +289,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
                     }`}
                   >
                     {togglingServe && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    <span>{tailscale.serve_active ? 'Désactiver Serve' : 'Activer Serve'}</span>
+                    <span>{tailscale.serve_active ? t('disable_serve', 'Désactiver Serve') : t('enable_serve', 'Activer Serve')}</span>
                   </button>
                 </div>
               </div>
@@ -295,7 +297,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
               <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-start gap-2.5">
                 <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
                 <div className="leading-relaxed">
-                  Tailscale n'est pas actif sur cet ordinateur. Installez Tailscale ou lancez l'application pour profiter du domaine MagicDNS sans configuration réseau.
+                  {t('tailscale_not_active_warning', "Tailscale n'est pas actif sur cet ordinateur. Installez Tailscale ou lancez l'application pour profiter du domaine MagicDNS sans configuration réseau.")}
                 </div>
               </div>
             )}
@@ -307,23 +309,23 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
               <div className="flex items-center gap-2.5">
                 <Bell className="w-4 h-4 text-sky-400" />
                 <span className="font-semibold text-xs tracking-wide uppercase text-slate-400">
-                  Notifications Web Push Mobiles (PWA)
+                  {t('mobile_web_push_title', 'Notifications Web Push Mobiles (PWA)')}
                 </span>
               </div>
               <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/30">
-                {subscriptions.length} appareil{subscriptions.length > 1 ? 's' : ''} enregistré{subscriptions.length > 1 ? 's' : ''}
+                {t('devices_registered', '{0} appareil(s) enregistré(s)').replace('{0}', String(subscriptions.length))}
               </span>
             </div>
 
             <p className="text-xs text-slate-400 leading-relaxed">
-              Recevez des notifications système instantanées sur votre téléphone ou tablette dès qu'une tâche longue, une suite de tests ou une demande d'approbation d'outil nécessite votre attention.
+              {t('pwa_push_desc', "Recevez des notifications système instantanées sur votre téléphone ou tablette dès qu'une tâche longue, une suite de tests ou une demande d'approbation d'outil nécessite votre attention.")}
             </p>
 
             <div className="flex items-center justify-between flex-wrap gap-3 pt-2">
               <div className="flex items-center gap-2">
                 <Smartphone className="w-4 h-4 text-slate-400" />
                 <span className="text-xs font-medium text-slate-200">
-                  {pushSubscribed ? 'Notifications activées sur ce navigateur' : 'Non activé sur ce navigateur'}
+                  {pushSubscribed ? t('push_enabled_this_browser', 'Notifications activées sur ce navigateur') : t('push_disabled_this_browser', 'Non activé sur ce navigateur')}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -335,7 +337,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
                     style={{ borderColor: 'var(--border)' }}
                   >
                     {testingPush ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                    <span>Tester le Push</span>
+                    <span>{t('test_push_btn', 'Tester le Push')}</span>
                   </button>
                 )}
                 <button
@@ -349,7 +351,7 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
                 >
                   {subscribingPush && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   {pushSubscribed ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
-                  <span>{pushSubscribed ? 'Abonné' : 'Activer sur cet appareil'}</span>
+                  <span>{pushSubscribed ? t('push_subscribed', 'Abonné') : t('enable_on_device', 'Activer sur cet appareil')}</span>
                 </button>
               </div>
             </div>
@@ -360,14 +362,14 @@ export const RemoteAccessModal: React.FC<RemoteAccessModalProps> = ({ isOpen, on
         <div className="p-4 border-t flex items-center justify-between shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Chiffrement de bout en bout P-256 et tunnel WireGuard</span>
+            <span>{t('encryption_wireguard_hint', 'Chiffrement de bout en bout P-256 et tunnel WireGuard')}</span>
           </div>
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl text-xs font-medium border hover:bg-slate-500/10 transition-colors cursor-pointer text-slate-300"
             style={{ borderColor: 'var(--border)' }}
           >
-            Fermer
+            {t('close', 'Fermer')}
           </button>
         </div>
       </div>
