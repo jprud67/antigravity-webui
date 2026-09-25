@@ -888,7 +888,7 @@ def truncate_tool_output(content: Any, max_lines: int = 50, max_chars: int = 350
     return content[:half] + marker + content[-half:], True
 
 
-def auto_truncate_transcript(conversation_id: str, max_lines: int = 50, max_chars: int = 3500) -> dict[str, Any]:
+def auto_truncate_transcript(conversation_id: str, max_lines: int = 30, max_chars: int = 2500) -> dict[str, Any]:
     """
     Scanne transcript.jsonl et tronque toute sortie volumineuse d'outil/terminal.
     Sauvegarde systématiquement l'historique complet dans transcript_full.jsonl.
@@ -974,8 +974,10 @@ def compact_conversation_in_place(conversation_id: str, preserve_last_n_turns: i
     transcript_path = logs_dir / "transcript.jsonl"
     transcript_full_path = logs_dir / "transcript_full.jsonl"
 
-    if not transcript_path.exists() or transcript_path.stat().st_size == 0:
+    if not transcript_path.exists():
         raise ValueError("Aucun transcript à compacter")
+    if transcript_path.stat().st_size == 0:
+        return {"status": "ok", "conversation_id": conversation_id, "compacted_steps": 0, "chars_saved": 0, "tokens_saved": 0, "reduction_pct": 0.0}
 
     raw_lines: list[str] = []
     with open(transcript_path, "r", encoding="utf-8-sig", errors="replace") as f:
@@ -989,7 +991,7 @@ def compact_conversation_in_place(conversation_id: str, preserve_last_n_turns: i
             continue
 
     if not steps:
-        raise ValueError("Transcript vide ou corrompu")
+        return {"status": "ok", "conversation_id": conversation_id, "compacted_steps": 0, "chars_saved": 0, "tokens_saved": 0, "reduction_pct": 0.0}
 
     # Sauvegarde complète systématique
     if not transcript_full_path.exists() or transcript_full_path.stat().st_size < transcript_path.stat().st_size:
@@ -3023,10 +3025,10 @@ def get_settings() -> dict[str, Any]:
     defaults: dict[str, Any] = {
         "agentMode": "accept-edits",
         "colorScheme": "dark",
-        "model": "Gemini 3.8 Flash (High)",
+        "model": "Gemini 3.8 Flash (Medium)",
         "trustedWorkspaces": [DEFAULT_WORKSPACE],
         "defaultWorkspace": DEFAULT_WORKSPACE,
-        "ecoMode": False,
+        "ecoMode": True,
     }
     with _settings_lock:
         if not SETTINGS_FILE.exists():
@@ -3048,7 +3050,7 @@ def get_settings() -> dict[str, Any]:
             if not res.get("defaultWorkspace"):
                 res["defaultWorkspace"] = DEFAULT_WORKSPACE
             if "ecoMode" not in res:
-                res["ecoMode"] = False
+                res["ecoMode"] = True
             _cached_settings = copy.deepcopy(res)
             _cached_settings_mtime = mtime
             return copy.deepcopy(res)

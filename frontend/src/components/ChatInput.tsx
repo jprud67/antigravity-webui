@@ -159,9 +159,10 @@ export const ChatInput = React.memo<ChatInputProps>(({
 
   const [isEcoMode, setIsEcoMode] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('antigravity_eco_mode') === 'true';
+      const saved = localStorage.getItem('antigravity_eco_mode');
+      return saved !== null ? saved === 'true' : true;
     } catch {
-      return false;
+      return true;
     }
   });
 

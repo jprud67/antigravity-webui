@@ -23,6 +23,7 @@ from app.services.google_auth import (
 )
 from app.services.storage import (
     auto_truncate_transcript,
+    compact_conversation_in_place,
     get_settings,
     is_safe_conversation_id,
     save_settings,
@@ -400,10 +401,23 @@ class ExecutionSession:
 
         eco_mode = params.get("eco_mode")
         if eco_mode is None:
-            eco_mode = settings.get("ecoMode", False)
+            eco_mode = settings.get("ecoMode", True)
 
         if eco_mode:
             prompt = inject_eco_directives(prompt)
+
+        # Adaptive Effort (Token Thrift Architecture):
+        # Prevent excessive thinking tokens on short conversational prompts (e.g., "oui", "1", "continue")
+        clean_prompt_len = len((prompt or "").strip())
+        current_model = model
+        current_effort = effort
+        if not current_effort:
+            if clean_prompt_len <= 50:
+                current_effort = "low"
+            elif eco_mode:
+                current_effort = "medium"
+            else:
+                current_effort = "medium"
 
         def on_proc_spawned(p: asyncio.subprocess.Process):
             self.active_proc = p
@@ -411,8 +425,6 @@ class ExecutionSession:
         attempt = 0
         max_failover_attempts = 5
         model_switched_on_current_account = False
-        current_model = model
-        current_effort = effort
 
         try:
             while attempt < max_failover_attempts:
@@ -428,7 +440,22 @@ class ExecutionSession:
 
                 try:
                     active_cid = self.conversation_id or conv_id
-                    logger.info(f"[Session {active_cid}] Starting turn in background (attempt {attempt})...")
+                    # Proactive Auto-Compaction (IDE Token Parity):
+                    # In Antigravity IDE, older turns have their tool outputs pruned before prompt execution.
+                    # In WebUI, compact steps prior to the last 2 turns in transcript.jsonl
+                    # to prevent massive re-ingestion of stale input tokens on every turn.
+                    if active_cid:
+                        try:
+                            comp_res = compact_conversation_in_place(active_cid, preserve_last_n_turns=2)
+                            if comp_res.get("compacted_steps", 0) > 0:
+                                logger.info(
+                                    f"[Session {active_cid}] Auto-compacted {comp_res['compacted_steps']} older tool steps "
+                                    f"(~{comp_res.get('tokens_saved', 0)} tokens saved)."
+                                )
+                        except Exception as cp_err:
+                            logger.debug(f"Proactive compaction error: {cp_err}")
+
+                    logger.info(f"[Session {active_cid}] Starting turn in background (attempt {attempt}, model={current_model}, effort={current_effort})...")
                     async for event in stream_turn(
                         prompt=prompt,
                         conversation_id=active_cid,
@@ -640,14 +667,12 @@ class ExecutionSession:
                     # Auto-truncate large tool outputs in transcript to safeguard tokens for subsequent turns
                     if self.conversation_id:
                         try:
-                            st = get_settings()
-                            if st.get("ecoMode", True):
-                                trunc_res = auto_truncate_transcript(self.conversation_id)
-                                if trunc_res.get("truncated_steps_count", 0) > 0:
-                                    logger.info(
-                                        f"[Session {self.conversation_id}] Auto-truncated {trunc_res['truncated_steps_count']} steps in transcript "
-                                        f"({trunc_res['chars_saved']} chars saved)."
-                                    )
+                            trunc_res = auto_truncate_transcript(self.conversation_id, max_lines=30, max_chars=2500)
+                            if trunc_res.get("truncated_steps_count", 0) > 0:
+                                logger.info(
+                                    f"[Session {self.conversation_id}] Auto-truncated {trunc_res['truncated_steps_count']} steps in transcript "
+                                    f"({trunc_res['chars_saved']} chars saved)."
+                                )
                         except Exception as tr_err:
                             logger.debug(f"Auto-truncate transcript warning: {tr_err}")
 

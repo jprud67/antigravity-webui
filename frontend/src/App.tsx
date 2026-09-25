@@ -184,7 +184,7 @@ export function App() {
 
   const [models, setModels] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
-  const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('high');
+  const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('medium');
   const [quickPrompt, setQuickPrompt] = useState('');
 
   // Memoized prompt history of active discussion for terminal-like navigation
@@ -412,16 +412,16 @@ export function App() {
             } else if (lowerModel.includes('medium') || lowerModel.includes('med')) {
               setSelectedEffort('medium');
             } else {
-              setSelectedEffort((found.default_effort as any) || 'high');
+              setSelectedEffort((found.default_effort as any) || 'medium');
             }
           }
         } else {
           setSelectedModel(mods[0].id);
-          setSelectedEffort((mods[0].default_effort as any) || 'high');
+          setSelectedEffort((mods[0].default_effort as any) || 'medium');
         }
       } else if (mods.length > 0) {
         setSelectedModel(mods[0].id);
-        setSelectedEffort((mods[0].default_effort as any) || 'high');
+        setSelectedEffort((mods[0].default_effort as any) || 'medium');
       }
 
       const savedWorkspace = (() => {

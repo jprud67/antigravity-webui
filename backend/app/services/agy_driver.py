@@ -23,7 +23,7 @@ DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
     {
         "id": "gemini-3.8-flash",
         "name": "Gemini 3.8 Flash",
-        "default_effort": "high",
+        "default_effort": "medium",
         "supported_efforts": ["high", "medium", "low"],
         "variants": {
             "high": "gemini-3.8-flash-high",
@@ -34,7 +34,7 @@ DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
     {
         "id": "gemini-3.7-flash",
         "name": "Gemini 3.7 Flash",
-        "default_effort": "high",
+        "default_effort": "medium",
         "supported_efforts": ["high", "medium", "low"],
         "variants": {
             "high": "gemini-3.7-flash-high",
@@ -45,7 +45,7 @@ DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
     {
         "id": "gemini-3.6-flash",
         "name": "Gemini 3.6 Flash",
-        "default_effort": "high",
+        "default_effort": "medium",
         "supported_efforts": ["high", "medium", "low"],
         "variants": {
             "high": "gemini-3.6-flash-high",
@@ -56,7 +56,7 @@ DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
     {
         "id": "gemini-3.1-pro",
         "name": "Gemini 3.1 Pro",
-        "default_effort": "high",
+        "default_effort": "low",
         "supported_efforts": ["high", "low"],
         "variants": {
             "high": "gemini-3.1-pro-high",
@@ -189,7 +189,7 @@ async def get_model_families() -> list[dict[str, Any]]:
                 families[fid] = {
                     'id': fid,
                     'name': meta['family_name'],
-                    'default_effort': meta['effort'] or ('high' if meta['supported_efforts'] else None),
+                    'default_effort': meta['effort'] or ('medium' if 'medium' in meta['supported_efforts'] else ('low' if 'low' in meta['supported_efforts'] else 'high')),
                     'supported_efforts': meta['supported_efforts'],
                     'variants': {}
                 }
@@ -363,11 +363,12 @@ async def stream_turn(
 
     if workspace_path and Path(workspace_path).is_dir():
         try:
-            is_different = Path(workspace_path).resolve() != Path(DEFAULT_WORKSPACE).resolve()
-        except Exception:
-            is_different = str(workspace_path) != str(DEFAULT_WORKSPACE)
-        if is_different:
-            cmd.extend(["--add-dir", str(Path(workspace_path).resolve())])
+            ws_resolved = Path(workspace_path).resolve()
+            cwd_resolved = Path(cwd).resolve()
+            if ws_resolved != cwd_resolved:
+                cmd.extend(["--add-dir", str(ws_resolved)])
+        except Exception as e:
+            logger.debug(f"Ignored error resolving workspace path: {e}")
 
     # Prompt parameter.
     # Sous Linux, MAX_ARG_STRLEN (128 Kio) impose une limite stricte par argument
