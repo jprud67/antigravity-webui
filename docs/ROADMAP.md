@@ -165,12 +165,19 @@ This roadmap outlines the strategic direction for **Antigravity‑webui**, the f
 | **Télémétrie Context Budget, Anneau ContextRing & Studio d'Élagage** | Affichage de l'anneau de contexte indexé sur le budget cible (`14.2k / 35k`), popover détaillé avec jauge de budget et alertes dynamiques, studio d'élagage avec action 1-clic d'application du budget, paramètres utilisateur configurables et commande rapide `/budget`. | UI / Frontend | 2027‑02‑18 | ✅ **Completed** |
 | **Release v0.2.25** | Version bump à 0.2.25 (`package.json`, `package-lock.json`, `main.py`, `updater.py`, `sw.js`), 0 warning/erreur Oxlint (68 fichiers), 0 erreur TypeScript (`tsc -b`), build production Vite optimisé, 105/105 tests unitaires pytest backend validés (100% de réussite), commit & tag v0.2.25 poussé vers GitHub. | Release Manager | 2027‑02‑18 | ✅ **Completed** |
 
-### 📌 Sprint 22 (v0.2.26 – Prochaine étape)
+### 📌 Sprint 22 (v0.2.26 – Terminé)
 | Milestone | Description | Owner | Target | Status |
 |---|---|---|---|---|
-| **Option A : Integrated Docker & Container Management Studio** *(Recommandé)* | Détection automatique des `Dockerfile` et `docker-compose.yml`, inspection visuelle de l'état des conteneurs en cours d'exécution, affichage des logs de conteneur en streaming temps réel, terminal interactif dans les conteneurs et contrôles de cycle de vie (start, stop, restart, rebuild, prune). | DevOps / IDE | 2027‑02‑20 | ⏳ Planned |
-| **Option B : Database Explorer & Visual SQL Query Studio** | Explorateur intégré pour bases de données locales et distantes (SQLite, PostgreSQL, MySQL), inspection des schémas de tables, exécuteur de requêtes SQL interactif avec pagination et export CSV/JSON, et visualisation des migrations de données. | Data / Web | 2027‑02‑23 | ⏳ Planned |
-| **Option C : Global Workspace Task Runner & Pipeline Orchestrator** | Détection automatique des scripts de build / test (`npm`, `pytest`, `cargo`, `make`), lanceur de tâches unifié avec exécution parallèle/séquentielle, inspection de statut et journalisation en temps réel. | DevOps / IDE | 2027‑02‑26 | ⏳ Planned |
+| **Passerelle API Universelle pour Applications Externes & Actions Groupées** | Endpoints standard OpenAI `/v1/chat/completions`, `/v1/models` et API Agent native `/api/v1/agent/run` pour connecter Cursor, Continue.dev, LangChain, OpenWebUI. Gestion complète des clés d'API dans les paramètres avec actions groupées (bulk revocation, bulk rotation de clés avec auto-reveal, copie groupée `.env`, export instantané `.env` et `.json`, bascule de visibilité collective, recherche temps réel et filtres Toutes/Utilisées/Inactives). | Core / API | 2027‑02‑20 | ✅ **Completed** |
+| **Correctifs de Fiabilité & Service Worker PWA** | Correction de l'erreur 403 Forbidden sur l'accès aux arborescences de fichiers d'espaces de travail sous Windows (normalisation des séparateurs de chemin `/` et `\`). Correction de l'incompatibilité de préchargement `modulePreload` sur le Service Worker PWA éliminant l'avertissement cross-world mismatch. | Web / Core | 2027‑02‑20 | ✅ **Completed** |
+| **Release v0.2.26** | Version bump à 0.2.26 (`package.json`, `package-lock.json`, `main.py`, `updater.py`, `sw.js`), 0 warning/erreur Oxlint (68 fichiers), 0 erreur TypeScript (`tsc -b`), build production Vite optimisé, 105/105 tests unitaires backend validés (100% de réussite), commit & tag v0.2.26 poussé vers GitHub. | Release Manager | 2027‑02‑20 | ✅ **Completed** |
+
+### 📌 Sprint 23 (v0.2.27 – Prochaine étape)
+| Milestone | Description | Owner | Target | Status |
+|---|---|---|---|---|
+| **Option A : Integrated Docker & Container Management Studio** *(Recommandé)* | Détection automatique des `Dockerfile` et `docker-compose.yml`, inspection visuelle de l'état des conteneurs en cours d'exécution, affichage des logs de conteneur en streaming temps réel, terminal interactif dans les conteneurs et contrôles de cycle de vie (start, stop, restart, rebuild, prune). | DevOps / IDE | 2027‑02‑23 | ⏳ Planned |
+| **Option B : Database Explorer & Visual SQL Query Studio** | Explorateur intégré pour bases de données locales et distantes (SQLite, PostgreSQL, MySQL), inspection des schémas de tables, exécuteur de requêtes SQL interactif avec pagination et export CSV/JSON, et visualisation des migrations de données. | Data / Web | 2027‑02‑26 | ⏳ Planned |
+| **Option C : Global Workspace Task Runner & Pipeline Orchestrator** | Détection automatique des scripts de build / test (`npm`, `pytest`, `cargo`, `make`), lanceur de tâches unifié avec exécution parallèle/séquentielle, inspection de statut et journalisation en temps réel. | DevOps / IDE | 2027‑03‑01 | ⏳ Planned |
 
 ### 📌 Long‑Term (v0.4 – 3‑6 months)
 | Milestone | Description |
