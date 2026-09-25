@@ -176,7 +176,15 @@ export function registerMonacoCopilot(monaco: any, options: CopilotOptions = {})
   const disposable = monaco.languages.registerInlineCompletionsProvider('*', provider);
   isRegistered = true;
 
-  return disposable;
+  return {
+    dispose: () => {
+      try {
+        disposable.dispose();
+      } finally {
+        isRegistered = false;
+      }
+    }
+  };
 }
 
 export function isCopilotRegistered(): boolean {

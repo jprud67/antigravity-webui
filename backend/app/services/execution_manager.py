@@ -237,8 +237,6 @@ class ExecutionSession:
                                 t["id"] = tool_id
                                 if tool_args and not t.get("args"):
                                     t["args"] = tool_args
-                                if tool_output is not None and not t.get("result"):
-                                    t["result"] = tool_output
                                 if is_done:
                                     t["status"] = "done"
                                 elif is_error:
@@ -254,8 +252,6 @@ class ExecutionSession:
                         if t.get("name") == tool_name and t.get("status") == "running":
                             if tool_args and not t.get("args"):
                                 t["args"] = tool_args
-                            if tool_output is not None and not t.get("result"):
-                                t["result"] = tool_output
                             if is_done:
                                 t["status"] = "done"
                             elif is_error:
