@@ -8764,6 +8764,98 @@ def test_rules_payload_limit_and_read_only_flags():
     print("✓ test_rules_payload_limit_and_read_only_flags passed")
 
 
+def test_git_publish_release_and_tags_sanitization():
+    """Vérifie la protection contre l'injection d'options CLI dans publish_release, tags et stash."""
+    from app.api.git import (
+        publish_release, PublishReleaseRequest,
+        create_tag, CreateTagRequest,
+        delete_tag, push_tag, push_all_tags,
+        StashActionRequest,
+    )
+    from fastapi import HTTPException
+    import pytest
+    from pydantic import ValidationError
+
+    # Test StashActionRequest rejects negative index
+    with pytest.raises(ValidationError):
+        StashActionRequest(index=-1)
+    req_stash = StashActionRequest(index=2)
+    assert req_stash.index == 2
+
+    # Test publish_release rejects injection in tag
+    with pytest.raises(HTTPException) as exc_info:
+        publish_release(PublishReleaseRequest(tag="--title-injection", title="v1.0"))
+    assert exc_info.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc_info:
+        publish_release(PublishReleaseRequest(tag="v1.0;rm -rf", title="v1.0"))
+    assert exc_info.value.status_code == 400
+
+    # Test publish_release rejects injection in target_commitish
+    with pytest.raises(HTTPException) as exc_info:
+        publish_release(PublishReleaseRequest(tag="v1.0.0", title="v1.0", target_commitish="--target-flag"))
+    assert exc_info.value.status_code == 400
+
+    # Test create_tag rejects leading dash
+    with pytest.raises(HTTPException) as exc_info:
+        create_tag(CreateTagRequest(name="-s"))
+    assert exc_info.value.status_code == 400
+
+    # Test delete_tag rejects leading dash
+    with pytest.raises(HTTPException) as exc_info:
+        delete_tag(name="-d")
+    assert exc_info.value.status_code == 400
+
+    # Test push_tag rejects leading dash
+    with pytest.raises(HTTPException) as exc_info:
+        push_tag(name="-f")
+    assert exc_info.value.status_code == 400
+
+    # Test push_all_tags rejects invalid remote
+    with pytest.raises(HTTPException) as exc_info:
+        push_all_tags(remote="--upload-pack=exploit")
+    assert exc_info.value.status_code == 400
+
+
+def test_files_search_workspace_and_sensitive_exclusion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Vérifie que /api/files/search prend en charge le paramètre workspace et filtre les fichiers sensibles."""
+    from app.api.files import search_files
+    import app.api.files as files_mod
+
+    ws_dir = tmp_path / "custom_ws"
+    ws_dir.mkdir(parents=True, exist_ok=True)
+
+    (ws_dir / "index.ts").write_text("console.log('hello world');", encoding="utf-8")
+    (ws_dir / "secret_logic.py").write_text("def find_me(): pass", encoding="utf-8")
+    (ws_dir / ".env").write_text("SECRET_KEY=12345", encoding="utf-8")
+    (ws_dir / "webui_auth.json").write_text('{"token": "xyz"}', encoding="utf-8")
+
+    monkeypatch.setattr(files_mod, "get_settings", lambda: {"trustedWorkspaces": [str(ws_dir)]})
+
+    res = search_files(q="secret", workspace=str(ws_dir))
+    names = [r["name"] for r in res["results"]]
+    assert "secret_logic.py" in names
+    assert ".env" not in names
+    assert "webui_auth.json" not in names
+
+    res_path = search_files(q="hello", path=str(ws_dir))
+    assert any(r["name"] == "index.ts" for r in res_path["results"])
+
+
+def test_cron_compute_next_run_interval_dict_variants():
+    """Vérifie que compute_next_run gère les dictionnaires interval avec every/value/unit."""
+    from app.services.cron_store import compute_next_run
+
+    res_mins = compute_next_run({"kind": "interval", "every": 15, "unit": "minutes"})
+    assert res_mins is not None
+
+    res_hours = compute_next_run({"kind": "interval", "value": 2, "unit": "hours"})
+    assert res_hours is not None
+
+    res_days = compute_next_run({"kind": "interval", "interval": 5, "unit": "days"})
+    assert res_days is not None
+
+
 if __name__ == "__main__":
     test_tasks_transcript_outcomes_and_exit_code(Path(tempfile.mkdtemp()))
     test_tasks_kill_task_open_file_and_fallback(Path(tempfile.mkdtemp()))
@@ -9086,6 +9178,12 @@ if __name__ == "__main__":
     test_git_devnull_platform_and_unstage_robustness()
     test_cron_log_entry_collision_avoidance()
     test_execution_manager_stdin_safe_exception_handling()
+    test_git_publish_release_and_tags_sanitization()
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        test_files_search_workspace_and_sensitive_exclusion(Path(td), monkeypatch=pytest.MonkeyPatch())
+    test_cron_compute_next_run_interval_dict_variants()
     print("\nAll unit tests passed successfully!")
+
 
 

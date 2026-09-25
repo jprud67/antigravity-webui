@@ -122,7 +122,10 @@ def _validate_path_access(file_path: Path | str, base_dir: Path | str | None = N
     base_root = Path(DEFAULT_WORKSPACE).resolve()
     if base_dir:
         try:
-            cand_base = Path(base_dir).resolve()
+            cand = Path(base_dir)
+            if not cand.is_absolute():
+                cand = base_root / cand
+            cand_base = cand.resolve()
             if not _is_blocked_sensitive_path(cand_base) and (
                 is_safe_path(cand_base, allowed_roots)
                 or (cand_base / ".git").exists()
@@ -468,15 +471,21 @@ def delete_file_or_dir(req: DeleteFileRequest, _ = Depends(require_auth)):
 def search_files(
     q: str = Query(..., min_length=1),
     path: str | None = Query(None),
+    workspace: str | None = Query(None),
     max_results: int = Query(50, ge=1, le=200),
     _ = Depends(require_auth)
 ):
-    target_path = Path(path) if path else Path(DEFAULT_WORKSPACE)
-    resolved_root = _validate_path_access(target_path)
+    path_str = path if isinstance(path, (str, Path)) else None
+    ws_str = workspace if isinstance(workspace, (str, Path)) else None
+    search_dir = path_str or ws_str
+    target_path = Path(search_dir) if search_dir else Path(DEFAULT_WORKSPACE)
+    resolved_root = _validate_path_access(target_path, base_dir=ws_str)
     if not resolved_root.exists() or not resolved_root.is_dir():
         raise HTTPException(status_code=400, detail="Répertoire racine invalide.")
 
-    query_lower = q.lower().strip()
+    query_str = str(q) if isinstance(q, str) else ""
+    query_lower = query_str.lower().strip()
+    limit = max_results if isinstance(max_results, int) and not isinstance(max_results, bool) else 50
     results = []
 
     try:
@@ -491,7 +500,7 @@ def search_files(
             # Prune ignored directories in-place
             dirs[:] = [
                 d for d in dirs
-                if d not in IGNORED_DIRS and not d.startswith(".")
+                if d not in IGNORED_DIRS and not d.startswith(".") and not is_blocked_sensitive_path(Path(root) / d)
             ]
 
             # Check directory names
@@ -504,14 +513,16 @@ def search_files(
                         "is_dir": True,
                         "match_type": "name"
                     })
-                    if len(results) >= max_results:
-                        return {"query": q, "results": results, "total": len(results)}
+                    if len(results) >= limit:
+                        return {"query": query_str, "results": results, "total": len(results)}
 
             # Check files
             for f in files:
                 if f.startswith(".") and f != ".gitignore":
                     continue
                 file_p = Path(root) / f
+                if is_blocked_sensitive_path(file_p):
+                    continue
                 if query_lower in f.lower():
                     results.append({
                         "name": f,
@@ -519,8 +530,8 @@ def search_files(
                         "is_dir": False,
                         "match_type": "name"
                     })
-                    if len(results) >= max_results:
-                        return {"query": q, "results": results, "total": len(results)}
+                    if len(results) >= limit:
+                        return {"query": query_str, "results": results, "total": len(results)}
 
                 # Also search text content inside small text files (< 256KB)
                 if len(query_lower) >= 2:
@@ -538,13 +549,15 @@ def search_files(
                                             "line_number": line_idx,
                                             "snippet": line.strip()[:160]
                                         })
-                                        if len(results) >= max_results:
-                                            return {"query": q, "results": results, "total": len(results)}
+                                        if len(results) >= limit:
+                                            return {"query": query_str, "results": results, "total": len(results)}
                                         break  # one snippet per file match
                     except (OSError, PermissionError):
                         continue
 
-        return {"query": q, "results": results, "total": len(results)}
+        return {"query": query_str, "results": results, "total": len(results)}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error searching files in {resolved_root}: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur de recherche : {e!s}")

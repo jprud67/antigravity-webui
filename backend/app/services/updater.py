@@ -484,13 +484,41 @@ async def apply_update() -> dict[str, Any]:
     build_ok = True
     build_output = ""
     if frontend_dir.exists() and (frontend_dir / "package.json").exists():
+        if prev_sha:
+            try:
+                changed_files = _git_cmd(["diff", "--name-only", prev_sha, "HEAD"], timeout=10) or ""
+                if any("package.json" in f or "package-lock.json" in f for f in changed_files.splitlines()):
+                    logger.info("Dépendances frontend modifiées par la mise à jour, exécution de npm install...")
+                    install_proc = await asyncio.create_subprocess_exec(
+                        *npm_argv("install", "--prefer-offline", "--no-audit", "--no-fund"),
+                        cwd=str(frontend_dir),
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                        env=os.environ.copy(),
+                        **spawn_group_kwargs()
+                    )
+                    try:
+                        _i_out, i_err = await asyncio.wait_for(install_proc.communicate(), timeout=180.0)
+                        if install_proc.returncode != 0:
+                            logger.warning(f"npm install warning: {i_err.decode(errors='replace').strip()}")
+                    except asyncio.TimeoutError:
+                        try:
+                            await terminate_process_group_async(install_proc, grace=0.5)
+                        except Exception as te:
+                            logger.debug(f"Failed to terminate npm install: {te}")
+                        logger.warning("npm install a expiré après 180s, poursuite du build...")
+            except Exception as e_dep:
+                logger.warning(f"Frontend dependency check/install error: {e_dep}")
+
+        build_proc: asyncio.subprocess.Process | None = None
         try:
             build_proc = await asyncio.create_subprocess_exec(
                 *npm_argv("run", "build"),
                 cwd=str(frontend_dir),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=os.environ.copy()
+                env=os.environ.copy(),
+                **spawn_group_kwargs()
             )
             _b_out, b_err = await asyncio.wait_for(build_proc.communicate(), timeout=300.0)
             if build_proc.returncode != 0:
@@ -499,9 +527,23 @@ async def apply_update() -> dict[str, Any]:
                 logger.warning(f"Frontend build failed after update: {build_output}")
             else:
                 build_output = "Frontend compilé avec succès."
+        except asyncio.TimeoutError:
+            build_ok = False
+            build_output = "Délai d'attente dépassé pour la compilation frontend (300s)."
+            if build_proc:
+                try:
+                    await terminate_process_group_async(build_proc, grace=0.5)
+                except Exception as t_err:
+                    logger.debug(f"Failed to terminate build process group: {t_err}")
+            logger.warning("Frontend build timed out after update")
         except Exception as e:
             build_ok = False
             build_output = str(e)
+            if build_proc:
+                try:
+                    await terminate_process_group_async(build_proc, grace=0.5)
+                except Exception:
+                    pass
             logger.warning(f"Frontend build error after update: {e}")
 
     # 3b. Rollback automatique si le build échoue (ne pas laisser un état bancal)

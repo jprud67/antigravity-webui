@@ -11,7 +11,7 @@ from typing import Any
 from urllib.parse import unquote, urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE, REPO_ROOT
@@ -1526,7 +1526,7 @@ class StashSaveRequest(BaseModel):
 
 class StashActionRequest(BaseModel):
     workspace: str | None = None
-    index: int = 0
+    index: int = Field(0, ge=0)
 
 
 class ResolveConflictRequest(BaseModel):
@@ -1649,7 +1649,7 @@ def apply_git_stash(
 @router.delete("/stash")
 def drop_git_stash(
     workspace: str | None = Query(None),
-    index: int | None = Query(None),
+    index: int | None = Query(None, ge=0),
     _ = Depends(require_auth)
 ):
     target = _validate_workspace(workspace)
@@ -1669,7 +1669,7 @@ def drop_git_stash(
 @router.get("/stash/diff")
 def get_git_stash_diff(
     workspace: str | None = Query(None),
-    index: int = Query(0),
+    index: int = Query(0, ge=0),
     path: str | None = Query(None),
     _ = Depends(require_auth)
 ):
@@ -2184,7 +2184,7 @@ def create_tag(
 ):
     target = _validate_workspace(req.workspace)
     tag_name = req.name.strip()
-    if not re.match(r"^[a-zA-Z0-9._/-]+$", tag_name):
+    if not tag_name or tag_name.startswith("-") or not re.match(r"^[a-zA-Z0-9._/-]+$", tag_name):
         raise HTTPException(status_code=400, detail="Nom de tag invalide.")
     target_commit = (req.target_commit or "HEAD").strip()
 
@@ -2204,7 +2204,10 @@ def create_tag(
 
     remote_to_push = req.push_remote or (req.remote if req.push else None)
     if remote_to_push:
-        run_git(["push", remote_to_push.strip(), tag_name], target, timeout=30)
+        rem_clean = remote_to_push.strip()
+        if rem_clean.startswith("-") or not re.match(r"^[a-zA-Z0-9_\-\./]+$", rem_clean):
+            raise HTTPException(status_code=400, detail="Nom de remote invalide.")
+        run_git(["push", rem_clean, tag_name], target, timeout=30)
 
     res_commit = run_git(["rev-parse", target_commit], target)
     c_sha = res_commit.stdout.strip()
@@ -2232,11 +2235,16 @@ def delete_tag(
 ):
     target = _validate_workspace(workspace)
     tag_name = name.strip()
+    if not tag_name or tag_name.startswith("-") or not re.match(r"^[a-zA-Z0-9_\-\./+]+$", tag_name):
+        raise HTTPException(status_code=400, detail="Nom de tag invalide.")
     res = run_git(["tag", "-d", tag_name], target)
     if res.returncode != 0:
         raise HTTPException(status_code=400, detail=f"Erreur suppression tag local : {_mask_git_output(res.stderr or res.stdout)}")
     if delete_remote:
-        run_git(["push", remote_name.strip(), "--delete", tag_name], target, timeout=30)
+        rem_clean = remote_name.strip()
+        if rem_clean.startswith("-") or not re.match(r"^[a-zA-Z0-9_\-\./]+$", rem_clean):
+            raise HTTPException(status_code=400, detail="Nom de remote invalide.")
+        run_git(["push", rem_clean, "--delete", tag_name], target, timeout=30)
     return {"success": True, "message": f"Tag {tag_name} supprimé avec succès."}
 
 
@@ -2248,7 +2256,13 @@ def push_tag(
     _ = Depends(require_auth)
 ):
     target = _validate_workspace(workspace)
-    res = run_git(["push", remote.strip(), name.strip()], target, timeout=30)
+    tag_name = name.strip()
+    if not tag_name or tag_name.startswith("-") or not re.match(r"^[a-zA-Z0-9_\-\./+]+$", tag_name):
+        raise HTTPException(status_code=400, detail="Nom de tag invalide.")
+    rem_clean = remote.strip()
+    if rem_clean.startswith("-") or not re.match(r"^[a-zA-Z0-9_\-\./]+$", rem_clean):
+        raise HTTPException(status_code=400, detail="Nom de remote invalide.")
+    res = run_git(["push", rem_clean, tag_name], target, timeout=30)
     if res.returncode != 0:
         raise HTTPException(status_code=400, detail=f"Erreur push tag : {_mask_git_output(res.stderr or res.stdout)}")
     return {"success": True, "output": res.stdout or res.stderr or "Tag poussé avec succès."}
@@ -2261,7 +2275,10 @@ def push_all_tags(
     _ = Depends(require_auth)
 ):
     target = _validate_workspace(workspace)
-    res = run_git(["push", remote.strip(), "--tags"], target, timeout=30)
+    rem_clean = remote.strip() if remote else "origin"
+    if rem_clean.startswith("-") or not re.match(r"^[a-zA-Z0-9_\-\./]+$", rem_clean):
+        raise HTTPException(status_code=400, detail="Nom de remote invalide.")
+    res = run_git(["push", rem_clean, "--tags"], target, timeout=30)
     if res.returncode != 0:
         raise HTTPException(status_code=400, detail=f"Erreur push --tags : {_mask_git_output(res.stderr or res.stdout)}")
     return {"success": True, "output": res.stdout or res.stderr or "Tous les tags ont été poussés avec succès."}
@@ -2393,16 +2410,27 @@ def publish_release(
     _ = Depends(require_auth)
 ):
     target = _validate_workspace(req.workspace)
+    tag_clean = req.tag.strip()
+    if not tag_clean or tag_clean.startswith("-") or "--" in tag_clean or not re.match(r"^[a-zA-Z0-9_\-\./+]+$", tag_clean):
+        raise HTTPException(status_code=400, detail="Nom de tag Git invalide.")
+
+    commitish = None
+    if req.target_commitish:
+        c_clean = req.target_commitish.strip()
+        if c_clean.startswith("-") or not re.match(r"^[a-zA-Z0-9_\-\./~^]+$", c_clean):
+            raise HTTPException(status_code=400, detail="Cible de commit invalide.")
+        commitish = c_clean
+
     body_text = (req.body or req.notes or "").strip()
     gh_bin = shutil.which("gh")
     if gh_bin:
-        args = [gh_bin, "release", "create", req.tag, "--title", req.title, "--notes", body_text]
+        args = [gh_bin, "release", "create", tag_clean, "--title", req.title, "--notes", body_text]
         if req.draft:
             args.append("--draft")
         if req.prerelease:
             args.append("--prerelease")
-        if req.target_commitish:
-            args.extend(["--target", req.target_commitish])
+        if commitish:
+            args.extend(["--target", commitish])
         try:
             res = subprocess.run(args, cwd=target, capture_output=True, text=True, timeout=15)
             if res.returncode == 0:
@@ -2429,7 +2457,7 @@ def publish_release(
     if owner_repo:
         web_url = _build_github_release_url(
             owner_repo=owner_repo,
-            tag=req.tag,
+            tag=tag_clean,
             title=req.title,
             body=body_text,
             prerelease=bool(req.prerelease)

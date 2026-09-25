@@ -176,6 +176,26 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
                             has_units = True
                     except (ValueError, TypeError):
                         logger.debug("Ignored error")
+
+            if not has_units:
+                val_raw = schedule.get("every") if schedule.get("every") is not None else (
+                    schedule.get("value") if schedule.get("value") is not None else schedule.get("interval")
+                )
+                unit_raw = schedule.get("unit") or schedule.get("units")
+                if val_raw is not None and unit_raw:
+                    try:
+                        val = int(val_raw)
+                        u = str(unit_raw).lower().strip()
+                        for uk, df in unit_defs:
+                            if u.startswith(uk[:-1]) or u == uk:
+                                unit_delta = df(val)
+                                if unit_delta.total_seconds() > 0:
+                                    total_delta += unit_delta
+                                    has_units = True
+                                break
+                    except (ValueError, TypeError):
+                        logger.debug("Ignored error")
+
             if has_units:
                 if total_delta.total_seconds() < 10:
                     total_delta = timedelta(seconds=10)
