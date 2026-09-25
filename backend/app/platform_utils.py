@@ -251,31 +251,47 @@ def is_blocked_sensitive_path(target: os.PathLike[Any] | str) -> bool:
                     ):
                         return True
 
+        # Dossier de comptes et jetons Antigravity / Gemini
+        for i, p in enumerate(parts):
+            if p.lower() in ("accounts", "oauth") and any(
+                ".gemini" in prev.lower() or "antigravity" in prev.lower()
+                for prev in parts[:i]
+            ):
+                return True
+
         # Fichiers de secrets et identifiants
         name = resolved.name.lower()
         if any(p == ".git" for p in parts):
             return True
-        if name in (
-            "antigravity-oauth-token",
-            "webui_auth.json",
-            "webui_password.txt",
-            "google_accounts.json",
-            "credentials",
-            "credentials.json",
-            "client_secret.json",
-            ".bash_history",
-            ".zsh_history",
-            ".netrc",
-            ".npmrc",
-            ".pypirc",
-            ".dockercfg",
+        if (
+            name.startswith((
+                "antigravity-oauth-token",
+                "webui_auth.json",
+                ".webui_auth.json",
+                "webui_password.txt",
+                "google_accounts",
+            ))
+            or name in (
+                "credentials",
+                "credentials.json",
+                ".bash_history",
+                ".zsh_history",
+                ".netrc",
+                ".npmrc",
+                ".pypirc",
+                ".dockercfg",
+            )
+            or (name.startswith("credentials.") and not name.endswith((".py", ".ts", ".js", ".html", ".css")))
         ):
             return True
         if name.startswith("client_secret") and name.endswith(".json"):
             return True
         if name in ("id_rsa", "id_ed25519", "id_dsa", "id_ecdsa") or name.startswith(("id_rsa.", "id_ed25519.")):
             return True
-        if name in ("privkey.pem", "server.key", "server.pem", "private.key", "cert.key"):
+        if name in ("privkey.pem", "server.key", "server.pem", "private.key", "cert.key") or (
+            name.endswith((".key", ".pem", ".pfx", ".pkcs12"))
+            and any(k in name for k in ("id_", "priv", "server", "cert", "secret", "token"))
+        ):
             return True
         if name == ".env" or name.startswith(".env."):
             return True

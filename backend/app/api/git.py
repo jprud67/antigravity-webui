@@ -292,9 +292,9 @@ def get_git_status(workspace: str | None = Query(None), _ = Depends(require_auth
         elif x == "U" or y == "U" or (x == "A" and y == "A") or (x == "D" and y == "D"):
             conflicts.append(path)
         else:
-            if x in ["M", "A", "R", "C", "D"]:
+            if x in ["M", "A", "R", "C", "D", "T"]:
                 staged.append(path)
-            if y == "M":
+            if y in ["M", "T"]:
                 modified.append(path)
             elif y == "D" or x == "D":
                 deleted.append(path)
@@ -693,7 +693,19 @@ def get_branches(workspace: str | None = Query(None), _ = Depends(require_auth))
     target = _validate_workspace(workspace)
     
     curr_res = run_git(["branch", "--show-current"], target)
-    current = curr_res.stdout.strip() or "main"
+    raw_current = curr_res.stdout.strip()
+    is_detached = False
+    detached_sha = None
+    if raw_current:
+        current = raw_current
+    else:
+        head_res = run_git(["rev-parse", "--short=8", "HEAD"], target)
+        if head_res.returncode == 0 and head_res.stdout.strip():
+            detached_sha = head_res.stdout.strip()
+            current = f"HEAD (detached at {detached_sha})"
+            is_detached = True
+        else:
+            current = "main"
 
     ref_format = "%(refname:short)\t%(refname)\t%(HEAD)\t%(upstream:short)\t%(upstream:track)\t%(objectname:short)\t%(authordate:iso-strict)\t%(subject)"
     res = run_git(["for-each-ref", f"--format={ref_format}", "refs/heads/", "refs/remotes/"], target)
@@ -711,7 +723,7 @@ def get_branches(workspace: str | None = Query(None), _ = Depends(require_auth))
                 continue
 
             is_remote = full_ref.startswith("refs/remotes/")
-            is_current = (head_mark.strip() == "*") or (short_name == current and not is_remote)
+            is_current = False if is_detached else ((head_mark.strip() == "*") or (short_name == current and not is_remote))
             ahead = 0
             behind = 0
             if upstream_track:
@@ -735,6 +747,19 @@ def get_branches(workspace: str | None = Query(None), _ = Depends(require_auth))
                     "last_commit_date": date or None,
                     "last_commit_subject": subject or None,
                 })
+
+    if is_detached:
+        branches.insert(0, {
+            "name": current,
+            "is_current": True,
+            "is_remote": False,
+            "upstream": None,
+            "ahead": 0,
+            "behind": 0,
+            "last_commit_sha": detached_sha,
+            "last_commit_date": None,
+            "last_commit_subject": None,
+        })
 
     # Fallback si for-each-ref est vide (dépôt vide ou sans commit)
     if not branches:
@@ -1248,7 +1273,15 @@ def git_push(req: PushRequest, _ = Depends(require_auth)):
     branch = req.branch.strip() if req.branch else None
     if not branch:
         res_br = run_git(["branch", "--show-current"], target)
-        branch = res_br.stdout.strip() or "main"
+        branch = res_br.stdout.strip()
+        if not branch:
+            res_head = run_git(["rev-parse", "--short=8", "HEAD"], target)
+            if res_head.returncode == 0 and res_head.stdout.strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Impossible d'effectuer le push en mode HEAD détaché. Spécifiez une branche explicitement."
+                )
+            branch = "main"
 
     if branch.startswith("-") or "--" in branch or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
         raise HTTPException(status_code=400, detail="Nom de branche Git invalide.")
@@ -1293,7 +1326,15 @@ def git_pull(req: PullRequest, _ = Depends(require_auth)):
     branch = req.branch.strip() if req.branch else None
     if not branch:
         res_br = run_git(["branch", "--show-current"], target)
-        branch = res_br.stdout.strip() or "main"
+        branch = res_br.stdout.strip()
+        if not branch:
+            res_head = run_git(["rev-parse", "--short=8", "HEAD"], target)
+            if res_head.returncode == 0 and res_head.stdout.strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Impossible d'effectuer le pull en mode HEAD détaché. Spécifiez une branche explicitement."
+                )
+            branch = "main"
 
     if branch.startswith("-") or "--" in branch or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
         raise HTTPException(status_code=400, detail="Nom de branche Git invalide.")

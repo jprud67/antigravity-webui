@@ -123,16 +123,34 @@ def get_local_version_info() -> dict[str, Any]:
     }
 
 
-def _recent_upstream_commits(n: int = 20) -> list[dict[str, Any]]:
+def _get_upstream_branch() -> tuple[str, str]:
     """
-    Returns commits the local checkout is behind origin/main by, newest first.
+    Returns (remote, branch_name), e.g. ('origin', 'main').
+    Detects the current branch and its configured remote tracking branch,
+    falling back to ('origin', 'main') if detached or untracked.
+    """
+    branch = _git_cmd(["branch", "--show-current"])
+    if not branch:
+        return ("origin", "main")
+    remote = _git_cmd(["config", f"branch.{branch}.remote"]) or "origin"
+    merge = _git_cmd(["config", f"branch.{branch}.merge"])
+    if merge and merge.startswith("refs/heads/"):
+        target_branch = merge[len("refs/heads/"):]
+    else:
+        target_branch = branch or "main"
+    return (remote, target_branch)
+
+
+def _recent_upstream_commits(n: int = 20, upstream_ref: str = "origin/main") -> list[dict[str, Any]]:
+    """
+    Returns commits the local checkout is behind upstream_ref by, newest first.
     Replicates Hermes' git log format (%H%x1f%s%x1f%an%x1f%ct).
     """
     raw = _git_cmd(
         [
             "log",
             "--format=%H%x1f%s%x1f%an%x1f%ct",
-            "HEAD..origin/main",
+            f"HEAD..{upstream_ref}",
             f"-n{int(n)}"
         ],
         timeout=8
@@ -275,13 +293,16 @@ def check_for_updates(force: bool = False) -> dict[str, Any]:
     }
 
     try:
+        remote, upstream_branch = _get_upstream_branch()
+        upstream_ref = f"{remote}/{upstream_branch}"
+
         # 1. Fetch des dernières références du dépôt distant
         fetch_env = {
             **os.environ,
             **_DEFAULT_GIT_ENV,
         }
         fetch_res = subprocess.run(
-            [GIT_BIN, "fetch", "origin", "main", "--quiet"],
+            [GIT_BIN, "fetch", remote, upstream_branch, "--quiet"],
             cwd=str(REPO_DIR),
             capture_output=True,
             text=True,
@@ -291,19 +312,19 @@ def check_for_updates(force: bool = False) -> dict[str, Any]:
         )  # nosec B603, B607
 
         if fetch_res.returncode != 0:
-            logger.warning(f"git fetch origin main failed: {fetch_res.stderr}")
+            logger.warning(f"git fetch {remote} {upstream_branch} failed: {fetch_res.stderr}")
             payload["message"] = "Impossible de joindre le dépôt GitHub distant. Vérifiez la connexion réseau."
             return payload
 
         # 2. Nombre de commits de retard
-        count_raw = _git_cmd(["rev-list", "--count", "HEAD..origin/main"], timeout=6)
+        count_raw = _git_cmd(["rev-list", "--count", f"HEAD..{upstream_ref}"], timeout=6)
         behind = int(count_raw) if count_raw and count_raw.isdigit() else 0
         payload["behind"] = behind
 
         if behind > 0:
             payload["update_available"] = True
-            payload["message"] = f"Mise à jour disponible : {behind} nouveau(x) commit(s) sur origin/main."
-            payload["commits"] = _recent_upstream_commits(n=30)
+            payload["message"] = f"Mise à jour disponible : {behind} nouveau(x) commit(s) sur {upstream_ref}."
+            payload["commits"] = _recent_upstream_commits(n=30, upstream_ref=upstream_ref)
         else:
             payload["message"] = "Vous disposez de la version la plus récente."
 
@@ -352,7 +373,8 @@ async def apply_update() -> dict[str, Any]:
     Applique la mise à jour : pull fast-forward, rebuild frontend,
     rollback automatique si le build échoue, puis redémarrage du service.
     """
-    logger.info("Applying Antigravity WebUI update from origin/main...")
+    remote, upstream_branch = _get_upstream_branch()
+    logger.info(f"Applying Antigravity WebUI update from {remote}/{upstream_branch}...")
 
     # 0. Marqueur anti-interruption
     _write_update_marker()
@@ -382,7 +404,7 @@ async def apply_update() -> dict[str, Any]:
         **_DEFAULT_GIT_ENV,
     }
     pull_proc = await asyncio.create_subprocess_exec(
-        GIT_BIN, *_DEFAULT_GIT_ARGS, "pull", "--ff-only", "origin", "main",
+        GIT_BIN, *_DEFAULT_GIT_ARGS, "pull", "--ff-only", remote, upstream_branch,
         cwd=str(REPO_DIR),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -407,9 +429,9 @@ async def apply_update() -> dict[str, Any]:
     if pull_proc.returncode != 0:
         err_msg = stderr.decode(errors="replace").strip()
         if "diverging" in err_msg.lower() or "not possible to fast-forward" in err_msg.lower():
-            logger.info("Divergence détectée, tentative de git pull --rebase origin main...")
+            logger.info(f"Divergence détectée, tentative de git pull --rebase {remote} {upstream_branch}...")
             rebase_proc = await asyncio.create_subprocess_exec(
-                GIT_BIN, *_DEFAULT_GIT_ARGS, "pull", "--rebase", "origin", "main",
+                GIT_BIN, *_DEFAULT_GIT_ARGS, "pull", "--rebase", remote, upstream_branch,
                 cwd=str(REPO_DIR),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

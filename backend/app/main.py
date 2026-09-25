@@ -177,6 +177,11 @@ if FRONTEND_DIST.is_dir():
                 headers = {}
                 if full_path.startswith("assets/"):
                     headers["Cache-Control"] = "public, max-age=31536000, immutable"
+                elif (
+                    full_path in ("sw.js", "manifest.json", "manifest.webmanifest", "locales.json")
+                    or full_path.endswith((".webmanifest", "/sw.js"))
+                ):
+                    headers = dict(no_cache_headers)
                 return FileResponse(file_candidate, headers=headers)
         except (ValueError, TypeError, OSError):
             pass

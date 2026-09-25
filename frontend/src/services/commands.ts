@@ -427,17 +427,6 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     color: 'text-pink-400',
     isAction: true
   },
-  {
-    cmd: '/workspace',
-    descKey: 'cmd_desc_workspace',
-    desc: 'Afficher ou basculer le répertoire de travail courant',
-    arg: '<chemin>',
-    category: 'system',
-    icon: Folder,
-    color: 'text-amber-400',
-    isAction: true
-  },
-
   // Conversation Management
   {
     cmd: '/clear',
@@ -458,8 +447,8 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     isAction: true
   },
   {
-    cmd: '/branch',
-    descKey: 'cmd_desc_branch',
+    cmd: '/fork',
+    descKey: 'cmd_desc_fork',
     desc: 'Créer une nouvelle branche (bifurcation) de cette session',
     category: 'action',
     icon: GitBranch,
