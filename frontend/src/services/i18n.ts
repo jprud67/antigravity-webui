@@ -2179,6 +2179,94 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     en: 'Worktrees detected',
     fr: 'Worktrees détectés',
   },
+  canvas_badge_sandbox: {
+    en: 'Sandboxed Document',
+    fr: 'Document Sandboxé',
+  },
+  canvas_template_chart: {
+    en: 'Chart.js Visualizer',
+    fr: 'Graphique Chart.js',
+  },
+  canvas_template_kpi: {
+    en: 'KPI Dashboard',
+    fr: 'Tableau de Bord KPI',
+  },
+  canvas_template_table: {
+    en: 'Filterable Table',
+    fr: 'Tableau Filtrable',
+  },
+  vector_clear_all: {
+    en: 'Clear all memories',
+    fr: 'Effacer tous les souvenirs',
+  },
+  vector_config_desc: {
+    en: 'Controls filtering, similarity thresholds and embeddings model',
+    fr: 'Contrôle le filtrage, les seuils de similarité et le modèle d\'embeddings',
+  },
+  vector_config_saved: {
+    en: 'Configuration Saved!',
+    fr: 'Configuration Enregistrée !',
+  },
+  vector_config_title: {
+    en: 'Auto-Recall Hook Configuration',
+    fr: 'Configuration du Hook Auto-Recall',
+  },
+  vector_embedding_model: {
+    en: 'Embedding Model',
+    fr: 'Modèle d\'embedding',
+  },
+  vector_embedding_provider: {
+    en: 'Embeddings Engine',
+    fr: 'Moteur d\'Embeddings',
+  },
+  vector_enable_auto_recall: {
+    en: 'Enable Automatic Auto-Recall',
+    fr: 'Activer l\'Auto-Recall automatique',
+  },
+  vector_enable_auto_recall_desc: {
+    en: 'Injects relevant memories before each LLM prompt',
+    fr: 'Injecte les souvenirs pertinents avant chaque prompt LLM',
+  },
+  vector_engine_badge: {
+    en: 'Vector Engine',
+    fr: 'Moteur Vectoriel',
+  },
+  vector_max_chars: {
+    en: 'Max length of injected block',
+    fr: 'Longueur max du bloc injecté',
+  },
+  vector_max_results: {
+    en: 'Max memories injected (Top-K)',
+    fr: 'Max souvenirs réinjectés (Top-K)',
+  },
+  vector_min_similarity: {
+    en: 'Minimum similarity threshold',
+    fr: 'Seuil de similarité minimale',
+  },
+  vector_sim_btn: {
+    en: 'Test',
+    fr: 'Tester',
+  },
+  vector_sim_desc: {
+    en: 'Test how the hook analyzes a prompt and injects memories',
+    fr: 'Testez comment le hook analyse un prompt et injecte les souvenirs',
+  },
+  vector_sim_no_injection: {
+    en: 'The hook did not inject context (trivial prompt or below threshold).',
+    fr: 'Le hook n\'a pas injecté de contexte (prompt trivial ou score inférieur au seuil).',
+  },
+  vector_sim_placeholder: {
+    en: 'Enter a test prompt...',
+    fr: 'Entrez un prompt de test...',
+  },
+  vector_sim_testing: {
+    en: 'Calculating...',
+    fr: 'Calcul...',
+  },
+  vector_xml_block: {
+    en: 'XML BLOCK INJECTED INTO SYSTEM:',
+    fr: 'BLOC XML INJECTÉ DANS LE SYSTÈME :',
+  },
 };
 
 const STORAGE_KEY = 'antigravity-lang';
@@ -2186,7 +2274,7 @@ const LISTENERS = new Set<(lang: string) => void>();
 
 function detectInitialLocale(): string {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('hermes-lang');
+    const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && SUPPORTED_LANGUAGES.some((l) => l.code === saved)) return saved;
 
     const nav = navigator.language || '';
@@ -2210,7 +2298,6 @@ export function setLanguage(lang: string) {
   currentLanguage = resolved;
   try {
     localStorage.setItem(STORAGE_KEY, resolved);
-    localStorage.setItem('hermes-lang', resolved);
   } catch {}
   document.documentElement.lang = resolved;
   LISTENERS.forEach((fn) => fn(resolved));
