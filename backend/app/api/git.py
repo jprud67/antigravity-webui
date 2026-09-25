@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -1055,8 +1056,6 @@ def get_rebase_status(workspace: str | None = Query(None), _ = Depends(require_a
 
 @router.post("/rebase/execute")
 def execute_rebase(req: RebaseExecuteRequest, _ = Depends(require_auth)):
-    import json
-    import os as _os
     target = _validate_workspace(req.workspace)
     clean_base = req.base.strip()
     if clean_base.startswith("-") or "--" in clean_base or not re.match(r'^[a-zA-Z0-9_\-\./~^]+$', clean_base):
@@ -1100,7 +1099,7 @@ def execute_rebase(req: RebaseExecuteRequest, _ = Depends(require_auth)):
     helper_script = str(REBASE_HELPER_PATH)
     cfg_str = str(config_file)
 
-    git_env = _os.environ.copy()
+    git_env = os.environ.copy()
     git_env["GIT_TERMINAL_PROMPT"] = "0"
     git_env["GIT_SEQUENCE_EDITOR"] = f'"{python_bin}" "{helper_script}" sequence "{cfg_str}"'
     git_env["GIT_EDITOR"] = f'"{python_bin}" "{helper_script}" editor "{cfg_str}"'
@@ -1140,7 +1139,6 @@ def execute_rebase(req: RebaseExecuteRequest, _ = Depends(require_auth)):
 
 @router.post("/rebase/continue")
 def continue_rebase(req: RebaseActionRequest, _ = Depends(require_auth)):
-    import os as _os
     target = _validate_workspace(req.workspace)
     config_file = target / ".git" / "antigravity_rebase_config.json"
     
@@ -1148,7 +1146,7 @@ def continue_rebase(req: RebaseActionRequest, _ = Depends(require_auth)):
     helper_script = str(REBASE_HELPER_PATH)
     cfg_str = str(config_file)
 
-    git_env = _os.environ.copy()
+    git_env = os.environ.copy()
     git_env["GIT_TERMINAL_PROMPT"] = "0"
     git_env["GIT_EDITOR"] = f'"{python_bin}" "{helper_script}" editor "{cfg_str}"'
 
@@ -1267,7 +1265,6 @@ class PushRequest(BaseModel):
 
 @router.post("/push")
 def git_push(req: PushRequest, _ = Depends(require_auth)):
-    import os as _os
     target = _validate_workspace(req.workspace)
     remote = req.remote.strip() if req.remote else "origin"
     if remote.startswith("-") or "--" in remote or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote):
@@ -1292,7 +1289,7 @@ def git_push(req: PushRequest, _ = Depends(require_auth)):
     # Préparer l'environnement avec désactivation du prompt interactif
     # Le token peut être injecté via GIT_TOKEN dans l'environnement du serveur,
     # ou le remote peut être préconfiguré avec le token dans son URL.
-    git_env = _os.environ.copy()
+    git_env = os.environ.copy()
     git_env["GIT_TERMINAL_PROMPT"] = "0"  # Désactive tout prompt interactif git
 
     push_res = run_git(["push", remote, branch], target, timeout=35, env=git_env)
@@ -1320,7 +1317,6 @@ class PullRequest(BaseModel):
 
 @router.post("/pull")
 def git_pull(req: PullRequest, _ = Depends(require_auth)):
-    import os as _os
     target = _validate_workspace(req.workspace)
     remote = req.remote.strip() if req.remote else "origin"
     if remote.startswith("-") or "--" in remote or not re.match(r'^[a-zA-Z0-9_\-\./]+$', remote):
@@ -1342,7 +1338,7 @@ def git_pull(req: PullRequest, _ = Depends(require_auth)):
     if branch.startswith("-") or "--" in branch or not re.match(r'^[a-zA-Z0-9_\-\./]+$', branch):
         raise HTTPException(status_code=400, detail="Nom de branche Git invalide.")
 
-    git_env = _os.environ.copy()
+    git_env = os.environ.copy()
     git_env["GIT_TERMINAL_PROMPT"] = "0"
 
     pull_args = ["pull"]
@@ -1384,7 +1380,6 @@ class TagRequest(BaseModel):
 
 @router.post("/tag")
 def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
-    import os as _os
     target = _validate_workspace(req.workspace)
     tag_name = req.tag.strip()
     if not tag_name:
@@ -1411,7 +1406,7 @@ def create_git_tag(req: TagRequest, _ = Depends(require_auth)):
 
     push_output = None
     if req.push:
-        git_env = _os.environ.copy()
+        git_env = os.environ.copy()
         git_env["GIT_TERMINAL_PROMPT"] = "0"
         push_res = run_git(["push", remote, tag_name], target, timeout=35, env=git_env)
         if push_res.returncode != 0:
@@ -2223,9 +2218,12 @@ def create_tag(
         run_git(["push", rem_clean, tag_name], target, timeout=30)
 
     res_commit = run_git(["rev-parse", target_commit], target)
-    c_sha = res_commit.stdout.strip()
-    c_date_res = run_git(["log", "-1", "--format=%cd|%s", "--date=iso8601", c_sha], target)
-    c_date, c_msg = c_date_res.stdout.strip().split("|", 1) if "|" in c_date_res.stdout else ("", "")
+    c_sha = res_commit.stdout.strip() if res_commit.returncode == 0 else ""
+    c_date, c_msg = "", ""
+    if c_sha:
+        c_date_res = run_git(["log", "-1", "--format=%cd|%s", "--date=iso8601", c_sha], target)
+        if c_date_res.returncode == 0 and "|" in c_date_res.stdout:
+            c_date, c_msg = c_date_res.stdout.strip().split("|", 1)
 
     return GitTagDetail(
         name=tag_name,
@@ -2445,7 +2443,13 @@ def publish_release(
         if commitish:
             args.extend(["--target", commitish])
         try:
-            res = subprocess.run(args, cwd=str(target), capture_output=True, text=True, timeout=15)
+            gh_env = {
+                **os.environ,
+                "GH_PROMPT_DISABLED": "1",
+                "GIT_TERMINAL_PROMPT": "0",
+                "NO_COLOR": "1",
+            }
+            res = subprocess.run(args, cwd=str(target), capture_output=True, text=True, timeout=15, env=gh_env)
             if res.returncode == 0:
                 created_url = res.stdout.strip()
                 return PublishReleaseResponse(

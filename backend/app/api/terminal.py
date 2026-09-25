@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import hashlib
 import json
 import logging
@@ -10,6 +11,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 
@@ -468,8 +470,6 @@ async def terminal_websocket(
             if sp_clean.startswith("token."):
                 raw_token = sp_clean[6:]
                 if not effective_token:
-                    import base64
-                    from urllib.parse import unquote
                     try:
                         clean_unquoted = unquote(raw_token).strip()
                         rem = len(clean_unquoted) % 4

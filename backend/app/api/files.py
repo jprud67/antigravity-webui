@@ -1,12 +1,15 @@
 import fnmatch
 import logging
+import mimetypes
 import os
 import re
 import shutil
 import time
+import unicodedata
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -139,8 +142,6 @@ def _validate_path_access(file_path: Path | str, base_dir: Path | str | None = N
             logger.debug(f"Ignored error with candidate base_dir: {e}")
 
     try:
-        import unicodedata
-        from urllib.parse import unquote
         p_str = str(file_path).strip()
         for _ in range(3):
             next_p = unquote(p_str)
@@ -287,14 +288,12 @@ def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):
                 break
             except (PermissionError, OSError):
                 if attempt == 2:
-                    import shutil
                     try:
                         shutil.copy2(tmp_target, resolved_path)
                     finally:
                         tmp_target.unlink(missing_ok=True)
                     tmp_path = None
                     break
-                import time
                 time.sleep(0.05)
         stat = resolved_path.stat()
         return {
@@ -408,7 +407,6 @@ def rename_file_or_dir(req: RenameFileRequest, _ = Depends(require_auth)):
 
     try:
         new_p.parent.mkdir(parents=True, exist_ok=True)
-        import shutil
         shutil.move(str(old_p), str(new_p))
         return {
             "success": True,
@@ -449,7 +447,6 @@ def delete_file_or_dir(req: DeleteFileRequest, _ = Depends(require_auth)):
         raise HTTPException(status_code=403, detail="Interdiction formelle de supprimer la racine du projet.")
 
     try:
-        import shutil
         is_dir = target.is_dir()
         if is_dir:
             shutil.rmtree(target)
@@ -564,7 +561,6 @@ def search_files(
 
 @router.get("/download")
 def download_file(path: str = Query(...), workspace: str | None = Query(None), _ = Depends(require_auth)):
-    import mimetypes
     resolved_path = _validate_path_access(path, base_dir=workspace)
     if not resolved_path.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
