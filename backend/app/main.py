@@ -136,10 +136,19 @@ app.include_router(copilot_router)
 def health_check():
     return {"status": "ok", "service": "antigravity-webui"}
 
+class CacheStaticFiles(StaticFiles):
+    """Serveur statique ajoutant des en-têtes de cache long-terme pour les assets immuables Vite."""
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 # Frontend SPA serving
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 if (FRONTEND_DIST / "assets").is_dir():
-    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+    app.mount("/assets", CacheStaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 
 if FRONTEND_DIST.is_dir():
     @app.api_route("/{full_path:path}", methods=["GET", "HEAD"])

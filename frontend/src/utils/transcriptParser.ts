@@ -136,10 +136,15 @@ export function cleanUserPrompt(raw: any): string {
  */
 export function isToolOutputContent(content: any): boolean {
   if (!content) return false;
-  // Éviter de cloner / trimmer des chaînes géantes (ex. outputs multi-Mo)
-  const c = typeof content === 'string'
-    ? (content.length > 200 ? content.slice(0, 100).trimStart() : content.trim())
-    : (typeof content === 'object' ? JSON.stringify(content) : String(content).trim());
+  let c = '';
+  if (typeof content === 'string') {
+    const trimmedStart = content.trimStart();
+    c = trimmedStart.length > 250 ? trimmedStart.slice(0, 250) : trimmedStart;
+  } else if (typeof content === 'object') {
+    c = JSON.stringify(content);
+  } else {
+    c = String(content).trim();
+  }
 
   return (
     c.startsWith('Created At:') ||

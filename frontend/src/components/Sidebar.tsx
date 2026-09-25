@@ -46,19 +46,28 @@ import { showConfirm } from '../services/dialog';
 import { QuickThemePopover } from './QuickThemePopover';
 
 function parseSafeDate(dateVal: any): Date {
-  if (!dateVal) return new Date();
-  if (typeof dateVal === 'number') {
-    return new Date(dateVal < 10000000000 ? dateVal * 1000 : dateVal);
-  }
-  if (typeof dateVal === 'string') {
-    const s = dateVal.trim();
-    if (/^\d+$/.test(s)) {
-      const n = parseInt(s, 10);
-      return new Date(n < 10000000000 ? n * 1000 : n);
+  if (!dateVal) return new Date(0);
+  try {
+    if (typeof dateVal === 'number') {
+      const d = new Date(dateVal < 10000000000 ? dateVal * 1000 : dateVal);
+      return isNaN(d.getTime()) ? new Date(0) : d;
     }
-    return new Date(s.replace(' ', 'T'));
+    if (typeof dateVal === 'string') {
+      const s = dateVal.trim();
+      if (!s) return new Date(0);
+      if (/^\d+(\.\d+)?$/.test(s)) {
+        const n = parseFloat(s);
+        const d = new Date(n < 10000000000 ? n * 1000 : n);
+        return isNaN(d.getTime()) ? new Date(0) : d;
+      }
+      const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
+      return isNaN(d.getTime()) ? new Date(0) : d;
+    }
+    const d = new Date(dateVal);
+    return isNaN(d.getTime()) ? new Date(0) : d;
+  } catch {
+    return new Date(0);
   }
-  return new Date(dateVal);
 }
 
 export interface SavedFilterView {

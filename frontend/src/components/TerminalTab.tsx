@@ -524,6 +524,9 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
     if (entry) {
       if (entry.ws) {
         try {
+          entry.ws.onclose = null;
+          entry.ws.onerror = null;
+          entry.ws.onmessage = null;
           entry.ws.close();
         } catch {}
       }

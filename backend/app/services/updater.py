@@ -32,7 +32,14 @@ from pathlib import Path
 from typing import Any
 
 from app.config import GEMINI_DIR
-from app.platform_utils import IS_MACOS, IS_WINDOWS, npm_argv, platform_name
+from app.platform_utils import (
+    IS_MACOS,
+    IS_WINDOWS,
+    npm_argv,
+    platform_name,
+    spawn_group_kwargs,
+    terminate_process_group_async,
+)
 
 logger = logging.getLogger("antigravity.updater")
 
@@ -379,15 +386,16 @@ async def apply_update() -> dict[str, Any]:
         cwd=str(REPO_DIR),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        env=git_env
+        env=git_env,
+        **spawn_group_kwargs()
     )  # nosec B603, B607
     try:
         stdout, stderr = await asyncio.wait_for(pull_proc.communicate(), timeout=45.0)
     except asyncio.TimeoutError:
         try:
-            pull_proc.kill()
-        except OSError as e:
-            logger.debug(f"Failed to kill timed out pull process: {e}")
+            await terminate_process_group_async(pull_proc, grace=0.5)
+        except Exception as e:
+            logger.debug(f"Failed to terminate timed out pull process group: {e}")
         _clear_update_marker()
         logger.error("git pull --ff-only timed out after 45s.")
         return {
@@ -405,15 +413,16 @@ async def apply_update() -> dict[str, Any]:
                 cwd=str(REPO_DIR),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=git_env
+                env=git_env,
+                **spawn_group_kwargs()
             )  # nosec B603, B607
             try:
                 r_out, r_err = await asyncio.wait_for(rebase_proc.communicate(), timeout=45.0)
             except asyncio.TimeoutError:
                 try:
-                    rebase_proc.kill()
-                except OSError as e:
-                    logger.debug(f"Failed to kill timed out rebase process: {e}")
+                    await terminate_process_group_async(rebase_proc, grace=0.5)
+                except Exception as e:
+                    logger.debug(f"Failed to terminate timed out rebase process group: {e}")
                 _git_cmd(["rebase", "--abort"])
                 _clear_update_marker()
                 logger.error("git pull --rebase timed out after 45s.")

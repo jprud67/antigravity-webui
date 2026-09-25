@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import sqlite3
+import stat
 import sys
 import threading
 import time
@@ -1621,7 +1622,7 @@ def _safe_rmtree(dir_path: Path, root_boundary: Path) -> None:
         if resolved.exists() and resolved.is_relative_to(root_resolved) and resolved != root_resolved:
             def _remove_readonly(func, path, exc=None):
                 try:
-                    os.chmod(path, 0o777)
+                    os.chmod(path, stat.S_IRWXU)
                     func(path)
                 except Exception:
                     pass
@@ -2023,7 +2024,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                         for cid in chunk:
                             if cid not in seen_ids:
                                 meta = all_meta.get(cid, {})
-                                conv = get_conversation_by_id(cid)
+                                conv = get_conversation_by_id(cid, conn=conn)
                                 if conv:
                                     c_item = dict(conv)
                                     c_item["match_type"] = "metadata"
