@@ -4,9 +4,10 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import unicodedata
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -1323,14 +1324,6 @@ def git_pull(req: PullRequest, _ = Depends(require_auth)):
     }
 
 
-@router.get("/tags")
-def get_git_tags(workspace: str | None = Query(None), _ = Depends(require_auth)):
-    target = _validate_workspace(workspace)
-    res = run_git(["tag", "-l", "--sort=-v:refname"], target)
-    if res.returncode != 0:
-        return {"tags": []}
-    tags = [line.strip() for line in res.stdout.strip().split("\n") if line.strip()]
-    return {"tags": tags}
 
 
 class TagRequest(BaseModel):
@@ -1792,3 +1785,551 @@ def continue_cherry_pick(
             detail=f"Erreur lors de la poursuite du cherry-pick : {_mask_git_output(res.stderr.strip() or res.stdout.strip())}"
         )
     return {"status": "continued", "message": "Cherry-pick continué avec succès."}
+
+
+# -------------------------------------------------------------
+# Sprint 19: Git Remote Manager & Interactive Tag Publisher
+# -------------------------------------------------------------
+
+class GitRemoteDetail(BaseModel):
+    name: str
+    fetch_url: str
+    push_url: str
+    is_default: bool = False
+    branches: list[str] = []
+
+
+class CreateRemoteRequest(BaseModel):
+    name: str
+    url: str
+    workspace: str | None = None
+
+
+class UpdateRemoteRequest(BaseModel):
+    new_name: str | None = None
+    new_url: str | None = None
+    workspace: str | None = None
+
+
+class RemoteActionRequest(BaseModel):
+    branch: str | None = None
+    set_upstream: bool = False
+    prune: bool = True
+    workspace: str | None = None
+
+
+class GitTagDetail(BaseModel):
+    name: str
+    commit_sha: str
+    commit_short_sha: str
+    commit_date: str
+    commit_message: str
+    is_annotated: bool
+    tagger_name: str | None = None
+    tagger_date: str | None = None
+    tag_message: str | None = None
+
+
+class CreateTagRequest(BaseModel):
+    name: str
+    target_commit: str = "HEAD"
+    message: str | None = None
+    push_remote: str | None = None
+    workspace: str | None = None
+
+
+class DeleteTagRequest(BaseModel):
+    delete_remote: bool = False
+    remote_name: str = "origin"
+    workspace: str | None = None
+
+
+class ReleaseNotesResponse(BaseModel):
+    tag: str
+    from_tag: str | None = None
+    commits_count: int
+    notes_markdown: str
+    suggested_title: str
+
+
+class PublishReleaseRequest(BaseModel):
+    tag: str
+    title: str
+    body: str
+    draft: bool = False
+    prerelease: bool = False
+    target_commitish: str | None = None
+    workspace: str | None = None
+
+
+class PublishReleaseResponse(BaseModel):
+    success: bool
+    method: str  # "gh_cli" | "web_url"
+    url: str | None = None
+    output: str | None = None
+
+
+@router.get("/remotes", response_model=list[GitRemoteDetail])
+def get_remotes(
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    res = run_git(["remote", "-v"], target)
+    remotes_map: dict[str, dict[str, str]] = {}
+    for line in res.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) >= 3:
+            name = parts[0]
+            url = parts[1]
+            url_type = parts[2].strip("()")
+            if name not in remotes_map:
+                remotes_map[name] = {"fetch": "", "push": ""}
+            if url_type == "fetch":
+                remotes_map[name]["fetch"] = url
+            elif url_type == "push":
+                remotes_map[name]["push"] = url
+
+    branches_res = run_git(["branch", "-r"], target)
+    remote_branches_map: dict[str, list[str]] = {}
+    for line in branches_res.stdout.splitlines():
+        b = line.strip()
+        if not b or "->" in b:
+            continue
+        if "/" in b:
+            r_name, r_branch = b.split("/", 1)
+            remote_branches_map.setdefault(r_name, []).append(r_branch)
+
+    out: list[GitRemoteDetail] = []
+    for name, urls in remotes_map.items():
+        fetch_url = urls.get("fetch") or urls.get("push") or ""
+        push_url = urls.get("push") or urls.get("fetch") or ""
+        out.append(GitRemoteDetail(
+            name=name,
+            fetch_url=fetch_url,
+            push_url=push_url,
+            is_default=(name == "origin"),
+            branches=remote_branches_map.get(name, [])
+        ))
+    out.sort(key=lambda r: (0 if r.is_default else 1, r.name.lower()))
+    return out
+
+
+@router.post("/remotes", response_model=GitRemoteDetail)
+def create_remote(
+    req: CreateRemoteRequest,
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(req.workspace)
+    clean_name = req.name.strip()
+    if not re.match(r"^[a-zA-Z0-9._-]+$", clean_name):
+        raise HTTPException(status_code=400, detail="Nom de remote invalide (caractères alphanumériques, '.', '-', '_' uniquement).")
+    clean_url = req.url.strip()
+    if not clean_url:
+        raise HTTPException(status_code=400, detail="URL de remote obligatoire.")
+
+    res = run_git(["remote", "add", clean_name, clean_url], target)
+    if res.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Erreur lors de l'ajout du remote : {_mask_git_output(res.stderr or res.stdout)}")
+
+    return GitRemoteDetail(
+        name=clean_name,
+        fetch_url=clean_url,
+        push_url=clean_url,
+        is_default=(clean_name == "origin"),
+        branches=[]
+    )
+
+
+@router.put("/remotes/{name}", response_model=GitRemoteDetail)
+def update_remote(
+    name: str,
+    req: UpdateRemoteRequest,
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(req.workspace)
+    current_name = name.strip()
+    final_name = current_name
+    if req.new_name and req.new_name.strip() != current_name:
+        new_name_clean = req.new_name.strip()
+        if not re.match(r"^[a-zA-Z0-9._-]+$", new_name_clean):
+            raise HTTPException(status_code=400, detail="Nouveau nom de remote invalide.")
+        res_rename = run_git(["remote", "rename", current_name, new_name_clean], target)
+        if res_rename.returncode != 0:
+            raise HTTPException(status_code=400, detail=f"Erreur renommage remote : {_mask_git_output(res_rename.stderr or res_rename.stdout)}")
+        final_name = new_name_clean
+
+    if req.new_url and req.new_url.strip():
+        new_url_clean = req.new_url.strip()
+        res_url = run_git(["remote", "set-url", final_name, new_url_clean], target)
+        if res_url.returncode != 0:
+            raise HTTPException(status_code=400, detail=f"Erreur modification URL remote : {_mask_git_output(res_url.stderr or res_url.stdout)}")
+
+    res_v = run_git(["remote", "-v"], target)
+    fetch_u = ""
+    push_u = ""
+    for line in res_v.stdout.splitlines():
+        parts = line.strip().split()
+        if len(parts) >= 3 and parts[0] == final_name:
+            if "fetch" in parts[2]:
+                fetch_u = parts[1]
+            elif "push" in parts[2]:
+                push_u = parts[1]
+
+    return GitRemoteDetail(
+        name=final_name,
+        fetch_url=fetch_u or push_u or (req.new_url or ""),
+        push_url=push_u or fetch_u or (req.new_url or ""),
+        is_default=(final_name == "origin")
+    )
+
+
+@router.delete("/remotes/{name}")
+def delete_remote(
+    name: str,
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    res = run_git(["remote", "remove", name.strip()], target)
+    if res.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Erreur suppression remote : {_mask_git_output(res.stderr or res.stdout)}")
+    return {"success": True, "message": f"Remote {name} supprimé avec succès."}
+
+
+@router.post("/remotes/{name}/test")
+def test_remote_connection(
+    name: str,
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    start = time.perf_counter()
+    res = run_git(["ls-remote", "--heads", name.strip()], target, timeout=10)
+    latency_ms = int((time.perf_counter() - start) * 1000)
+    if res.returncode == 0:
+        return {
+            "success": True,
+            "latency_ms": latency_ms,
+            "output": res.stdout[:500] or "Connexion réussie."
+        }
+    else:
+        return {
+            "success": False,
+            "latency_ms": latency_ms,
+            "output": _mask_git_output(res.stderr[:500] or res.stdout[:500] or "Inaccessible")
+        }
+
+
+@router.post("/remotes/{name}/fetch")
+def fetch_remote(
+    name: str,
+    req: RemoteActionRequest = None,
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    ws = req.workspace if req else workspace
+    target = _validate_workspace(ws)
+    args = ["fetch", name.strip()]
+    if req and req.prune:
+        args.append("--prune")
+    res = run_git(args, target, timeout=30)
+    if res.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Erreur git fetch : {_mask_git_output(res.stderr or res.stdout)}")
+    return {"success": True, "output": res.stdout or res.stderr or "Fetch terminé avec succès."}
+
+
+@router.post("/remotes/{name}/push")
+def push_remote(
+    name: str,
+    req: RemoteActionRequest = None,
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    ws = req.workspace if req else workspace
+    target = _validate_workspace(ws)
+    branch = req.branch if (req and req.branch) else ""
+    if not branch:
+        res_br = run_git(["rev-parse", "--abbrev-ref", "HEAD"], target)
+        branch = res_br.stdout.strip() or "main"
+    args = ["push", name.strip(), branch]
+    if req and req.set_upstream:
+        args.append("-u")
+    res = run_git(args, target, timeout=30)
+    if res.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Erreur git push : {_mask_git_output(res.stderr or res.stdout)}")
+    return {"success": True, "output": res.stdout or res.stderr or "Push terminé avec succès."}
+
+
+@router.get("/tags", response_model=list[GitTagDetail])
+def get_tags(
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    fmt = "%(refname:strip=2)%09%(objectname)%09%(*objectname)%09%(creatordate:iso8601)%09%(*creatordate:iso8601)%09%(contents:subject)%09%(subject)%09%(taggername)"
+    res = run_git(["for-each-ref", "refs/tags", f"--format={fmt}", "--sort=-creatordate"], target)
+    out: list[GitTagDetail] = []
+    for line in res.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("\t")
+        while len(parts) < 8:
+            parts.append("")
+        tag_name, obj_sha, deref_sha, creator_date, deref_date, contents_subj, subj, tagger = parts
+        is_annotated = bool(deref_sha.strip())
+        commit_sha = deref_sha.strip() if is_annotated else obj_sha.strip()
+        commit_short = commit_sha[:7] if commit_sha else ""
+        commit_date = deref_date.strip() if is_annotated else creator_date.strip()
+        tag_msg = (contents_subj or subj).strip() if is_annotated else None
+
+        commit_msg = ""
+        if commit_sha:
+            c_res = run_git(["log", "-1", "--format=%s", commit_sha], target)
+            commit_msg = c_res.stdout.strip()
+
+        out.append(GitTagDetail(
+            name=tag_name,
+            commit_sha=commit_sha,
+            commit_short_sha=commit_short,
+            commit_date=commit_date,
+            commit_message=commit_msg,
+            is_annotated=is_annotated,
+            tagger_name=tagger.strip() if tagger.strip() else None,
+            tagger_date=creator_date.strip() if is_annotated else None,
+            tag_message=tag_msg
+        ))
+    return out
+
+
+@router.post("/tags", response_model=GitTagDetail)
+def create_tag(
+    req: CreateTagRequest,
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(req.workspace)
+    tag_name = req.name.strip()
+    if not re.match(r"^[a-zA-Z0-9._/-]+$", tag_name):
+        raise HTTPException(status_code=400, detail="Nom de tag invalide.")
+    target_commit = (req.target_commit or "HEAD").strip()
+
+    args = ["tag"]
+    is_annotated = False
+    if req.message and req.message.strip():
+        is_annotated = True
+        args.extend(["-a", tag_name, "-m", req.message.strip(), target_commit])
+    else:
+        args.extend([tag_name, target_commit])
+
+    res = run_git(args, target)
+    if res.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Erreur création tag : {_mask_git_output(res.stderr or res.stdout)}")
+
+    if req.push_remote:
+        remote_name = req.push_remote.strip()
+        run_git(["push", remote_name, tag_name], target, timeout=30)
+
+    res_commit = run_git(["rev-parse", target_commit], target)
+    c_sha = res_commit.stdout.strip()
+    c_date_res = run_git(["log", "-1", "--format=%cd|%s", "--date=iso8601", c_sha], target)
+    c_date, c_msg = c_date_res.stdout.strip().split("|", 1) if "|" in c_date_res.stdout else ("", "")
+
+    return GitTagDetail(
+        name=tag_name,
+        commit_sha=c_sha,
+        commit_short_sha=c_sha[:7],
+        commit_date=c_date,
+        commit_message=c_msg,
+        is_annotated=is_annotated,
+        tag_message=req.message.strip() if is_annotated else None
+    )
+
+
+@router.delete("/tags/{name}")
+def delete_tag(
+    name: str,
+    delete_remote: bool = Query(False),
+    remote_name: str = Query("origin"),
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    tag_name = name.strip()
+    res = run_git(["tag", "-d", tag_name], target)
+    if res.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Erreur suppression tag local : {_mask_git_output(res.stderr or res.stdout)}")
+    if delete_remote:
+        run_git(["push", remote_name.strip(), "--delete", tag_name], target, timeout=30)
+    return {"success": True, "message": f"Tag {tag_name} supprimé avec succès."}
+
+
+@router.post("/tags/{name}/push")
+def push_tag(
+    name: str,
+    remote: str = Query("origin"),
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    res = run_git(["push", remote.strip(), name.strip()], target, timeout=30)
+    if res.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Erreur push tag : {_mask_git_output(res.stderr or res.stdout)}")
+    return {"success": True, "output": res.stdout or res.stderr or "Tag poussé avec succès."}
+
+
+@router.post("/tags/push-all")
+def push_all_tags(
+    remote: str = Query("origin"),
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    res = run_git(["push", remote.strip(), "--tags"], target, timeout=30)
+    if res.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"Erreur push --tags : {_mask_git_output(res.stderr or res.stdout)}")
+    return {"success": True, "output": res.stdout or res.stderr or "Tous les tags ont été poussés avec succès."}
+
+
+@router.get("/releases/notes", response_model=ReleaseNotesResponse)
+def get_release_notes(
+    tag: str = Query(...),
+    from_tag: str | None = Query(None),
+    workspace: str | None = Query(None),
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(workspace)
+    current_tag = tag.strip()
+    prev_tag = from_tag.strip() if from_tag else None
+    if not prev_tag:
+        res_prev = run_git(["describe", "--tags", "--abbrev=0", f"{current_tag}^"], target)
+        if res_prev.returncode == 0 and res_prev.stdout.strip():
+            prev_tag = res_prev.stdout.strip()
+
+    log_range = f"{prev_tag}..{current_tag}" if prev_tag else current_tag
+    res_log = run_git(["log", log_range, "--pretty=format:%H|%h|%an|%s"], target)
+
+    features = []
+    fixes = []
+    perf = []
+    refactor = []
+    docs = []
+    chores = []
+
+    commits_count = 0
+    for line in res_log.stdout.splitlines():
+        line = line.strip()
+        if not line or "|" not in line:
+            continue
+        commits_count += 1
+        parts = line.split("|", 3)
+        sha = parts[0]
+        short_sha = parts[1]
+        author = parts[2]
+        subject = parts[3]
+
+        item = f"- {subject} (`{short_sha}` par {author})"
+        subj_lower = subject.lower()
+        if subj_lower.startswith("feat"):
+            features.append(item)
+        elif subj_lower.startswith("fix"):
+            fixes.append(item)
+        elif subj_lower.startswith("perf"):
+            perf.append(item)
+        elif subj_lower.startswith("refactor"):
+            refactor.append(item)
+        elif subj_lower.startswith("docs"):
+            docs.append(item)
+        else:
+            chores.append(item)
+
+    md_sections = [f"## Release {current_tag}\n"]
+    if prev_tag:
+        md_sections.append(f"*Changelog des modifications depuis `{prev_tag}`*\n")
+
+    if features:
+        md_sections.append("### 🚀 Nouvelles Fonctionnalités\n" + "\n".join(features) + "\n")
+    if fixes:
+        md_sections.append("### 🐛 Corrections de Bugs\n" + "\n".join(fixes) + "\n")
+    if perf:
+        md_sections.append("### ⚡ Performances\n" + "\n".join(perf) + "\n")
+    if refactor:
+        md_sections.append("### ♻️ Refactorisation\n" + "\n".join(refactor) + "\n")
+    if docs:
+        md_sections.append("### 📚 Documentation\n" + "\n".join(docs) + "\n")
+    if chores:
+        md_sections.append("### 🔧 Maintenance & Tâches\n" + "\n".join(chores) + "\n")
+
+    if commits_count == 0:
+        md_sections.append("*Aucun commit spécifique trouvé pour cette plage.*")
+
+    return ReleaseNotesResponse(
+        tag=current_tag,
+        from_tag=prev_tag,
+        commits_count=commits_count,
+        notes_markdown="\n".join(md_sections).strip(),
+        suggested_title=f"Release {current_tag}"
+    )
+
+
+@router.post("/releases/publish", response_model=PublishReleaseResponse)
+def publish_release(
+    req: PublishReleaseRequest,
+    _ = Depends(require_auth)
+):
+    target = _validate_workspace(req.workspace)
+    gh_bin = shutil.which("gh")
+    if gh_bin:
+        args = [gh_bin, "release", "create", req.tag, "--title", req.title, "--notes", req.body]
+        if req.draft:
+            args.append("--draft")
+        if req.prerelease:
+            args.append("--prerelease")
+        if req.target_commitish:
+            args.extend(["--target", req.target_commitish])
+        try:
+            res = subprocess.run(args, cwd=target, capture_output=True, text=True, timeout=15)
+            if res.returncode == 0:
+                created_url = res.stdout.strip()
+                return PublishReleaseResponse(
+                    success=True,
+                    method="gh_cli",
+                    url=created_url,
+                    output="Release publiée avec succès via GitHub CLI."
+                )
+        except Exception as e:
+            logger.debug(f"gh release create fallback: {e}")
+
+    # Fallback to web URL
+    res_remote = run_git(["remote", "get-url", "origin"], target)
+    origin_url = res_remote.stdout.strip()
+    owner_repo = ""
+    match = re.search(r"github\.com[:/]([^/]+)/(.+?)(?:\.git)?$", origin_url)
+    if match:
+        owner_repo = f"{match.group(1)}/{match.group(2)}"
+
+    if owner_repo:
+        params = {
+            "tag": req.tag,
+            "title": req.title,
+            "body": req.body,
+            "prerelease": "1" if req.prerelease else "0"
+        }
+        web_url = f"https://github.com/{owner_repo}/releases/new?{urlencode(params)}"
+        return PublishReleaseResponse(
+            success=True,
+            method="web_url",
+            url=web_url,
+            output="URL de création de release GitHub générée."
+        )
+
+    return PublishReleaseResponse(
+        success=True,
+        method="web_url",
+        url=None,
+        output="Aucun remote GitHub détecté pour la publication automatique."
+    )
+
