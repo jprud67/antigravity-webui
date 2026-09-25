@@ -150,8 +150,9 @@ def make_default_meta() -> dict[str, Any]:
     }
 
 def get_session_meta(conversation_id: str) -> dict[str, Any]:
+    cleaned_cid = (conversation_id or "").strip()
     all_meta = get_all_session_metadata()
-    existing = all_meta.get(conversation_id)
+    existing = all_meta.get(cleaned_cid) if cleaned_cid else None
     merged = make_default_meta()
     if isinstance(existing, dict):
         merged.update(existing)

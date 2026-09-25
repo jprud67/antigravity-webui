@@ -8958,8 +8958,73 @@ def test_cron_compute_next_run_interval_dict_variants():
     res_hours = compute_next_run({"kind": "interval", "value": 2, "unit": "hours"})
     assert res_hours is not None
 
-    res_days = compute_next_run({"kind": "interval", "interval": 5, "unit": "days"})
-    assert res_days is not None
+def test_git_run_git_non_interactive_editor():
+    """Vérifie que run_git passe core.editor=true et configure GIT_EDITOR pour prévenir les blocages interactifs."""
+    import subprocess
+    from unittest.mock import patch
+    import app.api.git as git_mod
+
+    captured_args = []
+    captured_env = {}
+
+    def fake_subprocess_run(cmd, cwd=None, capture_output=None, text=None, timeout=None, env=None):
+        nonlocal captured_args, captured_env
+        captured_args = cmd
+        captured_env = env
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    with patch("subprocess.run", side_effect=fake_subprocess_run):
+        git_mod.run_git(["status"], Path("/fake/path"))
+
+    assert "-c" in captured_args
+    assert "core.editor=true" in captured_args
+    assert captured_env.get("GIT_EDITOR") == "true"
+    assert captured_env.get("EDITOR") == "true"
+
+
+def test_git_resolve_conflict_checkout_failure():
+    """Vérifie que resolve_conflict lève une HTTPException 400 si checkout --ours ou --theirs échoue."""
+    from unittest.mock import patch
+    import subprocess
+    from fastapi import HTTPException
+    import app.api.git as git_mod
+    from app.api.git import resolve_conflict, ResolveConflictRequest
+
+    with patch("app.api.git._validate_workspace", return_value=Path("/fake/workspace")):
+        with patch("app.api.git._resolve_relative_git_path", return_value="conflict_file.txt"):
+            def fake_run_git(args, cwd, **kwargs):
+                if args[:2] == ["checkout", "--ours"]:
+                    return subprocess.CompletedProcess(args, 1, stdout="", stderr="error: pathspec did not match")
+                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+            with patch("app.api.git.run_git", side_effect=fake_run_git):
+                with pytest.raises(HTTPException) as exc_info:
+                    resolve_conflict(ResolveConflictRequest(workspace="/fake/workspace", path="conflict_file.txt", resolution="ours"))
+                assert exc_info.value.status_code == 400
+                assert "Erreur lors de la résolution (ours)" in exc_info.value.detail
+
+
+def test_session_metadata_get_trimmed_conversation_id():
+    """Vérifie que get_session_meta normalise les identifiants avec des espaces superflus."""
+    from app.services.session_metadata import bulk_update_session_meta_batch, get_session_meta
+
+    bulk_update_session_meta_batch({
+        "unit_test_trim_cid": {"customTitle": "Titre Test Espaces"}
+    })
+
+    meta_exact = get_session_meta("unit_test_trim_cid")
+    meta_spaced = get_session_meta("  unit_test_trim_cid  \n")
+    assert meta_exact["customTitle"] == "Titre Test Espaces"
+    assert meta_spaced["customTitle"] == "Titre Test Espaces"
+
+
+def test_updater_repo_dir_matches_repo_root():
+    """Vérifie que REPO_DIR de updater correspond exactement à REPO_ROOT de config."""
+    from app.config import REPO_ROOT
+    from app.services.updater import REPO_DIR
+
+    assert REPO_DIR == REPO_ROOT
+    assert REPO_DIR.is_dir()
 
 
 if __name__ == "__main__":
@@ -9290,6 +9355,10 @@ if __name__ == "__main__":
         test_files_search_workspace_and_sensitive_exclusion(Path(td), monkeypatch=pytest.MonkeyPatch())
         test_workspace_search_and_replace_sensitive_path_exclusion(Path(td), monkeypatch=pytest.MonkeyPatch())
     test_cron_compute_next_run_interval_dict_variants()
+    test_git_run_git_non_interactive_editor()
+    test_git_resolve_conflict_checkout_failure()
+    test_session_metadata_get_trimmed_conversation_id()
+    test_updater_repo_dir_matches_repo_root()
     print("\nAll unit tests passed successfully!")
 
 

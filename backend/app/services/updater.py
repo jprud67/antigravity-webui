@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from app.config import GEMINI_DIR
+from app.config import GEMINI_DIR, REPO_ROOT
 from app.platform_utils import (
     IS_MACOS,
     IS_WINDOWS,
@@ -43,7 +43,7 @@ from app.platform_utils import (
 
 logger = logging.getLogger("antigravity.updater")
 
-REPO_DIR = Path(__file__).resolve().parent.parent.parent.parent
+REPO_DIR = REPO_ROOT
 CACHE_FILE = GEMINI_DIR / ".update_check"
 MARKER_FILE = GEMINI_DIR / ".update_incomplete"
 CURRENT_VERSION = "0.2.26"

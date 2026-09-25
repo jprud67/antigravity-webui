@@ -186,6 +186,7 @@ def _resolve_relative_git_path(raw_path: str, target: Path) -> str:
 def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | None = None) -> subprocess.CompletedProcess:
     base_args = [
         GIT_BIN,
+        "-c", "core.editor=true",
         "-c", "user.name=jprud67",
         "-c", "user.email=jprud67@gmail.com",
         "-c", "author.name=jprud67",
@@ -201,6 +202,8 @@ def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | 
         "GIT_TERMINAL_PROMPT": "0",
         "GIT_ASKPASS": "",
         "SSH_ASKPASS": "",
+        "GIT_EDITOR": "true",
+        "EDITOR": "true",
     }
     if env:
         merged_env.update(env)
@@ -1739,9 +1742,19 @@ def resolve_conflict(
     full_path = target / norm_path
 
     if req.resolution == "ours":
-        run_git(["checkout", "--ours", "--", norm_path], target)
+        chk_res = run_git(["checkout", "--ours", "--", norm_path], target)
+        if chk_res.returncode != 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Erreur lors de la résolution (ours) : {_mask_git_output(chk_res.stderr.strip() or chk_res.stdout.strip())}"
+            )
     elif req.resolution == "theirs":
-        run_git(["checkout", "--theirs", "--", norm_path], target)
+        chk_res = run_git(["checkout", "--theirs", "--", norm_path], target)
+        if chk_res.returncode != 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Erreur lors de la résolution (theirs) : {_mask_git_output(chk_res.stderr.strip() or chk_res.stdout.strip())}"
+            )
     elif req.resolution == "custom":
         if req.custom_content is None:
             raise HTTPException(status_code=400, detail="custom_content requis pour une résolution personnalisée.")
@@ -2432,7 +2445,7 @@ def publish_release(
         if commitish:
             args.extend(["--target", commitish])
         try:
-            res = subprocess.run(args, cwd=target, capture_output=True, text=True, timeout=15)
+            res = subprocess.run(args, cwd=str(target), capture_output=True, text=True, timeout=15)
             if res.returncode == 0:
                 created_url = res.stdout.strip()
                 return PublishReleaseResponse(
@@ -2443,6 +2456,8 @@ def publish_release(
                     output="Release publiée avec succès via GitHub CLI.",
                     message="Release publiée avec succès via GitHub CLI."
                 )
+            else:
+                logger.warning(f"gh release create failed (exit {res.returncode}): {_mask_git_output(res.stderr.strip() or res.stdout.strip())}")
         except Exception as e:
             logger.debug(f"gh release create fallback: {e}")
 

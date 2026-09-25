@@ -582,10 +582,14 @@ async def terminal_websocket(
                             break
                         elif action in ("restart", "reset"):
                             await kill_session(sid)
-                            session, _ = await get_or_create_session(sid, cwd, effective_shell)
-                            session.active_websocket = websocket
-                            reset_label = "✔ Interpréteur bash réinitialisé." if not IS_WINDOWS and not IS_MACOS else "✔ Console réinitialisée."
-                            await websocket.send_text(f"\r\n\x1b[32m{reset_label}\x1b[0m\r\n")
+                            try:
+                                session, _ = await get_or_create_session(sid, cwd, effective_shell)
+                                session.active_websocket = websocket
+                                reset_label = "✔ Interpréteur bash réinitialisé." if not IS_WINDOWS and not IS_MACOS else "✔ Console réinitialisée."
+                                await websocket.send_text(f"\r\n\x1b[32m{reset_label}\x1b[0m\r\n")
+                            except Exception as re_err:
+                                logger.error(f"Failed to restart terminal session {sid}: {re_err}")
+                                await websocket.send_text(f"\r\n\x1b[31m✖ Erreur réinitialisation : {re_err}\x1b[0m\r\n")
                             continue
                     except json.JSONDecodeError:
                         logger.debug("Ignored error")
