@@ -28,11 +28,12 @@ import {
   ArrowRight,
   Edit3,
   Globe,
+  Tag,
   Play,
   RotateCcw,
   AlertTriangle
 } from 'lucide-react';
-import type { MonacoStudioConfig, GitStashItem, GitBranchDetail, RebaseStatusResponse } from '../types';
+import type { MonacoStudioConfig, GitStashItem, GitBranchDetail, RebaseStatusResponse, GitTagDetail } from '../types';
 import { 
   fetchGitStatus, 
   fetchGitDiff, 
@@ -65,6 +66,9 @@ import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
 import { GitConflictModal } from './GitConflictModal';
 import { GitRebaseModal } from './GitRebaseModal';
+import { GitRemotesView } from './GitRemotesView';
+import { GitTagsView } from './GitTagsView';
+import { GitReleaseModal } from './GitReleaseModal';
 
 interface GitTabProps {
   currentWorkspace: string;
@@ -77,8 +81,12 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // View Mode: 'changes' vs 'history' vs 'stashes' vs 'branches'
-  const [viewMode, setViewMode] = useState<'changes' | 'history' | 'stashes' | 'branches'>('changes');
+  // View Mode: 'changes' vs 'history' vs 'stashes' vs 'branches' vs 'remotes' vs 'tags'
+  const [viewMode, setViewMode] = useState<'changes' | 'history' | 'stashes' | 'branches' | 'remotes' | 'tags'>('changes');
+
+  // Release Modal states
+  const [releaseModalTag, setReleaseModalTag] = useState<GitTagDetail | null>(null);
+  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
 
   // Branch management states
   const [branches, setBranches] = useState<GitBranchDetail[]>([]);
@@ -988,6 +996,34 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
               {branches.length}
             </span>
           )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setViewMode('remotes')}
+          className={`flex items-center gap-1.5 px-3 py-2 border-b-2 font-medium transition-colors cursor-pointer ${
+            viewMode === 'remotes'
+              ? 'border-sky-500 text-sky-500 font-semibold'
+              : 'border-transparent hover:opacity-100 opacity-70'
+          }`}
+          style={{ color: viewMode === 'remotes' ? undefined : 'var(--text)' }}
+        >
+          <Globe className="w-3.5 h-3.5" />
+          <span>Remotes</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setViewMode('tags')}
+          className={`flex items-center gap-1.5 px-3 py-2 border-b-2 font-medium transition-colors cursor-pointer ${
+            viewMode === 'tags'
+              ? 'border-sky-500 text-sky-500 font-semibold'
+              : 'border-transparent hover:opacity-100 opacity-70'
+          }`}
+          style={{ color: viewMode === 'tags' ? undefined : 'var(--text)' }}
+        >
+          <Tag className="w-3.5 h-3.5" />
+          <span>Tags & Releases</span>
         </button>
       </div>
 
@@ -2303,6 +2339,31 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         </div>
       )}
 
+      {/* Git Remotes Studio View */}
+      {viewMode === 'remotes' && (
+        <div className="flex-1 overflow-hidden">
+          <GitRemotesView
+            workspace={currentWorkspace}
+            currentBranch={status?.branch || 'main'}
+            onNotify={(msg, type) => showToast(msg, type)}
+          />
+        </div>
+      )}
+
+      {/* Git Tags & Releases Studio View */}
+      {viewMode === 'tags' && (
+        <div className="flex-1 overflow-hidden">
+          <GitTagsView
+            workspace={currentWorkspace}
+            onOpenReleaseModal={(tag) => {
+              setReleaseModalTag(tag);
+              setIsReleaseModalOpen(true);
+            }}
+            onNotify={(msg, type) => showToast(msg, type)}
+          />
+        </div>
+      )}
+
       {/* Git Rebase Studio Modal */}
       <GitRebaseModal
         key={`rebase-${rebaseBaseRef}-${isRebaseModalOpen}`}
@@ -2337,6 +2398,21 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           }}
         />
       )}
+
+      {/* Git Release Publisher Modal */}
+      <GitReleaseModal
+        isOpen={isReleaseModalOpen}
+        onClose={() => {
+          setIsReleaseModalOpen(false);
+          setReleaseModalTag(null);
+        }}
+        tag={releaseModalTag}
+        workspace={currentWorkspace}
+        onReleasePublished={() => {
+          void loadStatus();
+        }}
+        onNotify={(msg, type) => showToast(msg, type)}
+      />
     </div>
   );
 };
