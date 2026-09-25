@@ -36,4 +36,7 @@ scratch/
 *.png
 .test_tmp*
 backend/tests/.test_env_data/
+*.db
+*.db-journal
+backend/sessions.db
 

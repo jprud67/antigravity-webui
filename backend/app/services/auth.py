@@ -147,7 +147,14 @@ def save_auth_config(config: dict[str, Any]):
             with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2)
             restrict_file_permissions(temp_file)
-            temp_file.replace(AUTH_CONFIG_FILE)
+            for attempt in range(5):
+                try:
+                    temp_file.replace(AUTH_CONFIG_FILE)
+                    break
+                except PermissionError:
+                    if attempt == 4:
+                        raise
+                    time.sleep(0.05)
             restrict_file_permissions(AUTH_CONFIG_FILE)
             _auth_cache = config.copy()
             _auth_cache_mtime = AUTH_CONFIG_FILE.stat().st_mtime
@@ -158,7 +165,14 @@ def save_auth_config(config: dict[str, Any]):
                 with open(bak_temp, "w", encoding="utf-8") as f:
                     json.dump(config, f, indent=2)
                 restrict_file_permissions(bak_temp)
-                bak_temp.replace(AUTH_BACKUP_FILE)
+                for attempt in range(5):
+                    try:
+                        bak_temp.replace(AUTH_BACKUP_FILE)
+                        break
+                    except PermissionError:
+                        if attempt == 4:
+                            raise
+                        time.sleep(0.05)
                 restrict_file_permissions(AUTH_BACKUP_FILE)
             except Exception as bak_err:
                 bak_temp.unlink(missing_ok=True)

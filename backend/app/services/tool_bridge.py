@@ -221,11 +221,17 @@ def _tool_choice_hint(tool_choice: Any) -> str:
 
 def build_prompt(messages: list[dict[str, Any]], tools: list[dict[str, Any]], tool_choice: Any = None) -> str:
     """Construit le prompt « API simulée » : en-tête strict + schémas d'outils + conversation aplatie."""
+    from app.services.memory_store import memory_store
+    memory_snapshot = memory_store.get_system_prompt_snapshot()
     parts = [
         _SIMULATION_HEADER,
-        "AVAILABLE FUNCTIONS (OpenAI tool definitions):\n"
-        + json.dumps(tools, ensure_ascii=False, indent=1),
     ]
+    if memory_snapshot:
+        parts.append(memory_snapshot)
+    parts.append(
+        "AVAILABLE FUNCTIONS (OpenAI tool definitions):\n"
+        + json.dumps(tools, ensure_ascii=False, indent=1)
+    )
     hint = _tool_choice_hint(tool_choice)
     if hint:
         parts.append(hint)
@@ -398,6 +404,25 @@ def normalize_decision(
 
     if action not in ("final", ""):
         logger.warning(f"Action inconnue `{action}` reçue du pont — traitée comme réponse finale.")
+
+    if content:
+        from app.services.tool_repair import tool_repair_engine
+        cleaned_text, repaired_calls, was_repaired = tool_repair_engine.repair_and_extract(
+            content, list(allowed_lower.values())
+        )
+        if was_repaired and repaired_calls:
+            call = repaired_calls[0]
+            name = allowed_lower.get(call["name"].lower(), call["name"])
+            logger.info(f"Outil détecté et normalisé par tool_repair_engine: {name}")
+            return {
+                "kind": "tool_call",
+                "id": call.get("id") or f"call_{uuid.uuid4().hex[:24]}",
+                "name": name,
+                "arguments": call.get("arguments", {}),
+                "usage": usage,
+                "thinking": thinking,
+            }
+
     return {"kind": "final", "content": content, "usage": usage, "thinking": thinking}
 
 
@@ -526,8 +551,25 @@ async def run_turn(
                 logger.warning("structured_output absent — décision reconstruite depuis la réponse brute.")
                 decision = normalize_decision(parsed, allowed_lower, usage, thinking)
             elif raw_response.strip():
-                logger.warning("structured_output absent — repli en réponse texte brute.")
-                decision = {"kind": "final", "content": raw_response.strip(), "usage": usage, "thinking": thinking}
+                from app.services.tool_repair import tool_repair_engine
+                cleaned_text, repaired_calls, was_repaired = tool_repair_engine.repair_and_extract(
+                    raw_response, list(allowed_lower.values())
+                )
+                if was_repaired and repaired_calls:
+                    call = repaired_calls[0]
+                    name = allowed_lower.get(call["name"].lower(), call["name"])
+                    logger.info(f"Outil récupéré de la réponse brute par tool_repair_engine: {name}")
+                    decision = {
+                        "kind": "tool_call",
+                        "id": call.get("id") or f"call_{uuid.uuid4().hex[:24]}",
+                        "name": name,
+                        "arguments": call.get("arguments", {}),
+                        "usage": usage,
+                        "thinking": thinking,
+                    }
+                else:
+                    logger.warning("structured_output absent — repli en réponse texte brute.")
+                    decision = {"kind": "final", "content": raw_response.strip(), "usage": usage, "thinking": thinking}
             else:
                 return {
                     "kind": "error",

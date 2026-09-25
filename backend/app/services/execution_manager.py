@@ -30,6 +30,8 @@ from app.services.storage import (
     is_safe_conversation_id,
     save_settings,
 )
+from app.services.progress_card import get_progress_card, save_progress_card
+from app.services.link_understanding import enrich_user_prompt_with_links
 
 logger = logging.getLogger("antigravity.execution")
 
@@ -86,6 +88,7 @@ class ExecutionSession:
         self.live_tool_calls: list[dict[str, Any]] = []
         self.live_usage: dict[str, Any] | None = None
         self.pending_approval: dict[str, Any] | None = None
+        self.live_progress_card: dict[str, Any] | None = None
         self.recent_events: deque[dict[str, Any]] = deque(maxlen=50)
 
     def add_subscriber(self, ws: WebSocket | None):
@@ -120,6 +123,7 @@ class ExecutionSession:
                 "tool_calls": self.live_tool_calls[-50:] if len(self.live_tool_calls) > 50 else self.live_tool_calls,
                 "usage": self.live_usage,
                 "pending_approval": self.pending_approval,
+                "progress_card": self.live_progress_card or (get_progress_card(self.conversation_id) if self.conversation_id else None),
             },
             "recent_events": list(self.recent_events)[-30:]
         }
@@ -172,6 +176,13 @@ class ExecutionSession:
             if cid:
                 self.conversation_id = cid
                 execution_manager.register_session_cid(self, cid)
+
+        elif evt_type == "progress_card":
+            card_data = event.get("card")
+            if isinstance(card_data, dict):
+                self.live_progress_card = card_data
+                if self.conversation_id:
+                    save_progress_card(self.conversation_id, card_data)
 
         elif evt_type == "step_update":
             raw_update = event.get("step_update")
@@ -1030,11 +1041,14 @@ class ExecutionManager:
                 self.sessions[session.conversation_id] = session
             return session.get_live_state()
 
+        card = get_progress_card(conversation_id) if conversation_id else None
         return {
             "conversation_id": conversation_id,
             "is_running": False,
             "queue_size": 0,
-            "live_state": None,
+            "live_state": {
+                "progress_card": card
+            } if card else None,
             "recent_events": []
         }
 
@@ -1055,6 +1069,14 @@ class ExecutionManager:
         conv_id = _clean_cid(raw_cid)
         ws_path = data.get("workspace_path")
         mode = data.get("mode", "normal")
+
+        # Link understanding: if bare URLs are present in prompt, enrich it in background
+        try:
+            enriched_prompt, extracted = await enrich_user_prompt_with_links(prompt)
+            if extracted:
+                data["prompt"] = enriched_prompt
+        except Exception as e:
+            logger.debug(f"Link understanding enrichment skipped: {e}")
 
         session = self.get_or_create_session(conv_id, ws_path, ws=ws)
         if ws is not None:

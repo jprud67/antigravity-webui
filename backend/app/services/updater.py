@@ -46,7 +46,7 @@ logger = logging.getLogger("antigravity.updater")
 REPO_DIR = REPO_ROOT
 CACHE_FILE = GEMINI_DIR / ".update_check"
 MARKER_FILE = GEMINI_DIR / ".update_incomplete"
-CURRENT_VERSION = "0.2.26"
+CURRENT_VERSION = "0.3.0"
 GIT_BIN: str = shutil.which("git") or "git"
 
 # Principe Hermes : cache de 6 h + rafraîchissement périodique de 6 h

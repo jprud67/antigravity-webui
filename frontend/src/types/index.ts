@@ -612,4 +612,367 @@ export interface PublishReleaseResponse {
   message: string;
 }
 
+// Sprint 23: Continuous Memory, FTS5 Search & Skill Curator
+export interface MemoryTargetStatus {
+  path: string;
+  exists: boolean;
+  entries: string[];
+  entry_count: number;
+  char_count: number;
+  char_limit: number;
+  percentage: number;
+  raw: string;
+  workspace?: string;
+}
+
+export interface ContinuousMemoryStatus {
+  user: MemoryTargetStatus;
+  memory: MemoryTargetStatus;
+  snapshot_available: boolean;
+}
+
+export interface MemoryOperationPayload {
+  target: 'user' | 'memory';
+  action: 'add' | 'replace' | 'remove' | 'save_raw';
+  content?: string;
+  old_text?: string;
+  new_content?: string;
+  raw_markdown?: string;
+}
+
+export interface FtsSearchResultItem {
+  session_id: string;
+  session_title: string;
+  message_id: string;
+  role: string;
+  project: string;
+  timestamp: string;
+  snippet: string;
+  rank: number;
+}
+
+export interface FtsSearchResponse {
+  query: string;
+  matches: FtsSearchResultItem[];
+  total_matches: number;
+  took_ms: number;
+  error?: string;
+}
+
+export interface SkillTelemetry {
+  skill_name: string;
+  use_count: number;
+  last_used_at: string | null;
+  created_at: string | null;
+  pinned: boolean;
+  status: 'active' | 'stale' | 'archived';
+  is_protected: boolean;
+}
+
+export interface SkillCuratorSweepResult {
+  success: boolean;
+  timestamp: string;
+  total_skills: number;
+  transitions_count: number;
+  transitions: Array<{ skill_name: string; before: string; after: string }>;
+  archived_count?: number;
+  swept_count?: number;
+}
+
+export interface SkillCuratorLedgerRecord {
+  id: string;
+  timestamp: string;
+  action: string;
+  skill_name: string;
+  actor: string;
+  before?: any;
+  after?: any;
+  details: string;
+}
+
+export interface ToolRepairPreviewResponse {
+  cleaned_text: string;
+  tool_calls: Array<{ id: string; name: string; arguments: Record<string, any> }>;
+  was_repaired: boolean;
+  repaired_count: number;
+}
+
+// Sprint 24 Types: MCP Catalog, Progress Card, Doctor, Link Understanding
+export interface McpCatalogItem {
+  slug: string;
+  name: string;
+  description: string;
+  category: string;
+  transport: {
+    type: 'http' | 'stdio';
+    url?: string;
+    command?: string;
+    args?: string[];
+  };
+  auth?: {
+    type?: string;
+    env_var?: string;
+    provider?: string;
+  };
+  source?: string;
+  keywords?: string[];
+  is_official?: boolean;
+  is_installed: boolean;
+}
+
+export interface McpTestResult {
+  success: boolean;
+  status_code: number;
+  latency_ms: number;
+  transport: string;
+  error?: string | null;
+  binary?: string;
+}
+
+export interface ProgressCardStep {
+  label: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
+export interface ProgressCardData {
+  title: string;
+  markdown?: string | null;
+  steps: ProgressCardStep[];
+  percent: number;
+  updated_at: number;
+}
+
+export interface LlmProbeResult {
+  name: string;
+  provider: string;
+  url: string;
+  status: 'online' | 'degraded' | 'offline';
+  status_code: number;
+  latency_ms: number;
+  error?: string | null;
+}
+
+export interface SystemDiagnosticsReport {
+  health_status: 'healthy' | 'warning' | 'critical';
+  timestamp: number;
+  system: {
+    platform: string;
+    cpu_cores: number;
+    cpu_percent: number;
+    ram: {
+      total_gb: number;
+      available_gb: number;
+      used_gb: number;
+      percent: number;
+    };
+    disk: {
+      total_gb: number;
+      free_gb: number;
+      used_percent: number;
+    };
+  };
+  runtimes: {
+    python: {
+      version: string;
+      executable: string;
+      is_venv: boolean;
+    };
+    git: {
+      installed: boolean;
+      path?: string;
+      branch?: string;
+      dirty_files: number;
+    };
+  };
+  database: {
+    status: string;
+    size_mb: number;
+    integrity: string;
+    fts5: {
+      total_indexed_rows: number;
+      indexed_sessions: number;
+      engine: string;
+    };
+  };
+  llm_connectivity: LlmProbeResult[];
+  anomalies: Array<{ level: 'warning' | 'error'; message: string }>;
+}
+
+export interface LinkExtractionResult {
+  url: string;
+  title: string;
+  description: string;
+  content: string;
+  cached: boolean;
+  cached_at: number;
+}
+
+export interface GitWorktreeItem {
+  worktree: string;
+  branch?: string;
+  head?: string;
+  dirty?: boolean;
+  commits?: number;
+}
+
+export interface KernelExecutionResult {
+  session_id: string;
+  execution_count: number;
+  status: 'ok' | 'error' | 'timeout' | 'exit';
+  stdout: string;
+  stderr: string;
+  stdout_clipped: boolean;
+  stderr_clipped: boolean;
+  traceback: string;
+  duration_ms: number;
+}
+
+export interface TailscaleStatus {
+  installed: boolean;
+  running: boolean;
+  magicdns?: string | null;
+  tailscale_ip?: string | null;
+  all_ips?: string[];
+  serve_active: boolean;
+  serve_url?: string | null;
+  funnel_active: boolean;
+  message: string;
+}
+
+export interface WebPushSubscriptionItem {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent?: string;
+  created_at: number;
+}
+
+export interface MessagingGatewayBotConfig {
+  platform: string;
+  has_token: boolean;
+  masked_token: string;
+  chat_id?: string;
+  is_active: boolean;
+  notify_on_approval: boolean;
+  notify_on_complete: boolean;
+  updated_at: number;
+}
+
+export interface PairingCodeItem {
+  code: string;
+  platform: string;
+  user_id: string;
+  user_name?: string;
+  created_at: number;
+  expires_at: number;
+}
+
+export interface ApprovedDeviceItem {
+  id?: number;
+  platform: string;
+  user_id: string;
+  user_name?: string;
+  approved_at: number;
+}
+
+export interface MessagingGatewayStatus {
+  configs: Record<string, MessagingGatewayBotConfig>;
+  pending_count: number;
+  approved_count: number;
+}
+
+// --- Canvas Documents ---
+export type CanvasDocumentKind = 'html_bundle' | 'url_embed' | 'document' | 'image' | 'video_asset';
+export type CanvasSurface = 'assistant_message' | 'tool_card' | 'sidebar';
+
+export interface CanvasDocumentAsset {
+  logicalPath: string;
+  sourcePath: string;
+  contentType?: string;
+}
+
+export interface CanvasDocumentEntrypoint {
+  type: 'html' | 'path' | 'url';
+  value: string;
+}
+
+export interface CanvasDocumentCreateInput {
+  id?: string;
+  kind?: CanvasDocumentKind;
+  title?: string;
+  preferredHeight?: number;
+  entrypoint: CanvasDocumentEntrypoint;
+  assets?: CanvasDocumentAsset[];
+  surface?: CanvasSurface;
+  retentionScope?: string;
+  cspSandbox?: 'scripts';
+  wrapWithTheme?: boolean;
+}
+
+export interface CanvasDocumentManifest {
+  id: string;
+  kind: CanvasDocumentKind;
+  title?: string;
+  preferredHeight?: number;
+  createdAt: string;
+  entryUrl: string;
+  localEntrypoint?: string;
+  externalUrl?: string;
+  surface?: CanvasSurface;
+  retentionScope?: string;
+  cspSandbox?: 'scripts';
+  assets: Array<{
+    logicalPath: string;
+    contentType?: string;
+  }>;
+}
+
+// --- Vector Memory & Auto-Recall Hook ---
+export type MemoryCategory = 'core' | 'daily' | 'preference' | 'fact' | 'convention' | 'general';
+export type EmbeddingProvider = 'local' | 'openai' | 'ollama' | 'gemini';
+
+export interface MemoryEntry {
+  id: string;
+  text: string;
+  category: MemoryCategory;
+  importance: number;
+  agentId: string;
+  createdAt: number;
+  metadata?: Record<string, unknown>;
+  vector?: number[];
+}
+
+export interface MemoryStoreInput {
+  text: string;
+  category?: MemoryCategory;
+  importance?: number;
+  agentId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MemorySearchResult {
+  entry: MemoryEntry;
+  score: number;
+  similarity: number;
+}
+
+export interface AutoRecallConfig {
+  enabled: boolean;
+  provider: EmbeddingProvider;
+  model: string;
+  apiKey?: string;
+  apiBase?: string;
+  maxResults: number;
+  minSimilarity: number;
+  maxChars: number;
+}
+
+export interface RecallHookResult {
+  shouldInject: boolean;
+  recalledCount: number;
+  contextBlock: string;
+  memories: MemorySearchResult[];
+}
+
+
 

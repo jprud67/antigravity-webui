@@ -49,7 +49,36 @@ import type {
   DeleteTagPayload,
   ReleaseNotesResponse,
   PublishReleasePayload,
-  PublishReleaseResponse
+  PublishReleaseResponse,
+  ContinuousMemoryStatus,
+  MemoryOperationPayload,
+  FtsSearchResponse,
+  SkillTelemetry,
+  SkillCuratorSweepResult,
+  SkillCuratorLedgerRecord,
+  ToolRepairPreviewResponse,
+  McpCatalogItem,
+  McpTestResult,
+  ProgressCardData,
+  ProgressCardStep,
+  SystemDiagnosticsReport,
+  LinkExtractionResult,
+  GitWorktreeItem,
+  KernelExecutionResult,
+  TailscaleStatus,
+  WebPushSubscriptionItem,
+  MessagingGatewayStatus,
+  PairingCodeItem,
+  ApprovedDeviceItem,
+  CanvasDocumentManifest,
+  CanvasDocumentCreateInput,
+  CanvasDocumentKind,
+  MemoryEntry,
+  MemoryStoreInput,
+  MemorySearchResult,
+  AutoRecallConfig,
+  RecallHookResult,
+  MemoryCategory
 } from '../types';
 
 const API_BASE = '/api';
@@ -2310,6 +2339,650 @@ export async function publishGitRelease(payload: PublishReleasePayload): Promise
   }
   return res.json();
 }
+
+// ==========================================
+// Sprint 23: Continuous Memory (USER.md / MEMORY.md)
+// ==========================================
+
+export async function fetchMemoryStatus(): Promise<ContinuousMemoryStatus> {
+  const res = await fetch(`${API_BASE}/memory`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de récupération de la mémoire continue' }));
+    throw new Error(err.detail || 'Erreur mémoire continue');
+  }
+  return res.json();
+}
+
+export async function fetchMemorySnapshot(): Promise<{ snapshot: string; available: boolean }> {
+  const res = await fetch(`${API_BASE}/memory/snapshot`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur snapshot mémoire');
+  }
+  return res.json();
+}
+
+export async function refreshMemorySnapshot(): Promise<{ success: boolean; snapshot: string; message: string }> {
+  const res = await fetch(`${API_BASE}/memory/refresh-snapshot`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur rafraîchissement snapshot mémoire');
+  }
+  return res.json();
+}
+
+export async function executeMemoryOperation(payload: MemoryOperationPayload): Promise<any> {
+  const res = await fetch(`${API_BASE}/memory`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de l\'opération mémoire' }));
+    throw new Error(err.detail || 'Erreur opération mémoire');
+  }
+  return res.json();
+}
+
+// ==========================================
+// Sprint 23: Cross-Sessions FTS5 Search
+// ==========================================
+
+export async function searchFts(
+  query: string,
+  role?: string,
+  sessionId?: string,
+  project?: string,
+  limit: number = 50
+): Promise<FtsSearchResponse> {
+  const params = new URLSearchParams({ q: query, limit: String(limit) });
+  if (role) params.append('role', role);
+  if (sessionId) params.append('session_id', sessionId);
+  if (project) params.append('project', project);
+
+  const res = await fetch(`${API_BASE}/search/fts?${params.toString()}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la recherche plein-texte' }));
+    throw new Error(err.detail || 'Erreur recherche FTS');
+  }
+  return res.json();
+}
+
+export async function reindexFts(): Promise<{ success: boolean; total_sessions: number; total_messages_indexed: number; took_ms: number }> {
+  const res = await fetch(`${API_BASE}/search/fts/reindex`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur réindexation FTS');
+  }
+  return res.json();
+}
+
+export async function getFtsStats(): Promise<{ total_indexed_rows: number; indexed_sessions: number; engine: string }> {
+  const res = await fetch(`${API_BASE}/search/fts/stats`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur statistiques FTS');
+  }
+  return res.json();
+}
+
+// ==========================================
+// Sprint 23: Tool Call Repair
+// ==========================================
+
+export async function previewToolRepair(text: string, allowedTools?: string[]): Promise<ToolRepairPreviewResponse> {
+  const res = await fetch(`${API_BASE}/tools/repair`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ text, allowed_tools: allowedTools })
+  });
+  if (!res.ok) {
+    throw new Error('Erreur réparation tool call');
+  }
+  return res.json();
+}
+
+export async function getToolRepairStats(): Promise<{ total_scanned: number; total_repaired: number; repair_rate: number }> {
+  const res = await fetch(`${API_BASE}/tools/repair/stats`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur stats tool repair');
+  }
+  return res.json();
+}
+
+// ==========================================
+// Sprint 23: Skill Curator & Lifecycle
+// ==========================================
+
+export async function fetchSkillCuratorStatus(): Promise<SkillTelemetry[]> {
+  const res = await fetch(`${API_BASE}/skills/curator/status`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur chargement télémétrie curateur');
+  }
+  return res.json();
+}
+
+export async function triggerSkillCuratorSweep(staleDays: number = 14, archiveDays: number = 30): Promise<SkillCuratorSweepResult> {
+  const params = new URLSearchParams({ stale_days: String(staleDays), archive_days: String(archiveDays) });
+  const res = await fetch(`${API_BASE}/skills/curator/sweep?${params.toString()}`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur balayage cycle de vie des compétences');
+  }
+  return res.json();
+}
+
+export async function toggleSkillPin(skillId: string, pinned?: boolean): Promise<{ skill_name: string; pinned: boolean; status: string }> {
+  const res = await fetch(`${API_BASE}/skills/${encodeURIComponent(skillId)}/pin`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ pinned })
+  });
+  if (!res.ok) {
+    throw new Error('Erreur bascule épinglage compétence');
+  }
+  return res.json();
+}
+
+export async function fetchSkillCuratorLedger(limit: number = 50): Promise<SkillCuratorLedgerRecord[]> {
+  const res = await fetch(`${API_BASE}/skills/curator/ledger?limit=${limit}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur chargement journal curateur');
+  }
+  return res.json();
+}
+
+// ==========================================
+// Sprint 24: MCP Catalog Store API
+// ==========================================
+
+export async function fetchMcpCatalog(query?: string, category?: string): Promise<{ total: number; items: McpCatalogItem[] }> {
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  if (category && category !== 'all') params.set('category', category);
+  const qStr = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_BASE}/mcp/catalog${qStr}`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur lors du chargement du catalogue MCP');
+  }
+  return res.json();
+}
+
+export async function installMcpServer(slug: string, config?: { api_key?: string; env?: Record<string, string>; headers?: string[] }): Promise<any> {
+  const res = await fetch(`${API_BASE}/mcp/catalog/${encodeURIComponent(slug)}/install`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(config || {})
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de l\'installation' }));
+    throw new Error(err.detail || 'Erreur lors de l\'installation du serveur MCP');
+  }
+  return res.json();
+}
+
+export async function uninstallMcpServer(slug: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/mcp/catalog/${encodeURIComponent(slug)}/uninstall`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur lors de la désinstallation du serveur MCP');
+  }
+  return res.json();
+}
+
+export async function testMcpServer(slug: string): Promise<McpTestResult> {
+  const res = await fetch(`${API_BASE}/mcp/catalog/${encodeURIComponent(slug)}/test`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur lors du test de connexion du serveur MCP');
+  }
+  return res.json();
+}
+
+// ==========================================
+// Sprint 24: Session Progress Card API
+// ==========================================
+
+export async function fetchProgressCard(conversationId: string): Promise<{ exists: boolean; card: ProgressCardData | null }> {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/progress-card`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    return { exists: false, card: null };
+  }
+  return res.json();
+}
+
+export async function updateProgressCard(conversationId: string, payload: { title?: string; markdown?: string; plan: ProgressCardStep[] }): Promise<{ success: boolean; card: ProgressCardData }> {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/progress-card`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    throw new Error('Erreur lors de la mise à jour de la carte de progression');
+  }
+  return res.json();
+}
+
+export async function deleteProgressCard(conversationId: string): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/progress-card`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur lors de la suppression de la carte de progression');
+  }
+  return res.json();
+}
+
+// ==========================================
+// Sprint 24: System Doctor & Auto-Repair API
+// ==========================================
+
+export async function fetchSystemDiagnostics(): Promise<SystemDiagnosticsReport> {
+  const res = await fetch(`${API_BASE}/doctor/diagnose`, {
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur lors du diagnostic système');
+  }
+  return res.json();
+}
+
+export async function executeDoctorRepair(): Promise<{ success: boolean; actions_taken: string[]; post_repair_diagnostics: SystemDiagnosticsReport }> {
+  const res = await fetch(`${API_BASE}/doctor/repair`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    throw new Error('Erreur lors de l\'exécution de l\'auto-réparation');
+  }
+  return res.json();
+}
+
+// ==========================================
+// Sprint 24: Link Understanding API
+// ==========================================
+
+export async function extractLinkPreview(url: string, forceRefresh: boolean = false): Promise<LinkExtractionResult> {
+  const res = await fetch(`${API_BASE}/links/extract`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ url, force_refresh: forceRefresh })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de lecture du lien' }));
+    throw new Error(err.detail || 'Erreur lors de l\'analyse du lien');
+  }
+  return res.json();
+}
+
+// ==========================================
+// Sprint 25: Git Worktree Isolation
+// ==========================================
+
+export async function fetchWorktrees(cwd?: string): Promise<{ repo_root: string | null; worktrees: GitWorktreeItem[] }> {
+  const url = cwd ? `${API_BASE}/worktrees?cwd=${encodeURIComponent(cwd)}` : `${API_BASE}/worktrees`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Impossible de charger les worktrees Git');
+  return res.json();
+}
+
+export async function createWorktree(cwd?: string, subagentId?: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/worktrees/create`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ cwd, subagent_id: subagentId })
+  });
+  if (!res.ok) throw new Error('Impossible de créer le worktree Git');
+  return res.json();
+}
+
+export async function finalizeWorktree(params: { path: string; branch?: string; repo_root?: string; base_commit?: string; prune?: boolean }): Promise<any> {
+  const res = await fetch(`${API_BASE}/worktrees/finalize`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params)
+  });
+  if (!res.ok) throw new Error('Impossible de finaliser le worktree Git');
+  return res.json();
+}
+
+export async function removeWorktree(params: { path: string; branch?: string; repo_root?: string }): Promise<any> {
+  const res = await fetch(`${API_BASE}/worktrees`, {
+    method: 'DELETE',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params)
+  });
+  if (!res.ok) throw new Error('Impossible de supprimer le worktree Git');
+  return res.json();
+}
+
+// ==========================================
+// Sprint 25: Persistent Code Kernel & Tool RPC
+// ==========================================
+
+export async function executeKernelCode(code: string, sessionId?: string, cwd?: string, timeout?: number): Promise<KernelExecutionResult> {
+  const res = await fetch(`${API_BASE}/kernel/execute`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ code, session_id: sessionId, cwd, timeout })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec d\'exécution du code' }));
+    throw new Error(err.detail || 'Erreur lors de l\'exécution du kernel');
+  }
+  return res.json();
+}
+
+export async function resetKernel(sessionId?: string, cwd?: string): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/kernel/reset`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ session_id: sessionId, cwd })
+  });
+  if (!res.ok) throw new Error('Impossible de réinitialiser le kernel');
+  return res.json();
+}
+
+export async function fetchKernelStatus(): Promise<{ active_kernels: any[]; total: number }> {
+  const res = await fetch(`${API_BASE}/kernel/status`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Impossible de charger le statut des kernels');
+  return res.json();
+}
+
+// ==========================================
+// Sprint 25: Tailscale & Web Push PWA
+// ==========================================
+
+export async function fetchTailscaleStatus(): Promise<TailscaleStatus> {
+  const res = await fetch(`${API_BASE}/tailscale/status`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Impossible de charger le statut Tailscale');
+  return res.json();
+}
+
+export async function toggleTailscaleServe(enable: boolean, port?: number): Promise<any> {
+  const res = await fetch(`${API_BASE}/tailscale/serve`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ enable, port })
+  });
+  if (!res.ok) throw new Error('Impossible de basculer Tailscale Serve');
+  return res.json();
+}
+
+export async function fetchVapidPublicKey(): Promise<{ public_key: string }> {
+  const res = await fetch(`${API_BASE}/push/vapid-public-key`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Impossible de récupérer la clé VAPID');
+  return res.json();
+}
+
+export async function fetchPushSubscriptions(): Promise<{ subscriptions: WebPushSubscriptionItem[]; count: number }> {
+  const res = await fetch(`${API_BASE}/push/subscriptions`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Impossible de charger les abonnements push');
+  return res.json();
+}
+
+export async function subscribeWebPush(sub: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/push/subscribe`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(sub)
+  });
+  if (!res.ok) throw new Error('Échec d\'enregistrement Web Push');
+  return res.json();
+}
+
+export async function unsubscribeWebPush(endpoint: string): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/push/unsubscribe`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ endpoint })
+  });
+  if (!res.ok) throw new Error('Échec de désinscription Web Push');
+  return res.json();
+}
+
+export async function sendTestWebPush(title?: string, body?: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/push/test`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ title, body })
+  });
+  if (!res.ok) throw new Error('Échec d\'envoi de la notification push');
+  return res.json();
+}
+
+// ==========================================
+// Sprint 25: Messaging Gateway & PIN Pairing
+// ==========================================
+
+export async function fetchGatewayStatus(): Promise<MessagingGatewayStatus> {
+  const res = await fetch(`${API_BASE}/gateway/status`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Impossible de charger le statut de la passerelle');
+  return res.json();
+}
+
+export async function fetchPendingPairings(): Promise<{ pending: PairingCodeItem[] }> {
+  const res = await fetch(`${API_BASE}/gateway/pairing/pending`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Impossible de charger les codes de couplage');
+  return res.json();
+}
+
+export async function fetchApprovedDevices(): Promise<{ approved: ApprovedDeviceItem[] }> {
+  const res = await fetch(`${API_BASE}/gateway/pairing/approved`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Impossible de charger les appareils approuvés');
+  return res.json();
+}
+
+export async function requestPairingCode(platform: string, userId: string, userName?: string): Promise<{ success: boolean; message: string; code?: string }> {
+  const res = await fetch(`${API_BASE}/gateway/pairing/request`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ platform, user_id: userId, user_name: userName })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de génération du code' }));
+    throw new Error(err.detail || 'Erreur couplage');
+  }
+  return res.json();
+}
+
+export async function approvePairingCode(code: string): Promise<{ success: boolean; message: string; device?: ApprovedDeviceItem }> {
+  const res = await fetch(`${API_BASE}/gateway/pairing/approve`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ code })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Code invalide ou expiré' }));
+    throw new Error(err.detail || 'Échec de validation du code');
+  }
+  return res.json();
+}
+
+export async function revokeDevice(platform: string, userId: string): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/gateway/pairing/revoke`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ platform, user_id: userId })
+  });
+  if (!res.ok) throw new Error('Échec de révocation de l\'appareil');
+  return res.json();
+}
+
+export async function saveBotConfig(config: { platform: string; bot_token: string; chat_id?: string; is_active?: boolean; notify_on_approval?: boolean; notify_on_complete?: boolean }): Promise<any> {
+  const res = await fetch(`${API_BASE}/gateway/config`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(config)
+  });
+  if (!res.ok) throw new Error('Échec de sauvegarde de la configuration bot');
+  return res.json();
+}
+
+// ==================== CANVAS DOCUMENTS API ====================
+export const canvasApi = {
+  async createDocument(payload: CanvasDocumentCreateInput): Promise<CanvasDocumentManifest> {
+    const res = await fetch(`${API_BASE}/canvas/documents`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Échec de création du Canvas: ${res.statusText}`);
+    return res.json();
+  },
+
+  async listDocuments(scope?: string, kind?: CanvasDocumentKind, limit: number = 50): Promise<CanvasDocumentManifest[]> {
+    const params = new URLSearchParams();
+    if (scope) params.set('scope', scope);
+    if (kind) params.set('kind', kind);
+    params.set('limit', String(limit));
+    const res = await fetch(`${API_BASE}/canvas/documents?${params.toString()}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Échec de récupération des Canvas: ${res.statusText}`);
+    return res.json();
+  },
+
+  async getDocument(docId: string): Promise<CanvasDocumentManifest> {
+    const res = await fetch(`${API_BASE}/canvas/documents/${encodeURIComponent(docId)}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Canvas introuvable: ${res.statusText}`);
+    return res.json();
+  },
+
+  async deleteDocument(docId: string): Promise<{ status: string; deleted: string }> {
+    const res = await fetch(`${API_BASE}/canvas/documents/${encodeURIComponent(docId)}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Échec de suppression: ${res.statusText}`);
+    return res.json();
+  },
+
+  async renderPreview(html: string, title: string = 'Live Preview', wrapWithTheme: boolean = true): Promise<string> {
+    const res = await fetch(`${API_BASE}/canvas/preview`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ html, title, wrap_with_theme: wrapWithTheme }),
+    });
+    if (!res.ok) throw new Error(`Échec de prévisualisation: ${res.statusText}`);
+    return res.text();
+  },
+
+  getServeUrl(docId: string, subpath: string = 'index.html'): string {
+    return `${API_BASE}/canvas/documents/${encodeURIComponent(docId)}/serve/${subpath.replace(/^\/+/, '')}`;
+  },
+};
+
+// ==================== VECTOR MEMORY API ====================
+export const vectorMemoryApi = {
+  async storeMemory(item: MemoryStoreInput): Promise<MemoryEntry> {
+    const res = await fetch(`${API_BASE}/memory/vector/store`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(item),
+    });
+    if (!res.ok) throw new Error(`Échec de stockage mémoire: ${res.statusText}`);
+    return res.json();
+  },
+
+  async searchMemories(query: string, limit: number = 5, minSimilarity: number = 0.5, agentId: string = 'default', category?: MemoryCategory): Promise<MemorySearchResult[]> {
+    const res = await fetch(`${API_BASE}/memory/vector/search`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ query, limit, minSimilarity, agentId, category }),
+    });
+    if (!res.ok) throw new Error(`Échec de recherche sémantique: ${res.statusText}`);
+    return res.json();
+  },
+
+  async listMemories(agentId: string = 'default', category?: MemoryCategory, limit: number = 50): Promise<MemoryEntry[]> {
+    const params = new URLSearchParams({ agentId, limit: String(limit) });
+    if (category) params.set('category', category);
+    const res = await fetch(`${API_BASE}/memory/vector/list?${params.toString()}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Échec de récupération des mémoires: ${res.statusText}`);
+    return res.json();
+  },
+
+  async deleteMemory(memoryId: string): Promise<{ status: string; deleted: string }> {
+    const res = await fetch(`${API_BASE}/memory/vector/${encodeURIComponent(memoryId)}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Échec de suppression mémoire: ${res.statusText}`);
+    return res.json();
+  },
+
+  async executeRecall(prompt: string, agentId: string = 'default'): Promise<RecallHookResult> {
+    const res = await fetch(`${API_BASE}/memory/vector/recall`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ prompt, agent_id: agentId }),
+    });
+    if (!res.ok) throw new Error(`Échec auto-recall: ${res.statusText}`);
+    return res.json();
+  },
+
+  async getConfig(): Promise<AutoRecallConfig> {
+    const res = await fetch(`${API_BASE}/memory/vector/config`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Échec de configuration mémoire: ${res.statusText}`);
+    return res.json();
+  },
+
+  async updateConfig(config: AutoRecallConfig): Promise<AutoRecallConfig> {
+    const res = await fetch(`${API_BASE}/memory/vector/config`, {
+      method: 'PUT',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(config),
+    });
+    if (!res.ok) throw new Error(`Échec de mise à jour configuration mémoire: ${res.statusText}`);
+    return res.json();
+  },
+
+  async clearMemories(agentId: string = 'default'): Promise<{ status: string; deletedCount: number }> {
+    const res = await fetch(`${API_BASE}/memory/vector/clear`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ agent_id: agentId }),
+    });
+    if (!res.ok) throw new Error(`Échec d'effacement des mémoires: ${res.statusText}`);
+    return res.json();
+  },
+};
+
+
 
 
 

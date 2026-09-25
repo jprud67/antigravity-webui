@@ -40,11 +40,12 @@ import {
   X,
   Bookmark
 } from 'lucide-react';
-import type { ChatMessage, ToolCallItem, BookmarkItem, MonacoStudioConfig } from '../types';
+import type { ChatMessage, ToolCallItem, BookmarkItem, MonacoStudioConfig, ProgressCardData } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
 import { DiffViewer } from './DiffViewer';
 import { ApprovalCard } from './ApprovalCard';
 import { TranscriptSearchOverlay } from './TranscriptSearchOverlay';
+import { ProgressCardWidget } from './ProgressCardWidget';
 import { getAuthToken } from '../services/api';
 import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
@@ -90,6 +91,8 @@ interface ChatCanvasProps {
   onDismissLoopWarning?: () => void;
   onStopStreaming?: () => void;
   onOpenMonacoStudio?: (config: MonacoStudioConfig) => void;
+  progressCard?: ProgressCardData | null;
+  onDismissProgressCard?: () => void;
 }
 
 const copyTextToClipboard = async (text: string): Promise<boolean> => {
@@ -807,6 +810,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   onDismissLoopWarning,
   onStopStreaming,
   onOpenMonacoStudio,
+  progressCard,
+  onDismissProgressCard,
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -1798,6 +1803,14 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
               command={pendingApproval.command}
               path={pendingApproval.path}
               onResolved={onApprovalResolved}
+            />
+          </div>
+        )}
+        {progressCard && (
+          <div className="max-w-4xl mx-auto">
+            <ProgressCardWidget
+              card={progressCard}
+              onDismiss={onDismissProgressCard}
             />
           </div>
         )}

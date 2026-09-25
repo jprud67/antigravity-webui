@@ -21,15 +21,24 @@ const ContextCompactorModal = lazy(() => import('./components/ContextCompactorMo
 const SessionBranchModal = lazy(() => import('./components/SessionBranchModal').then(m => ({ default: m.SessionBranchModal })));
 const MonacoStudioModal = lazy(() => import('./components/MonacoStudioModal').then(m => ({ default: m.MonacoStudioModal })));
 const QuickOpenModal = lazy(() => import('./components/QuickOpenModal').then(m => ({ default: m.QuickOpenModal })));
+const FtsSearchModal = lazy(() => import('./components/FtsSearchModal').then(m => ({ default: m.FtsSearchModal })));
+const McpCatalogModal = lazy(() => import('./components/McpCatalogModal').then(m => ({ default: m.McpCatalogModal })));
+const SystemDoctorModal = lazy(() => import('./components/SystemDoctorModal').then(m => ({ default: m.SystemDoctorModal })));
+const RemoteAccessModal = lazy(() => import('./components/RemoteAccessModal').then(m => ({ default: m.RemoteAccessModal })));
+const MessagingGatewayModal = lazy(() => import('./components/MessagingGatewayModal').then(m => ({ default: m.MessagingGatewayModal })));
+const WorktreeDashboardModal = lazy(() => import('./components/WorktreeDashboardModal').then(m => ({ default: m.WorktreeDashboardModal })));
+const CanvasStudioModal = lazy(() => import('./components/CanvasStudioModal').then(m => ({ default: m.CanvasStudioModal })));
+const VectorMemoryModal = lazy(() => import('./components/VectorMemoryModal').then(m => ({ default: m.VectorMemoryModal })));
 
 import type { TokenUsageData } from './components/ContextRing';
-import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig, AppSettings } from './types';
+import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig, AppSettings, ProgressCardData } from './types';
 import { parseStepsToMessages, cleanUserPrompt } from './utils/transcriptParser';
 import { 
   fetchConversations, 
   fetchConversationTranscript, 
   fetchModels, 
   fetchSettings,
+  fetchProgressCard,
   checkAuthStatus,
   clearAuthToken,
   enforceContextBudget,
@@ -273,6 +282,32 @@ export function App() {
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
   const [isMonacoStudioOpen, setIsMonacoStudioOpen] = useState(false);
   const [monacoStudioConfig, setMonacoStudioConfig] = useState<MonacoStudioConfig>({ mode: 'editor' });
+  const [isFtsSearchOpen, setIsFtsSearchOpen] = useState(false);
+  const [isMcpCatalogOpen, setIsMcpCatalogOpen] = useState(false);
+  const [isDoctorOpen, setIsDoctorOpen] = useState(false);
+  const [isRemoteAccessOpen, setIsRemoteAccessOpen] = useState(false);
+  const [isGatewayOpen, setIsGatewayOpen] = useState(false);
+  const [isWorktreeOpen, setIsWorktreeOpen] = useState(false);
+  const [isCanvasStudioOpen, setIsCanvasStudioOpen] = useState(false);
+  const [isVectorMemoryOpen, setIsVectorMemoryOpen] = useState(false);
+  const [activeProgressCard, setActiveProgressCard] = useState<ProgressCardData | null>(null);
+
+  // Global FTS search shortcut (Ctrl+Shift+K or Cmd+Shift+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key.toLowerCase() === 'k' || e.key.toLowerCase() === 'f')) {
+        e.preventDefault();
+        setIsFtsSearchOpen((prev) => !prev);
+      }
+    };
+    const handleOpenFts = () => setIsFtsSearchOpen(true);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('open-fts-search', handleOpenFts);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('open-fts-search', handleOpenFts);
+    };
+  }, []);
 
   const [sessionBookmarks, setSessionBookmarks] = useState<BookmarkItem[]>([]);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('models');
@@ -315,7 +350,15 @@ export function App() {
     chatSocket.setCurrentConversation(convId);
     setPendingApproval(null);
     setQueueCount(0);
+    setActiveProgressCard(null);
     try {
+      // Load any active progress card for this conversation
+      fetchProgressCard(convId).then((res) => {
+        if (activeConversationIdRef.current === convId) {
+          setActiveProgressCard(res?.card || null);
+        }
+      }).catch(() => {});
+
       const data = await fetchConversationTranscript(convId);
       
       // Prevent race conditions from rapid clicking
@@ -596,6 +639,7 @@ export function App() {
     setQueueCount(0);
     setPendingApproval(null);
     setIsStreaming(false);
+    setActiveProgressCard(null);
   };
 
   // WebSocket event handler — subscribe once, use ref for conversation id
@@ -624,6 +668,7 @@ export function App() {
             }
             const live = event.active_turn.live_state;
             if (live) {
+              if (live.progress_card !== undefined) setActiveProgressCard(live.progress_card);
               if (live.pending_approval) setPendingApproval(live.pending_approval);
               if (live.usage) {
                 const norm = normalizeUsage(live.usage);
@@ -676,6 +721,7 @@ export function App() {
             }
             const live = event.live_state;
             if (live) {
+              if (live.progress_card !== undefined) setActiveProgressCard(live.progress_card);
               if (live.pending_approval) setPendingApproval(live.pending_approval);
               if (live.usage) {
                 const norm = normalizeUsage(live.usage);
@@ -963,6 +1009,10 @@ export function App() {
       } else if (event.event === 'approval_resolved') {
         if (!event.conversation_id || !activeConversationIdRef.current || event.conversation_id === activeConversationIdRef.current) {
           setPendingApproval(null);
+        }
+      } else if (event.event === 'progress_card') {
+        if (!event.conversation_id || !activeConversationIdRef.current || event.conversation_id === activeConversationIdRef.current) {
+          setActiveProgressCard(event.card || null);
         }
       } else if (event.event === 'queued') {
         if (typeof event.queue_size === 'number') {
@@ -1344,6 +1394,11 @@ export function App() {
         if (isRulesModalOpen) { setIsRulesModalOpen(false); return; }
         if (isSessionMetaOpen) { setIsSessionMetaOpen(false); return; }
         if (isBranchModalOpen) { setIsBranchModalOpen(false); return; }
+        if (isMcpCatalogOpen) { setIsMcpCatalogOpen(false); return; }
+        if (isDoctorOpen) { setIsDoctorOpen(false); return; }
+        if (isRemoteAccessOpen) { setIsRemoteAccessOpen(false); return; }
+        if (isGatewayOpen) { setIsGatewayOpen(false); return; }
+        if (isWorktreeOpen) { setIsWorktreeOpen(false); return; }
         if (isRightPanelOpen) { setIsRightPanelOpen(false); return; }
         if (isMobileSidebarOpen) { setIsMobileSidebarOpen(false); return; }
         return;
@@ -1363,7 +1418,8 @@ export function App() {
     isSettingsOpen, isAnalyticsOpen, isHelpOpen, isArtifactsOpen, isWorkspacesOpen,
     isFileExplorerOpen, isTaskDashboardOpen, isCronModalOpen, isRulesModalOpen,
     isSessionMetaOpen, isBranchModalOpen, isRightPanelOpen, isMobileSidebarOpen,
-    isQuickOpenOpen,
+    isQuickOpenOpen, isMcpCatalogOpen, isDoctorOpen,
+    isRemoteAccessOpen, isGatewayOpen, isWorktreeOpen,
   ]);
 
   // Phase 3 Session Handlers (Fork, Pin, Tags, Project, Search)
@@ -1852,6 +1908,14 @@ export function App() {
         onOpenGoogleAccount={handleOpenGoogleAccount}
         updateAvailable={!!updateInfo?.update_available}
         onOpenUpdates={handleOpenUpdates}
+        onOpenFtsSearch={() => setIsFtsSearchOpen(true)}
+        onOpenMcpCatalog={() => setIsMcpCatalogOpen(true)}
+        onOpenDoctor={() => setIsDoctorOpen(true)}
+        onOpenRemoteAccess={() => setIsRemoteAccessOpen(true)}
+        onOpenGateway={() => setIsGatewayOpen(true)}
+        onOpenWorktreeDashboard={() => setIsWorktreeOpen(true)}
+        onOpenCanvasStudio={() => setIsCanvasStudioOpen(true)}
+        onOpenVectorMemory={() => setIsVectorMemoryOpen(true)}
       />
 
       {/* Main Chat Area */}
@@ -1924,6 +1988,8 @@ export function App() {
           onDismissLoopWarning={() => setLoopWarning(null)}
           onStopStreaming={handleStopStreaming}
           onOpenMonacoStudio={handleOpenMonacoStudio}
+          progressCard={activeProgressCard}
+          onDismissProgressCard={() => setActiveProgressCard(null)}
         />
 
         <ChatInput
@@ -2152,6 +2218,67 @@ export function App() {
             setPendingOpenFile(filePath);
             window.dispatchEvent(new CustomEvent('open-workspace-file', { detail: { path: filePath } }));
           }}
+        />
+      )}
+
+      {isFtsSearchOpen && (
+        <FtsSearchModal
+          isOpen={isFtsSearchOpen}
+          onClose={() => setIsFtsSearchOpen(false)}
+          onSelectConversation={(sessionId) => {
+            handleSelectConversation(sessionId);
+            setIsFtsSearchOpen(false);
+          }}
+        />
+      )}
+
+      {isMcpCatalogOpen && (
+        <McpCatalogModal
+          isOpen={isMcpCatalogOpen}
+          onClose={() => setIsMcpCatalogOpen(false)}
+        />
+      )}
+
+      {isDoctorOpen && (
+        <SystemDoctorModal
+          isOpen={isDoctorOpen}
+          onClose={() => setIsDoctorOpen(false)}
+        />
+      )}
+
+      {isRemoteAccessOpen && (
+        <RemoteAccessModal
+          isOpen={isRemoteAccessOpen}
+          onClose={() => setIsRemoteAccessOpen(false)}
+        />
+      )}
+
+      {isGatewayOpen && (
+        <MessagingGatewayModal
+          isOpen={isGatewayOpen}
+          onClose={() => setIsGatewayOpen(false)}
+        />
+      )}
+
+      {isWorktreeOpen && (
+        <WorktreeDashboardModal
+          isOpen={isWorktreeOpen}
+          onClose={() => setIsWorktreeOpen(false)}
+          currentWorkspace={currentWorkspace}
+        />
+      )}
+
+      {isCanvasStudioOpen && (
+        <CanvasStudioModal
+          isOpen={isCanvasStudioOpen}
+          onClose={() => setIsCanvasStudioOpen(false)}
+        />
+      )}
+
+      {isVectorMemoryOpen && (
+        <VectorMemoryModal
+          isOpen={isVectorMemoryOpen}
+          onClose={() => setIsVectorMemoryOpen(false)}
         />
       )}
       </Suspense>

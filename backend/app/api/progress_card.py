@@ -1,0 +1,39 @@
+"""FastAPI router for session Progress Cards."""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from app.services.progress_card import (
+    get_progress_card,
+    save_progress_card,
+    delete_progress_card,
+    ProgressCardPayload
+)
+
+router = APIRouter(prefix="/api/conversations/{conversation_id}/progress-card", tags=["Progress Card"])
+
+
+@router.get("")
+async def fetch_card(conversation_id: str):
+    card = get_progress_card(conversation_id)
+    if not card:
+        return {"exists": False, "card": None}
+    return {"exists": True, "card": card}
+
+
+@router.post("")
+async def update_card(conversation_id: str, payload: ProgressCardPayload):
+    try:
+        saved = save_progress_card(conversation_id, payload.model_dump())
+        return {"success": True, "card": saved}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("")
+async def remove_card(conversation_id: str):
+    success = delete_progress_card(conversation_id)
+    return {"success": success}

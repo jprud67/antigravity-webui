@@ -20,20 +20,40 @@ from app.api.files import router as files_router
 from app.api.git import router as git_router
 from app.api.google_accounts import router as google_router
 from app.api.kanban import router as kanban_router
+from app.api.memory import router as memory_router
 from app.api.openai_compat import router as openai_router
 from app.api.prompt import router as prompt_router
 from app.api.rules import router as rules_router
+from app.api.search import router as search_router
 from app.api.settings import router as set_router
 from app.api.skills import router as skills_router
 from app.api.tasks import router as tasks_router
 from app.api.terminal import close_all_terminal_sessions
 from app.api.terminal import router as terminal_router
+from app.api.tool_repair import router as tool_repair_router
 from app.api.updater import router as updater_router
 from app.api.workspaces import router as ws_router
+from app.api.mcp_catalog import router as mcp_catalog_router
+from app.api.progress_card import router as progress_card_router
+from app.api.doctor import router as doctor_router
+from app.api.link_understanding import router as link_understanding_router
+from app.api.git_worktree import router as git_worktree_router
+from app.api.code_kernel import router as code_kernel_router
+from app.api.tailscale import router as tailscale_router
+from app.api.web_push import router as web_push_router
+from app.api.messaging_gateway import router as messaging_gateway_router
+from app.api.canvas_documents import router as canvas_documents_router
+from app.api.vector_memory import router as vector_memory_router
 from app.config import BRAIN_DIR, CONVERSATION_DB
 from app.services.cron_ticker import cron_ticker_loop
 from app.services.execution_manager import execution_manager
 from app.services.fs_watcher import set_main_loop, watch_filesystem
+from app.services.fts_search import ensure_fts_schema
+from app.services.progress_card import ensure_progress_card_schema
+from app.services.link_understanding import ensure_link_cache_schema
+from app.services.web_push import ensure_web_push_schema
+from app.services.messaging_gateway import ensure_messaging_gateway_schema
+from app.services.vector_memory import ensure_vector_memory_schema
 from app.services.google_auth import restore_stashed_token_if_needed
 from app.services.storage import ensure_db_schema
 from app.services.updater import prefetch_update_check
@@ -59,6 +79,12 @@ async def lifespan(app: FastAPI):
     """Démarre les services d'arrière-plan : watcher FS, ticker des tâches planifiées, prefetch MAJ."""
     set_main_loop(asyncio.get_running_loop())
     ensure_db_schema()
+    ensure_fts_schema()
+    ensure_progress_card_schema()
+    ensure_link_cache_schema()
+    ensure_web_push_schema()
+    ensure_messaging_gateway_schema()
+    ensure_vector_memory_schema()
     restore_stashed_token_if_needed()
     prefetch_update_check()
     _warn_if_default_password()
@@ -96,7 +122,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Antigravity WebUI",
     description="Web Interface to orchestrate Antigravity CLI without touching the terminal",
-    version="0.2.26",
+    version="0.3.0",
     lifespan=lifespan
 )
 
@@ -130,6 +156,20 @@ app.include_router(events_router)  # SSE real-time sync CLI ↔ WebUI
 app.include_router(updater_router)  # Hermes-style update check & apply
 app.include_router(prompt_router)
 app.include_router(copilot_router)
+app.include_router(memory_router)   # Continuous memory & user profile (USER.md / MEMORY.md)
+app.include_router(search_router)   # Cross-sessions FTS5 full-text search
+app.include_router(tool_repair_router)  # Local models tool-call repair & normalizer
+app.include_router(mcp_catalog_router)  # 1-Click MCP Catalog Store
+app.include_router(progress_card_router)  # Dynamic Replace-on-Write Progress Card
+app.include_router(doctor_router)  # System Health & Auto-Doctor
+app.include_router(link_understanding_router)  # Bare URL Readability Extraction
+app.include_router(git_worktree_router)  # Subagents Git Worktree Isolation
+app.include_router(code_kernel_router)  # Persistent Python Kernel & Tool RPC
+app.include_router(tailscale_router)  # Zero-Config Tailscale Remote Access
+app.include_router(web_push_router)  # Web Push Notifications
+app.include_router(messaging_gateway_router)  # Telegram & Discord Gateway with PIN Pairing
+app.include_router(canvas_documents_router)  # Sandboxed Canvas Documents & Widgets
+app.include_router(vector_memory_router)  # Vector Memory & Auto-Recall Hook
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])

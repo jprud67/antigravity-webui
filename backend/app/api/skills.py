@@ -1,16 +1,19 @@
 import logging
 import re
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, TypedDict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.config import GEMINI_DIR, HOME
 from app.platform_utils import is_safe_path
+from app.services.skill_curator import skill_curator
 
 logger = logging.getLogger("antigravity.skills")
 router = APIRouter(prefix="/api/skills", tags=["skills"])
+
 
 class SkillDirInfo(TypedDict):
     type: str
@@ -39,6 +42,7 @@ def get_skill_dirs() -> list[SkillDirInfo]:
 
 
 SKILL_DIRS: list[SkillDirInfo] = get_skill_dirs()
+
 
 def parse_skill_md(skill_file: Path) -> dict[str, Any]:
     name = skill_file.parent.name
@@ -94,6 +98,7 @@ def parse_skill_md(skill_file: Path) -> dict[str, Any]:
         "content": content
     }
 
+
 @router.get("")
 def list_skills(_ = Depends(require_auth)) -> list[dict[str, Any]]:
     skills: list[dict[str, Any]] = []
@@ -116,6 +121,8 @@ def list_skills(_ = Depends(require_auth)) -> list[dict[str, Any]]:
                 stat = skill_md.stat()
 
                 seen_ids.add(folder.name)
+                telemetry = skill_curator.get_skill_telemetry(folder.name)
+
                 skills.append({
                     "id": folder.name,
                     "name": meta["name"],
@@ -125,10 +132,61 @@ def list_skills(_ = Depends(require_auth)) -> list[dict[str, Any]]:
                     "has_scripts": has_scripts,
                     "has_examples": has_examples,
                     "last_modified": stat.st_mtime,
-                    "enabled": True  # All discovered skills in these folders are active
+                    "enabled": True,
+                    "status": telemetry["status"],
+                    "use_count": telemetry["use_count"],
+                    "last_used_at": telemetry["last_used_at"],
+                    "pinned": telemetry["pinned"],
+                    "is_protected": telemetry["is_protected"],
                 })
 
     return skills
+
+
+@router.get("/curator/status")
+def get_curator_status(_ = Depends(require_auth)) -> list[dict[str, Any]]:
+    """Renvoie la télémétrie de curation pour toutes les compétences."""
+    return skill_curator.get_all_skills_telemetry()
+
+
+@router.post("/curator/sweep")
+def trigger_curator_sweep(
+    stale_days: int = Query(14, ge=1, le=180),
+    archive_days: int = Query(30, ge=1, le=365),
+    _ = Depends(require_auth),
+) -> dict[str, Any]:
+    """Déclenche le cycle de maintenance et de transition d'état des compétences."""
+    return skill_curator.sweep_lifecycle(stale_days=stale_days, archive_days=archive_days, actor="user")
+
+
+@router.get("/curator/ledger")
+def get_curator_ledger(limit: int = Query(50, ge=1, le=200), _ = Depends(require_auth)) -> list[dict[str, Any]]:
+    """Renvoie l'historique des mutations du journal de curation."""
+    return skill_curator.get_ledger(limit=limit)
+
+
+class PinRequest(BaseModel):
+    pinned: Optional[bool] = None
+
+
+@router.post("/{skill_id}/pin")
+def toggle_skill_pin(skill_id: str, req: Optional[PinRequest] = None, _ = Depends(require_auth)) -> dict[str, Any]:
+    """Épingle ou désépingle une compétence pour la protéger de l'archivage automatique."""
+    safe_id = Path(skill_id).name
+    if not safe_id or safe_id != skill_id or ".." in skill_id:
+        raise HTTPException(status_code=400, detail="Identifiant de skill non valide")
+    pinned_val = req.pinned if req else None
+    return skill_curator.toggle_pin(safe_id, pinned=pinned_val, actor="user")
+
+
+@router.post("/{skill_id}/record-use")
+def record_skill_use(skill_id: str, _ = Depends(require_auth)) -> dict[str, Any]:
+    """Enregistre une invocation de compétence."""
+    safe_id = Path(skill_id).name
+    if not safe_id or safe_id != skill_id or ".." in skill_id:
+        raise HTTPException(status_code=400, detail="Identifiant de skill non valide")
+    return skill_curator.record_skill_usage(safe_id, actor="agent")
+
 
 @router.get("/{skill_id}")
 def get_skill_detail(skill_id: str, _ = Depends(require_auth)):
@@ -141,13 +199,15 @@ def get_skill_detail(skill_id: str, _ = Depends(require_auth)):
         target = (base_dir / safe_id / "SKILL.md").resolve()
         if target.exists() and is_safe_path(target, [base_dir]):
             meta = parse_skill_md(target)
+            telemetry = skill_curator.get_skill_telemetry(safe_id)
             return {
                 "id": safe_id,
                 "name": meta["name"],
                 "description": meta["description"],
                 "content": meta["content"],
                 "type": s_info["type"],
-                "path": str(target.parent)
+                "path": str(target.parent),
+                "telemetry": telemetry,
             }
-            
+
     raise HTTPException(status_code=404, detail="Skill introuvable")

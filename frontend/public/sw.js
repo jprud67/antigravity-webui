@@ -1,6 +1,6 @@
 // Antigravity WebUI Service Worker
-// Version: 0.2.26
-const CACHE_NAME = 'antigravity-cache-v0.2.26';
+// Version: 0.3.0
+const CACHE_NAME = 'antigravity-cache-v0.3.0';
 
 const STATIC_PRECACHE = [
   '/',
@@ -111,3 +111,42 @@ self.addEventListener('fetch', (event) => {
       })
   );
 });
+
+// 5. Web Push notification handling
+self.addEventListener('push', (event) => {
+  let data = { title: 'Antigravity WebUI', body: 'Nouvelle notification' };
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch {
+      data.body = event.data.text();
+    }
+  }
+  const options = {
+    body: data.body || '',
+    icon: data.icon || '/favicon.svg',
+    badge: '/favicon.svg',
+    data: data.data || { url: '/' },
+    tag: data.tag || 'antigravity-notification',
+    renotify: true,
+  };
+  event.waitUntil(self.registration.showNotification(data.title || 'Antigravity', options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

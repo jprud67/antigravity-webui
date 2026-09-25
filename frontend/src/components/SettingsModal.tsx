@@ -45,7 +45,9 @@ import {
   Square,
   RotateCw,
   Search,
-  FileCode2
+  FileCode2,
+  Brain,
+  Sparkles
 } from 'lucide-react';
 import type { AppSettings, ModelOption, Conversation } from '../types';
 import { 
@@ -75,12 +77,15 @@ import {
   deleteApiKey,
   bulkDeleteApiKeys,
   bulkRotateApiKeys,
+  toggleSkillPin,
+  triggerSkillCuratorSweep,
   type ApiKeyItem,
   type GoogleAccountInfo,
   type GoogleAccountsResponse,
   type SystemVersionInfo,
   type UpdateCheckResult
 } from '../services/api';
+import { ContinuousMemoryStudio } from './ContinuousMemoryStudio';
 import { 
   AVAILABLE_THEMES, 
   AVAILABLE_SKINS, 
@@ -106,7 +111,7 @@ export const GoogleIcon = ({ className = "w-4 h-4" }: { className?: string }) =>
   </svg>
 );
 
-export type SettingsTab = 'models' | 'permissions' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates' | 'api_keys';
+export type SettingsTab = 'models' | 'permissions' | 'memory' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates' | 'api_keys';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -367,6 +372,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [skills, setSkills] = useState<any[]>([]);
   const [selectedSkill, setSelectedSkill] = useState<any | null>(null);
   const [skillsLoading, setSkillsLoading] = useState(false);
+  const [curatorSweeping, setCuratorSweeping] = useState(false);
 
   // Security state
   const [oldPassword, setOldPassword] = useState('');
@@ -920,6 +926,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handleToggleSkillPin = async (skillId: string, currentPinned: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res = await toggleSkillPin(skillId, !currentPinned);
+      setSkills((prev) =>
+        prev.map((s) => (s.id === skillId ? { ...s, pinned: res.pinned } : s))
+      );
+      showToast(res.pinned ? t('skill_pinned', 'Skill épinglée (protégée du curateur)') : t('skill_unpinned', 'Skill désépinglée'), 'success');
+    } catch (err: any) {
+      showToast(t('err_pin_skill', 'Erreur: {0}').replace('{0}', err.message), 'error');
+    }
+  };
+
+  const handleCuratorSweep = async () => {
+    setCuratorSweeping(true);
+    try {
+      const res = await triggerSkillCuratorSweep();
+      const updated = await fetchSkills();
+      setSkills(updated);
+      showToast(
+        t('curator_sweep_done', 'Curator: {0} archivée(s), {1} examinée(s)').replace('{0}', String(res.archived_count)).replace('{1}', String(res.swept_count)),
+        'success'
+      );
+    } catch (err: any) {
+      showToast(t('err_curator_sweep', 'Erreur sweep: {0}').replace('{0}', err.message), 'error');
+    } finally {
+      setCuratorSweeping(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -1057,6 +1093,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <span>{t("permission_rules", "Permission Rules")}</span>
               <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60 px-1.5 py-0.2 rounded-full font-mono font-bold">
                 {allowRules.length}
+              </span>
+            </button>
+
+            <button
+              onClick={(e) => handleTabClick('memory', e)}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'memory'
+                  ? 'border-cyan-500 text-cyan-600 dark:text-cyan-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <Brain className="w-4 h-4 text-cyan-500" />
+              <span>{t('tab_memory', 'Mémoire Continue')}</span>
+              <span className="text-[10px] bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-800/60 px-1.5 py-0.2 rounded-full font-mono font-bold">
+                USER / MEM
               </span>
             </button>
 
@@ -2003,6 +2054,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
+          {activeTab === 'memory' && (
+            <ContinuousMemoryStudio />
+          )}
+
           {activeTab === 'skills' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -2010,11 +2065,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>
                     {t("installed_skills", "Installed Skills & Ecosystem")}
                   </h3>
-                  <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{t("modular_capabilities_desc", "Modular capabilities discovered automatically by Antigravity")}</p>
+                  <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{t("modular_capabilities_desc", "Modular capabilities discovered automatically by Antigravity with auto-curator")}</p>
                 </div>
-                <span className="text-[10px] font-mono bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 px-2 py-0.5 rounded-full">
-                  {t('skills_available_count', '{0} skills disponibles').replace('{0}', String(skills.length))}
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCuratorSweep}
+                    disabled={curatorSweeping}
+                    className="py-1 px-2.5 rounded-lg text-[10px] font-medium flex items-center gap-1.5 cursor-pointer border transition-colors disabled:opacity-50 hover:bg-black/5 dark:hover:bg-white/5"
+                    style={{
+                      backgroundColor: 'var(--surface-subtle)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--text)',
+                    }}
+                    title={t('curator_sweep_tooltip', 'Archive automatiquement les compétences non utilisées depuis plus de 30 jours')}
+                  >
+                    <Sparkles className={`w-3 h-3 text-amber-500 ${curatorSweeping ? 'animate-spin' : ''}`} />
+                    <span>{curatorSweeping ? t('sweeping', 'Nettoyage...') : t('curator_sweep_btn', 'Curator Sweep')}</span>
+                  </button>
+                  <span className="text-[10px] font-mono bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 px-2 py-0.5 rounded-full">
+                    {t('skills_available_count', '{0} skills disponibles').replace('{0}', String(skills.length))}
+                  </span>
+                </div>
               </div>
 
               {selectedSkill ? (
@@ -2091,6 +2163,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             >
                               {skill.type === 'builtin' ? 'Built-in' : 'User Config'}
                             </span>
+                            {skill.pinned && (
+                              <span className="text-[9px] bg-amber-500/15 text-amber-500 border border-amber-500/30 px-1 py-0.2 rounded font-mono flex items-center gap-0.5">
+                                <Pin className="w-2.5 h-2.5" /> Épinglée
+                              </span>
+                            )}
+                            {skill.status && (
+                              <span className={`text-[9px] px-1 py-0.2 rounded font-mono border ${
+                                skill.status === 'active'
+                                  ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                                  : skill.status === 'stale'
+                                  ? 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                                  : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/30'
+                              }`}>
+                                {skill.status}
+                              </span>
+                            )}
+                            {skill.use_count !== undefined && (
+                              <span className="text-[9px] text-zinc-400 font-mono">
+                                • {skill.use_count}x
+                              </span>
+                            )}
                             {skill.has_scripts && (
                               <span className="text-[9px] bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded font-mono">
                                 Scripts
@@ -2103,6 +2196,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
 
                       <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleSkillPin(skill.id, !!skill.pinned, e)}
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                            skill.pinned
+                              ? 'bg-amber-500/15 border-amber-500/40 text-amber-500'
+                              : 'bg-transparent border-transparent hover:border-zinc-500/20 text-zinc-400 hover:text-zinc-200'
+                          }`}
+                          title={skill.pinned ? t('pinned_protected', 'Épinglée (protégée du curateur)') : t('click_to_pin', 'Épingler pour protéger')}
+                        >
+                          <Pin className="w-3.5 h-3.5" />
+                        </button>
                         <span className="text-[10px] group-hover:text-indigo-500 transition-colors flex items-center gap-1" style={{ color: 'var(--muted)' }}>
                           <span>{t('view_doc', 'Voir doc')}</span>
                           <ChevronRight className="w-3 h-3" />

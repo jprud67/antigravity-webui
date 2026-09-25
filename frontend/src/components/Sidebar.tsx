@@ -34,7 +34,11 @@ import {
   RotateCcw,
   FileArchive,
   BookmarkPlus,
-  Star
+  Star,
+  Package,
+  Radio,
+  Layers,
+  Brain
 } from 'lucide-react';
 import type { Conversation } from '../types';
 import { AntigravityIcon } from './AntigravityLogo';
@@ -127,6 +131,14 @@ interface SidebarProps {
   updateAvailable?: boolean;
   onOpenUpdates?: () => void;
   onOpenAnalytics?: () => void;
+  onOpenFtsSearch?: () => void;
+  onOpenMcpCatalog?: () => void;
+  onOpenDoctor?: () => void;
+  onOpenRemoteAccess?: () => void;
+  onOpenGateway?: () => void;
+  onOpenWorktreeDashboard?: () => void;
+  onOpenCanvasStudio?: () => void;
+  onOpenVectorMemory?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = React.memo(({
@@ -155,7 +167,15 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   onRefreshConversations,
   updateAvailable,
   onOpenUpdates,
-  onOpenAnalytics
+  onOpenAnalytics,
+  onOpenFtsSearch,
+  onOpenMcpCatalog,
+  onOpenDoctor,
+  onOpenRemoteAccess,
+  onOpenGateway,
+  onOpenWorktreeDashboard,
+  onOpenCanvasStudio,
+  onOpenVectorMemory,
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -943,6 +963,27 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 {activeFilterCount}
               </span>
             )}
+          </button>
+
+          {/* FTS Search Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenFtsSearch) onOpenFtsSearch();
+              else window.dispatchEvent(new CustomEvent('open-fts-search'));
+            }}
+            className="p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center hover:border-indigo-500/50 hover:text-indigo-400 group"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderColor: 'var(--border)',
+              color: 'var(--muted)',
+            }}
+            title={t('fts_search_shortcut', 'Recherche Plein-Texte FTS5 Cross-Sessions (Ctrl+Shift+K)')}
+            aria-label="Recherche Plein-Texte FTS5"
+          >
+            <span className="text-[10px] font-mono font-bold px-1 bg-indigo-500/10 text-indigo-400 rounded group-hover:bg-indigo-500/20">
+              FTS
+            </span>
           </button>
         </div>
 
@@ -1786,6 +1827,118 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               <span className="font-medium text-[11px]">{t('analytics_and_quotas', 'Quotas & Analytique')}</span>
             </div>
             <span className="text-[10px] text-amber-500 group-hover:translate-x-0.5 transition-transform">→</span>
+          </button>
+        )}
+
+        {onOpenMcpCatalog && (
+          <button
+            onClick={onOpenMcpCatalog}
+            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--text)' }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                <Package className="w-3 h-3 text-purple-500" />
+              </div>
+              <span className="font-medium text-[11px]">{t('mcp_store', 'Store MCP (73)')}</span>
+            </div>
+            <span className="text-[10px] text-purple-500 group-hover:translate-x-0.5 transition-transform">→</span>
+          </button>
+        )}
+
+        {onOpenDoctor && (
+          <button
+            onClick={onOpenDoctor}
+            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--text)' }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                <Activity className="w-3 h-3 text-cyan-500" />
+              </div>
+              <span className="font-medium text-[11px]">{t('system_doctor', 'Diagnostics & Doctor')}</span>
+            </div>
+            <span className="text-[10px] text-cyan-500 group-hover:translate-x-0.5 transition-transform">→</span>
+          </button>
+        )}
+
+        {onOpenRemoteAccess && (
+          <button
+            onClick={onOpenRemoteAccess}
+            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--text)' }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
+                <Radio className="w-3 h-3 text-teal-400" />
+              </div>
+              <span className="font-medium text-[11px]">{t('remote_access', 'Accès Distant & Push')}</span>
+            </div>
+            <span className="text-[10px] text-teal-400 group-hover:translate-x-0.5 transition-transform">→</span>
+          </button>
+        )}
+
+        {onOpenGateway && (
+          <button
+            onClick={onOpenGateway}
+            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--text)' }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                <MessageSquare className="w-3 h-3 text-indigo-400" />
+              </div>
+              <span className="font-medium text-[11px]">{t('messaging_gateway', 'Telegram & Discord')}</span>
+            </div>
+            <span className="text-[10px] text-indigo-400 group-hover:translate-x-0.5 transition-transform">→</span>
+          </button>
+        )}
+
+        {onOpenWorktreeDashboard && (
+          <button
+            onClick={onOpenWorktreeDashboard}
+            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--text)' }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <FolderGit2 className="w-3 h-3 text-amber-400" />
+              </div>
+              <span className="font-medium text-[11px]">{t('worktrees_isolation', 'Worktrees Sous-Agents')}</span>
+            </div>
+            <span className="text-[10px] text-amber-400 group-hover:translate-x-0.5 transition-transform">→</span>
+          </button>
+        )}
+
+        {onOpenCanvasStudio && (
+          <button
+            onClick={onOpenCanvasStudio}
+            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--text)' }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                <Layers className="w-3 h-3 text-blue-400" />
+              </div>
+              <span className="font-medium text-[11px]">{t('canvas_documents', 'Canvas Documents Vivants')}</span>
+            </div>
+            <span className="text-[10px] text-blue-400 group-hover:translate-x-0.5 transition-transform">→</span>
+          </button>
+        )}
+
+        {onOpenVectorMemory && (
+          <button
+            onClick={onOpenVectorMemory}
+            className="w-full py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--text)' }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                <Brain className="w-3 h-3 text-purple-400" />
+              </div>
+              <span className="font-medium text-[11px]">{t('vector_memory', 'Mémoire Vectorielle & Recall')}</span>
+            </div>
+            <span className="text-[10px] text-purple-400 group-hover:translate-x-0.5 transition-transform">→</span>
           </button>
         )}
 
