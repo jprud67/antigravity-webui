@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PreBlock, CodeOrInlineBlock } from './AdaptiveCodeBlock';
@@ -12,7 +12,6 @@ import {
   Copy, 
   Terminal, 
   Zap, 
-  Code2, 
   Compass, 
   FileCheck, 
   Cpu,
@@ -21,15 +20,11 @@ import {
   GitBranch,
   PanelRight,
   Download,
-  Globe,
   Edit3,
-  BarChart3,
-  Kanban as KanbanIcon,
   Clock,
-  ShieldCheck,
+  Code2,
   Volume2,
   VolumeX,
-  GitPullRequest,
   Info,
   Lightbulb,
   AlertCircle,
@@ -39,10 +34,8 @@ import {
   User,
   Menu,
   Plus,
-  MoreHorizontal,
   RotateCcw,
   X,
-  Search,
   Bookmark
 } from 'lucide-react';
 import type { ChatMessage, ToolCallItem, BookmarkItem, MonacoStudioConfig } from '../types';
@@ -50,7 +43,7 @@ import { InteractiveQuestion } from './InteractiveQuestion';
 import { DiffViewer } from './DiffViewer';
 import { ApprovalCard } from './ApprovalCard';
 import { TranscriptSearchOverlay } from './TranscriptSearchOverlay';
-import { getExportHtmlUrl, getExportMarkdownUrl, getExportJsonUrl, getAuthToken } from '../services/api';
+import { getAuthToken } from '../services/api';
 import { AntigravityIcon } from './AntigravityLogo';
 import { useI18n, SUPPORTED_LANGUAGES } from '../services/i18n';
 import { showToast } from '../services/toast';
@@ -788,12 +781,12 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   onQuickPrompt,
   onAnswerQuestion,
   onOpenTerminal,
-  onOpenGit,
-  onOpenKanban,
-  onOpenCrons,
-  onOpenRules,
-  onOpenAnalytics,
-  onOpenBranchTree,
+  onOpenGit: _onOpenGit,
+  onOpenKanban: _onOpenKanban,
+  onOpenCrons: _onOpenCrons,
+  onOpenRules: _onOpenRules,
+  onOpenAnalytics: _onOpenAnalytics,
+  onOpenBranchTree: _onOpenBranchTree,
   bookmarks,
   onAddBookmark,
   onRemoveBookmark,
@@ -821,8 +814,6 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showMobileToolsMenu, setShowMobileToolsMenu] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -889,19 +880,18 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
     }
   };
 
-  const handleToggleSearch = () => {
-    if (isSearchOpen) {
-      setIsSearchOpen(false);
-    } else {
-      setIsSearchOpen(true);
-      if (matchingMessageIds.length > 0) {
+  const handleToggleSearch = useCallback(() => {
+    setIsSearchOpen((prev) => {
+      const next = !prev;
+      if (next && matchingMessageIds.length > 0) {
         const safeIdx = Math.min(Math.max(0, currentMatchIndex), matchingMessageIds.length - 1);
         scrollToMatchedMessage(matchingMessageIds[safeIdx]);
       }
-    }
-  };
+      return next;
+    });
+  }, [matchingMessageIds, currentMatchIndex]);
 
-  // Global Ctrl+F / Cmd+F shortcut to open search overlay
+  // Global Ctrl+F / Cmd+F and custom event to open/toggle search overlay
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
@@ -909,9 +899,16 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
         setIsSearchOpen(true);
       }
     };
+    const handleCustomSearch = () => {
+      handleToggleSearch();
+    };
     window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
+    window.addEventListener('antigravity:toggle-chat-search', handleCustomSearch);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      window.removeEventListener('antigravity:toggle-chat-search', handleCustomSearch);
+    };
+  }, [handleToggleSearch]);
 
   const handleCopyMessage = async (id: string, text: string) => {
     await copyTextToClipboard(text);
@@ -1153,360 +1150,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
           )}
         </div>
 
-        {/* Right Side: Tools, Export & Right Panel */}
+        {/* Right Side: Volet Latéral Toggle (Seul bouton conservé dans le header principal) */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Mobile Tools Dropdown Toggle */}
-          <div className="relative md:hidden">
-            <button
-              type="button"
-              onClick={() => setShowMobileToolsMenu(!showMobileToolsMenu)}
-              className="p-2 rounded-xl border flex items-center justify-center transition-colors cursor-pointer"
-              style={{
-                backgroundColor: showMobileToolsMenu ? 'var(--accent-bg)' : 'var(--surface-subtle)',
-                borderColor: showMobileToolsMenu ? 'var(--accent)' : 'var(--border)',
-                color: showMobileToolsMenu ? 'var(--accent-text)' : 'var(--text)',
-              }}
-              title={t('tools_and_extensions', 'Tools & Extensions')}
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-
-            {showMobileToolsMenu && (
-              <div
-                className="absolute right-0 top-full mt-2 w-48 rounded-2xl shadow-2xl z-50 p-2 space-y-1 text-xs animate-fadeIn backdrop-blur-2xl border"
-                style={{
-                  backgroundColor: 'var(--surface)',
-                  borderColor: 'var(--border2)'
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleToggleSearch();
-                    setShowMobileToolsMenu(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
-                  style={{ color: 'var(--text)' }}
-                >
-                  <Search className="w-4 h-4 text-accent shrink-0" />
-                  <span className="font-medium">{t("search_conversation", "Rechercher")} (Ctrl+F)</span>
-                </button>
-                {onOpenTerminal && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenTerminal();
-                      setShowMobileToolsMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    <Terminal className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span className="font-medium">{t("terminal", "Terminal")}</span>
-                  </button>
-                )}
-
-                {onOpenGit && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenGit();
-                      setShowMobileToolsMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    <GitPullRequest className="w-4 h-4 text-rose-400 shrink-0" />
-                    <span className="font-medium">Git</span>
-                  </button>
-                )}
-
-                {onOpenKanban && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenKanban();
-                      setShowMobileToolsMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    <KanbanIcon className="w-4 h-4 text-violet-400 shrink-0" />
-                    <span className="font-medium">Kanban</span>
-                  </button>
-                )}
-
-                {onOpenCrons && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenCrons();
-                      setShowMobileToolsMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span className="font-medium">{t("crons_tasks", "Crons & Tasks")}</span>
-                  </button>
-                )}
-
-                {onOpenRules && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenRules();
-                      setShowMobileToolsMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span className="font-medium">{t("rules_memory", "Rules & Memory")}</span>
-                  </button>
-                )}
-
-                {conversationId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowExportMenu(true);
-                      setShowMobileToolsMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors text-left border-t mt-1 pt-2"
-                    style={{ borderColor: 'var(--border-subtle)', color: 'var(--text)' }}
-                  >
-                    <Download className="w-4 h-4 text-sky-400 shrink-0" />
-                    <span className="font-medium">{t("export_session", "Export session")}</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Desktop Direct Action Buttons */}
-          {/* Export Dropdown */}
-          {conversationId && (
-            <div className="relative hidden md:block">
-              <button
-                type="button"
-                onClick={() => setShowExportMenu(!showExportMenu)}
-                className="py-1.5 px-2.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border"
-                style={{
-                  backgroundColor: 'var(--surface-subtle)',
-                  borderColor: 'var(--border)',
-                  color: 'var(--text)'
-                }}
-                title={t("export_session_title", "Export session to HTML, Markdown or JSON")}
-              >
-                <Download className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
-                <span className="text-[11px] font-medium hidden sm:inline">{t("export", "Export")}</span>
-                <ChevronDown className="w-3 h-3 opacity-60" />
-              </button>
-
-              {showExportMenu && (
-                <div
-                  className="absolute right-0 top-full mt-1.5 w-52 rounded-xl shadow-2xl z-40 p-1.5 space-y-1 text-xs animate-fadeIn backdrop-blur-xl border"
-                  style={{
-                    backgroundColor: 'var(--surface)',
-                    borderColor: 'var(--border2)'
-                  }}
-                  onMouseLeave={() => setShowExportMenu(false)}
-                >
-                  <a
-                    href={getExportHtmlUrl(conversationId)}
-                    target="_blank"
-                    rel="noreferrer"
-                    download
-                    onClick={() => setShowExportMenu(false)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    <Globe className="w-4 h-4 text-sky-400 shrink-0" />
-                    <div className="flex flex-col text-left">
-                      <span className="font-semibold text-[11px]">HTML Autonome</span>
-                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>{t("offline_styled", "Complete & styled offline")}</span>
-                    </div>
-                  </a>
-
-                  <a
-                    href={getExportMarkdownUrl(conversationId)}
-                    target="_blank"
-                    rel="noreferrer"
-                    download
-                    onClick={() => setShowExportMenu(false)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <div className="flex flex-col text-left">
-                      <span className="font-semibold text-[11px]">Markdown (.md)</span>
-                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>{t("github_structured", "GitHub structured format")}</span>
-                    </div>
-                  </a>
-
-                  <a
-                    href={getExportJsonUrl(conversationId)}
-                    target="_blank"
-                    rel="noreferrer"
-                    download
-                    onClick={() => setShowExportMenu(false)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    <Code2 className="w-4 h-4 text-amber-400 shrink-0" />
-                    <div className="flex flex-col text-left">
-                      <span className="font-semibold text-[11px]">{t("json_data", "JSON Data (.json)")}</span>
-                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Transcript brut complet</span>
-                    </div>
-                  </a>
-                </div>
-              )}
-            </div>
-          )}
-
-          {onOpenTerminal && (
-            <button
-              onClick={onOpenTerminal}
-              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden md:flex"
-              style={{
-                backgroundColor: 'var(--surface-subtle)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)'
-              }}
-              title={t("interactive_terminal", "Interactive Terminal (/terminal)")}
-            >
-              <Terminal className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-[11px] font-medium hidden lg:inline">Terminal</span>
-            </button>
-          )}
-
-          {onOpenGit && (
-            <button
-              onClick={onOpenGit}
-              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden md:flex"
-              style={{
-                backgroundColor: 'var(--surface-subtle)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)'
-              }}
-              title={t('git_manager_title', 'Git Manager (/git)')}
-            >
-              <GitPullRequest className="w-3.5 h-3.5 text-rose-400" />
-              <span className="text-[11px] font-medium hidden lg:inline">Git</span>
-            </button>
-          )}
-
-          {onOpenKanban && (
-            <button
-              onClick={onOpenKanban}
-              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden lg:flex"
-              style={{
-                backgroundColor: 'var(--surface-subtle)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)'
-              }}
-              title={t("kanban_board", "Kanban Board (/kanban)")}
-            >
-              <KanbanIcon className="w-3.5 h-3.5 text-violet-400" />
-              <span className="text-[11px] font-medium">Kanban</span>
-            </button>
-          )}
-
-          {onOpenCrons && (
-            <button
-              onClick={onOpenCrons}
-              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden lg:flex"
-              style={{
-                backgroundColor: 'var(--surface-subtle)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)'
-              }}
-              title={t("task_cron_scheduler", "Task & Cron Scheduler (/crons)")}
-            >
-              <Clock className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-[11px] font-medium">Crons</span>
-            </button>
-          )}
-
-          {onOpenRules && (
-            <button
-              onClick={onOpenRules}
-              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden xl:flex"
-              style={{
-                backgroundColor: 'var(--surface-subtle)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)'
-              }}
-              title={t("system_rules_memory", "System Rules & AGENTS.md Memory (/rules)")}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-[11px] font-medium">{t("rules", "Rules")}</span>
-            </button>
-          )}
-
-          {onOpenAnalytics && (
-            <button
-              onClick={onOpenAnalytics}
-              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden lg:flex"
-              style={{
-                backgroundColor: 'var(--surface-subtle)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)'
-              }}
-              title={t("analytics_dashboard", "Dashboard Quotas & Analytique (/analytics)")}
-            >
-              <BarChart3 className="w-3.5 h-3.5 text-sky-400" />
-              <span className="text-[11px] font-medium">Quotas</span>
-            </button>
-          )}
-
-          {onOpenBranchTree && (
-            <button
-              onClick={onOpenBranchTree}
-              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden lg:flex"
-              style={{
-                backgroundColor: 'var(--surface-subtle)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)'
-              }}
-              title={t("session_branches_tooltip", "Arbre des branches et signets mémoire (/branch)")}
-            >
-              <GitBranch className="w-3.5 h-3.5 text-purple-400" />
-              <span className="text-[11px] font-medium">Branches</span>
-            </button>
-          )}
-
-          {onOpenMonacoStudio && (
-            <button
-              onClick={() => onOpenMonacoStudio({ mode: 'editor', initialValue: '', readOnly: false })}
-              className="py-1.5 px-2 rounded-lg text-xs items-center gap-1.5 transition-colors cursor-pointer border hidden lg:flex"
-              style={{
-                backgroundColor: 'var(--surface-subtle)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)'
-              }}
-              title="Monaco Code Studio (/editor)"
-            >
-              <Code2 className="w-3.5 h-3.5 text-sky-400" />
-              <span className="text-[11px] font-medium">Éditeur</span>
-            </button>
-          )}
-
-          {/* Conversation Search Toggle Button */}
-          <button
-            onClick={handleToggleSearch}
-            className="p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border"
-            style={{
-              backgroundColor: isSearchOpen ? 'var(--accent-bg)' : 'var(--surface-subtle)',
-              borderColor: isSearchOpen ? 'var(--accent)' : 'var(--border)',
-              color: isSearchOpen ? 'var(--accent-text)' : 'var(--muted)',
-            }}
-            title={t('search_in_conversation', 'Rechercher dans la conversation (Ctrl+F)')}
-          >
-            <Search className="w-4 h-4" />
-          </button>
-
           {onToggleRightPanel && (
             <button
               onClick={onToggleRightPanel}
@@ -1516,7 +1161,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 borderColor: isRightPanelOpen ? 'var(--accent)' : 'var(--border)',
                 color: isRightPanelOpen ? 'var(--accent-text)' : 'var(--muted)'
               }}
-              title={isRightPanelOpen ? t('close_side_panel', 'Close side panel') : t('open_side_panel', 'Open side panel')}
+              title={isRightPanelOpen ? t('close_side_panel', 'Fermer le volet latéral') : t('open_side_panel', 'Ouvrir le volet latéral')}
             >
               <PanelRight className="w-4 h-4" />
             </button>

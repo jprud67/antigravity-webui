@@ -1996,6 +1996,10 @@ export function App() {
         initialSearchMode={workspaceSearchMode}
         agentActivityTimestamp={agentActivityTimestamp}
         onOpenMonacoStudio={handleOpenMonacoStudio}
+        onOpenCrons={() => setIsCronModalOpen(true)}
+        onOpenRules={() => setIsRulesModalOpen(true)}
+        onOpenAnalytics={stableOpenAnalytics}
+        onOpenBranchTree={() => setIsBranchModalOpen(true)}
       />
 
       {/* Modals & Panels */}

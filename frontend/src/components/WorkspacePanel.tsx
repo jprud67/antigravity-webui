@@ -33,6 +33,10 @@ Loader2,
   SlidersHorizontal,
   ChevronUp,
   Layers,
+  Clock,
+  ShieldCheck,
+  BarChart3,
+  Globe,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon';
 import ReactMarkdown from 'react-markdown';
@@ -63,7 +67,10 @@ import {
   triggerFileDownload,
   uploadWorkspaceFile,
   duplicateWorkspaceFile,
-  fetchGitDiffRanges
+  fetchGitDiffRanges,
+  getExportHtmlUrl,
+  getExportMarkdownUrl,
+  getExportJsonUrl
 } from '../services/api';
 import { detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
 import { showToast } from '../services/toast';
@@ -124,6 +131,11 @@ export interface WorkspacePanelProps {
   onGitStatusChanged?: (status: GitStatusResult | null) => void;
   onArtifactsCountChanged?: (count: number) => void;
   onOpenMonacoStudio?: (config: MonacoStudioConfig) => void;
+  onOpenCrons?: () => void;
+  onOpenRules?: () => void;
+  onOpenAnalytics?: () => void;
+  onOpenBranchTree?: () => void;
+  onToggleChatSearch?: () => void;
 }
 
 export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
@@ -143,8 +155,14 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   onGitStatusChanged,
   onArtifactsCountChanged,
   onOpenMonacoStudio,
+  onOpenCrons,
+  onOpenRules,
+  onOpenAnalytics,
+  onOpenBranchTree,
+  onToggleChatSearch,
 }) => {
   const { t } = useI18n();
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [panelWidth, setPanelWidth] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('antigravity_aux_panel_width');
@@ -1272,9 +1290,14 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
           borderColor: 'var(--border)',
         }}
       >
-        {/* Horizontally Scrollable Tab Buttons */}
+        {/* Horizontally Scrollable Tab Buttons & Actions */}
         <div
-          className="flex items-center gap-1 p-0.5 rounded-xl border overflow-x-auto no-scrollbar touch-scroll min-w-0 flex-1"
+          onWheel={(e) => {
+            if (e.deltaY !== 0) {
+              e.currentTarget.scrollLeft += e.deltaY;
+            }
+          }}
+          className="flex items-center gap-1 p-0.5 rounded-xl border overflow-x-auto no-scrollbar touch-scroll min-w-0 flex-1 whitespace-nowrap"
           style={{
             backgroundColor: 'var(--surface)',
             borderColor: 'var(--border)',
@@ -1352,6 +1375,166 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             <KanbanIcon className="w-3.5 h-3.5" />
             <span>{t('kanban', 'Kanban')}</span>
           </button>
+
+          {/* Divider between Workspace Tabs & General Tools */}
+          <div className="w-px h-4 mx-1 shrink-0" style={{ backgroundColor: 'var(--border)' }} />
+
+          {/* Éditeur Monaco Studio */}
+          {onOpenMonacoStudio && (
+            <button
+              type="button"
+              onClick={() => onOpenMonacoStudio({ mode: 'editor', initialValue: '', readOnly: false })}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50"
+              title="Monaco Code Studio (/editor)"
+            >
+              <Code2 className="w-3.5 h-3.5 text-sky-400" />
+              <span>Éditeur</span>
+            </button>
+          )}
+
+          {/* Branches Studio */}
+          {onOpenBranchTree && (
+            <button
+              type="button"
+              onClick={onOpenBranchTree}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50"
+              title={t("session_branches_tooltip", "Arbre des branches et signets mémoire (/branch)")}
+            >
+              <GitBranch className="w-3.5 h-3.5 text-purple-400" />
+              <span>Branches</span>
+            </button>
+          )}
+
+          {/* Crons Scheduler */}
+          {onOpenCrons && (
+            <button
+              type="button"
+              onClick={onOpenCrons}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50"
+              title={t("task_cron_scheduler", "Task & Cron Scheduler (/crons)")}
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Crons</span>
+            </button>
+          )}
+
+          {/* System Rules */}
+          {onOpenRules && (
+            <button
+              type="button"
+              onClick={onOpenRules}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50"
+              title={t("system_rules_memory", "System Rules & AGENTS.md Memory (/rules)")}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{t("rules", "Règles")}</span>
+            </button>
+          )}
+
+          {/* Analytics Quotas */}
+          {onOpenAnalytics && (
+            <button
+              type="button"
+              onClick={onOpenAnalytics}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50"
+              title={t("analytics_dashboard", "Dashboard Quotas & Analytique (/analytics)")}
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-sky-400" />
+              <span>Quotas</span>
+            </button>
+          )}
+
+          {/* Chat Transcript Search Overlay Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onToggleChatSearch) {
+                onToggleChatSearch();
+              } else {
+                window.dispatchEvent(new CustomEvent('antigravity:toggle-chat-search'));
+              }
+            }}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50"
+            title={t('search_in_conversation', 'Rechercher dans la conversation (Ctrl+F)')}
+          >
+            <Search className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Chat Search</span>
+          </button>
+
+          {/* Export Dropdown */}
+          {conversationId && (
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50"
+                title={t("export_session_title", "Export session to HTML, Markdown or JSON")}
+              >
+                <Download className="w-3.5 h-3.5 text-sky-400" />
+                <span>{t("export", "Export")}</span>
+                <ChevronDown className="w-3 h-3 opacity-60" />
+              </button>
+
+              {showExportMenu && (
+                <div
+                  className="absolute right-0 top-full mt-1.5 w-52 rounded-xl shadow-2xl z-50 p-1.5 space-y-1 text-xs animate-fadeIn backdrop-blur-xl border"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border2)'
+                  }}
+                  onMouseLeave={() => setShowExportMenu(false)}
+                >
+                  <a
+                    href={getExportHtmlUrl(conversationId)}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    onClick={() => setShowExportMenu(false)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <Globe className="w-4 h-4 text-sky-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-[11px]">HTML Autonome</span>
+                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>{t("offline_styled", "Complete & styled offline")}</span>
+                    </div>
+                  </a>
+
+                  <a
+                    href={getExportMarkdownUrl(conversationId)}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    onClick={() => setShowExportMenu(false)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-[11px]">Markdown (.md)</span>
+                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>{t("github_structured", "GitHub structured format")}</span>
+                    </div>
+                  </a>
+
+                  <a
+                    href={getExportJsonUrl(conversationId)}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    onClick={() => setShowExportMenu(false)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <Code2 className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-[11px]">{t("json_data", "JSON Data (.json)")}</span>
+                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Transcript brut complet</span>
+                    </div>
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Header Right Actions: Git Badge & Close */}
