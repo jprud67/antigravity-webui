@@ -1514,7 +1514,7 @@ def list_git_stashes(
     if res.returncode != 0:
         return []
 
-    stashes = []
+    stashes: list[dict[str, Any]] = []
     lines = res.stdout.strip().split("\n") if res.stdout.strip() else []
     for line in lines:
         if not line.strip():
@@ -1704,6 +1704,7 @@ def resolve_conflict(
     elif req.resolution == "custom":
         if req.custom_content is None:
             raise HTTPException(status_code=400, detail="custom_content requis pour une résolution personnalisée.")
+        full_path.parent.mkdir(parents=True, exist_ok=True)
         full_path.write_text(req.custom_content, encoding="utf-8")
     else:
         raise HTTPException(status_code=400, detail=f"Résolution invalide: {req.resolution}")
@@ -1816,9 +1817,11 @@ class UpdateRemoteRequest(BaseModel):
 
 
 class RemoteActionRequest(BaseModel):
+    remote: str | None = None
     branch: str | None = None
     set_upstream: bool = False
     prune: bool = True
+    force: bool = False
     workspace: str | None = None
 
 
@@ -1839,6 +1842,8 @@ class CreateTagRequest(BaseModel):
     target_commit: str = "HEAD"
     message: str | None = None
     push_remote: str | None = None
+    push: bool = False
+    remote: str | None = None
     workspace: str | None = None
 
 
@@ -1851,15 +1856,21 @@ class DeleteTagRequest(BaseModel):
 class ReleaseNotesResponse(BaseModel):
     tag: str
     from_tag: str | None = None
-    commits_count: int
-    notes_markdown: str
+    previous_tag: str | None = None
+    commits_count: int = 0
+    commit_count: int = 0
+    notes_markdown: str = ""
+    changelog_markdown: str = ""
     suggested_title: str
+    github_release_url: str | None = None
+    has_gh_cli: bool = False
 
 
 class PublishReleaseRequest(BaseModel):
     tag: str
     title: str
-    body: str
+    body: str | None = None
+    notes: str | None = None
     draft: bool = False
     prerelease: bool = False
     target_commitish: str | None = None
@@ -1868,9 +1879,11 @@ class PublishReleaseRequest(BaseModel):
 
 class PublishReleaseResponse(BaseModel):
     success: bool
-    method: str  # "gh_cli" | "web_url"
+    method: str = "gh_cli"  # "gh_cli" | "web_url"
+    mode: str = "cli"       # "cli" | "web"
     url: str | None = None
     output: str | None = None
+    message: str = ""
 
 
 @router.get("/remotes", response_model=list[GitRemoteDetail])
@@ -2018,26 +2031,31 @@ def test_remote_connection(
         return {
             "success": True,
             "latency_ms": latency_ms,
-            "output": res.stdout[:500] or "Connexion réussie."
+            "output": res.stdout[:500] or "Connexion réussie.",
+            "error": None
         }
     else:
+        err_msg = _mask_git_output(res.stderr[:500] or res.stdout[:500] or "Inaccessible")
         return {
             "success": False,
             "latency_ms": latency_ms,
-            "output": _mask_git_output(res.stderr[:500] or res.stdout[:500] or "Inaccessible")
+            "output": err_msg,
+            "error": err_msg
         }
 
 
+@router.post("/remotes/fetch")
 @router.post("/remotes/{name}/fetch")
 def fetch_remote(
-    name: str,
-    req: RemoteActionRequest = None,
+    name: str | None = None,
+    req: RemoteActionRequest | None = None,
     workspace: str | None = Query(None),
     _ = Depends(require_auth)
 ):
-    ws = req.workspace if req else workspace
+    remote_name = (name or (req.remote if req else None) or "origin").strip()
+    ws = req.workspace if (req and req.workspace) else workspace
     target = _validate_workspace(ws)
-    args = ["fetch", name.strip()]
+    args = ["fetch", remote_name]
     if req and req.prune:
         args.append("--prune")
     res = run_git(args, target, timeout=30)
@@ -2046,22 +2064,26 @@ def fetch_remote(
     return {"success": True, "output": res.stdout or res.stderr or "Fetch terminé avec succès."}
 
 
+@router.post("/remotes/push")
 @router.post("/remotes/{name}/push")
 def push_remote(
-    name: str,
-    req: RemoteActionRequest = None,
+    name: str | None = None,
+    req: RemoteActionRequest | None = None,
     workspace: str | None = Query(None),
     _ = Depends(require_auth)
 ):
-    ws = req.workspace if req else workspace
+    remote_name = (name or (req.remote if req else None) or "origin").strip()
+    ws = req.workspace if (req and req.workspace) else workspace
     target = _validate_workspace(ws)
     branch = req.branch if (req and req.branch) else ""
     if not branch:
         res_br = run_git(["rev-parse", "--abbrev-ref", "HEAD"], target)
         branch = res_br.stdout.strip() or "main"
-    args = ["push", name.strip(), branch]
+    args = ["push", remote_name, branch]
     if req and req.set_upstream:
         args.append("-u")
+    if req and req.force:
+        args.append("-f")
     res = run_git(args, target, timeout=30)
     if res.returncode != 0:
         raise HTTPException(status_code=400, detail=f"Erreur git push : {_mask_git_output(res.stderr or res.stdout)}")
@@ -2123,9 +2145,11 @@ def create_tag(
 
     args = ["tag"]
     is_annotated = False
+    tag_msg = None
     if req.message and req.message.strip():
         is_annotated = True
-        args.extend(["-a", tag_name, "-m", req.message.strip(), target_commit])
+        tag_msg = _sanitize_git_message(req.message.strip())
+        args.extend(["-a", tag_name, "-m", tag_msg, target_commit])
     else:
         args.extend([tag_name, target_commit])
 
@@ -2133,9 +2157,9 @@ def create_tag(
     if res.returncode != 0:
         raise HTTPException(status_code=400, detail=f"Erreur création tag : {_mask_git_output(res.stderr or res.stdout)}")
 
-    if req.push_remote:
-        remote_name = req.push_remote.strip()
-        run_git(["push", remote_name, tag_name], target, timeout=30)
+    remote_to_push = req.push_remote or (req.remote if req.push else None)
+    if remote_to_push:
+        run_git(["push", remote_to_push.strip(), tag_name], target, timeout=30)
 
     res_commit = run_git(["rev-parse", target_commit], target)
     c_sha = res_commit.stdout.strip()
@@ -2149,7 +2173,7 @@ def create_tag(
         commit_date=c_date,
         commit_message=c_msg,
         is_annotated=is_annotated,
-        tag_message=req.message.strip() if is_annotated else None
+        tag_message=tag_msg
     )
 
 
@@ -2270,12 +2294,35 @@ def get_release_notes(
     if commits_count == 0:
         md_sections.append("*Aucun commit spécifique trouvé pour cette plage.*")
 
+    has_gh_cli = shutil.which("gh") is not None
+    res_remote = run_git(["remote", "get-url", "origin"], target)
+    origin_url = res_remote.stdout.strip()
+    owner_repo = ""
+    match = re.search(r"github\.com[:/]([^/]+)/(.+?)(?:\.git)?$", origin_url)
+    if match:
+        owner_repo = f"{match.group(1)}/{match.group(2)}"
+
+    notes_md = "\n".join(md_sections).strip()
+    github_release_url = None
+    if owner_repo:
+        params = {
+            "tag": current_tag,
+            "title": f"Release {current_tag}",
+            "body": notes_md
+        }
+        github_release_url = f"https://github.com/{owner_repo}/releases/new?{urlencode(params)}"
+
     return ReleaseNotesResponse(
         tag=current_tag,
         from_tag=prev_tag,
+        previous_tag=prev_tag,
         commits_count=commits_count,
-        notes_markdown="\n".join(md_sections).strip(),
-        suggested_title=f"Release {current_tag}"
+        commit_count=commits_count,
+        notes_markdown=notes_md,
+        changelog_markdown=notes_md,
+        suggested_title=f"Release {current_tag}",
+        github_release_url=github_release_url,
+        has_gh_cli=has_gh_cli
     )
 
 
@@ -2285,9 +2332,10 @@ def publish_release(
     _ = Depends(require_auth)
 ):
     target = _validate_workspace(req.workspace)
+    body_text = (req.body or req.notes or "").strip()
     gh_bin = shutil.which("gh")
     if gh_bin:
-        args = [gh_bin, "release", "create", req.tag, "--title", req.title, "--notes", req.body]
+        args = [gh_bin, "release", "create", req.tag, "--title", req.title, "--notes", body_text]
         if req.draft:
             args.append("--draft")
         if req.prerelease:
@@ -2301,8 +2349,10 @@ def publish_release(
                 return PublishReleaseResponse(
                     success=True,
                     method="gh_cli",
+                    mode="cli",
                     url=created_url,
-                    output="Release publiée avec succès via GitHub CLI."
+                    output="Release publiée avec succès via GitHub CLI.",
+                    message="Release publiée avec succès via GitHub CLI."
                 )
         except Exception as e:
             logger.debug(f"gh release create fallback: {e}")
@@ -2319,21 +2369,25 @@ def publish_release(
         params = {
             "tag": req.tag,
             "title": req.title,
-            "body": req.body,
+            "body": body_text,
             "prerelease": "1" if req.prerelease else "0"
         }
         web_url = f"https://github.com/{owner_repo}/releases/new?{urlencode(params)}"
         return PublishReleaseResponse(
             success=True,
             method="web_url",
+            mode="web",
             url=web_url,
-            output="URL de création de release GitHub générée."
+            output="URL de création de release GitHub générée.",
+            message="URL de création de release GitHub générée."
         )
 
     return PublishReleaseResponse(
         success=True,
         method="web_url",
+        mode="web",
         url=None,
-        output="Aucun remote GitHub détecté pour la publication automatique."
+        output="Aucun remote GitHub détecté pour la publication automatique.",
+        message="Aucun remote GitHub détecté pour la publication automatique."
     )
 

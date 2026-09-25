@@ -129,25 +129,35 @@ def test_tags_and_releases(temp_git_repo, auth_headers):
     tags = res.json()
     assert len(tags) >= 2
 
-    # 4. Release notes generation
+    # 4. Release notes generation (both legacy and frontend keys)
     res = client.get("/api/git/releases/notes", params={"tag": "v0.2.0", "workspace": ws}, headers=auth_headers)
     assert res.status_code == 200
     notes = res.json()
     assert notes["tag"] == "v0.2.0"
     assert "Features" in notes["notes_markdown"] or "Nouvelles" in notes["notes_markdown"] or "feat" in notes["notes_markdown"]
+    assert notes["changelog_markdown"] == notes["notes_markdown"]
+    assert notes["previous_tag"] == "v0.1.0"
+    assert notes["commit_count"] >= 1
 
     # 5. Delete tag
     res = client.delete("/api/git/tags/v0.1.0", params={"workspace": ws}, headers=auth_headers)
     assert res.status_code == 200
     assert res.json()["success"] is True
 
-    # 6. Publish release URL generation
+    # 6. Publish release with 'notes' payload (frontend format) and test response fields
     res = client.post(
         "/api/git/releases/publish",
-        json={"tag": "v0.2.0", "title": "Release v0.2.0", "body": "Changelog test", "workspace": ws},
+        json={"tag": "v0.2.0", "title": "Release v0.2.0", "notes": "Changelog test", "workspace": ws},
         headers=auth_headers
     )
     assert res.status_code == 200
     pub = res.json()
     assert pub["success"] is True
     assert pub["method"] in ["gh_cli", "web_url"]
+    assert pub["mode"] in ["cli", "web"]
+
+    # 7. Generic remotes fetch and push endpoints (frontend format)
+    res_fetch = client.post("/api/git/remotes/fetch", json={"remote": "origin", "workspace": ws}, headers=auth_headers)
+    assert res_fetch.status_code in [200, 400]
+    res_push = client.post("/api/git/remotes/push", json={"remote": "origin", "branch": "main", "workspace": ws}, headers=auth_headers)
+    assert res_push.status_code in [200, 400]

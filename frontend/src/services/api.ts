@@ -2184,7 +2184,8 @@ export async function testGitRemoteConnection(
 }
 
 export async function fetchGitRemote(payload: RemoteActionPayload): Promise<{ success: boolean; output: string }> {
-  const res = await fetch(`${API_BASE}/git/remotes/fetch`, {
+  const remotePath = payload.remote ? `/${encodeURIComponent(payload.remote)}/fetch` : '/fetch';
+  const res = await fetch(`${API_BASE}/git/remotes${remotePath}`, {
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload)
@@ -2197,7 +2198,8 @@ export async function fetchGitRemote(payload: RemoteActionPayload): Promise<{ su
 }
 
 export async function pushGitRemote(payload: RemoteActionPayload): Promise<{ success: boolean; output: string }> {
-  const res = await fetch(`${API_BASE}/git/remotes/push`, {
+  const remotePath = payload.remote ? `/${encodeURIComponent(payload.remote)}/push` : '/push';
+  const res = await fetch(`${API_BASE}/git/remotes${remotePath}`, {
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload)

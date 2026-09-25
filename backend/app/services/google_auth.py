@@ -69,7 +69,7 @@ if IS_WINDOWS:
             ("UserName", wintypes.LPWSTR),
         ]
 
-    _advapi32 = ctypes.WinDLL("Advapi32.dll")
+    _advapi32: Any = ctypes.WinDLL("Advapi32.dll")  # type: ignore[attr-defined]
     _CredReadW = _advapi32.CredReadW
     _CredReadW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.POINTER(ctypes.POINTER(_WIN_CREDENTIAL_READ))]
     _CredReadW.restype = wintypes.BOOL

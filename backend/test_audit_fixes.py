@@ -34,6 +34,7 @@ except ImportError:
     pytest = _pytest_shim
 
 import json
+import tempfile
 from datetime import datetime, timezone
 
 from app.config import BRAIN_DIR
@@ -8665,9 +8666,10 @@ def test_storage_compact_supports_role_user():
 
 def test_tasks_transcript_outcomes_and_exit_code(tmp_path):
     """Test that _parse_transcript_task_outcomes correctly extracts completed, failed, and cancelled tasks."""
-    from app.api.tasks import _parse_transcript_task_outcomes, list_active_tasks
     import json
     from unittest.mock import patch
+
+    from app.api.tasks import _parse_transcript_task_outcomes, list_active_tasks
 
     logs_dir = tmp_path / "test-conv" / ".system_generated" / "logs"
     logs_dir.mkdir(parents=True)
@@ -8708,8 +8710,9 @@ def test_tasks_transcript_outcomes_and_exit_code(tmp_path):
 
 def test_tasks_kill_task_open_file_and_fallback(tmp_path):
     """Test that kill_task finds process by open file descriptor or marks task cancelled."""
-    from app.api.tasks import kill_task, KillTaskRequest
     from unittest.mock import patch
+
+    from app.api.tasks import KillTaskRequest, kill_task
 
     tasks_dir = tmp_path / "conv-kill" / ".system_generated" / "tasks"
     tasks_dir.mkdir(parents=True)
@@ -8728,9 +8731,15 @@ def test_tasks_kill_task_open_file_and_fallback(tmp_path):
 
 def test_rules_payload_limit_and_read_only_flags():
     """Test that rules API enforces payload size limits and exposes read_only flags."""
-    from fastapi import HTTPException
     import pytest
-    from app.api.rules import save_rule_content, SaveRuleRequest, list_rules_files, get_rule_content
+    from fastapi import HTTPException
+
+    from app.api.rules import (
+        SaveRuleRequest,
+        get_rule_content,
+        list_rules_files,
+        save_rule_content,
+    )
 
     # Payload limit test
     big_content = "x" * (6 * 1024 * 1024)

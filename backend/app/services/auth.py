@@ -341,7 +341,7 @@ def delete_api_keys_bulk(key_ids: list[str]) -> tuple[int, list[str]]:
     with _auth_lock:
         config = get_auth_config()
         keys = _ensure_api_keys_storage(config)
-        deleted_ids = [k.get("id") for k in keys if k.get("id") in target_ids]
+        deleted_ids = [str(k["id"]) for k in keys if k.get("id") and k.get("id") in target_ids]
         if not deleted_ids:
             return 0, []
         new_keys = [k for k in keys if k.get("id") not in target_ids]

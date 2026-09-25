@@ -1026,7 +1026,7 @@ def single_replace(req: SingleReplaceRequest, _ = Depends(require_auth)):
 
     target_line = lines[req.line_number - 1]
     col_idx = req.column - 1
-    if col_idx < 0 or col_idx + req.match_length > len(target_line):
+    if col_idx < 0 or req.match_length < 0 or col_idx + req.match_length > len(target_line):
         raise HTTPException(status_code=400, detail="Coordonnées de remplacement invalides.")
 
     actual_match = target_line[col_idx : col_idx + req.match_length]
