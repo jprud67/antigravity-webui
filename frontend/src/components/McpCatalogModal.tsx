@@ -282,7 +282,7 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
 
                         {item.is_installed ? (
                           <span className="text-[10px] font-medium text-emerald-500 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
-                            <Check className="w-3 h-3" /> Actif
+                            <Check className="w-3 h-3" /> {t('active', 'Actif')}
                           </span>
                         ) : (
                           <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono shrink-0">
@@ -302,8 +302,8 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
                             ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' 
                             : 'bg-rose-500/10 text-rose-500 border-rose-500/30'
                         }`}>
-                          <span>Latence : {test.latency_ms} ms</span>
-                          <span>{test.success ? 'En ligne' : 'Inaccessible'}</span>
+                          <span>{t('latency_colon', 'Latence :')} {test.latency_ms} ms</span>
+                          <span>{test.success ? t('online', 'En ligne') : t('unreachable', 'Inaccessible')}</span>
                         </div>
                       )}
                     </div>
@@ -319,7 +319,7 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
                           title={t('mcp_test_connectivity', 'Tester la connectivité en direct')}
                         >
                           <Activity className={`w-3 h-3 text-cyan-500 ${isTesting ? 'animate-pulse' : ''}`} />
-                          <span>{isTesting ? 'Test...' : 'Ping'}</span>
+                          <span>{isTesting ? t('testing_ellipsis', 'Test...') : t('ping', 'Ping')}</span>
                         </button>
 
                         {item.source && (
@@ -404,7 +404,7 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
                 </div>
               ) : (
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400">
-                  Ce serveur MCP utilise une configuration sans clé d'API (accès direct ou authentification OAuth via navigateur).
+                  {t('mcp_no_key_needed_notice', "Ce serveur MCP utilise une configuration sans clé d'API (accès direct ou authentification OAuth via navigateur).")}
                 </div>
               )}
 

@@ -168,7 +168,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
                       color: 'var(--muted)',
                     }}
                   >
-                    {data.total_branches} {data.total_branches > 1 ? 'branches' : 'branche'}
+                    {data.total_branches} {data.total_branches > 1 ? t('branches_plural', 'branches') : t('branch_singular', 'branche')}
                   </span>
                 )}
               </div>
@@ -376,7 +376,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
 
           {activeTab === 'tree' && !loading && !data?.tree && (
             <div className="py-12 text-center text-xs opacity-60">
-              Aucune généalogie de branche trouvée pour cette session.
+              {t('no_branch_genealogy_found', 'Aucune généalogie de branche trouvée pour cette session.')}
             </div>
           )}
 
@@ -385,7 +385,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
             <div className="space-y-3">
               {filteredBookmarks.length === 0 ? (
                 <div className="py-12 text-center text-xs opacity-60">
-                  {searchQuery ? 'Aucun signet ne correspond à votre recherche.' : 'Aucun signet mémoire enregistré.'}
+                  {searchQuery ? t('no_bookmark_matches_search', 'Aucun signet ne correspond à votre recherche.') : t('no_memory_bookmark_saved', 'Aucun signet mémoire enregistré.')}
                 </div>
               ) : (
                 filteredBookmarks.map((bm) => {
@@ -414,7 +414,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
                                 color: 'var(--muted)',
                               }}
                             >
-                              Tour #{bm.step_index}
+                              {t('turn_prefix', 'Tour #')}{bm.step_index}
                             </span>
                             {bm.conversation_title && (
                               <span className="text-[11px] font-mono text-[var(--muted)] truncate max-w-[200px]">
@@ -423,7 +423,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
                             )}
                             {isCurrentSession && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                Session active
+                                {t('active_session_badge', 'Session active')}
                               </span>
                             )}
                           </div>
@@ -433,7 +433,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
                             </p>
                           )}
                           <div className="text-[10px] font-mono opacity-50">
-                            Créé le {new Date(bm.created_at).toLocaleString()}
+                            {t('created_on', 'Créé le')} {new Date(bm.created_at).toLocaleString()}
                           </div>
                         </div>
                       </div>
@@ -484,7 +484,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
         >
           <div className="flex items-center gap-2 text-muted">
             <Clock className="w-3.5 h-3.5" />
-            <span>ID Actif : {currentConversationId.slice(0, 18)}...</span>
+            <span>{t('active_id_prefix', 'ID Actif :')} {currentConversationId.slice(0, 18)}...</span>
           </div>
 
           <button
@@ -497,7 +497,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
               color: 'var(--text)',
             }}
           >
-            Fermer
+            {t('close', 'Fermer')}
           </button>
         </div>
       </div>
@@ -560,13 +560,13 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
                 {node.is_root && (
                   <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                    Racine
+                    {t('branch_root', 'Racine')}
                   </span>
                 )}
 
                 {isCurrent && (
                   <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-500/15 text-purple-400 border border-purple-500/30 font-semibold">
-                    En cours
+                    {t('branch_in_progress', 'En cours')}
                   </span>
                 )}
 
@@ -574,7 +574,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
                   className="text-[10px] font-mono px-1.5 py-0.2 rounded border"
                   style={{ borderColor: 'var(--border-subtle)', color: 'var(--muted)' }}
                 >
-                  {node.step_count} étapes
+                  {node.step_count} {t('steps_count', 'étapes')}
                 </span>
               </div>
 
@@ -616,7 +616,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
                 className="px-2.5 py-1 rounded-md text-xs font-medium border hover:bg-[var(--accent-bg)] hover:text-[var(--accent-text)] transition-colors cursor-pointer"
                 style={{ borderColor: 'var(--border)' }}
               >
-                Ouvrir
+                {t('open', 'Ouvrir')}
               </button>
             )}
 

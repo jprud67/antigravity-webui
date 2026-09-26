@@ -195,7 +195,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                       />
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      {report.system.ram.used_gb} Go utilisés / {report.system.ram.total_gb} Go ({report.system.ram.available_gb} Go libres)
+                      {report.system.ram.used_gb} {t('doctor_gb_used', 'Go utilisés')} / {report.system.ram.total_gb} {t('doctor_gb', 'Go')} ({report.system.ram.available_gb} {t('doctor_gb_free', 'Go libres')})
                     </p>
                   </div>
 
@@ -214,7 +214,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                       />
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      {report.system.disk.free_gb} Go disponibles sur {report.system.disk.total_gb} Go
+                      {report.system.disk.free_gb} {t('doctor_gb_available_of', 'Go disponibles sur')} {report.system.disk.total_gb} {t('doctor_gb', 'Go')}
                     </p>
                   </div>
 
@@ -231,7 +231,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                       />
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      {report.system.cpu_cores} cœurs logiques • {report.system.platform}
+                      {report.system.cpu_cores} {t('doctor_logical_cores', 'cœurs logiques')} • {report.system.platform}
                     </p>
                   </div>
                 </div>
@@ -291,7 +291,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      Taille disque : {report.database.size_mb} Mo • Index FTS5 : {report.database.fts5.total_indexed_rows} messages ({report.database.fts5.indexed_sessions} sessions)
+                      {t('doctor_disk_size', 'Taille disque :')} {report.database.size_mb} {t('doctor_mb', 'Mo')} • {t('doctor_fts5_index', 'Index FTS5 :')} {report.database.fts5.total_indexed_rows} {t('doctor_messages', 'messages')} ({report.database.fts5.indexed_sessions} {t('doctor_sessions', 'sessions')})
                     </p>
                   </div>
 
@@ -306,7 +306,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      Python {report.runtimes.python.version} ({report.runtimes.python.is_venv ? 'venv actif' : 'système'}) • Fichiers modifiés Git : {report.runtimes.git.dirty_files}
+                      Python {report.runtimes.python.version} ({report.runtimes.python.is_venv ? t('doctor_venv_active', 'venv actif') : t('doctor_system', 'système')}) • {t('doctor_git_modified_files', 'Fichiers modifiés Git :')} {report.runtimes.git.dirty_files}
                     </p>
                   </div>
                 </div>

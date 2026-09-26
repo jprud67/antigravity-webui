@@ -1153,7 +1153,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                       fontWeight: projectFilter === null ? 600 : 400,
                     }}
                   >
-                    Tous les projets
+                    {t('all_projects', 'Tous les projets')}
                   </button>
                   {allProjects.map((proj) => {
                     const active = projectFilter?.toLowerCase() === proj.name.toLowerCase();
@@ -1182,7 +1182,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             {/* Filter Drawer Footer: count, reset button, save view, and export filtered ZIP */}
             <div className="pt-2 border-t flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
               <div className="flex items-center gap-1.5 text-[11px] font-mono" style={{ color: 'var(--muted)' }}>
-                <span>{filtered.length} session(s)</span>
+                <span>{filtered.length} {t('sessions_count', 'session(s)')}</span>
                 {activeFilterCount > 0 && (
                   <button
                     type="button"
@@ -1239,7 +1239,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[10px] font-sans">
             <span className="text-[9px] uppercase font-bold tracking-wider opacity-60 flex items-center gap-0.5 shrink-0 pl-0.5 text-amber-500">
               <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
-              Vues :
+              {t('views_label', 'Vues :')}
             </span>
             {savedViews.map((v) => {
               const active = activeViewId === v.id;
@@ -1283,7 +1283,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 borderColor: selectedTags.length === 0 ? 'var(--accent)' : 'var(--border)',
               }}
             >
-              #tous
+              #{t('all_tags_abbr', 'tous')}
             </button>
             {allTags.map((tag) => {
               const active = selectedTags.includes(tag.toLowerCase());
@@ -1772,7 +1772,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                           <Clock className="w-2.5 h-2.5" />
                           {parseSafeDate(conv.last_modified_time).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
                         </span>
-                        <span>{conv.step_count}st</span>
+                        <span>{conv.step_count}{t('steps_short', 'st')}</span>
                       </div>
                     </div>
                   </div>
@@ -2201,17 +2201,17 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               {allTags.length > 0 && (
                 <div>
                   <label className="text-[11px] block mb-1 font-medium" style={{ color: 'var(--muted)' }}>
-                    Suggestions existantes :
+                    {t('existing_suggestions', 'Suggestions existantes :')}
                   </label>
                   <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                    {allTags.map((t) => (
+                    {allTags.map((tTag) => (
                       <button
-                        key={t}
+                        key={tTag}
                         type="button"
                         onClick={() => {
                           const current = bulkTagInput.split(',').map((s) => s.trim()).filter(Boolean);
-                          if (!current.includes(t)) {
-                            setBulkTagInput(current.concat(t).join(', '));
+                          if (!current.includes(tTag)) {
+                            setBulkTagInput(current.concat(tTag).join(', '));
                           }
                         }}
                         className="px-2 py-0.5 rounded-full text-[10px] font-mono border hover:border-emerald-500/50 transition-colors cursor-pointer"
@@ -2221,7 +2221,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                           color: 'var(--text)',
                         }}
                       >
-                        #{t}
+                        #{tTag}
                       </button>
                     ))}
                   </div>
@@ -2231,7 +2231,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               {/* Mode choice */}
               <div className="space-y-1.5 pt-1">
                 <label className="text-xs font-medium block" style={{ color: 'var(--text)' }}>
-                  Mode d'application :
+                  {t('application_mode', "Mode d'application :")}
                 </label>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <button
@@ -2271,7 +2271,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 className="px-3.5 py-1.5 rounded-xl text-xs font-medium border hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                 style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
               >
-                Annuler
+                {t('cancel', 'Annuler')}
               </button>
               <button
                 type="button"
@@ -2309,7 +2309,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm" style={{ color: 'var(--strong)' }}>
-                    Assigner un projet
+                    {t('assign_project', 'Assigner un projet')}
                   </h3>
                   <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
                     {t("apply_to_n_sessions", "Apply to {0} selected sessions").replace("{0}", String(selectedConvIds.size))}
@@ -2347,7 +2347,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               {/* Color presets */}
               <div>
                 <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text)' }}>
-                  Couleur du projet :
+                  {t('project_color_label', 'Couleur du projet :')}
                 </label>
                 <div className="flex items-center gap-2">
                   {['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#06B6D4', '#64748B'].map((color) => (
@@ -2375,7 +2375,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 className="px-3 py-1.5 rounded-xl text-xs font-medium border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
                 title={t("remove_project_all_selected", "Remove project assignment from all selected sessions")}
               >
-                Dissocier le projet
+                {t('unlink_project', 'Dissocier le projet')}
               </button>
 
               <div className="flex items-center gap-2">
@@ -2385,7 +2385,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                   className="px-3.5 py-1.5 rounded-xl text-xs font-medium border hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                   style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
                 >
-                  Annuler
+                  {t('cancel', 'Annuler')}
                 </button>
                 <button
                   type="button"
@@ -2430,10 +2430,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm" style={{ color: 'var(--strong)' }}>
-                    Sauvegarder la vue
+                    {t('save_view', 'Sauvegarder la vue')}
                   </h3>
                   <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                    {filtered.length} session(s) correspondent
+                    {filtered.length} {t('sessions_match', 'session(s) correspondent')}
                   </p>
                 </div>
               </div>
@@ -2449,7 +2449,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text)' }}>
-                  Nom de la vue :
+                  {t('view_name_label', 'Nom de la vue :')}
                 </label>
                 <input
                   type="text"
@@ -2476,14 +2476,20 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               {/* Suggestions */}
               <div>
                 <span className="text-[10px] uppercase font-semibold tracking-wider block mb-1" style={{ color: 'var(--muted)' }}>
-                  Idées rapides :
+                  {t('quick_ideas', 'Idées rapides :')}
                 </span>
                 <div className="flex flex-wrap gap-1">
-                  {['Tâches récentes', 'Bugs & Fixes', 'Projet actif', 'Revue de code', 'Favoris'].map((preset) => (
+                  {[
+                    { key: 'recent_tasks', label: t('view_preset_recent_tasks', 'Tâches récentes') },
+                    { key: 'bugs_fixes', label: t('view_preset_bugs_fixes', 'Bugs & Fixes') },
+                    { key: 'active_project', label: t('view_preset_active_project', 'Projet actif') },
+                    { key: 'code_review', label: t('view_preset_code_review', 'Revue de code') },
+                    { key: 'favorites', label: t('view_preset_favorites', 'Favoris') },
+                  ].map((preset) => (
                     <button
-                      key={preset}
+                      key={preset.key}
                       type="button"
-                      onClick={() => setNewViewName(preset)}
+                      onClick={() => setNewViewName(preset.label)}
                       className="px-2 py-0.5 rounded-full text-[10px] border transition-colors cursor-pointer"
                       style={{
                         backgroundColor: 'var(--surface-subtle)',
@@ -2491,7 +2497,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                         color: 'var(--text)',
                       }}
                     >
-                      {preset}
+                      {preset.label}
                     </button>
                   ))}
                 </div>

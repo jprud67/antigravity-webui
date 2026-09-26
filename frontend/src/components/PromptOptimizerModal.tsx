@@ -306,7 +306,7 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
             title={t('prompt_crit_format', 'Format de livrable attendu (diff, étapes, explication)')}
           >
             <Code2 className="w-3 h-3" />
-            <span>Format ({(('output_format' in currentBreakdown ? (currentBreakdown as any).output_format : (currentBreakdown as any).outputFormat) ?? 0)}/25)</span>
+            <span>{t('format', 'Format')} ({(('output_format' in currentBreakdown ? (currentBreakdown as any).output_format : (currentBreakdown as any).outputFormat) ?? 0)}/25)</span>
           </div>
         </div>
       </div>
@@ -335,7 +335,7 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
         }}
       >
         <span className="text-[11px] font-medium uppercase tracking-wider mr-1 shrink-0" style={{ color: 'var(--muted, #71717a)' }}>
-          Preset :
+          {t('preset_label', 'Preset :')}
         </span>
         {PRESET_OPTIONS.map((opt) => {
           const isSelected = selectedPreset === opt.id;
@@ -381,9 +381,9 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
           >
             <span>{t('prompt_original_draft', 'Brouillon Original (modifiable)')}</span>
             <div className="flex items-center gap-2 font-mono text-[10px]">
-              <span>{clientClarity.wordCount} mots</span>
+              <span>{clientClarity.wordCount} {t('words', 'mots')}</span>
               <span>•</span>
-              <span>~{clientClarity.estimatedTokens} tokens</span>
+              <span>~{clientClarity.estimatedTokens} {t('tokens', 'tokens')}</span>
             </div>
           </div>
 
@@ -442,9 +442,9 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
               <span>{t('prompt_optimized_result', 'Meta-Prompt Optimisé (Agentic)')}</span>
             </div>
             <div className="flex items-center gap-2 font-mono text-[10px]" style={{ color: 'var(--muted, #71717a)' }}>
-              <span>{optimizedText ? `${optimizedText.split(/\s+/).length} mots` : '0 mot'}</span>
+              <span>{optimizedText ? `${optimizedText.split(/\s+/).length} ${t('words', 'mots')}` : `0 ${t('word_singular', 'mot')}`}</span>
               <span>•</span>
-              <span>~{Math.max(1, Math.ceil(optimizedText.length / 3.8))} tokens</span>
+              <span>~{Math.max(1, Math.ceil(optimizedText.length / 3.8))} {t('tokens', 'tokens')}</span>
             </div>
           </div>
 
@@ -481,7 +481,7 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
               }}
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copié !' : 'Copier'}</span>
+              <span>{copied ? t('copied_excl', 'Copié !') : t('copy', 'Copier')}</span>
             </button>
 
             <button

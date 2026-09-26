@@ -250,7 +250,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                 {stats.total}
               </div>
               <div className="text-[10px]" style={{ color: 'var(--muted)' }}>
-                {stats.pinned} épinglées &bull; {stats.archived} archivées
+                {stats.pinned} {t('pinned_abbr', 'épinglées')} &bull; {stats.archived} {t('archived_abbr', 'archivées')}
               </div>
             </div>
 
@@ -283,7 +283,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                 {t('active_session_tokens', 'Consommation de la Discussion Active')}
               </h3>
               <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                {tokenUsage ? 'Mesure en direct' : 'En attente de messages'}
+                {tokenUsage ? t('live_measurement', 'Mesure en direct') : t('waiting_for_messages', 'En attente de messages')}
               </span>
             </div>
 
@@ -306,7 +306,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                   {formatNum(tokenUsage?.inputTokens)}
                 </div>
                 <span className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>
-                  Contexte & historique injecté
+                  {t('context_and_history_injected', 'Contexte & historique injecté')}
                 </span>
               </div>
 
@@ -328,7 +328,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                   {formatNum(tokenUsage?.outputTokens)}
                 </div>
                 <span className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>
-                  Génération par le modèle
+                  {t('model_generation', 'Génération par le modèle')}
                 </span>
               </div>
 
@@ -350,7 +350,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                   {formatNum(tokenUsage?.thinkingTokens)}
                 </div>
                 <span className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>
-                  Raisonnement interne
+                  {t('internal_reasoning', 'Raisonnement interne')}
                 </span>
               </div>
 
@@ -372,7 +372,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                   {formatNum(tokenUsage?.totalTokens)}
                 </div>
                 <span className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>
-                  Volume total cumulé
+                  {t('total_accumulated_volume', 'Volume total cumulé')}
                 </span>
               </div>
             </div>
@@ -386,7 +386,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                 {t('model_quotas_title', 'Quotas des Modèles (Google Cloud & Antigravity)')}
               </h3>
               <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                Dernière synchro : {lastRefreshed.toLocaleTimeString()}
+                {t('last_sync_prefix', 'Dernière synchro :')} {lastRefreshed.toLocaleTimeString()}
               </span>
             </div>
 
@@ -411,7 +411,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                   {t('quota_not_available', 'Quotas temporairement inaccessibles via le CLI')}
                 </p>
                 <p className="text-[11px] max-w-md mx-auto">
-                  Antigravity gère automatiquement les bascules de quotas en arrière-plan. Dès qu'un compte atteint son quota, un compte relais prend le relais.
+                  {t('antigravity_quota_fallback_desc', "Antigravity gère automatiquement les bascules de quotas en arrière-plan. Dès qu'un compte atteint son quota, un compte relais prend le relais.")}
                 </p>
                 <button
                   type="button"
@@ -442,7 +442,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                           {group.name}
                         </span>
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded border" style={{ borderColor: 'var(--border)' }}>
-                          {buckets.length} palier(s)
+                          {buckets.length} {t('tiers_count', 'palier(s)')}
                         </span>
                       </div>
 
@@ -474,10 +474,10 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                             <div key={bIdx} className="space-y-1.5 p-2 rounded-xl bg-black/10 dark:bg-white/5 border border-white/5">
                               <div className="flex items-center justify-between text-xs">
                                 <span className="font-medium" style={{ color: 'var(--text)' }}>
-                                  {b.name || 'Fenêtre de quota'}
+                                  {b.name || t('quota_window', 'Fenêtre de quota')}
                                 </span>
                                 <span className={`font-mono font-bold ${colorClass.split(' ')[1]}`}>
-                                  {pctText}% restant
+                                  {pctText}% {t('remaining', 'restant')}
                                 </span>
                               </div>
 

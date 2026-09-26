@@ -432,7 +432,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                   }}
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>{addingMemory ? 'Mémorisation...' : t('vector_add_btn', 'Mémoriser')}</span>
+                  <span>{addingMemory ? t('memorizing', 'Mémorisation...') : t('vector_add_btn', 'Mémoriser')}</span>
                 </button>
               </form>
 
@@ -456,7 +456,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                             <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-500/15 text-purple-300 border border-purple-500/30 font-mono font-bold">
-                              {(res.similarity * 100).toFixed(0)}% match
+                              {(res.similarity * 100).toFixed(0)}% {t('match', 'match')}
                             </span>
                             <span
                               className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase font-semibold border"
@@ -469,7 +469,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                               {res.entry.category}
                             </span>
                             <span className="text-[10px] font-mono" style={{ color: 'var(--muted)' }}>
-                              Score: {res.score.toFixed(3)}
+                              {t('score_colon', 'Score:')} {res.score.toFixed(3)}
                             </span>
                           </div>
                           <p className="text-xs leading-relaxed select-text" style={{ color: 'var(--text)' }}>
@@ -494,7 +494,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                     <Brain className="w-10 h-10 mb-3 opacity-40 text-purple-400" />
                     <h3 className="text-sm font-semibold" style={{ color: 'var(--strong)' }}>{t('vector_no_memories', 'Aucun souvenir enregistré')}</h3>
                     <p className="text-xs max-w-sm mt-1" style={{ color: 'var(--muted)' }}>
-                      Ajoutez votre première règle, habitude ou fait technique dans le formulaire ci-dessus.
+                      {t('vector_first_rule_hint', 'Ajoutez votre première règle, habitude ou fait technique dans le formulaire ci-dessus.')}
                     </p>
                   </div>
                 ) : (
@@ -686,7 +686,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                         <span>{t('vector_config_saved', 'Configuration Enregistrée !')}</span>
                       </>
                     ) : (
-                      <span>{savingConfig ? 'Enregistrement...' : 'Sauvegarder les paramètres'}</span>
+                      <span>{savingConfig ? t('saving_ellipsis', 'Enregistrement...') : t('save_settings', 'Sauvegarder les paramètres')}</span>
                     )}
                   </button>
                 </div>

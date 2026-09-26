@@ -622,7 +622,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
               title={t('copilot_ghost_tooltip', 'Activer ou mettre en pause AI Copilot Ghost Text (Alt+C)')}
             >
               <Zap className={`w-3.5 h-3.5 ${copilotStatus === 'generating' ? 'animate-pulse text-amber-400' : copilotActive ? 'text-purple-400' : ''}`} />
-              <span>Copilot {copilotActive ? 'Actif' : 'En pause'}</span>
+              <span>Copilot {copilotActive ? t('active', 'Actif') : t('paused', 'En pause')}</span>
               {copilotLatency !== null && copilotActive && (
                 <span className="text-[10px] opacity-70 font-mono">({copilotLatency}ms)</span>
               )}
@@ -808,7 +808,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
                 title={t('multiple_cursors_tooltip', 'Curseurs multiples actifs. Cliquez pour réinitialiser à un seul curseur (ou Échap).')}
               >
                 <Layers className="w-3 h-3" />
-                <span>{cursorCount} curseurs</span>
+                <span>{cursorCount} {t('cursors', 'curseurs')}</span>
                 <X className="w-3 h-3 opacity-60 hover:opacity-100" />
               </button>
             </>

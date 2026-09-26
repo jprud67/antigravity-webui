@@ -2161,11 +2161,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                   : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
                               }`}
                             >
-                              {skill.type === 'builtin' ? 'Built-in' : 'User Config'}
+                              {skill.type === 'builtin' ? t('builtin', 'Built-in') : t('user_config', 'User Config')}
                             </span>
                             {skill.pinned && (
                               <span className="text-[9px] bg-amber-500/15 text-amber-500 border border-amber-500/30 px-1 py-0.2 rounded font-mono flex items-center gap-0.5">
-                                <Pin className="w-2.5 h-2.5" /> Épinglée
+                                <Pin className="w-2.5 h-2.5" /> {t('pinned', 'Épinglée')}
                               </span>
                             )}
                             {skill.status && (
@@ -2186,7 +2186,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             )}
                             {skill.has_scripts && (
                               <span className="text-[9px] bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded font-mono">
-                                Scripts
+                                {t('scripts', 'Scripts')}
                               </span>
                             )}
                           </div>

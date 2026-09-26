@@ -169,7 +169,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
 
           <button
             onClick={handleToggleSource}
-            title={viewSource ? 'Voir le rendu' : 'Voir le code HTML'}
+            title={viewSource ? t('view_rendered', 'Voir le rendu') : t('view_html_code', 'Voir le code HTML')}
             className={`p-1 rounded transition-colors ${
               viewSource ? 'bg-accent/20 text-accent font-semibold' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
             }`}
@@ -200,7 +200,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
           {allowFullscreen && (
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}
-              title={isFullscreen ? 'Réduire' : 'Plein écran'}
+              title={isFullscreen ? t('minimize', 'Réduire') : t('fullscreen', 'Plein écran')}
               className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             >
               {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}

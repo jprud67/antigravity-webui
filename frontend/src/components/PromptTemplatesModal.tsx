@@ -465,14 +465,14 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-bold text-sm tracking-tight" style={{ color: 'var(--strong)' }}>
-                  Bibliothèque de Prompts & Snippets
+                  {t('prompt_library_title', 'Bibliothèque de Prompts & Snippets')}
                 </h2>
                 <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                  {allTemplates.length} modèles
+                  {allTemplates.length} {t('templates_count', 'modèles')}
                 </span>
               </div>
               <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                Modèles structurés avec variables dynamiques pour vos workflows réguliers
+                {t('prompt_library_desc', 'Modèles structurés avec variables dynamiques pour vos workflows réguliers')}
               </p>
             </div>
           </div>
@@ -583,11 +583,11 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                       <div className="flex items-center justify-between gap-1.5 mb-1">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="font-semibold text-xs truncate" style={{ color: active ? 'var(--accent)' : 'var(--strong)' }}>
-                            {tmpl.isCustom ? tmpl.title : t(`prompt_tpl_${tmpl.id}_title`, tmpl.title)}
+                            {tmpl.title}
                           </span>
                           {tmpl.isCustom && (
                             <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-500 font-mono">
-                              custom
+                              {t('custom', 'custom')}
                             </span>
                           )}
                         </div>
@@ -615,7 +615,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                       </div>
 
                       <p className="text-[11px] line-clamp-2 leading-relaxed" style={{ color: 'var(--muted)' }}>
-                        {tmpl.isCustom ? tmpl.description : t(`prompt_tpl_${tmpl.id}_desc`, tmpl.description)}
+                        {tmpl.description}
                       </p>
 
                       {vars.length > 0 && (
@@ -775,10 +775,10 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                 >
                   <div className="min-w-0">
                     <h3 className="font-bold text-sm truncate" style={{ color: 'var(--strong)' }}>
-                      {selectedTemplate.isCustom ? selectedTemplate.title : t(`prompt_tpl_${selectedTemplate.id}_title`, selectedTemplate.title)}
+                      {selectedTemplate.title}
                     </h3>
                     <p className="text-[11px] truncate" style={{ color: 'var(--muted)' }}>
-                      {selectedTemplate.isCustom ? selectedTemplate.description : t(`prompt_tpl_${selectedTemplate.id}_desc`, selectedTemplate.description)}
+                      {selectedTemplate.description}
                     </p>
                   </div>
 
@@ -791,7 +791,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                       title={t('prompt_tpl_copy_resolved_tooltip', 'Copier le prompt résolu')}
                     >
                       {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copied ? 'Copié' : 'Copier'}</span>
+                      <span>{copied ? t('copied', 'Copié') : t('copy', 'Copier')}</span>
                     </button>
                   </div>
                 </div>

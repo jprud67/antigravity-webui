@@ -1840,7 +1840,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                 }}
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>{queueCount} en attente</span>
+                <span>{queueCount} {t('pending', 'en attente')}</span>
                 {onClearQueue && (
                   <button
                     type="button"

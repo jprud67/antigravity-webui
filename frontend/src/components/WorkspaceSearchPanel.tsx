@@ -468,11 +468,11 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
         <div className="px-3 py-1.5 border-b flex items-center justify-between text-[11px] text-slate-400 shrink-0" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface-subtle)' }}>
           <div className="flex items-center gap-1.5 truncate">
             <span className="font-semibold text-slate-200">
-              {resultsData.total_matches} occurrence{resultsData.total_matches > 1 ? 's' : ''}
+              {resultsData.total_matches} {resultsData.total_matches > 1 ? t('occurrences_plural', 'occurrences') : t('occurrence_singular', 'occurrence')}
             </span>
             <span>{t('in', 'dans')}</span>
             <span className="font-semibold text-slate-200">
-              {resultsData.total_files} fichier{resultsData.total_files > 1 ? 's' : ''}
+              {resultsData.total_files} {resultsData.total_files > 1 ? t('files_plural', 'fichiers') : t('file_singular', 'fichier')}
             </span>
             <span className="text-[10px] opacity-70">({resultsData.duration_ms} ms)</span>
             {resultsData.truncated && (

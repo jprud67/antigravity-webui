@@ -294,7 +294,7 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
                   {t('context_compactor_title', 'Assistant d\'Élagage & Compactage de Contexte')}
                 </h3>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 font-mono font-medium border border-sky-500/30">
-                  Optimiseur LLM
+                  {t('llm_optimizer', 'Optimiseur LLM')}
                 </span>
               </div>
               <p className="text-xs opacity-70">
@@ -359,7 +359,7 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
                 <span className={`font-bold ${budgetInfo?.is_over_budget ? 'text-rose-400' : 'text-sky-400'}`}>
                   ~{(budgetInfo?.estimated_input_tokens || currentTokens).toLocaleString()}
                 </span>
-                <span className="opacity-60"> / {(budgetInfo?.budget_tokens || 35000).toLocaleString()} tokens ({budgetInfo ? `${budgetInfo.budget_usage_pct}%` : `${contextPct}%`})</span>
+                <span className="opacity-60"> / {(budgetInfo?.budget_tokens || 35000).toLocaleString()} {t('tokens', 'tokens')} ({budgetInfo ? `${budgetInfo.budget_usage_pct}%` : `${contextPct}%`})</span>
               </div>
             </div>
 
@@ -453,7 +453,7 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold">{t('turns_to_preserve', 'Tours récents à préserver intacts :')}</span>
                 <span className="text-xs font-bold text-amber-400 font-mono">
-                  {preserveTurns} {preserveTurns > 1 ? 'derniers tours' : 'dernier tour'}
+                  {preserveTurns} {preserveTurns > 1 ? t('last_turns_plural', 'derniers tours') : t('last_turn_singular', 'dernier tour')}
                 </span>
               </div>
 
@@ -469,9 +469,9 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
                         : 'border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <span className="font-bold">{val} {val > 1 ? 'tours' : 'tour'}</span>
+                    <span className="font-bold">{val} {val > 1 ? t('turns_plural', 'tours') : t('turn_singular', 'tour')}</span>
                     <span className="text-[10px] opacity-75 font-sans">
-                      {val === 1 ? 'Élagage maximal' : val === 2 ? 'Équilibre recommandé' : 'Sécurité maximale'}
+                      {val === 1 ? t('maximal_pruning', 'Élagage maximal') : val === 2 ? t('recommended_balance', 'Équilibre recommandé') : t('maximal_safety', 'Sécurité maximale')}
                     </span>
                   </button>
                 ))}
@@ -561,7 +561,7 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
             <div className="text-xs">
               <span className="opacity-70">{t('estimated_savings', 'Économie estimée : ')}</span>
               <span className="font-bold text-emerald-400 font-mono">
-                ~{estimatedSavings.tokens.toLocaleString()} tokens
+                ~{estimatedSavings.tokens.toLocaleString()} {t('tokens', 'tokens')}
               </span>
               {estimatedSavings.pct > 0 && (
                 <span className="ml-1 text-[11px] font-mono opacity-75 text-emerald-400">

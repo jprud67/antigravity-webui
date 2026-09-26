@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../services/i18n';
 
 interface VoiceWaveformVisualizerProps {
   isActive: boolean;
@@ -13,6 +14,7 @@ export const VoiceWaveformVisualizer: React.FC<VoiceWaveformVisualizerProps> = (
   barCount = 28,
   className = '',
 }) => {
+  const { t } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hasMicAccess, setHasMicAccess] = useState<boolean | null>(null);
 
@@ -173,8 +175,8 @@ export const VoiceWaveformVisualizer: React.FC<VoiceWaveformVisualizerProps> = (
         style={{ height: `${height}px` }}
         title={
           hasMicAccess === false
-            ? 'Animation d\'ondes vocales simulée'
-            : 'Visualiseur de microphone en direct'
+            ? t('simulated_voice_waveform_tooltip', "Animation d'ondes vocales simulée")
+            : t('live_mic_visualizer_tooltip', 'Visualiseur de microphone en direct')
         }
       />
     </div>

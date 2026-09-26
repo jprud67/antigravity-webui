@@ -330,7 +330,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
                         <span className="font-mono truncate font-medium" style={{ color: isSelected ? 'var(--accent-text)' : 'var(--strong)' }}>{art.filename}</span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px] pl-5.5 font-mono" style={{ color: 'var(--muted)' }}>
-                        <span>{(art.size / 1024).toFixed(1)} Ko</span>
+                        <span>{(art.size / 1024).toFixed(1)} {t('kb_abbr', 'Ko')}</span>
                         <span>•</span>
                         <span>{new Date(art.last_modified).toLocaleDateString()}</span>
                       </div>
@@ -376,7 +376,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
                     <span className="hidden md:inline opacity-30">|</span>
                     <span className="text-[10.5px] truncate max-w-xs hidden md:inline font-mono opacity-70">{selectedArtifact.relative_path}</span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full border bg-black/10 dark:bg-black/20 hidden lg:inline font-mono" style={{ borderColor: 'var(--border-subtle)', color: 'var(--muted)' }}>
-                      {docStats.lines} l • {docStats.words} mots • {(selectedArtifact.size / 1024).toFixed(1)} Ko
+                      {docStats.lines} {t('lines_short', 'l')} • {docStats.words} {t('words', 'mots')} • {(selectedArtifact.size / 1024).toFixed(1)} {t('kb_abbr', 'Ko')}
                     </span>
                   </div>
 

@@ -264,7 +264,9 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
               <p className="text-xs font-medium">{t('fts_empty_prompt', 'Recherche plein-texte ultra-rapide à travers toutes vos conversations.')}</p>
               {stats && (
                 <p className="text-[11px] text-slate-500 font-mono">
-                  Base FTS : {stats.total_indexed_rows.toLocaleString()} messages indexés dans {stats.indexed_sessions} sessions.
+                  {t('fts_db_stats_summary', 'Base FTS : {0} messages indexés dans {1} sessions.')
+                    .replace('{0}', stats.total_indexed_rows.toLocaleString())
+                    .replace('{1}', String(stats.indexed_sessions))}
                 </p>
               )}
             </div>

@@ -1982,13 +1982,13 @@ export function App() {
             }}
           >
             <span className={wsStatus === 'reconnecting' ? 'animate-pulse' : ''}>
-              {wsStatus === 'reconnecting' ? '⟳ Reconnexion en cours…' : '⚠ Connexion perdue'}
+              {wsStatus === 'reconnecting' ? t('reconnecting_in_progress', '⟳ Reconnexion en cours…') : t('connection_lost', '⚠ Connexion perdue')}
             </span>
             <button
               onClick={() => chatSocket.reconnect()}
               className="underline hover:opacity-80 transition-opacity"
             >
-              Reconnecter
+              {t('reconnect', 'Reconnecter')}
             </button>
           </div>
         )}

@@ -849,7 +849,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
                   )}
 
                   <span className="text-xs opacity-60 font-mono hidden sm:inline">
-                    ({linesCount} lines • {formatBytes(cleanedCode.length)})
+                    ({linesCount} {t('lines_plural', 'lignes')} • {formatBytes(cleanedCode.length)})
                   </span>
                 </div>
 

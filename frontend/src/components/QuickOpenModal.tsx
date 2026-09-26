@@ -147,7 +147,7 @@ export const QuickOpenModal: React.FC<QuickOpenModalProps> = React.memo(({
             </button>
           )}
           <kbd className="px-1.5 py-0.5 rounded border text-[10px] font-mono text-slate-400 bg-black/10 dark:bg-white/10 shrink-0">
-            Échap
+            {t('key_esc', 'Échap')}
           </kbd>
         </div>
 
@@ -160,15 +160,15 @@ export const QuickOpenModal: React.FC<QuickOpenModalProps> = React.memo(({
             <div className="py-10 text-center flex flex-col items-center justify-center gap-2 text-xs" style={{ color: 'var(--muted)' }}>
               <Sparkles className="w-6 h-6 text-sky-400/60 mb-1" />
               <p className="font-medium text-sm" style={{ color: 'var(--strong)' }}>
-                Accès Rapide aux Fichiers (Quick Open)
+                {t('quick_open_title', 'Accès Rapide aux Fichiers (Quick Open)')}
               </p>
               <p className="max-w-xs text-slate-400">
-                Tapez les premières lettres du nom d'un fichier ou d'une fonction pour naviguer instantanément.
+                {t('quick_open_hint', "Tapez les premières lettres du nom d'un fichier ou d'une fonction pour naviguer instantanément.")}
               </p>
             </div>
           ) : activeResults.length === 0 && !loading ? (
             <div className="py-10 text-center text-xs" style={{ color: 'var(--muted)' }}>
-              Aucun fichier correspondant à « <span className="text-sky-400 font-mono">{query}</span> »
+              {t('no_file_matching_query', 'Aucun fichier correspondant à « {0} »').replace('{0}', query)}
             </div>
           ) : (
             activeResults.map((item, idx) => {
@@ -202,12 +202,12 @@ export const QuickOpenModal: React.FC<QuickOpenModalProps> = React.memo(({
                         </span>
                         {item.match_type === 'content' && (
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            Lg {item.line_number}
+                            {t('line_abbr', 'Lg')} {item.line_number}
                           </span>
                         )}
                         {item.is_dir && (
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center gap-1">
-                            <Folder className="w-2.5 h-2.5" /> Dossier
+                            <Folder className="w-2.5 h-2.5" /> {t('folder', 'Dossier')}
                           </span>
                         )}
                       </div>

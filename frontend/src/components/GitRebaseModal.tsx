@@ -364,7 +364,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
                             }}
                           />
                           <p className="text-[10px] truncate" style={{ color: 'var(--muted)' }}>
-                            Original : {c.subject} • {c.author}
+                            {t('original_colon', 'Original :')} {c.subject} • {c.author}
                           </p>
                         </div>
                       ) : (
@@ -462,7 +462,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
           {/* Summary Pills */}
           <div className="flex items-center gap-2 text-xs">
             <span className="font-semibold" style={{ color: 'var(--strong)' }}>
-              {commits.length} commit(s) :
+              {commits.length} {t('commits_count_colon', 'commit(s) :')}
             </span>
             {pickCount > 0 && (
               <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono text-[10px]">

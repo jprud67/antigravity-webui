@@ -244,7 +244,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
     if (!runtimes || runtimes.length === 0) {
       return (
         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-2 text-text-muted border border-border">
-          Générique
+          {t('generic', 'Générique')}
         </span>
       );
     }
@@ -293,14 +293,14 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold tracking-tight text-text-main">
-                  Studio Projets & Workspaces
+                  {t('projects_workspace_studio', 'Studio Projets & Workspaces')}
                 </h2>
                 <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
                   v0.2.21 • Hub
                 </span>
               </div>
               <p className="text-xs text-text-muted">
-                Basculez instantanément de projet, surveillez la santé de vos dépôts et remédiez aux alertes en 1-clic.
+                {t('project_switcher_desc', 'Basculez instantanément de projet, surveillez la santé de vos dépôts et remédiez aux alertes en 1-clic.')}
               </p>
             </div>
           </div>
@@ -334,15 +334,15 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                   <div className="flex items-center gap-2.5">
                     <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      PROJET ACTIF
+                      {t('active_project_caps', 'PROJET ACTIF')}
                     </span>
                     {activeProject.is_default && (
                       <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-500/20 text-sky-400 border border-sky-500/30">
-                        <Star className="w-3 h-3 fill-sky-400" /> Par défaut
+                        <Star className="w-3 h-3 fill-sky-400" /> {t('default_tag', 'Par défaut')}
                       </span>
                     )}
                     <span className="text-xs text-text-muted font-mono">
-                      {activeProject.stats?.file_count ? `${activeProject.stats.file_count} fichiers` : ''}
+                      {activeProject.stats?.file_count ? `${activeProject.stats.file_count} ${t('files_count', 'fichiers')}` : ''}
                     </span>
                   </div>
 
@@ -375,12 +375,12 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                       {activeProject.git.is_dirty ? (
                         <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 font-medium">
                           <AlertTriangle className="w-3.5 h-3.5" />
-                          {activeProject.git.uncommitted_count} modif(s)
+                          {activeProject.git.uncommitted_count} {t('modifs_count', 'modif(s)')}
                         </span>
                       ) : (
                         <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-medium">
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          Clean
+                          {t('clean', 'Clean')}
                         </span>
                       )}
                     </div>
@@ -396,7 +396,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-xs text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-                        <Activity className="w-3.5 h-3.5" /> {activeProject.health.warnings.length} alerte(s) de santé
+                        <Activity className="w-3.5 h-3.5" /> {activeProject.health.warnings.length} {t('health_alerts_count', 'alerte(s) de santé')}
                       </span>
                     )}
                   </div>
@@ -487,7 +487,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                 </button>
               ))}
               <span className="ml-auto text-[11px] text-text-muted font-mono">
-                {filteredProjects.length} projet(s)
+                {filteredProjects.length} {t('projects_count', 'projet(s)')}
               </span>
             </div>
           </div>
@@ -501,17 +501,17 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-text-main flex items-center gap-1.5">
                   <FolderPlus className="w-4 h-4 text-accent" />
-                  Ajouter un dossier de travail existant
+                  {t('add_existing_workspace', 'Ajouter un dossier de travail existant')}
                 </span>
                 <span className="text-[11px] text-text-muted">
-                  Chemin absolu vers le répertoire racine
+                  {t('absolute_path_root', 'Chemin absolu vers le répertoire racine')}
                 </span>
               </div>
 
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="ex: c:\laragon\www\mon-autre-projet"
+                  placeholder={t('project_path_placeholder', 'ex: c:\\laragon\\www\\mon-autre-projet')}
                   value={newPath}
                   onChange={(e) => handleExploreInput(e.target.value)}
                   className="w-full px-3.5 py-2 text-xs bg-surface-1 border border-border rounded-lg text-text-main font-mono placeholder:text-text-muted focus:outline-none focus:border-accent"
@@ -522,7 +522,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
               {suggestedDirs.length > 0 && (
                 <div className="space-y-1">
                   <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
-                    Suggestions de sous-dossiers :
+                    {t('subfolder_suggestions', 'Suggestions de sous-dossiers :')}
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {suggestedDirs.map((dir) => (
@@ -552,7 +552,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                   onClick={() => setIsAdding(false)}
                   className="px-3 py-1.5 text-xs text-text-muted hover:text-text-main"
                 >
-                  Annuler
+                  {t('cancel', 'Annuler')}
                 </button>
                 <button
                   type="submit"
@@ -564,7 +564,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                   ) : (
                     <Check className="w-3.5 h-3.5" />
                   )}
-                  Valider et Enregistrer
+                  {t('validate_and_save', 'Valider et Enregistrer')}
                 </button>
               </div>
             </form>
@@ -610,13 +610,13 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
 
                           {isActive && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                              ACTIF
+                              {t('active_caps', 'ACTIF')}
                             </span>
                           )}
 
                           {project.is_default && (
                             <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/20 flex items-center gap-0.5">
-                              <Star className="w-2.5 h-2.5 fill-sky-400" /> Défaut
+                              <Star className="w-2.5 h-2.5 fill-sky-400" /> {t('default', 'Défaut')}
                             </span>
                           )}
 
@@ -673,7 +673,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                       <div className="flex items-center gap-1.5 self-end sm:self-center">
                         <button
                           onClick={(e) => handleSetDefault(project.path, e)}
-                          title={project.is_default ? 'Workspace par défaut' : 'Définir comme workspace par défaut'}
+                          title={project.is_default ? t('default_workspace', 'Workspace par défaut') : t('set_as_default_workspace', 'Définir comme workspace par défaut')}
                           disabled={actionLoading === project.path}
                           className={`p-2 rounded-lg border transition-colors ${
                             project.is_default
@@ -686,7 +686,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
 
                         <button
                           onClick={(e) => handleRemove(project.path, project.is_default, e)}
-                          title={project.is_default ? 'Impossible de retirer le projet par défaut' : 'Retirer de la liste'}
+                          title={project.is_default ? t('cannot_remove_default_project', 'Impossible de retirer le projet par défaut') : t('remove_from_list', 'Retirer de la liste')}
                           disabled={project.is_default || actionLoading === project.path}
                           className={`p-2 rounded-lg border transition-colors ${
                             project.is_default
@@ -707,11 +707,11 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                         >
                           {isActive ? (
                             <>
-                              <Check className="w-3.5 h-3.5" /> Actif
+                              <Check className="w-3.5 h-3.5" /> {t('active', 'Actif')}
                             </>
                           ) : (
                             <>
-                              <ExternalLink className="w-3.5 h-3.5" /> Basculer
+                              <ExternalLink className="w-3.5 h-3.5" /> {t('switch', 'Basculer')}
                             </>
                           )}
                         </button>

@@ -523,7 +523,7 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
 
                       {file.services && file.services.length > 0 && (
                         <div className="bg-black/30 rounded-xl p-3 border border-white/5 space-y-1.5">
-                          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Services ({file.services.length})</span>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{t('services', 'Services')} ({file.services.length})</span>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
                             {file.services.map((svc, sidx) => (
                               <div key={sidx} className="p-2 rounded-lg bg-white/5 border border-white/5 text-xs">
@@ -626,7 +626,7 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
                     className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md shrink-0"
                   >
                     <Terminal className="w-3.5 h-3.5" />
-                    <span>{execRunning ? 'Running...' : t('docker_exec_btn', 'Run Command')}</span>
+                    <span>{execRunning ? t('executing_ellipsis', 'Exécution...') : t('docker_exec_btn', 'Exécuter')}</span>
                   </button>
                 </div>
 

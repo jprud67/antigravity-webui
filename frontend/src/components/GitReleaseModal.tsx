@@ -167,7 +167,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-semibold text-white tracking-wide">
-                  Interactive Release Publisher
+                  {t('interactive_release_publisher_title', 'Éditeur de Release Interactif')}
                 </h3>
                 <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-mono font-medium rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                   <Tag className="w-3 h-3" />
@@ -175,7 +175,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Génération automatique du changelog et publication GitHub
+                {t('git_release_desc', 'Génération automatique du changelog et publication GitHub')}
               </p>
             </div>
           </div>
@@ -207,7 +207,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                 </div>
                 {releaseData?.previous_tag && (
                   <div className="text-slate-400">
-                    depuis <span className="font-mono text-slate-200">{releaseData.previous_tag}</span>
+                    {t('since', 'depuis')} <span className="font-mono text-slate-200">{releaseData.previous_tag}</span>
                   </div>
                 )}
               </div>
@@ -217,7 +217,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                 {releaseData?.has_gh_cli ? (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[11px] font-medium">
                     <Terminal className="w-3 h-3 text-emerald-400" />
-                    CLI `gh` détecté
+                    {t('gh_cli_detected', 'CLI `gh` détecté')}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[11px] font-medium">

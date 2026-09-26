@@ -223,7 +223,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
                         <Terminal className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
                         <span className="font-semibold" style={{ color: 'var(--strong)' }}>{task.task_id}</span>
                         <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
-                          conv {task.conversation_id.substring(0, 8)}...
+                          {t('conv_abbr', 'conv')} {task.conversation_id.substring(0, 8)}...
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -358,7 +358,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
                             PID {proc.pid}
                           </span>
                           <span className="text-[10px] font-mono" style={{ color: 'var(--accent)' }}>
-                            {proc.memory_mb} MB RAM
+                            {proc.memory_mb} {t('mb_ram', 'Mo RAM')}
                           </span>
                         </div>
                         <p className="text-[10px] font-mono truncate max-w-lg mt-0.5" style={{ color: 'var(--muted)' }}>

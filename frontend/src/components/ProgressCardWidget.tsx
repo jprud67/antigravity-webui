@@ -50,15 +50,15 @@ export const ProgressCardWidget: React.FC<ProgressCardWidgetProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate">
-                  {card.title || "Plan d'action en cours"}
+                  {card.title || t('ongoing_action_plan', "Plan d'action en cours")}
                 </span>
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-500 border border-indigo-500/30 shrink-0">
                   {percent}%
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                {completedSteps} sur {totalSteps} terminée{totalSteps > 1 ? 's' : ''}
-                {inProgressSteps > 0 && ` • ${inProgressSteps} en cours`}
+                {t('completed_steps_progress', '{0} sur {1} terminée(s)').replace('{0}', String(completedSteps)).replace('{1}', String(totalSteps))}
+                {inProgressSteps > 0 && ` • ${inProgressSteps} ${t('in_progress_short', 'en cours')}`}
               </p>
             </div>
           </div>

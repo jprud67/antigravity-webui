@@ -636,7 +636,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
                   className={`w-1.5 h-1.5 rounded-full ${
                     tab.connected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'
                   }`}
-                  title={tab.connected ? 'En ligne' : 'Déconnecté'}
+                  title={tab.connected ? t('online', 'En ligne') : t('disconnected', 'Déconnecté')}
                 />
                 <button
                   type="button"
@@ -706,7 +706,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
                     </div>
                     {sh.id === defaultShell && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        Défaut
+                        {t('default', 'Défaut')}
                       </span>
                     )}
                   </button>
