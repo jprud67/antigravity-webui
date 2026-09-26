@@ -247,11 +247,20 @@ This roadmap outlines the strategic direction for **Antigravity‑webui**, the f
 | **Multi-View Live Preview Drawer** | Tiroir latéral rétractable (`LivePreviewDrawer.tsx`) offrant 3 modes d'inspection : iframe responsive sandboxée pour applications Web et Canvas (avec présélections Desktop, Tablette, Mobile et rechargement), visionneuse Monaco Editor en lecture seule pour les fichiers modifiés de la session avec sélecteur de fichiers, et visionneuse Markdown pour les artéfacts et plans de session. Raccourci global `Ctrl+Shift+P`. | Frontend / IDE | 2027‑03‑29 | ✅ **Completed** |
 | **Full 15-Language i18n Parity & Release v0.4.0** | Ajout de 38 nouvelles clés `share_*` avec parité stricte à 100% sur l'ensemble des 15 langues dans `locales.json` (4 384 clés par langue), commandes slash (`/share`, `/collaborate`, `/preview`), 100% tests pytest validés, zéro erreur TypeScript (`tsc -b`), build de production Vite optimisé. | Release Manager | 2027‑03‑29 | ✅ **Completed** |
 
+### 📌 Jalon v0.4.1 : Multi-Agent Visual Orchestration Studio & Hierarchical Steering
+| Milestone | Description | Owner | Target | Status |
+|---|---|---|---|---|
+| **Backend Agent Orchestrator Service & Transcript Mining** | Extraction récursive automatique de la hiérarchie parent/enfant depuis les transcriptions (`subagent_id`, `spawn_subagent`, `invoke_subagent`), corrélation temps réel avec les processus système OS via `psutil` (PID, CPU %, RAM MB), modèles Pydantic stricts et garde anti path traversal. | Backend / Core | 2027‑03‑30 | ✅ **Completed** |
+| **REST Orchestration Endpoints & Live WebSocket Broadcast** | Endpoints FastAPI sécurisés (`/api/orchestrator/graph/{id}`, `/steer`, `/terminate`, `/inspect/{agent_id}`), diffusion d'événements temps réel `orchestrator_update` via `execution_manager.py` et handler WebSocket `orchestrator_refresh`. | Backend / API | 2027‑03‑30 | ✅ **Completed** |
+| **Interactive Nodal DAG Canvas (`AgentGraphCanvas.tsx`)** | Graphe d'exécution hiérarchique interactif (dispositions verticale et horizontale), courbes de Bézier cubiques SVG avec glow et pulses animés sur les connexions actives, cartes nodales glassmorphiques riches avec statut temps réel, contrôles de zoom/pan et centrage automatique. | Frontend / UX | 2027‑03‑30 | ✅ **Completed** |
+| **Agent Inspection Drawer & Steering Deck** | Tiroir latéral contextuel rétractable (`AgentInspectionDrawer.tsx`) affichant la télémétrie complète, le flux de pensée en direct (*thought / reasoning stream*), la chronologie des outils avec paramètres/résultats, la liste des fichiers modifiés dans le worktree, l'injection d'instructions prioritaires (*⚡ Steering*) et la terminaison unitaire ou en cascade. | Frontend / IDE | 2027‑03‑30 | ✅ **Completed** |
+| **Full Studio Integration & Full 15-Language i18n Parity** | Modale plein écran glassmorphe (`AgentOrchestrationModal.tsx`) avec raccourci global `Ctrl+Alt+A`, bouton header et barre latérale, commandes slash (`/orchestrator`, `/agents`, `/subagents`), et parité stricte à 100% sur l'ensemble des 15 langues dans `locales.json` (4 434 clés par langue). | Release Manager | 2027‑03‑30 | ✅ **Completed** |
+
 ### 📌 Prochaines étapes v0.4.x (Cockpit Web IDE & Agentic Workspace)
 | Milestone | Description |
 |---|---|
-| **Multi-Agent Visual Orchestration Studio** – Visualisation des sous-agents en temps réel, graphe d'exécution et pilotage hiérarchique. |
 | **Autonomous Multi-Workspace Coordinator** – Orchestration parallèle de plusieurs workspaces et pipelines CI/CD autonomes. |
+| **Agent Dynamic Checkpoint & Rewind Studio** – Restauration d'états d'exécution antérieurs et bifurcation d'arborescences sous-agents. |
 
 
 
