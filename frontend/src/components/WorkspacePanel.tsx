@@ -37,6 +37,11 @@ Loader2,
   Clock,
   ShieldCheck,
   Globe,
+  AlertTriangle,
+  AlertCircle,
+  CheckCircle2,
+  RotateCw,
+  Info,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon';
 import ReactMarkdown from 'react-markdown';
@@ -70,7 +75,8 @@ import {
   fetchGitDiffRanges,
   getExportHtmlUrl,
   getExportMarkdownUrl,
-  getExportJsonUrl
+  getExportJsonUrl,
+  fetchEditorDiagnostics
 } from '../services/api';
 import { detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
 import { showToast } from '../services/toast';
@@ -82,7 +88,8 @@ import {
   applyGitDecorations,
   navigateGitDiff
 } from '../services/monacoAnnotations';
-import type { ArtifactItem, MonacoStudioConfig, GitDiffRange, GitDiffSummary } from '../types';
+import { applyMonacoDiagnostics, clearMonacoDiagnostics } from '../services/monacoDiagnostics';
+import type { ArtifactItem, MonacoStudioConfig, GitDiffRange, GitDiffSummary, DiagnosticItem } from '../types';
 
 export type RightPanelTab = 'files' | 'search' | 'artifacts' | 'terminal' | 'git' | 'kanban';
 
@@ -849,6 +856,68 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       isCancelled = true;
     };
   }, [activePath, isBinaryTab, currentWorkspace]);
+
+  // Live Diagnostics state for active tab in WorkspacePanel
+  const [diagnostics, setDiagnostics] = useState<DiagnosticItem[]>([]);
+  const [isLinting, setIsLinting] = useState<boolean>(false);
+  const [isProblemsOpen, setIsProblemsOpen] = useState<boolean>(false);
+
+  const loadDiagnostics = useCallback(
+    async (codeToLint: string, langToLint: string, path?: string) => {
+      if (!codeToLint.trim()) {
+        setDiagnostics([]);
+        if (monacoEditorRef.current && monacoInstanceRef.current) {
+          clearMonacoDiagnostics(monacoInstanceRef.current, monacoEditorRef.current.getModel());
+        }
+        return;
+      }
+      setIsLinting(true);
+      try {
+        const res = await fetchEditorDiagnostics({
+          content: codeToLint,
+          language: langToLint,
+          filePath: path,
+          workspace: currentWorkspace,
+        });
+        setDiagnostics(res.diagnostics || []);
+        if (monacoEditorRef.current && monacoInstanceRef.current) {
+          applyMonacoDiagnostics(
+            monacoInstanceRef.current,
+            monacoEditorRef.current.getModel(),
+            res.diagnostics || []
+          );
+        }
+      } catch {
+        // Ignore linting errors gracefully
+      } finally {
+        setIsLinting(false);
+      }
+    },
+    [currentWorkspace]
+  );
+
+  useEffect(() => {
+    if (!activeTabItem || isBinaryTab) {
+      setDiagnostics([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      loadDiagnostics(activeTabItem.content, activeTabItem.language, activeTabItem.path);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [activeTabItem?.path, activeTabItem?.content, activeTabItem?.language, isBinaryTab, loadDiagnostics]);
+
+  const handleJumpToProblem = useCallback((item: DiagnosticItem) => {
+    if (!monacoEditorRef.current) return;
+    const line = item.line || 1;
+    const col = item.column || 1;
+    monacoEditorRef.current.revealPositionInCenter({ lineNumber: line, column: col });
+    monacoEditorRef.current.setPosition({ lineNumber: line, column: col });
+    monacoEditorRef.current.focus();
+  }, []);
+
+  const totalErrors = useMemo(() => diagnostics.filter((d) => d.severity === 'error').length, [diagnostics]);
+  const totalWarnings = useMemo(() => diagnostics.filter((d) => d.severity === 'warning').length, [diagnostics]);
 
 
 
@@ -2296,6 +2365,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             });
                             multiCursorControllerRef.current = multiCtrl;
                             loadGitDiffRanges(activeTabItem.path);
+                            loadDiagnostics(activeTabItem.content, activeTabItem.language, activeTabItem.path);
                           }}
                           options={{
                             ...getMonacoMultiCursorOptions(),
@@ -2325,6 +2395,79 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       )}
                     </div>
 
+                    {/* Collapsible Problems Drawer in WorkspacePanel */}
+                    {isProblemsOpen && (
+                      <div className="flex flex-col max-h-40 min-h-[100px] border-t text-[11px] font-mono shrink-0 select-none" style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}>
+                        <div className="flex items-center justify-between px-3 py-1 border-b" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold flex items-center gap-1 text-[11px]">
+                              <AlertCircle className="w-3 h-3 text-rose-400" />
+                              <span>{t('editor_diagnostics_problems', 'Problèmes')}</span>
+                            </span>
+                            <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-black/10 dark:bg-white/10">
+                              {diagnostics.length}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => loadDiagnostics(activeTabItem.content, activeTabItem.language, activeTabItem.path)}
+                              disabled={isLinting}
+                              className="p-0.5 rounded hover:text-zinc-200 transition-colors cursor-pointer"
+                              title={t('editor_diagnostics_refresh', 'Actualiser les diagnostics')}
+                            >
+                              <RotateCw className={`w-3 h-3 ${isLinting ? 'animate-spin text-emerald-400' : ''}`} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsProblemsOpen(false)}
+                              className="p-0.5 rounded hover:text-zinc-200 transition-colors cursor-pointer"
+                              title={t('close', 'Fermer')}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40 p-1">
+                          {diagnostics.length === 0 ? (
+                            <div className="flex items-center justify-center py-4 text-zinc-500 gap-1.5 text-[11px]">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                              <span>{t('editor_diagnostics_no_problems', 'Aucun problème détecté')}</span>
+                            </div>
+                          ) : (
+                            diagnostics.map((item, idx) => (
+                              <div
+                                key={`${item.line}-${item.column}-${idx}`}
+                                onClick={() => handleJumpToProblem(item)}
+                                className="flex items-center justify-between gap-2 px-2 py-1 hover:bg-black/10 dark:hover:bg-white/5 cursor-pointer rounded transition-colors group"
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  {item.severity === 'error' ? (
+                                    <AlertCircle className="w-3 h-3 text-rose-400 shrink-0" />
+                                  ) : item.severity === 'warning' ? (
+                                    <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                                  ) : (
+                                    <Info className="w-3 h-3 text-sky-400 shrink-0" />
+                                  )}
+                                  <span className="truncate text-[10px] group-hover:text-emerald-400">
+                                    {item.message}
+                                  </span>
+                                  {item.code && (
+                                    <span className="px-1 py-0.2 rounded text-[8px] bg-black/15 dark:bg-white/10 shrink-0 opacity-70">
+                                      {item.source}:{item.code}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[9px] opacity-60 shrink-0">
+                                  Ln {item.line}, Col {item.column}
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Editor Status Bar */}
                     <div
                       className="flex items-center justify-between px-3 py-1 border-t text-[10px] font-mono shrink-0 select-none gap-2"
@@ -2353,6 +2496,38 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         )}
                         <span>•</span>
                         <span className="uppercase text-sky-400">{activeTabItem.language}</span>
+                        <span>•</span>
+                        {/* Problems Badge in Embedded Status Bar */}
+                        <button
+                          type="button"
+                          onClick={() => setIsProblemsOpen(!isProblemsOpen)}
+                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] border transition-colors cursor-pointer ${
+                            isProblemsOpen
+                              ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
+                              : totalErrors > 0
+                              ? 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25'
+                              : totalWarnings > 0
+                              ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+                              : 'text-zinc-500 hover:text-zinc-300 border-transparent hover:border-zinc-700'
+                          }`}
+                          title={t('editor_diagnostics_toggle_drawer', 'Afficher/Masquer le panneau des problèmes')}
+                        >
+                          {isLinting ? (
+                            <RotateCw className="w-2.5 h-2.5 animate-spin text-emerald-400" />
+                          ) : totalErrors > 0 ? (
+                            <AlertCircle className="w-2.5 h-2.5 text-rose-400" />
+                          ) : totalWarnings > 0 ? (
+                            <AlertTriangle className="w-2.5 h-2.5 text-amber-400" />
+                          ) : (
+                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                          )}
+                          <span>
+                            {diagnostics.length > 0
+                              ? `${totalErrors > 0 ? `❌ ${totalErrors}` : ''} ${totalWarnings > 0 ? `⚠️ ${totalWarnings}` : ''}`.trim()
+                              : t('editor_diagnostics_problems', 'Problèmes')}
+                          </span>
+                          <span className="opacity-70 text-[8px]">({diagnostics.length})</span>
+                        </button>
                         <span>•</span>
                         <span>UTF-8</span>
                       </div>
