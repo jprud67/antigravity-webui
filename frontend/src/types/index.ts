@@ -1148,5 +1148,72 @@ export interface PresenceUpdateEvent {
   participants: PresenceParticipant[];
 }
 
+export type AgentNodeRole = 'root' | 'architect' | 'coder' | 'tester' | 'reviewer' | 'explorer' | 'worker';
+export type AgentNodeStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface AgentNodeMetrics {
+  started_at?: string | null;
+  completed_at?: string | null;
+  duration_ms: number;
+  cpu_percent: number;
+  memory_mb: number;
+  tool_call_count: number;
+  token_count?: number | null;
+}
+
+export interface AgentNode {
+  id: string;
+  name: string;
+  parent_id?: string | null;
+  depth: number;
+  role: AgentNodeRole;
+  status: AgentNodeStatus;
+  model?: string | null;
+  task_summary: string;
+  current_activity?: string | null;
+  thought_preview?: string | null;
+  pid?: number | null;
+  worktree_path?: string | null;
+  worktree_branch?: string | null;
+  metrics: AgentNodeMetrics;
+}
+
+export interface AgentEdge {
+  source: string;
+  target: string;
+  edge_type: 'spawns' | 'delegates' | 'monitors';
+}
+
+export interface OrchestratorGraphResponse {
+  conversation_id: string;
+  root_agent_id: string;
+  active_count: number;
+  total_count: number;
+  nodes: AgentNode[];
+  edges: AgentEdge[];
+}
+
+export interface SteerAgentRequest {
+  conversation_id: string;
+  target_agent_id: string;
+  instruction: string;
+}
+
+export interface TerminateAgentRequest {
+  conversation_id: string;
+  target_agent_id: string;
+  recursive?: boolean;
+}
+
+export interface AgentInspectionDetails {
+  agent_id: string;
+  conversation_id: string;
+  thought_preview?: string;
+  thoughts: Array<{ step: number; text: string }>;
+  tools: Array<{ step: number; id?: string; name: string; args: any; status: string }>;
+  modified_files: Array<{ path: string; status: string; additions?: number; deletions?: number; diff?: string }>;
+}
+
+
 
 

@@ -90,7 +90,9 @@ import type {
   EditorDiagnosticsResponse,
   ShareLinkItem,
   ShareLinkCreatePayload,
-  ShareVerificationResult
+  ShareVerificationResult,
+  OrchestratorGraphResponse,
+  AgentInspectionDetails
 } from '../types';
 
 const API_BASE = '/api';
@@ -3218,6 +3220,62 @@ export async function fetchSharedTranscript(token: string, pinCode?: string): Pr
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Échec de chargement du transcript partagé' }));
     throw new Error(err.detail || 'Échec de chargement du transcript partagé');
+  }
+  return res.json();
+}
+
+export async function fetchOrchestratorGraph(conversationId: string): Promise<OrchestratorGraphResponse> {
+  const res = await fetch(`${API_BASE}/orchestrator/graph/${encodeURIComponent(conversationId)}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du chargement du graphe des agents' }));
+    throw new Error(err.detail || 'Échec du chargement du graphe des agents');
+  }
+  return res.json();
+}
+
+export async function steerSubagent(conversationId: string, targetAgentId: string, instruction: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/orchestrator/steer`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      conversation_id: conversationId,
+      target_agent_id: targetAgentId,
+      instruction,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'envoi de la directive" }));
+    throw new Error(err.detail || "Échec de l'envoi de la directive");
+  }
+  return res.json();
+}
+
+export async function terminateSubagent(conversationId: string, targetAgentId: string, recursive = false): Promise<any> {
+  const res = await fetch(`${API_BASE}/orchestrator/terminate`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      conversation_id: conversationId,
+      target_agent_id: targetAgentId,
+      recursive,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'arrêt de l'agent" }));
+    throw new Error(err.detail || "Échec de l'arrêt de l'agent");
+  }
+  return res.json();
+}
+
+export async function fetchAgentInspectionDetails(agentId: string, conversationId: string): Promise<AgentInspectionDetails> {
+  const res = await fetch(`${API_BASE}/orchestrator/inspect/${encodeURIComponent(agentId)}?conversation_id=${encodeURIComponent(conversationId)}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'inspection de l'agent" }));
+    throw new Error(err.detail || "Échec de l'inspection de l'agent");
   }
   return res.json();
 }
