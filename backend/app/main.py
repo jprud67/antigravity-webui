@@ -36,6 +36,7 @@ from app.api.prompt import router as prompt_router
 from app.api.rules import router as rules_router
 from app.api.search import router as search_router
 from app.api.settings import router as set_router
+from app.api.share import router as share_router
 from app.api.skills import router as skills_router
 from app.api.tailscale import router as tailscale_router
 from app.api.tasks import router as tasks_router
@@ -55,6 +56,7 @@ from app.services.google_auth import restore_stashed_token_if_needed
 from app.services.link_understanding import ensure_link_cache_schema
 from app.services.messaging_gateway import ensure_messaging_gateway_schema
 from app.services.progress_card import ensure_progress_card_schema
+from app.services.share_service import ensure_share_schema
 from app.services.storage import ensure_db_schema
 from app.services.updater import prefetch_update_check
 from app.services.vector_memory import ensure_vector_memory_schema
@@ -87,6 +89,7 @@ async def lifespan(app: FastAPI):
     ensure_web_push_schema()
     ensure_messaging_gateway_schema()
     ensure_vector_memory_schema()
+    ensure_share_schema()
     restore_stashed_token_if_needed()
     prefetch_update_check()
     _warn_if_default_password()
@@ -175,6 +178,7 @@ app.include_router(vector_memory_router)  # Vector Memory & Auto-Recall Hook
 app.include_router(docker_studio_router)  # Docker & Container Management Studio
 app.include_router(database_studio_router)  # Database Explorer & Visual SQL Query Studio
 app.include_router(editor_diagnostics_router)  # Live Syntax & Linter Diagnostics Studio
+app.include_router(share_router)  # Collaborative Session Sharing & Live Preview
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])

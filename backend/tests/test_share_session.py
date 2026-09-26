@@ -74,3 +74,75 @@ def test_list_share_links():
     for item in links:
         assert "pin_hash" not in item
         assert "has_pin" in item
+
+
+from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app)
+
+
+def get_auth_headers():
+    login_res = client.post("/api/auth/login", json={"password": "antigravity2026"})
+    token = login_res.json().get("token")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+def test_api_auth_guard():
+    # Unauthenticated requests should be rejected with 401 or 403
+    res_create = client.post("/api/share/create", json={"conversation_id": "test_c", "permission": "read"})
+    assert res_create.status_code in (401, 403)
+
+    res_links = client.get("/api/share/links/test_c")
+    assert res_links.status_code in (401, 403)
+
+    res_revoke = client.post("/api/share/revoke/dummy_token")
+    assert res_revoke.status_code in (401, 403)
+
+
+def test_api_create_and_verify_flow():
+    headers = get_auth_headers()
+    cid = "conv_api_flow"
+    res_create = client.post("/api/share/create", json={
+        "conversation_id": cid,
+        "permission": "write",
+        "duration_hours": 12,
+        "pin_code": "4321"
+    }, headers=headers)
+    assert res_create.status_code == 200
+    data = res_create.json()
+    assert "token" in data
+    assert data["permission"] == "write"
+    assert data["has_pin"] is True
+    token = data["token"]
+
+    # Public verify without PIN
+    res_verify = client.get(f"/api/share/verify/{token}")
+    assert res_verify.status_code == 200
+    vdata = res_verify.json()
+    assert vdata["valid"] is False
+    assert vdata["requires_pin"] is True
+
+    # Public unlock with wrong PIN
+    res_wrong = client.post(f"/api/share/unlock/{token}", json={"pin_code": "0000"})
+    assert res_wrong.status_code == 400
+    assert res_wrong.json()["detail"] == "invalid_pin"
+
+    # Public unlock with correct PIN
+    res_unlock = client.post(f"/api/share/unlock/{token}", json={"pin_code": "4321"})
+    assert res_unlock.status_code == 200
+    udata = res_unlock.json()
+    assert udata["valid"] is True
+    assert udata["permission"] == "write"
+
+    # Revoke via API
+    res_revoke = client.post(f"/api/share/revoke/{token}", headers=headers)
+    assert res_revoke.status_code == 200
+    assert res_revoke.json()["success"] is True
+
+    # Public verify after revocation
+    res_after = client.get(f"/api/share/verify/{token}")
+    assert res_after.status_code == 200
+    assert res_after.json()["valid"] is False
+    assert res_after.json()["reason"] == "revoked"
+
