@@ -19,6 +19,7 @@ from app.api.crons import router as crons_router
 from app.api.database_studio import router as database_studio_router
 from app.api.docker_studio import router as docker_studio_router
 from app.api.doctor import router as doctor_router
+from app.api.editor_diagnostics import router as editor_diagnostics_router
 from app.api.events import router as events_router
 from app.api.files import router as files_router
 from app.api.git import router as git_router
@@ -173,6 +174,7 @@ app.include_router(canvas_documents_router)  # Sandboxed Canvas Documents & Widg
 app.include_router(vector_memory_router)  # Vector Memory & Auto-Recall Hook
 app.include_router(docker_studio_router)  # Docker & Container Management Studio
 app.include_router(database_studio_router)  # Database Explorer & Visual SQL Query Studio
+app.include_router(editor_diagnostics_router)  # Live Syntax & Linter Diagnostics Studio
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
