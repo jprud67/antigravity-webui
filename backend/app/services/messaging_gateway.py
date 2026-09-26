@@ -242,11 +242,13 @@ def approve_pairing_code(code: str) -> tuple[bool, str, dict[str, Any] | None]:
         return True, f"Appareil {row['user_name']} ({row['platform']}) approuvé avec succès !", approved_device
 
 
-def reset_approval_rate_limits() -> None:
-    """Reset failed PIN approval attempts counter and lockout."""
+def reset_approval_rate_limits(clear_pending: bool = True) -> None:
+    """Reset failed PIN approval attempts counter and lockout (and optionally clear pending pairing codes)."""
     ensure_messaging_gateway_schema()
     with _get_db() as conn:
-        conn.execute("DELETE FROM messaging_pairing_rate_limits WHERE key = 'global_pin_approval'")
+        conn.execute("DELETE FROM messaging_pairing_rate_limits")
+        if clear_pending:
+            conn.execute("DELETE FROM messaging_pairing_codes")
         conn.commit()
 
 
@@ -305,7 +307,13 @@ def save_gateway_config(
 ) -> bool:
     """Save bot token and settings for Telegram or Discord."""
     ensure_messaging_gateway_schema()
+    clean_token = (bot_token or "").strip()
     with _get_db() as conn:
+        if clean_token in ("PRESERVE_EXISTING", ""):
+            row = conn.execute("SELECT bot_token FROM messaging_gateway_configs WHERE platform = ?", (platform,)).fetchone()
+            if row and row["bot_token"]:
+                clean_token = row["bot_token"]
+
         conn.execute("""
             INSERT INTO messaging_gateway_configs (platform, bot_token, chat_id, is_active, notify_on_approval, notify_on_complete, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -316,7 +324,7 @@ def save_gateway_config(
                 notify_on_approval = excluded.notify_on_approval,
                 notify_on_complete = excluded.notify_on_complete,
                 updated_at = excluded.updated_at
-        """, (platform, bot_token, chat_id or "", int(is_active), int(notify_on_approval), int(notify_on_complete), time.time()))
+        """, (platform, clean_token, chat_id or "", int(is_active), int(notify_on_approval), int(notify_on_complete), time.time()))
         conn.commit()
     return True
 

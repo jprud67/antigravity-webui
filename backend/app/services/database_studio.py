@@ -377,11 +377,15 @@ def execute_query(db_path: str, query: str, limit: int = 500, timeout_seconds: f
 
 def export_query_results(db_path: str, query: str, format: str = "csv") -> str:
     """Runs a query and formats results as CSV or JSON string."""
+    clean_fmt = (format or "csv").strip().lower()
+    if clean_fmt not in ("csv", "json"):
+        raise ValueError(f"Format d'exportation non supporté : '{format}'. Les formats valides sont 'csv' et 'json'.")
+
     result = execute_query(db_path, query, limit=5000)
     if result.error:
         raise ValueError(f"Erreur SQL : {result.error}")
 
-    if format == "json":
+    if clean_fmt == "json":
         records = [dict(zip(result.columns, row)) for row in result.rows]
         return json.dumps(records, ensure_ascii=False, indent=2)
 

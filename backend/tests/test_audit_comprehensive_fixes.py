@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 import urllib.error
 import uuid
@@ -682,8 +683,113 @@ def test_messaging_gateway_pin_rate_limiting():
         reset_approval_rate_limits()
 
 
+def test_safe_stream_redirect_prevents_zombie_clobber():
+    from app.services.code_kernel import SafeStreamRedirect
+    orig = sys.stdout
+    buf1 = IsolatedStream()
+    buf2 = IsolatedStream()
+
+    # Enter redirect 1
+    redir1 = SafeStreamRedirect("stdout", buf1)
+    redir1.__enter__()
+    assert sys.stdout is buf1
+
+    # In the meantime, another execution attaches buf2
+    sys.stdout = buf2
+
+    # When zombie redirect 1 exits, it should NOT overwrite buf2 with orig!
+    redir1.__exit__(None, None, None)
+    assert sys.stdout is buf2
+
+    # Clean up
+    sys.stdout = orig
 
 
+def test_kernel_grep_search_regex_error_handling(tmp_path):
+    proxy = KernelToolProxy(cwd=str(tmp_path))
+    test_file = tmp_path / "sample.txt"
+    test_file.write_text("Hello world", encoding="utf-8")
+
+    # Invalid regex syntax should raise a clear ValueError, not unhandled re.error
+    with pytest.raises(ValueError) as exc_info:
+        proxy.grep_search("[unclosed-regex", is_regex=True)
+    assert "Expression régulière invalide" in str(exc_info.value)
 
 
+def test_messaging_gateway_preserve_token_on_update():
+    from app.services.messaging_gateway import get_gateway_configs, save_gateway_config
+
+    secret_token = f"actual_bot_secret_{uuid.uuid4().hex}"
+    platform = "telegram"
+
+    # 1. Initial save with secret token
+    save_gateway_config(platform=platform, bot_token=secret_token, chat_id="12345", is_active=True)
+    cfg1 = get_gateway_configs().get(platform)
+    assert cfg1 is not None
+    assert cfg1["has_token"] is True
+
+    # 2. Update config sending "PRESERVE_EXISTING" (as sent by UI)
+    save_gateway_config(platform=platform, bot_token="PRESERVE_EXISTING", chat_id="67890", is_active=True)
+
+    # 3. Verify in DB that actual token was preserved and NOT overwritten by "PRESERVE_EXISTING"
+    from app.services.messaging_gateway import _get_db
+    with _get_db() as conn:
+        row = conn.execute("SELECT bot_token, chat_id FROM messaging_gateway_configs WHERE platform = ?", (platform,)).fetchone()
+        assert row["bot_token"] == secret_token
+        assert row["chat_id"] == "67890"
+
+    # 4. Update config sending empty string
+    save_gateway_config(platform=platform, bot_token="", chat_id="99999", is_active=True)
+    with _get_db() as conn:
+        row = conn.execute("SELECT bot_token, chat_id FROM messaging_gateway_configs WHERE platform = ?", (platform,)).fetchone()
+        assert row["bot_token"] == secret_token
+        assert row["chat_id"] == "99999"
+
+
+def test_database_studio_export_validation(tmp_path):
+    import sqlite3
+    from app.services.database_studio import export_query_results
+
+    db_file = tmp_path / "export_test.db"
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);")
+    conn.execute("INSERT INTO users (name) VALUES ('Alice'), ('Bob');")
+    conn.commit()
+    conn.close()
+
+    # Valid CSV (case-insensitive)
+    csv_out = export_query_results(str(db_file), "SELECT * FROM users;", format="CSV")
+    assert "Alice" in csv_out
+    assert "Bob" in csv_out
+
+    # Valid JSON (case-insensitive)
+    json_out = export_query_results(str(db_file), "SELECT * FROM users;", format="JSON")
+    assert '"name": "Alice"' in json_out
+
+    # Unsupported format raises ValueError
+    with pytest.raises(ValueError) as exc_info:
+        export_query_results(str(db_file), "SELECT * FROM users;", format="xml")
+    assert "Format d'exportation non supporté" in str(exc_info.value)
+
+
+def test_git_worktree_stale_branch_cleanup(tmp_path):
+    import subprocess
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    subprocess.run(["git", "init"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "jprud67"], cwd=str(repo_dir), check=True)
+    subprocess.run(["git", "config", "user.email", "jprud67@gmail.com"], cwd=str(repo_dir), check=True)
+    (repo_dir / "README.md").write_text("initial commit\n")
+    subprocess.run(["git", "add", "README.md"], cwd=str(repo_dir), check=True)
+    subprocess.run(["git", "commit", "-m", "initial"], cwd=str(repo_dir), check=True)
+
+    # Pre-create a stale subagent branch
+    stale_branch = "antigravity-subagent/subagent-teststale"
+    subprocess.run(["git", "branch", stale_branch], cwd=str(repo_dir), check=True)
+
+    # Creating worktree with same subagent ID should clean up stale branch and succeed
+    wt_info = create_subagent_worktree(str(repo_dir), subagent_id="teststale")
+    assert wt_info is not None
+    assert wt_info["branch"] == stale_branch
+    assert Path(wt_info["path"]).exists()
 

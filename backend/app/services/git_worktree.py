@@ -121,6 +121,13 @@ def create_subagent_worktree(
         base = _run_git(["rev-parse", "HEAD"], cwd=repo_root)
         base_commit = base.stdout.strip() if base.returncode == 0 else ""
 
+        # Check if the branch already exists (stale from previously interrupted run)
+        check_br = _run_git(["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], cwd=repo_root)
+        if check_br.returncode == 0:
+            if wt_path.exists():
+                _run_git(["worktree", "remove", "--force", str(wt_path)], cwd=repo_root)
+            _run_git(["branch", "-D", branch], cwd=repo_root)
+
         # Create worktree with dedicated branch
         result = _run_git(["worktree", "add", str(wt_path), "-b", branch, "HEAD"], cwd=repo_root)
         if result.returncode != 0:

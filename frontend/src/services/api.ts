@@ -3146,7 +3146,6 @@ export async function fetchEditorDiagnostics(
   }
   return res.json();
 }
-
 // Collaborative Session Sharing API
 export async function createShareLink(payload: ShareLinkCreatePayload): Promise<ShareLinkItem> {
   const res = await fetch(`${API_BASE}/share/create`, {
@@ -3217,14 +3216,3 @@ export async function fetchSharedTranscript(token: string, pinCode?: string): Pr
   }
   return res.json();
 }
-
-
-
-
-
-
-
-
-
-
-

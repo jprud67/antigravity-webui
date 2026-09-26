@@ -84,19 +84,23 @@ class KernelToolProxy:
             raise NotADirectoryError(f"Dossier introuvable : {full_path}")
         
         items = []
-        for entry in os.scandir(full_path):
-            try:
-                if is_blocked_sensitive_path(entry.path):
-                    continue
-                stat = entry.stat()
-                items.append({
-                    "name": entry.name,
-                    "is_dir": entry.is_dir(),
-                    "size": stat.st_size if not entry.is_dir() else None,
-                    "mtime": stat.st_mtime
-                })
-            except Exception:
-                continue
+        try:
+            with os.scandir(full_path) as it:
+                for entry in it:
+                    try:
+                        if is_blocked_sensitive_path(entry.path):
+                            continue
+                        stat = entry.stat()
+                        items.append({
+                            "name": entry.name,
+                            "is_dir": entry.is_dir(),
+                            "size": stat.st_size if not entry.is_dir() else None,
+                            "mtime": stat.st_mtime
+                        })
+                    except Exception:
+                        continue
+        except OSError as e:
+            raise OSError(f"Erreur de lecture du dossier : {e}") from e
         return items
 
     def grep_search(self, query: str, path: str = ".", is_regex: bool = False) -> list[dict[str, Any]]:
@@ -104,7 +108,12 @@ class KernelToolProxy:
         if is_blocked_sensitive_path(full_path):
             raise PermissionError("Accès refusé au chemin sensible")
         results = []
-        pattern = re.compile(query, re.IGNORECASE) if is_regex else None
+        pattern = None
+        if is_regex:
+            try:
+                pattern = re.compile(query, re.IGNORECASE)
+            except re.error as e:
+                raise ValueError(f"Expression régulière invalide '{query}': {e}") from e
 
         if os.path.isfile(full_path):
             files = [full_path]
@@ -172,6 +181,23 @@ class IsolatedStream(io.StringIO):
                     pass
 
 
+class SafeStreamRedirect:
+    """Redirects sys.stdout or sys.stderr without clobbering streams if a zombie thread exits late."""
+
+    def __init__(self, stream_name: str, new_target: Any) -> None:
+        self.stream_name = stream_name
+        self.new_target = new_target
+        self.old_target = getattr(sys, stream_name)
+
+    def __enter__(self) -> Any:
+        setattr(sys, self.stream_name, self.new_target)
+        return self.new_target
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if getattr(sys, self.stream_name) is self.new_target:
+            setattr(sys, self.stream_name, self.old_target)
+
+
 class PersistentPythonKernel:
     """Session-persistent Python kernel maintaining active namespace and RPC bridge."""
 
@@ -223,7 +249,7 @@ class PersistentPythonKernel:
                 def run_code():
                     nonlocal status, tb
                     try:
-                        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+                        with SafeStreamRedirect("stdout", out_buf), SafeStreamRedirect("stderr", err_buf):
                             compiled = compile(code, f"<cell-{current_exec_count}>", "exec")
                             exec(compiled, self.globals)  # nosec B102
                     except SystemExit as se:

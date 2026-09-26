@@ -68,9 +68,10 @@ def api_export_query(payload: ExportRequest):
     if is_blocked_sensitive_path(payload.db_path):
         raise HTTPException(status_code=403, detail="Accès au fichier de base de données interdit.")
     try:
-        content = export_query_results(payload.db_path, payload.query, format=payload.format)
-        media_type = "text/csv" if payload.format == "csv" else "application/json"
-        filename = f"export_{payload.format}.{payload.format}"
+        clean_fmt = (payload.format or "csv").strip().lower()
+        content = export_query_results(payload.db_path, payload.query, format=clean_fmt)
+        media_type = "text/csv" if clean_fmt == "csv" else "application/json"
+        filename = f"export_{clean_fmt}.{clean_fmt}"
         return Response(
             content=content,
             media_type=media_type,
