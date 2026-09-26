@@ -29,10 +29,12 @@ def get_kanban_db_path() -> Path:
 
 
 _schema_lock = threading.RLock()
+_schema_initialized: bool = False
 _initialized_kanban_paths: set[str] = set()
 
 
 def get_db_connection() -> sqlite3.Connection:
+    global _schema_initialized
     target_path = get_kanban_db_path()
     target_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(target_path), timeout=15.0)
@@ -41,11 +43,12 @@ def get_db_connection() -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=5000")
     path_key = str(target_path.resolve()) if target_path.exists() else str(target_path)
-    if path_key not in _initialized_kanban_paths:
+    if not _schema_initialized or path_key not in _initialized_kanban_paths:
         with _schema_lock:
-            if path_key not in _initialized_kanban_paths:
+            if not _schema_initialized or path_key not in _initialized_kanban_paths:
                 _ensure_schema(conn)
                 restrict_file_permissions(target_path)
+                _schema_initialized = True
                 _initialized_kanban_paths.add(path_key)
     return conn
 
@@ -62,6 +65,7 @@ def get_db():
             logger.debug(f"Fermeture DB kanban : {e}")
 
 def _ensure_schema(conn: sqlite3.Connection):
+    global _schema_initialized
     conn.execute("""
     CREATE TABLE IF NOT EXISTS tasks (
         id                   TEXT PRIMARY KEY,
@@ -121,6 +125,7 @@ def _ensure_schema(conn: sqlite3.Connection):
             except Exception as e:
                 logger.debug(f"Ignored error: {e}")
     conn.commit()
+    _schema_initialized = True
 
 class CreateTaskRequest(BaseModel):
     title: str

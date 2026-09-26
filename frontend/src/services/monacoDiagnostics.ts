@@ -35,7 +35,9 @@ export function applyMonacoDiagnostics(
     const startLineNumber = Math.max(1, d.line || 1);
     const startColumn = Math.max(1, d.column || 1);
     const endLineNumber = Math.max(startLineNumber, d.endLine || startLineNumber);
-    const endColumn = Math.max(startColumn + 1, d.endColumn || (startColumn + 1));
+    const endColumn = endLineNumber === startLineNumber
+      ? Math.max(startColumn + 1, d.endColumn || (startColumn + 1))
+      : Math.max(1, d.endColumn || 1);
 
     const prefix = d.code ? `[${d.source}:${d.code}]` : `[${d.source}]`;
 

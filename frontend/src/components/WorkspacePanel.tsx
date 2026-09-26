@@ -896,16 +896,30 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     [currentWorkspace]
   );
 
+  // Tab switch effect: immediately clear and start linting new file
   useEffect(() => {
     if (!activeTabItem || isBinaryTab) {
       setDiagnostics([]);
+      if (monacoEditorRef.current && monacoInstanceRef.current) {
+        clearMonacoDiagnostics(monacoInstanceRef.current, monacoEditorRef.current.getModel());
+      }
       return;
     }
+    setDiagnostics([]);
+    if (monacoEditorRef.current && monacoInstanceRef.current) {
+      clearMonacoDiagnostics(monacoInstanceRef.current, monacoEditorRef.current.getModel());
+    }
+    loadDiagnostics(activeTabItem.content, activeTabItem.language, activeTabItem.path);
+  }, [activeTabItem?.path, isBinaryTab, loadDiagnostics]);
+
+  // Content change debounce effect: re-lint on keystroke without flickering or clearing markers prematurely
+  useEffect(() => {
+    if (!activeTabItem || isBinaryTab || !activeTabItem.path) return;
     const timer = setTimeout(() => {
       loadDiagnostics(activeTabItem.content, activeTabItem.language, activeTabItem.path);
-    }, 400);
+    }, 450);
     return () => clearTimeout(timer);
-  }, [activeTabItem?.path, activeTabItem?.content, activeTabItem?.language, isBinaryTab, loadDiagnostics]);
+  }, [activeTabItem?.content, activeTabItem?.language, isBinaryTab, loadDiagnostics]);
 
   const handleJumpToProblem = useCallback((item: DiagnosticItem) => {
     if (!monacoEditorRef.current) return;

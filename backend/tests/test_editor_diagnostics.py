@@ -104,3 +104,54 @@ def test_typescript_clean_code():
     data = res.json()
     assert data["total_errors"] == 0
 
+
+def test_python_ruff_linter_empty_or_slash_filepath():
+    headers = get_auth_headers()
+    # Unused import with empty or slash filepath should not crash ruff stdin
+    res = client.post("/api/editor/diagnostics", json={
+        "content": "import sys\n\ndef run():\n    return 1\n",
+        "language": "python",
+        "filePath": "some_dir/"
+    }, headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data["diagnostics"]) >= 1
+    assert any(d["source"] == "ruff" for d in data["diagnostics"])
+
+
+def test_yaml_clean_and_error():
+    headers = get_auth_headers()
+    # Clean YAML
+    res_clean = client.post("/api/editor/diagnostics", json={
+        "content": "version: '3.8'\nservices:\n  web:\n    image: nginx:alpine\n    ports:\n      - '80:80'\n",
+        "language": "yaml"
+    }, headers=headers)
+    assert res_clean.status_code == 200
+    assert res_clean.json()["total_errors"] == 0
+
+    # Broken YAML
+    res_broken = client.post("/api/editor/diagnostics", json={
+        "content": "services:\n  web:\n    ports: [80, 443\n",
+        "language": "yaml",
+        "filePath": "docker-compose.yml"
+    }, headers=headers)
+    assert res_broken.status_code == 200
+    data = res_broken.json()
+    assert data["total_errors"] >= 1
+    assert data["diagnostics"][0]["source"] == "yaml"
+    assert data["diagnostics"][0]["line"] >= 1
+
+
+def test_oversized_content_protection():
+    headers = get_auth_headers()
+    huge_content = "x = 1\n" * 250_000  # > 1MB
+    res = client.post("/api/editor/diagnostics", json={
+        "content": huge_content,
+        "language": "python"
+    }, headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total_infos"] == 1
+    assert data["diagnostics"][0]["code"] == "OVERSIZED_CONTENT"
+
+

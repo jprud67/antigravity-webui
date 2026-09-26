@@ -53,6 +53,9 @@ def _get_ruff_executable() -> Optional[str]:
     candidate = scripts_dir / ("ruff.exe" if os.name == "nt" else "ruff")
     if candidate.exists():
         return str(candidate)
+    venv_candidate = Path(REPO_ROOT) / "backend" / "venv" / ("Scripts" if os.name == "nt" else "bin") / ("ruff.exe" if os.name == "nt" else "ruff")
+    if venv_candidate.exists():
+        return str(venv_candidate)
     return shutil.which("ruff")
 
 
@@ -94,9 +97,9 @@ def _lint_python(content: str, file_path: Optional[str]) -> List[DiagnosticItem]
     ruff_bin = _get_ruff_executable()
     if ruff_bin:
         try:
-            stdin_filename = file_path or "temp_check.py"
-            # If path is outside repo or synthetic, keep just filename
-            stdin_filename = os.path.basename(stdin_filename)
+            raw_target = (file_path or "").rstrip("/\\")
+            base_name = os.path.basename(raw_target) if raw_target else ""
+            stdin_filename = base_name if base_name else "temp_check.py"
             proc = subprocess.run(
                 [ruff_bin, "check", "--output-format=json", "--stdin-filename", stdin_filename, "-"],
                 input=content.encode("utf-8"),
@@ -177,10 +180,11 @@ def _lint_javascript(content: str, file_path: Optional[str], language: str) -> L
         proc = subprocess.run(
             cmd,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=5
         )
-        raw_out = proc.stdout.strip()
+        raw_out = (proc.stdout or "").strip()
         if raw_out:
             try:
                 parsed = json.loads(raw_out)
@@ -197,10 +201,15 @@ def _lint_javascript(content: str, file_path: Optional[str], language: str) -> L
                     col = 1
                     end_line = 1
                     end_col = 2
-                    if labels and isinstance(labels, list):
-                        span = labels[0].get("span") or {}
-                        line = span.get("line", 1)
-                        col = span.get("column", 1)
+                    span = None
+                    if labels and isinstance(labels, list) and len(labels) > 0 and isinstance(labels[0], dict):
+                        span = labels[0].get("span")
+                    if not span and isinstance(item.get("span"), dict):
+                        span = item.get("span")
+
+                    if span and isinstance(span, dict):
+                        line = max(1, span.get("line", 1))
+                        col = max(1, span.get("column", 1))
                         end_line = line
                         end_col = col + max(span.get("length", 1), 1)
 
@@ -250,6 +259,35 @@ def _lint_json(content: str) -> List[DiagnosticItem]:
     return diagnostics
 
 
+def _lint_yaml(content: str) -> List[DiagnosticItem]:
+    diagnostics: List[DiagnosticItem] = []
+    try:
+        import yaml
+        list(yaml.safe_load_all(content))
+    except Exception as e:
+        mark = getattr(e, "problem_mark", None)
+        line = (mark.line + 1) if mark and hasattr(mark, "line") else 1
+        col = (mark.column + 1) if mark and hasattr(mark, "column") else 1
+        msg = str(e)
+        if hasattr(e, "problem") and e.problem:
+            msg = e.problem
+            if hasattr(e, "context") and e.context:
+                msg = f"{e.context}: {msg}"
+        diagnostics.append(
+            DiagnosticItem(
+                line=line,
+                column=col,
+                endLine=line,
+                endColumn=col + 1,
+                message=msg,
+                severity="error",
+                source="yaml",
+                code="YAMLError"
+            )
+        )
+    return diagnostics
+
+
 @router.post("/diagnostics", response_model=EditorDiagnosticsResponse)
 def get_editor_diagnostics(
     req: EditorDiagnosticsRequest
@@ -258,6 +296,27 @@ def get_editor_diagnostics(
     content = req.content or ""
     language = (req.language or "text").lower().strip()
     file_path = req.filePath
+
+    # Protection against oversized content (>1MB) to prevent thread/subprocess starvation
+    if len(content) > 1_000_000:
+        return EditorDiagnosticsResponse(
+            diagnostics=[
+                DiagnosticItem(
+                    line=1,
+                    column=1,
+                    endLine=1,
+                    endColumn=1,
+                    message="Contenu trop volumineux (>1 Mo) pour l'analyse en temps réel.",
+                    severity="info",
+                    source="diagnostics",
+                    code="OVERSIZED_CONTENT"
+                )
+            ],
+            duration_ms=round((time.perf_counter() - start_time) * 1000, 2),
+            total_errors=0,
+            total_warnings=0,
+            total_infos=1
+        )
 
     # Infer language from file_path if language is generic or missing
     if (language in ("text", "plaintext", "") or not language) and file_path:
@@ -274,6 +333,8 @@ def get_editor_diagnostics(
             language = "javascriptreact"
         elif lower_fp.endswith(".json"):
             language = "json"
+        elif lower_fp.endswith((".yaml", ".yml")):
+            language = "yaml"
 
     diagnostics: List[DiagnosticItem] = []
 
@@ -284,6 +345,8 @@ def get_editor_diagnostics(
             diagnostics = _lint_javascript(content, file_path, language)
         elif language == "json":
             diagnostics = _lint_json(content)
+        elif language in ("yaml", "yml"):
+            diagnostics = _lint_yaml(content)
 
     # Sort diagnostics by line, then column
     diagnostics.sort(key=lambda d: (d.line, d.column))
