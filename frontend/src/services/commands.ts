@@ -49,7 +49,8 @@ import {
   GitCompare,
   Code2,
   Wand2,
-  Gauge
+  Gauge,
+  Database
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -674,6 +675,34 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'panel',
     icon: FileCode2,
     color: 'text-amber-400',
+    isAction: true
+  },
+  {
+    cmd: '/db',
+    descKey: 'cmd_desc_database',
+    desc: 'Ouvrir l\'explorateur de base de données et studio SQL',
+    category: 'panel',
+    icon: Database,
+    color: 'text-blue-400',
+    isAction: true
+  },
+  {
+    cmd: '/database',
+    descKey: 'cmd_desc_database',
+    desc: 'Ouvrir l\'explorateur de base de données et studio SQL',
+    category: 'panel',
+    icon: Database,
+    color: 'text-blue-400',
+    isAction: true
+  },
+  {
+    cmd: '/sql',
+    descKey: 'cmd_desc_sql',
+    desc: 'Exécuter des requêtes SQL et explorer les schémas SQLite',
+    arg: '<requête_optionnelle>',
+    category: 'panel',
+    icon: Database,
+    color: 'text-blue-400',
     isAction: true
   },
   {

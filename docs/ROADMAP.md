@@ -206,11 +206,18 @@ This roadmap outlines the strategic direction for **Antigravity‑webui**, the f
 | **Mémoire Vectorielle Embarquée & Hook Auto-Recall (LanceDB-Compatible)** | Système de stockage vectoriel local persistant SQLite avec calcul déterministe d'embeddings par défaut (384 dimensions, zéro dépendance externe) et compatibilité pluggable OpenAI, Ollama et Gemini. Moteur de recherche sémantique par similarité cosinus avec pondération d'importance temporelle. Hook d'auto-recall intelligent filtrant les salutations triviales et injectant automatiquement les top-K souvenirs pertinents dans le bloc `<recalled_memories>` avant chaque tour de modèle. Interface de gestion et simulateur en temps réel (Antigravity Core `extensions/memory-lancedb/` + Antigravity `agent/memory_manager.py`). | Core / AI | 2027‑03‑27 | ✅ **Completed** |
 | **Release v0.3.0** | Version bump majeur à 0.3.0 (`package.json`, `main.py`, `updater.py`, `sw.js`), 0 erreur Oxlint, 0 erreur TypeScript (`tsc -b`), build production Vite optimisé, 155 tests unitaires backend validés avec 100% de passage. Intégration ergonomique des modals Canvas Studio et Mémoire Vectorielle dans la barre latérale. | Release Manager | 2027‑03‑27 | ✅ **Completed** |
 
+### 📌 Jalon v0.3.1 : Database Explorer & Visual SQL Query Studio (SQLite Studio)
+| Milestone | Description | Owner | Target | Status |
+|---|---|---|---|---|
+| **Database Discovery & Schema Introspection** | Service backend FastAPI (`/api/database/discover`, `/schema`) avec détection automatique des bases SQLite dans le workspace, introspection des tables, vues, colonnes, types, clés primaires et estimations de lignes. | Backend / DB | 2027‑03‑28 | ✅ **Completed** |
+| **Interactive Monaco SQL Editor & Execution Engine** | Studio modal complet (`DatabaseStudioModal.tsx`) avec éditeur Monaco SQL (`Ctrl+Enter`), exécution sécurisée avec timeout 10s et limitation de lignes, télémétrie en temps réel (durée ms, total lignes), historique persistant des requêtes et modèles de requêtes rapides. | Frontend / IDE | 2027‑03‑28 | ✅ **Completed** |
+| **Data Grid & Instant CSV/JSON Export** | Grille de données interactive avec tri multi-colonnes, pagination dynamique, indicateurs de valeurs NULL, et export instantané des résultats de requêtes au format CSV et JSON (`/api/database/export`). | Frontend / UX | 2027‑03‑28 | ✅ **Completed** |
+| **Intégration & Internationalisation Complète** | Commandes slash `/db`, `/database`, `/sql`, raccourci studio dans la barre latérale, et couverture i18n intégrale à 100% sur les 15 langues dans `locales.json`. | Release Manager | 2027‑03‑28 | ✅ **Completed** |
+
 ### 📌 Long‑Term (v0.4 / 3‑6 mois)
 | Milestone | Description |
 |---|---|
 | **Integrated Docker & Container Management Studio** – Détection automatique des Dockerfiles/Compose, logs streaming et terminal interactif dans les conteneurs. |
-| **Database Explorer & Visual SQL Query Studio** – Explorateur SQLite/PostgreSQL/MySQL avec pagination et export CSV/JSON. |
 | **Collaborative Editing** – Real‑time shared sessions via WebSocket + CRDT. |
 | **Full IDE Integration** – Monaco avec live linting étendu, terminal split-view et orchestration multi-agents. |
 | **Release v0.4 – Premium‑grade Web IDE & Autonomous Agent Cockpit** |

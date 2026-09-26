@@ -30,6 +30,7 @@ const WorktreeDashboardModal = lazy(() => import('./components/WorktreeDashboard
 const CanvasStudioModal = lazy(() => import('./components/CanvasStudioModal').then(m => ({ default: m.CanvasStudioModal })));
 const VectorMemoryModal = lazy(() => import('./components/VectorMemoryModal').then(m => ({ default: m.VectorMemoryModal })));
 const DockerStudioModal = lazy(() => import('./components/DockerStudioModal').then(m => ({ default: m.DockerStudioModal })));
+const DatabaseStudioModal = lazy(() => import('./components/DatabaseStudioModal').then(m => ({ default: m.DatabaseStudioModal })));
 
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig, AppSettings, ProgressCardData } from './types';
@@ -271,15 +272,21 @@ export function App() {
         setWorkspaceSearchMode(e.detail.mode);
       }
     };
+    const handleOpenDatabaseStudio = (e: any) => {
+      setDatabaseStudioInitialQuery(e?.detail?.query || undefined);
+      setIsDatabaseStudioOpen(true);
+    };
     window.addEventListener('open-workspace-file', handleOpenFile);
     window.addEventListener('terminal-run-command', handleRunTerminal);
     window.addEventListener('open-quick-open', handleQuickOpen);
     window.addEventListener('open-workspace-search', handleWorkspaceSearch);
+    window.addEventListener('open-database-studio', handleOpenDatabaseStudio);
     return () => {
       window.removeEventListener('open-workspace-file', handleOpenFile);
       window.removeEventListener('terminal-run-command', handleRunTerminal);
       window.removeEventListener('open-quick-open', handleQuickOpen);
       window.removeEventListener('open-workspace-search', handleWorkspaceSearch);
+      window.removeEventListener('open-database-studio', handleOpenDatabaseStudio);
     };
   }, []);
 
@@ -308,6 +315,8 @@ export function App() {
   const [isCanvasStudioOpen, setIsCanvasStudioOpen] = useState(false);
   const [isVectorMemoryOpen, setIsVectorMemoryOpen] = useState(false);
   const [isDockerStudioOpen, setIsDockerStudioOpen] = useState(false);
+  const [isDatabaseStudioOpen, setIsDatabaseStudioOpen] = useState(false);
+  const [databaseStudioInitialQuery, setDatabaseStudioInitialQuery] = useState<string | undefined>(undefined);
   const [activeProgressCard, setActiveProgressCard] = useState<ProgressCardData | null>(null);
 
   // Global FTS search shortcut (Ctrl+Shift+K or Cmd+Shift+K)
@@ -1443,6 +1452,8 @@ export function App() {
         if (isRemoteAccessOpen) { setIsRemoteAccessOpen(false); return; }
         if (isGatewayOpen) { setIsGatewayOpen(false); return; }
         if (isWorktreeOpen) { setIsWorktreeOpen(false); return; }
+        if (isDockerStudioOpen) { setIsDockerStudioOpen(false); return; }
+        if (isDatabaseStudioOpen) { setIsDatabaseStudioOpen(false); return; }
         if (isRightPanelOpen) { setIsRightPanelOpen(false); return; }
         if (isMobileSidebarOpen) { setIsMobileSidebarOpen(false); return; }
         return;
@@ -1464,6 +1475,7 @@ export function App() {
     isSessionMetaOpen, isBranchModalOpen, isRightPanelOpen, isMobileSidebarOpen,
     isQuickOpenOpen, isMcpCatalogOpen, isDoctorOpen,
     isRemoteAccessOpen, isGatewayOpen, isWorktreeOpen,
+    isDockerStudioOpen, isDatabaseStudioOpen,
   ]);
 
   // Phase 3 Session Handlers (Fork, Pin, Tags, Project, Search)
@@ -1961,6 +1973,7 @@ export function App() {
         onOpenCanvasStudio={() => setIsCanvasStudioOpen(true)}
         onOpenVectorMemory={() => setIsVectorMemoryOpen(true)}
         onOpenDockerStudio={() => setIsDockerStudioOpen(true)}
+        onOpenDatabaseStudio={() => { setDatabaseStudioInitialQuery(undefined); setIsDatabaseStudioOpen(true); }}
       />
 
       {/* Main Chat Area */}
@@ -2098,6 +2111,10 @@ export function App() {
           onOpenUpdates={handleOpenUpdates}
           onShowUpdateCard={handleShowUpdateCard}
           onOpenMonacoStudio={handleOpenMonacoStudio}
+          onOpenDatabaseStudio={(query) => {
+            setDatabaseStudioInitialQuery(query);
+            setIsDatabaseStudioOpen(true);
+          }}
         />
       </main>
 
@@ -2332,6 +2349,15 @@ export function App() {
           isOpen={isDockerStudioOpen}
           onClose={() => setIsDockerStudioOpen(false)}
           currentWorkspace={currentWorkspace}
+        />
+      )}
+
+      {isDatabaseStudioOpen && (
+        <DatabaseStudioModal
+          isOpen={isDatabaseStudioOpen}
+          onClose={() => setIsDatabaseStudioOpen(false)}
+          currentWorkspace={currentWorkspace}
+          initialQuery={databaseStudioInitialQuery}
         />
       )}
       </Suspense>

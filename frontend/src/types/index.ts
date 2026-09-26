@@ -1023,5 +1023,58 @@ export interface ContainerExecResult {
   success: boolean;
 }
 
+// Database Explorer & Visual SQL Query Studio
+export interface DatabaseConnectionInfo {
+  id: string;
+  name: string;
+  dialect: 'sqlite' | 'postgresql' | 'mysql';
+  path: string;
+  size_bytes?: number | null;
+  is_workspace_local: boolean;
+  table_count: number;
+}
+
+export interface ColumnInfo {
+  name: string;
+  type: string;
+  primary_key: boolean;
+  nullable: boolean;
+  default_value?: string | null;
+}
+
+export interface TableInfo {
+  name: string;
+  is_view: boolean;
+  columns: ColumnInfo[];
+  row_count_estimate?: number | null;
+}
+
+export interface DatabaseSchema {
+  database_name: string;
+  dialect: string;
+  tables: TableInfo[];
+}
+
+export interface QueryResult {
+  columns: string[];
+  rows: any[][];
+  total_rows: number;
+  truncated: boolean;
+  execution_time_ms: number;
+  error?: string | null;
+}
+
+export interface QueryRequest {
+  db_path: string;
+  query: string;
+  limit?: number;
+}
+
+export interface ExportRequest {
+  db_path: string;
+  query: string;
+  format: 'csv' | 'json';
+}
+
 
 

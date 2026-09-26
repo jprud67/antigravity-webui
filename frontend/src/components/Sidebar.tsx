@@ -40,6 +40,7 @@ import {
   Layers,
   Brain,
   Container,
+  Database,
   ChevronDown
 } from 'lucide-react';
 import type { Conversation } from '../types';
@@ -142,6 +143,7 @@ interface SidebarProps {
   onOpenCanvasStudio?: () => void;
   onOpenVectorMemory?: () => void;
   onOpenDockerStudio?: () => void;
+  onOpenDatabaseStudio?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = React.memo(({
@@ -180,6 +182,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   onOpenCanvasStudio,
   onOpenVectorMemory,
   onOpenDockerStudio,
+  onOpenDatabaseStudio,
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -2030,6 +2033,20 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                   <Container className="w-3 h-3 text-sky-400" />
                 </div>
                 <span className="font-medium text-[11px] truncate">{t('studio_docker', 'Docker Studio')}</span>
+              </button>
+            )}
+
+            {onOpenDatabaseStudio && (
+              <button
+                type="button"
+                onClick={onOpenDatabaseStudio}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-emerald-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                  <Database className="w-3 h-3 text-emerald-400" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('studio_database', 'Base de données')}</span>
               </button>
             )}
           </div>

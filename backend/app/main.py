@@ -16,6 +16,7 @@ from app.api.code_kernel import router as code_kernel_router
 from app.api.conversations import router as conv_router
 from app.api.copilot import router as copilot_router
 from app.api.crons import router as crons_router
+from app.api.database_studio import router as database_studio_router
 from app.api.docker_studio import router as docker_studio_router
 from app.api.doctor import router as doctor_router
 from app.api.events import router as events_router
@@ -171,6 +172,7 @@ app.include_router(messaging_gateway_router)  # Telegram & Discord Gateway with 
 app.include_router(canvas_documents_router)  # Sandboxed Canvas Documents & Widgets
 app.include_router(vector_memory_router)  # Vector Memory & Auto-Recall Hook
 app.include_router(docker_studio_router)  # Docker & Container Management Studio
+app.include_router(database_studio_router)  # Database Explorer & Visual SQL Query Studio
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])

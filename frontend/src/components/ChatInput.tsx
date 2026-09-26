@@ -84,6 +84,7 @@ interface ChatInputProps {
   onOpenBranchTree?: () => void;
   onAddBookmark?: (label?: string) => void;
   onOpenMonacoStudio?: (config: MonacoStudioConfig) => void;
+  onOpenDatabaseStudio?: (query?: string) => void;
   contextBudgetTokens?: number;
 }
 
@@ -144,6 +145,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
   onOpenBranchTree,
   onAddBookmark,
   onOpenMonacoStudio,
+  onOpenDatabaseStudio,
   contextBudgetTokens
 }) => {
   const { lang, t } = useI18n();
@@ -818,6 +820,16 @@ export const ChatInput = React.memo<ChatInputProps>(({
           onOpenMonacoStudio({ mode: 'diff', filePath: args || undefined });
         } else {
           showToast(t('monaco_diff_unavailable', 'Studio Diff Monaco non disponible.'), 'info');
+        }
+        return true;
+
+      case '/db':
+      case '/database':
+      case '/sql':
+        if (onOpenDatabaseStudio) {
+          onOpenDatabaseStudio(args || undefined);
+        } else {
+          window.dispatchEvent(new CustomEvent('open-database-studio', { detail: { query: args || undefined } }));
         }
         return true;
 

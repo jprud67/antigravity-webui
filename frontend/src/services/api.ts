@@ -82,7 +82,10 @@ import type {
   ContainerSummary,
   DockerEngineStatus,
   WorkspaceDockerItem,
-  ContainerExecResult
+  ContainerExecResult,
+  DatabaseConnectionInfo,
+  DatabaseSchema,
+  QueryResult
 } from '../types';
 
 const API_BASE = '/api';
@@ -3068,6 +3071,57 @@ export const dockerApi = {
       throw new Error(err.detail || 'Action compose échouée');
     }
     return res.json();
+  },
+};
+
+export const databaseApi = {
+  async discover(workspace?: string): Promise<DatabaseConnectionInfo[]> {
+    const params = new URLSearchParams();
+    if (workspace) params.set('workspace', workspace);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${API_BASE}/database/discover${query}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Échec de détection des bases de données: ${res.statusText}`);
+    return res.json();
+  },
+
+  async getSchema(dbPath: string): Promise<DatabaseSchema> {
+    const params = new URLSearchParams({ db_path: dbPath });
+    const res = await fetch(`${API_BASE}/database/schema?${params.toString()}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || 'Échec d\'introspection du schéma');
+    }
+    return res.json();
+  },
+
+  async executeQuery(dbPath: string, query: string, limit: number = 500): Promise<QueryResult> {
+    const res = await fetch(`${API_BASE}/database/query`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ db_path: dbPath, query, limit }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || 'Échec de l\'exécution de la requête');
+    }
+    return res.json();
+  },
+
+  async exportQuery(dbPath: string, query: string, format: 'csv' | 'json'): Promise<Blob> {
+    const res = await fetch(`${API_BASE}/database/export`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ db_path: dbPath, query, format }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || 'Échec de l\'export');
+    }
+    return res.blob();
   },
 };
 
