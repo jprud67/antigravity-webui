@@ -107,7 +107,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [workspace, notify]);
+  }, [workspace, notify, t]);
 
   const loadRemotes = useCallback(async () => {
     try {
@@ -120,7 +120,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [workspace, notify]);
+  }, [workspace, notify, t]);
 
   const copyToClipboard = async (text: string) => {
     try {

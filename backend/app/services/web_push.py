@@ -14,11 +14,11 @@ import secrets
 import sqlite3
 import time
 import urllib.parse
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.config import SESSIONS_DB
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("antigravity.web_push")
 
 DB_PATH = str(SESSIONS_DB)
 
@@ -35,8 +35,11 @@ def is_safe_push_endpoint(endpoint: str) -> bool:
 
 
 def _get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 
@@ -63,7 +66,7 @@ def ensure_web_push_schema() -> None:
         conn.commit()
 
 
-def get_or_create_vapid_keys() -> Dict[str, str]:
+def get_or_create_vapid_keys() -> dict[str, str]:
     """Retrieve or generate persistent VAPID keypair."""
     ensure_web_push_schema()
     with _get_db() as conn:
@@ -85,7 +88,7 @@ def get_or_create_vapid_keys() -> Dict[str, str]:
         return {"public_key": pub_b64, "private_key": priv_b64}
 
 
-def save_subscription(endpoint: str, p256dh: str, auth: str, user_agent: Optional[str] = None) -> bool:
+def save_subscription(endpoint: str, p256dh: str, auth: str, user_agent: str | None = None) -> bool:
     """Register or update a client push subscription."""
     if not is_safe_push_endpoint(endpoint):
         logger.warning("web_push: rejet d'un endpoint push non sécurisé ou invalide : %s", endpoint[:40])
@@ -115,7 +118,7 @@ def remove_subscription(endpoint: str) -> bool:
         return cursor.rowcount > 0
 
 
-def list_subscriptions() -> List[Dict[str, Any]]:
+def list_subscriptions() -> list[dict[str, Any]]:
     """List all registered push subscriptions."""
     ensure_web_push_schema()
     with _get_db() as conn:
@@ -130,7 +133,7 @@ def send_web_push_notification(
     tag: str = "antigravity-event",
     url: str = "/",
     icon: str = "/favicon.svg"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Dispatch Web Push notification to all registered subscriptions."""
     subs = list_subscriptions()
     if not subs:
@@ -155,7 +158,9 @@ def send_web_push_notification(
         try:
             # If pywebpush is installed, use native VAPID encryption
             try:
-                from pywebpush import webpush  # type: ignore[import-not-found,import-untyped]
+                from pywebpush import (
+                    webpush,  # type: ignore[import-not-found,import-untyped]
+                )
                 keys = get_or_create_vapid_keys()
                 webpush(
                     subscription_info={

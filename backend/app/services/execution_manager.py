@@ -24,14 +24,14 @@ from app.services.google_auth import (
     is_quota_error,
     switch_to_next_healthy_account,
 )
+from app.services.link_understanding import enrich_user_prompt_with_links
+from app.services.progress_card import get_progress_card, save_progress_card
 from app.services.storage import (
     auto_truncate_transcript,
     get_settings,
     is_safe_conversation_id,
     save_settings,
 )
-from app.services.progress_card import get_progress_card, save_progress_card
-from app.services.link_understanding import enrich_user_prompt_with_links
 from app.services.vector_memory import execute_auto_recall_hook
 
 logger = logging.getLogger("antigravity.execution")

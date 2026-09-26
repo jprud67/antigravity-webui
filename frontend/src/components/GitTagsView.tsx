@@ -87,7 +87,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [workspace, notify]);
+  }, [workspace, notify, t]);
 
   const loadTags = useCallback(async () => {
     try {
@@ -100,15 +100,15 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [workspace, notify]);
+  }, [workspace, notify, t]);
 
   // SemVer Suggestions Calculation
   const semverSuggestions = useMemo(() => {
     let highest: { major: number; minor: number; patch: number; raw: string } | null = null;
     const semverRegex = /^v?(\d+)\.(\d+)\.(\d+)$/;
 
-    for (const t of tags) {
-      const match = t.name.match(semverRegex);
+    for (const tagItem of tags) {
+      const match = tagItem.name.match(semverRegex);
       if (match) {
         const major = parseInt(match[1], 10);
         const minor = parseInt(match[2], 10);
@@ -119,7 +119,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
           (major === highest.major && minor > highest.minor) ||
           (major === highest.major && minor === highest.minor && patch > highest.patch)
         ) {
-          highest = { major, minor, patch, raw: t.name };
+          highest = { major, minor, patch, raw: tagItem.name };
         }
       }
     }

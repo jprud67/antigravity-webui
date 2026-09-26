@@ -21,7 +21,7 @@ import json
 import logging
 import re
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger("antigravity.tool_repair")
 
@@ -48,7 +48,7 @@ _CODE_BLOCK_SHELL_RE = re.compile(
 )
 
 
-def repair_malformed_json(raw_json: str) -> Optional[dict]:
+def repair_malformed_json(raw_json: str) -> dict | None:
     """
     Tente de réparer et parser un flux JSON tronqué ou corrompu par un petit modèle.
     """
@@ -117,7 +117,7 @@ def repair_malformed_json(raw_json: str) -> Optional[dict]:
     return None
 
 
-def _extract_name_and_args(obj: dict) -> Tuple[Optional[str], dict]:
+def _extract_name_and_args(obj: dict) -> tuple[str | None, dict]:
     """Extrait le nom de l'outil et ses arguments depuis un objet standardisé ou arbitraire."""
     name = None
     args = {}
@@ -161,9 +161,9 @@ class ToolRepairEngine:
     def repair_and_extract(
         self,
         raw_text: str,
-        allowed_tools: Optional[List[str]] = None,
+        allowed_tools: list[str] | None = None,
         promote_shell: bool = True,
-    ) -> Tuple[str, List[Dict[str, Any]], bool]:
+    ) -> tuple[str, list[dict[str, Any]], bool]:
         """
         Analyse raw_text. Si des tool calls non natifs sont détectés, les répare,
         les extrait sous format standardisé et nettoie le texte visible.
@@ -172,7 +172,7 @@ class ToolRepairEngine:
         """
         self.total_scanned += 1
         allowed_lower = {t.lower(): t for t in allowed_tools} if allowed_tools else {}
-        extracted_calls: List[Dict[str, Any]] = []
+        extracted_calls: list[dict[str, Any]] = []
         cleaned_text = raw_text
 
         # 1. Détection des balises <tool_call> ... </tool_call>
@@ -256,7 +256,7 @@ class ToolRepairEngine:
 
         return cleaned_text, extracted_calls, was_repaired
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         return {
             "total_scanned": self.total_scanned,
             "total_repaired": self.total_repaired,

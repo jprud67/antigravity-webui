@@ -1,7 +1,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import Any, TypedDict, Optional
+from typing import Any, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -166,11 +166,11 @@ def get_curator_ledger(limit: int = Query(50, ge=1, le=200), _ = Depends(require
 
 
 class PinRequest(BaseModel):
-    pinned: Optional[bool] = None
+    pinned: bool | None = None
 
 
 @router.post("/{skill_id}/pin")
-def toggle_skill_pin(skill_id: str, req: Optional[PinRequest] = None, _ = Depends(require_auth)) -> dict[str, Any]:
+def toggle_skill_pin(skill_id: str, req: PinRequest | None = None, _ = Depends(require_auth)) -> dict[str, Any]:
     """Épingle ou désépingle une compétence pour la protéger de l'archivage automatique."""
     safe_id = Path(skill_id).name
     if not safe_id or safe_id != skill_id or ".." in skill_id:

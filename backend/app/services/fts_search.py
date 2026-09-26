@@ -18,7 +18,7 @@ import sqlite3
 import threading
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.config import BRAIN_DIR, CONVERSATION_DB
 
@@ -294,11 +294,11 @@ class TranscriptFtsService:
     def search(
         self,
         query: str,
-        role: Optional[str] = None,
-        session_id: Optional[str] = None,
-        project: Optional[str] = None,
+        role: str | None = None,
+        session_id: str | None = None,
+        project: str | None = None,
         limit: int = 50,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Exécute une recherche plein-texte avec ranking BM25 et extraits surlignés."""
         start_time = time.perf_counter()
         q_cleaned = clean_search_query(query)
@@ -308,7 +308,7 @@ class TranscriptFtsService:
         conn = _get_connection()
         try:
             clauses = ["session_transcript_fts MATCH ?"]
-            params: List[Any] = [q_cleaned]
+            params: list[Any] = [q_cleaned]
 
             if role:
                 clauses.append("role = ?")
@@ -341,13 +341,21 @@ class TranscriptFtsService:
             titles = {}
             if session_ids:
                 try:
+                    from app.services.session_metadata import get_all_session_metadata
+                    all_meta = get_all_session_metadata()
+                except Exception:
+                    all_meta = {}
+                try:
                     placeholders = ",".join("?" * len(session_ids))
                     title_rows = conn.execute(
                         f"SELECT conversation_id, title FROM conversation_summaries WHERE conversation_id IN ({placeholders})",  # nosec B608
                         session_ids
                     ).fetchall()
                     for tr in title_rows:
-                        titles[tr["conversation_id"]] = tr["title"]
+                        cid = tr["conversation_id"]
+                        meta = all_meta.get(cid, {})
+                        custom_title = (meta.get("customTitle") or meta.get("custom_title") or "").strip()
+                        titles[cid] = custom_title or tr["title"] or cid
                 except Exception:
                     pass
 
@@ -377,7 +385,7 @@ class TranscriptFtsService:
         finally:
             conn.close()
 
-    def rebuild_all_sessions(self) -> Dict[str, Any]:
+    def rebuild_all_sessions(self) -> dict[str, Any]:
         """Reconstruit l'intégralité de l'index FTS5 à partir des dossiers de conversations."""
         start_time = time.perf_counter()
         conn = _get_connection()
@@ -405,7 +413,7 @@ class TranscriptFtsService:
         finally:
             conn.close()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Fournit les statistiques de l'index FTS5."""
         conn = _get_connection()
         try:
@@ -426,10 +434,10 @@ class TranscriptFtsService:
 fts_service = TranscriptFtsService()
 
 
-def get_fts_stats() -> Dict[str, Any]:
+def get_fts_stats() -> dict[str, Any]:
     return fts_service.get_stats()
 
 
-def reindex_all_conversations() -> Dict[str, Any]:
+def reindex_all_conversations() -> dict[str, Any]:
     return fts_service.rebuild_all_sessions()
 

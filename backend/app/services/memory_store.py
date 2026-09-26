@@ -23,7 +23,7 @@ import re
 import threading
 from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger("antigravity.memory")
 
@@ -60,7 +60,7 @@ THREAT_PATTERNS = [
 ]
 
 
-def _scan_threats(content: str) -> Optional[str]:
+def _scan_threats(content: str) -> str | None:
     """Détecte les tentatives d'injection de prompt ou d'exfiltration persistantes."""
     for pattern in THREAT_PATTERNS:
         if pattern.search(content):
@@ -68,7 +68,7 @@ def _scan_threats(content: str) -> Optional[str]:
     return None
 
 
-def _find_unique_match(entries: List[str], old_text: str) -> Tuple[Optional[int], bool]:
+def _find_unique_match(entries: list[str], old_text: str) -> tuple[int | None, bool]:
     """Trouve l'entrée correspondant à old_text (priorité absolue à l'égalité exacte)."""
     exact = [i for i, e in enumerate(entries) if e.strip() == old_text.strip()]
     if exact:
@@ -108,9 +108,9 @@ class MemoryStore:
                 alt.mkdir(parents=True, exist_ok=True)
                 self.config_dir = alt
 
-        self.memory_entries: List[str] = []
-        self.user_entries: List[str] = []
-        self._system_prompt_snapshot: Dict[str, str] = {"memory": "", "user": ""}
+        self.memory_entries: list[str] = []
+        self.user_entries: list[str] = []
+        self._system_prompt_snapshot: dict[str, str] = {"memory": "", "user": ""}
         self._lock = threading.RLock()
         
         # Charge l'état initial
@@ -166,7 +166,7 @@ class MemoryStore:
                         fd.seek(0)
                         msvcrt.locking(fd.fileno(), msvcrt.LK_UNLCK, 1)  # type: ignore[attr-defined]
 
-    def _parse_entries(self, text: str) -> List[str]:
+    def _parse_entries(self, text: str) -> list[str]:
         """Découpe le texte markdown en entrées distinctes."""
         if not text or not text.strip():
             return []
@@ -191,13 +191,13 @@ class MemoryStore:
                 entries.append(cleaned)
         return entries
 
-    def _render_entries(self, entries: List[str]) -> str:
+    def _render_entries(self, entries: list[str]) -> str:
         """Formate les entrées pour l'écriture fichier."""
         if not entries:
             return ""
         return ENTRY_DELIMITER.join(entries) + "\n"
 
-    def _render_block(self, target: str, entries: List[str]) -> str:
+    def _render_block(self, target: str, entries: list[str]) -> str:
         """Rend le bloc structuré pour injection dans le system prompt."""
         if not entries:
             return ""
@@ -262,7 +262,7 @@ class MemoryStore:
                 self._update_snapshot_target(t)
             return self.get_system_prompt_snapshot()
 
-    def get_entries(self, target: str) -> List[str]:
+    def get_entries(self, target: str) -> list[str]:
         return list(self.user_entries if target == "user" else self.memory_entries)
 
     def get_char_limit(self, target: str) -> int:
@@ -272,7 +272,7 @@ class MemoryStore:
         entries = self.get_entries(target)
         return len(ENTRY_DELIMITER.join(entries))
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Fournit la télémétrie complète pour l'API et l'UI."""
         with self._lock:
             user_count = self.get_char_count("user")
@@ -311,7 +311,7 @@ class MemoryStore:
                 "snapshot_available": bool(self.get_system_prompt_snapshot()),
             }
 
-    def _persist(self, target: str, entries: List[str]) -> None:
+    def _persist(self, target: str, entries: list[str]) -> None:
         path = self._path_for(target)
         rendered = self._render_entries(entries)
         # Écriture atomique avec remplacement de fichier temporaire
@@ -323,7 +323,7 @@ class MemoryStore:
         else:
             self.memory_entries = entries
 
-    def add(self, target: str, content: str) -> Dict[str, Any]:
+    def add(self, target: str, content: str) -> dict[str, Any]:
         """Ajoute une nouvelle entrée en respectant les quotas."""
         content = content.strip()
         if not content:
@@ -365,7 +365,7 @@ class MemoryStore:
                 "status": self.get_status()[target]
             }
 
-    def replace(self, target: str, old_text: str, new_content: str) -> Dict[str, Any]:
+    def replace(self, target: str, old_text: str, new_content: str) -> dict[str, Any]:
         """Remplace une entrée existante par un nouveau contenu consolidé."""
         old_text = old_text.strip()
         new_content = new_content.strip()
@@ -413,7 +413,7 @@ class MemoryStore:
                 "status": self.get_status()[target]
             }
 
-    def remove(self, target: str, old_text: str) -> Dict[str, Any]:
+    def remove(self, target: str, old_text: str) -> dict[str, Any]:
         """Supprime une entrée spécifique."""
         old_text = old_text.strip()
         if not old_text:
@@ -447,7 +447,7 @@ class MemoryStore:
                 "status": self.get_status()[target]
             }
 
-    def save_raw(self, target: str, raw_markdown: str) -> Dict[str, Any]:
+    def save_raw(self, target: str, raw_markdown: str) -> dict[str, Any]:
         """Écrit directement le texte brut et le réanalyse proprement."""
         threat = _scan_threats(raw_markdown)
         if threat:

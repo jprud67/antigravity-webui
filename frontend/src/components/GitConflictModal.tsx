@@ -95,11 +95,11 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
       onResolved(filePath);
       onClose();
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de la résolution du conflit', 'error');
+      showToast(err.message || t('conflict_resolve_error', 'Erreur lors de la résolution du conflit'), 'error');
     } finally {
       setResolving(false);
     }
-  }, [workspace, filePath, editedContent, onResolved, onClose]);
+  }, [workspace, filePath, editedContent, onResolved, onClose, t]);
 
   if (!isOpen) return null;
 

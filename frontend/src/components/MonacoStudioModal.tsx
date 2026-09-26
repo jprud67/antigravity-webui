@@ -234,7 +234,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
         if (!isCancelled) setIsLoadingFile(false);
       });
     return () => { isCancelled = true; };
-  }, [needsFetchFile, config.filePath, currentWorkspace]);
+  }, [needsFetchFile, config.filePath, currentWorkspace, t]);
 
   // Fetch git file versions if in diff mode without pre-supplied content
   useEffect(() => {
@@ -294,7 +294,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
       editorRef.current.getAction('editor.action.formatDocument')?.run();
       showToast(t('document_formatted', 'Document formaté'), 'info');
     }
-  }, []);
+  }, [t]);
 
   // Handle Find in File (Ctrl+F)
   const handleFind = useCallback(() => {

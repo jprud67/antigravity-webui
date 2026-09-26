@@ -6,8 +6,6 @@ and configure embedding parameters.
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
@@ -51,7 +49,7 @@ async def api_store_memory(payload: MemoryStoreInput):
         raise HTTPException(status_code=500, detail=f"Failed to store memory: {e}")
 
 
-@router.post("/search", response_model=List[MemorySearchResult])
+@router.post("/search", response_model=list[MemorySearchResult])
 async def api_search_memories(payload: MemorySearchInput):
     """Searches memories using semantic vector similarity."""
     try:
@@ -61,10 +59,10 @@ async def api_search_memories(payload: MemorySearchInput):
         raise HTTPException(status_code=500, detail=f"Search failed: {e}")
 
 
-@router.get("/list", response_model=List[MemoryEntry])
+@router.get("/list", response_model=list[MemoryEntry])
 def api_list_memories(
     agent_id: str = Query("default", alias="agentId"),
-    category: Optional[MemoryCategory] = Query(None),
+    category: MemoryCategory | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
 ):
     """Lists stored memories for an agent."""

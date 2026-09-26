@@ -6,9 +6,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.services.link_understanding import (
-    fetch_and_extract_url,
+    enrich_user_prompt_with_links,
     extract_bare_urls,
-    enrich_user_prompt_with_links
+    fetch_and_extract_url,
 )
 
 router = APIRouter(prefix="/api/links", tags=["Link Understanding"])

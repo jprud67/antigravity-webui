@@ -17,7 +17,7 @@ import re
 import threading
 import time
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.platform_utils import is_blocked_sensitive_path
 
@@ -32,7 +32,7 @@ class KernelToolProxy:
     def __init__(self, cwd: str = "."):
         self.cwd = os.path.abspath(cwd)
 
-    def call(self, tool_name: str, args: Optional[Dict[str, Any]] = None) -> Any:
+    def call(self, tool_name: str, args: dict[str, Any] | None = None) -> Any:
         args = args or {}
         tool_name = tool_name.lower().replace("-", "_")
 
@@ -52,8 +52,8 @@ class KernelToolProxy:
     def view_file(
         self,
         path: str,
-        start_line: Optional[int] = None,
-        end_line: Optional[int] = None
+        start_line: int | None = None,
+        end_line: int | None = None
     ) -> str:
         full_path = os.path.normpath(os.path.join(self.cwd, path)) if not os.path.isabs(path) else path
         if is_blocked_sensitive_path(full_path):
@@ -73,7 +73,7 @@ class KernelToolProxy:
             end_idx = len(lines)
         return "".join(lines[start_idx:end_idx])
 
-    def list_dir(self, path: str = ".") -> List[Dict[str, Any]]:
+    def list_dir(self, path: str = ".") -> list[dict[str, Any]]:
         full_path = os.path.normpath(os.path.join(self.cwd, path)) if not os.path.isabs(path) else path
         if is_blocked_sensitive_path(full_path):
             raise PermissionError("Accès refusé au dossier sensible")
@@ -96,7 +96,7 @@ class KernelToolProxy:
                 continue
         return items
 
-    def grep_search(self, query: str, path: str = ".", is_regex: bool = False) -> List[Dict[str, Any]]:
+    def grep_search(self, query: str, path: str = ".", is_regex: bool = False) -> list[dict[str, Any]]:
         full_path = os.path.normpath(os.path.join(self.cwd, path)) if not os.path.isabs(path) else path
         if is_blocked_sensitive_path(full_path):
             raise PermissionError("Accès refusé au chemin sensible")
@@ -148,7 +148,7 @@ class PersistentPythonKernel:
         self.execution_count = 0
         self.created_at = time.time()
         self.last_active_at = time.time()
-        self.globals: Dict[str, Any] = {}
+        self.globals: dict[str, Any] = {}
         self.lock = threading.RLock()
         self.tool_proxy = KernelToolProxy(cwd=self.cwd)
         self._init_namespace()
@@ -160,7 +160,7 @@ class PersistentPythonKernel:
             "tools": self.tool_proxy,
         }
 
-    def reset(self, new_cwd: Optional[str] = None) -> None:
+    def reset(self, new_cwd: str | None = None) -> None:
         with self.lock:
             if new_cwd:
                 self.cwd = os.path.abspath(new_cwd)
@@ -169,11 +169,12 @@ class PersistentPythonKernel:
             self.execution_count = 0
             self.last_active_at = time.time()
 
-    def execute(self, code: str, timeout: int = 30) -> Dict[str, Any]:
+    def execute(self, code: str, timeout: int = 30) -> dict[str, Any]:
         """Execute a Python code cell inside the persistent namespace."""
         with self.lock:
             self.execution_count += 1
             self.last_active_at = time.time()
+            start_time = time.perf_counter()
             current_exec_count = self.execution_count
 
             out_buf = io.StringIO()
@@ -186,7 +187,7 @@ class PersistentPythonKernel:
                 try:
                     with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
                         compiled = compile(code, f"<cell-{current_exec_count}>", "exec")
-                        exec(compiled, self.globals)  # nosec B102 # noqa: S102
+                        exec(compiled, self.globals)  # nosec B102
                 except SystemExit as se:
                     status = "exit"
                     tb = f"SystemExit: {se.code}"
@@ -217,11 +218,11 @@ class PersistentPythonKernel:
                 "stdout_clipped": stdout_clipped,
                 "stderr_clipped": stderr_clipped,
                 "traceback": tb,
-                "duration_ms": int((time.time() - self.last_active_at) * 1000)
+                "duration_ms": max(0, int((time.perf_counter() - start_time) * 1000))
             }
 
 
-_KERNEL_REGISTRY: Dict[str, PersistentPythonKernel] = {}
+_KERNEL_REGISTRY: dict[str, PersistentPythonKernel] = {}
 _REGISTRY_LOCK = threading.Lock()
 
 
@@ -240,7 +241,7 @@ def stop_kernel(session_id: str) -> bool:
         return False
 
 
-def list_active_kernels() -> List[Dict[str, Any]]:
+def list_active_kernels() -> list[dict[str, Any]]:
     with _REGISTRY_LOCK:
         return [
             {

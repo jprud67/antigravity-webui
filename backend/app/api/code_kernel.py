@@ -1,28 +1,28 @@
 """API router for Persistent Code Kernel and Tool RPC."""
 
-from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.services.code_kernel import (
     get_or_create_kernel,
-    stop_kernel,
     list_active_kernels,
+    stop_kernel,
 )
 
 router = APIRouter(prefix="/api/kernel", tags=["kernel"])
 
 
 class ExecuteCodeRequest(BaseModel):
-    session_id: Optional[str] = "default"
+    session_id: str | None = "default"
     code: str
-    cwd: Optional[str] = "."
-    timeout: Optional[int] = 30
+    cwd: str | None = "."
+    timeout: int | None = 30
 
 
 class ResetKernelRequest(BaseModel):
-    session_id: Optional[str] = "default"
-    cwd: Optional[str] = None
+    session_id: str | None = "default"
+    cwd: str | None = None
 
 
 @router.get("/status")

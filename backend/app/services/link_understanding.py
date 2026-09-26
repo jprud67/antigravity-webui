@@ -17,6 +17,7 @@ import sqlite3
 import time
 from typing import Any
 from urllib.parse import urlparse
+
 import httpx
 
 from app.config import SESSIONS_DB
@@ -28,9 +29,12 @@ CACHE_TTL_SECONDS = 86400  # 24 hours
 MAX_CONTENT_CHARS = 1800
 
 
-def _get_db():
-    conn = sqlite3.connect(str(DB_PATH))
+def _get_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(str(DB_PATH), timeout=15.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 

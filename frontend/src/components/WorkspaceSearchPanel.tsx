@@ -97,11 +97,11 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
       // Initialize all files as expanded
       setCollapsedFiles({});
     } catch (err: any) {
-      setErrorMsg(err.message || 'Erreur lors de la recherche');
+      setErrorMsg(err.message || t('search_error', 'Erreur lors de la recherche'));
     } finally {
       setIsSearching(false);
     }
-  }, [query, currentWorkspace, isCaseSensitive, isWholeWord, isRegex, includePattern, excludePattern]);
+  }, [query, currentWorkspace, isCaseSensitive, isWholeWord, isRegex, includePattern, excludePattern, t]);
 
   const prevInitialQueryRef = useRef<string | null>(null);
   useEffect(() => {
@@ -179,11 +179,11 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
       // Re-run search to update match positions
       await handleExecuteSearch();
     } catch (err: any) {
-      showToast(err.message || "Erreur lors du remplacement", 'error');
+      showToast(err.message || t('replace_occurrence_error', 'Erreur lors du remplacement'), 'error');
     } finally {
       setIsReplacing(false);
     }
-  }, [currentWorkspace, replaceText, handleExecuteSearch, onFileModified]);
+  }, [currentWorkspace, replaceText, handleExecuteSearch, onFileModified, t]);
 
   // Preview Diff Before Replace
   const handlePreviewFileDiff = useCallback(async (e: React.MouseEvent, fileResult: WorkspaceFileSearchResult) => {
@@ -208,17 +208,17 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
         showToast(t('no_changes_to_preview', 'Aucune modification à prévisualiser'), 'info');
       }
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de la prévisualisation', 'error');
+      showToast(err.message || t('preview_diff_error', 'Erreur lors de la prévisualisation'), 'error');
     } finally {
       setIsReplacing(false);
     }
-  }, [query, replaceText, currentWorkspace, isCaseSensitive, isWholeWord, isRegex, onPreviewDiff]);
+  }, [query, replaceText, currentWorkspace, isCaseSensitive, isWholeWord, isRegex, onPreviewDiff, t]);
 
   // Replace All in File
   const handleReplaceAllInFile = useCallback(async (e: React.MouseEvent, fileResult: WorkspaceFileSearchResult) => {
     e.stopPropagation();
     const confirmed = await showConfirm(
-      `Remplacer toutes les occurrences (${fileResult.matches.length}) dans ${fileResult.relative_path} par "${replaceText}" ?`,
+      t('replace_all_in_file_confirm', 'Remplacer toutes les occurrences ({0}) dans {1} par "{2}" ?', fileResult.matches.length, fileResult.relative_path, replaceText),
       { title: t('replace_in_this_file', 'Remplacer dans ce fichier'), confirmLabel: t('replace', 'Remplacer') }
     );
     if (!confirmed) return;
@@ -239,7 +239,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
       onFileModified?.(fileResult.file_path);
       await handleExecuteSearch();
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors du remplacement', 'error');
+      showToast(err.message || t('replace_occurrence_error', 'Erreur lors du remplacement'), 'error');
     } finally {
       setIsReplacing(false);
     }
@@ -276,11 +276,11 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
       }
       await handleExecuteSearch();
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors du remplacement global', 'error');
+      showToast(err.message || t('replace_global_error', 'Erreur lors du remplacement global'), 'error');
     } finally {
       setIsReplacing(false);
     }
-  }, [resultsData, query, replaceText, currentWorkspace, isCaseSensitive, isWholeWord, isRegex, includePattern, excludePattern, handleExecuteSearch, onFileModified]);
+  }, [resultsData, query, replaceText, currentWorkspace, isCaseSensitive, isWholeWord, isRegex, includePattern, excludePattern, handleExecuteSearch, onFileModified, t]);
 
   // Format line snippet with highlighted match
   const renderHighlightedSnippet = useMemo(() => {

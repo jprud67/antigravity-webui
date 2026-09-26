@@ -1,14 +1,14 @@
 """API router for Web Push notifications."""
 
-from typing import Optional
+
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from app.services.web_push import (
     get_or_create_vapid_keys,
-    save_subscription,
-    remove_subscription,
     list_subscriptions,
+    remove_subscription,
+    save_subscription,
     send_web_push_notification,
 )
 
@@ -23,7 +23,7 @@ class SubscriptionKeys(BaseModel):
 class SubscribeRequest(BaseModel):
     endpoint: str
     keys: SubscriptionKeys
-    user_agent: Optional[str] = None
+    user_agent: str | None = None
 
 
 class UnsubscribeRequest(BaseModel):
@@ -31,9 +31,9 @@ class UnsubscribeRequest(BaseModel):
 
 
 class SendTestPushRequest(BaseModel):
-    title: Optional[str] = "Antigravity Test"
-    body: Optional[str] = "Notification Web Push de test réussie !"
-    url: Optional[str] = "/"
+    title: str | None = "Antigravity Test"
+    body: str | None = "Notification Web Push de test réussie !"
+    url: str | None = "/"
 
 
 @router.get("/vapid-public-key")

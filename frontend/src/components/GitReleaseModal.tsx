@@ -82,7 +82,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, tag, workspace, notify]);
+  }, [isOpen, tag, workspace, notify, t]);
 
   // Close on Escape key
   useEffect(() => {
@@ -101,9 +101,9 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
       await navigator.clipboard.writeText(notes);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      notify('Notes de version copiées dans le presse-papiers', 'success');
+      notify(t('release_notes_copied_clipboard', 'Notes de version copiées dans le presse-papiers'), 'success');
     } catch {
-      notify('Impossible de copier les notes', 'error');
+      notify(t('copy_notes_failed', 'Impossible de copier les notes'), 'error');
     }
   };
 

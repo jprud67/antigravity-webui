@@ -663,6 +663,11 @@ async def upload_file(
         raise
     except Exception as e:
         logger.error(f"Error saving uploaded file {resolved_target}: {e}")
+        try:
+            if resolved_target.exists():
+                resolved_target.unlink(missing_ok=True)
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement du fichier : {e!s}")
 
     return {
@@ -730,7 +735,7 @@ def _matches_pattern(rel_path: str, filename: str, pattern: str) -> bool:
             return True
         if fnmatch.fnmatch(norm_rel, f"*/{clean_token.lstrip('/')}"):
             return True
-        if fnmatch.fnmatch(norm_rel, f"*{clean_token}*"):
+        if "*" not in clean_token and "?" not in clean_token and fnmatch.fnmatch(norm_rel, f"*{clean_token}*"):
             return True
     return False
 

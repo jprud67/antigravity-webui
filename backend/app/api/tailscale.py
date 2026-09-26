@@ -1,6 +1,6 @@
 """API router for Tailscale Remote Access."""
 
-from typing import Optional
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/tailscale", tags=["tailscale"])
 
 class ToggleServeRequest(BaseModel):
     enable: bool
-    port: Optional[int] = Field(8000, ge=1, le=65535)
+    port: int | None = Field(8000, ge=1, le=65535)
 
 
 @router.get("/status")

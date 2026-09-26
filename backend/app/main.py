@@ -10,53 +10,53 @@ from fastapi.staticfiles import StaticFiles
 from app.api.agent_api import router as agent_api_router
 from app.api.artifacts import router as art_router
 from app.api.auth import router as auth_router
+from app.api.canvas_documents import router as canvas_documents_router
 from app.api.chat import router as chat_router
+from app.api.code_kernel import router as code_kernel_router
 from app.api.conversations import router as conv_router
 from app.api.copilot import router as copilot_router
 from app.api.crons import router as crons_router
+from app.api.docker_studio import router as docker_studio_router
+from app.api.doctor import router as doctor_router
 from app.api.events import router as events_router
 from app.api.files import router as files_router
 from app.api.git import router as git_router
+from app.api.git_worktree import router as git_worktree_router
 from app.api.google_accounts import router as google_router
 from app.api.kanban import router as kanban_router
+from app.api.link_understanding import router as link_understanding_router
+from app.api.mcp_catalog import router as mcp_catalog_router
 from app.api.memory import router as memory_router
+from app.api.messaging_gateway import router as messaging_gateway_router
 from app.api.openai_compat import router as openai_router
+from app.api.progress_card import router as progress_card_router
 from app.api.prompt import router as prompt_router
 from app.api.rules import router as rules_router
 from app.api.search import router as search_router
 from app.api.settings import router as set_router
 from app.api.skills import router as skills_router
+from app.api.tailscale import router as tailscale_router
 from app.api.tasks import router as tasks_router
 from app.api.terminal import close_all_terminal_sessions
 from app.api.terminal import router as terminal_router
 from app.api.tool_repair import router as tool_repair_router
 from app.api.updater import router as updater_router
-from app.api.workspaces import router as ws_router
-from app.api.mcp_catalog import router as mcp_catalog_router
-from app.api.progress_card import router as progress_card_router
-from app.api.doctor import router as doctor_router
-from app.api.link_understanding import router as link_understanding_router
-from app.api.git_worktree import router as git_worktree_router
-from app.api.code_kernel import router as code_kernel_router
-from app.api.tailscale import router as tailscale_router
-from app.api.web_push import router as web_push_router
-from app.api.messaging_gateway import router as messaging_gateway_router
-from app.api.canvas_documents import router as canvas_documents_router
 from app.api.vector_memory import router as vector_memory_router
-from app.api.docker_studio import router as docker_studio_router
+from app.api.web_push import router as web_push_router
+from app.api.workspaces import router as ws_router
 from app.config import BRAIN_DIR, CONVERSATION_DB, REPO_ROOT
 from app.services.cron_ticker import cron_ticker_loop
 from app.services.execution_manager import execution_manager
 from app.services.fs_watcher import set_main_loop, watch_filesystem
 from app.services.fts_search import ensure_fts_schema
-from app.services.progress_card import ensure_progress_card_schema
-from app.services.link_understanding import ensure_link_cache_schema
-from app.services.web_push import ensure_web_push_schema
-from app.services.messaging_gateway import ensure_messaging_gateway_schema
-from app.services.vector_memory import ensure_vector_memory_schema
 from app.services.google_auth import restore_stashed_token_if_needed
+from app.services.link_understanding import ensure_link_cache_schema
+from app.services.messaging_gateway import ensure_messaging_gateway_schema
+from app.services.progress_card import ensure_progress_card_schema
 from app.services.storage import ensure_db_schema
 from app.services.updater import prefetch_update_check
+from app.services.vector_memory import ensure_vector_memory_schema
+from app.services.web_push import ensure_web_push_schema
 
 logger = logging.getLogger("antigravity.main")
 

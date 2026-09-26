@@ -2,7 +2,8 @@
 backend/app/api/memory.py — Endpoints API pour la Mémoire Continue (USER.md + MEMORY.md).
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -14,20 +15,20 @@ router = APIRouter(prefix="/api/memory", tags=["memory"])
 class MemoryOperationRequest(BaseModel):
     target: str = "memory"  # "memory" ou "user"
     action: str  # "add", "replace", "remove", "save_raw"
-    content: Optional[str] = None
-    old_text: Optional[str] = None
-    new_content: Optional[str] = None
-    raw_markdown: Optional[str] = None
+    content: str | None = None
+    old_text: str | None = None
+    new_content: str | None = None
+    raw_markdown: str | None = None
 
 
 @router.get("")
-def get_memory_status() -> Dict[str, Any]:
+def get_memory_status() -> dict[str, Any]:
     """Renvoie l'état complet de la mémoire continue (profil utilisateur et mémoire workspace)."""
     return memory_store.get_status()
 
 
 @router.get("/snapshot")
-def get_memory_snapshot() -> Dict[str, Any]:
+def get_memory_snapshot() -> dict[str, Any]:
     """Renvoie le snapshot gelé pour le prompt système de l'agent."""
     snapshot = memory_store.get_system_prompt_snapshot()
     return {
@@ -37,7 +38,7 @@ def get_memory_snapshot() -> Dict[str, Any]:
 
 
 @router.post("/refresh-snapshot")
-def refresh_memory_snapshot() -> Dict[str, Any]:
+def refresh_memory_snapshot() -> dict[str, Any]:
     """Force le rafraîchissement du snapshot prompt système après une mise à jour manuelle."""
     snapshot = memory_store.refresh_snapshot()
     return {
@@ -48,7 +49,7 @@ def refresh_memory_snapshot() -> Dict[str, Any]:
 
 
 @router.post("")
-def execute_memory_operation(req: MemoryOperationRequest) -> Dict[str, Any]:
+def execute_memory_operation(req: MemoryOperationRequest) -> dict[str, Any]:
     """Exécute une action sur la mémoire (add, replace, remove, save_raw)."""
     target = req.target.lower()
     action = req.action.lower()

@@ -1,41 +1,41 @@
 """API router for subagent Git Worktree isolation."""
 
-from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.services.git_worktree import (
-    resolve_repo_root,
+    _run_git,
     create_subagent_worktree,
     finalize_subagent_worktree,
     list_subagent_worktrees,
-    _run_git
+    resolve_repo_root,
 )
 
 router = APIRouter(prefix="/api/worktrees", tags=["worktrees"])
 
 
 class CreateWorktreeRequest(BaseModel):
-    cwd: Optional[str] = None
-    subagent_id: Optional[str] = None
+    cwd: str | None = None
+    subagent_id: str | None = None
 
 
 class FinalizeWorktreeRequest(BaseModel):
     path: str
-    branch: Optional[str] = None
-    repo_root: Optional[str] = None
-    base_commit: Optional[str] = None
+    branch: str | None = None
+    repo_root: str | None = None
+    base_commit: str | None = None
     prune: bool = True
 
 
 class RemoveWorktreeRequest(BaseModel):
     path: str
-    branch: Optional[str] = None
-    repo_root: Optional[str] = None
+    branch: str | None = None
+    repo_root: str | None = None
 
 
 @router.get("")
-def get_worktrees(cwd: Optional[str] = Query(None)):
+def get_worktrees(cwd: str | None = Query(None)):
     """List all active subagent worktrees for the repository containing cwd."""
     root = resolve_repo_root(cwd or ".")
     if not root:

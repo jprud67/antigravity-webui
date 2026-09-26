@@ -17,14 +17,14 @@ import subprocess
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _GIT_TIMEOUT = 30
 
 
-def _run_git(args: List[str], cwd: str, timeout: int = _GIT_TIMEOUT) -> subprocess.CompletedProcess[str]:
+def _run_git(args: list[str], cwd: str, timeout: int = _GIT_TIMEOUT) -> subprocess.CompletedProcess[str]:
     """Run git command capturing output without raising on non-zero return codes."""
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
@@ -41,7 +41,7 @@ def _run_git(args: List[str], cwd: str, timeout: int = _GIT_TIMEOUT) -> subproce
     )
 
 
-def resolve_repo_root(path: Optional[str]) -> Optional[str]:
+def resolve_repo_root(path: str | None) -> str | None:
     """Return the git toplevel directory for path, or None if not inside a git repository."""
     candidate = os.path.abspath(os.path.expanduser(str(path))) if path else ""
     if not candidate or not os.path.isdir(candidate):
@@ -71,9 +71,9 @@ def ensure_worktrees_gitignore(repo_root: str) -> None:
 
 
 def create_subagent_worktree(
-    parent_cwd: Optional[str],
-    subagent_id: Optional[str] = None
-) -> Optional[Dict[str, Any]]:
+    parent_cwd: str | None,
+    subagent_id: str | None = None
+) -> dict[str, Any] | None:
     """Create an isolated git worktree for a subagent.
     
     Returns a dictionary with worktree metadata, or None if outside a repo or on error.
@@ -126,10 +126,10 @@ def create_subagent_worktree(
 
 
 def finalize_subagent_worktree(
-    info: Dict[str, Any],
+    info: dict[str, Any],
     *,
     prune: bool = True
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Inspect and finalize a subagent worktree.
 
     If prune is True and commits == 0 and dirty is False, the worktree and branch
@@ -140,7 +140,7 @@ def finalize_subagent_worktree(
     repo_root = info.get("repo_root", "")
     base_commit = info.get("base_commit", "")
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "path": path,
         "branch": branch,
         "repo_root": repo_root,
@@ -197,7 +197,7 @@ def finalize_subagent_worktree(
     return payload
 
 
-def list_subagent_worktrees(repo_root: str) -> List[Dict[str, Any]]:
+def list_subagent_worktrees(repo_root: str) -> list[dict[str, Any]]:
     """List all active subagent worktrees for a git repository."""
     root = resolve_repo_root(repo_root)
     if not root:
@@ -207,8 +207,8 @@ def list_subagent_worktrees(repo_root: str) -> List[Dict[str, Any]]:
     if res.returncode != 0:
         return []
 
-    worktrees: List[Dict[str, Any]] = []
-    current_entry: Dict[str, Any] = {}
+    worktrees: list[dict[str, Any]] = []
+    current_entry: dict[str, Any] = {}
 
     for line in res.stdout.splitlines():
         line = line.strip()

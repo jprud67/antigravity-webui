@@ -16,6 +16,7 @@ import sqlite3
 import sys
 import time
 from typing import Any
+
 import httpx
 import psutil
 
@@ -81,7 +82,7 @@ def _check_sqlite_integrity() -> dict[str, Any]:
         try:
             size_mb = round(p.stat().st_size / (1024 * 1024), 2)
             total_size_mb += size_mb
-            with sqlite3.connect(str(p)) as conn:
+            with sqlite3.connect(str(p), timeout=10.0) as conn:
                 cursor = conn.cursor()
                 cursor.execute("PRAGMA integrity_check;")
                 row = cursor.fetchone()
@@ -223,7 +224,7 @@ async def run_auto_repair() -> dict[str, Any]:
     for db_name, p in target_dbs:
         if p.exists():
             try:
-                with sqlite3.connect(str(p)) as conn:
+                with sqlite3.connect(str(p), timeout=15.0) as conn:
                     conn.execute("VACUUM;")
                     conn.execute("ANALYZE;")
                     conn.execute("PRAGMA optimize;")

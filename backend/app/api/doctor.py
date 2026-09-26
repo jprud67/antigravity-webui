@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
-from app.services.doctor import run_system_diagnostics, run_auto_repair
+
+from app.services.doctor import run_auto_repair, run_system_diagnostics
 
 router = APIRouter(prefix="/api/doctor", tags=["System Doctor"])
 

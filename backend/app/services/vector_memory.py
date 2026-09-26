@@ -16,7 +16,7 @@ import re
 import sqlite3
 import time
 import uuid
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -38,7 +38,7 @@ TRIVIAL_PROMPT_RE = re.compile(
 )
 
 
-def is_trivial_prompt(text: Optional[str]) -> bool:
+def is_trivial_prompt(text: str | None) -> bool:
     """True for empty input, slash commands, or bare greetings/acknowledgements."""
     stripped = (text or "").strip()
     if not stripped or stripped.startswith("/"):
@@ -54,8 +54,8 @@ class MemoryEntry(BaseModel):
     importance: float = Field(0.5, ge=0.0, le=1.0)
     agent_id: str = Field("default", alias="agentId")
     created_at: float = Field(default_factory=time.time, alias="createdAt")
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    vector: Optional[List[float]] = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    vector: list[float] | None = None
 
 
 class MemoryStoreInput(BaseModel):
@@ -64,14 +64,14 @@ class MemoryStoreInput(BaseModel):
     category: MemoryCategory = "general"
     importance: float = Field(0.5, ge=0.0, le=1.0)
     agent_id: str = Field("default", alias="agentId")
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 
 class MemorySearchInput(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     query: str
     agent_id: str = Field("default", alias="agentId")
-    category: Optional[MemoryCategory] = None
+    category: MemoryCategory | None = None
     limit: int = Field(5, ge=1, le=50)
     min_similarity: float = Field(0.5, ge=0.0, le=1.0, alias="minSimilarity")
 
@@ -87,8 +87,8 @@ class AutoRecallConfig(BaseModel):
     enabled: bool = True
     provider: EmbeddingProvider = "local"
     model: str = "text-embedding-3-small"
-    api_key: Optional[str] = Field(default=None, alias="apiKey")
-    api_base: Optional[str] = Field(default=None, alias="apiBase")
+    api_key: str | None = Field(default=None, alias="apiKey")
+    api_base: str | None = Field(default=None, alias="apiBase")
     max_results: int = Field(default=3, ge=1, le=10, alias="maxResults")
     min_similarity: float = Field(default=0.60, ge=0.0, le=1.0, alias="minSimilarity")
     max_chars: int = Field(default=2000, ge=200, le=10000, alias="maxChars")
@@ -99,12 +99,21 @@ class RecallHookResult(BaseModel):
     should_inject: bool = Field(..., alias="shouldInject")
     recalled_count: int = Field(0, alias="recalledCount")
     context_block: str = Field("", alias="contextBlock")
-    memories: List[MemorySearchResult] = Field(default_factory=list)
+    memories: list[MemorySearchResult] = Field(default_factory=list)
+
+
+def _get_db() -> sqlite3.Connection:
+    CONVERSATION_DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(CONVERSATION_DB), timeout=15.0)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    return conn
 
 
 def ensure_vector_memory_schema() -> None:
     """Creates the SQLite vector memory table if missing."""
-    with sqlite3.connect(CONVERSATION_DB) as conn:
+    with _get_db() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS vector_memories (
                 id TEXT PRIMARY KEY,
@@ -136,7 +145,7 @@ def get_auto_recall_config() -> AutoRecallConfig:
 
 def save_auto_recall_config(cfg: AutoRecallConfig) -> None:
     """Save AutoRecallConfig into settings."""
-    data: Dict[str, Any] = {}
+    data: dict[str, Any] = {}
     if SETTINGS_FILE.exists():
         try:
             data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
@@ -147,7 +156,7 @@ def save_auto_recall_config(cfg: AutoRecallConfig) -> None:
     SETTINGS_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def generate_local_embedding(text: str, dim: int = 384) -> List[float]:
+def generate_local_embedding(text: str, dim: int = 384) -> list[float]:
     """
     Deterministic zero-dependency character n-gram + word hash embedding.
     Maps arbitrary text to a normalized unit vector in R^dim.
@@ -182,7 +191,7 @@ def generate_local_embedding(text: str, dim: int = 384) -> List[float]:
     return vec
 
 
-async def compute_embedding(text: str, cfg: Optional[AutoRecallConfig] = None) -> List[float]:
+async def compute_embedding(text: str, cfg: AutoRecallConfig | None = None) -> list[float]:
     """Compute embedding using configured provider with automatic fallback to local."""
     config = cfg or get_auto_recall_config()
 
@@ -225,7 +234,7 @@ async def compute_embedding(text: str, cfg: Optional[AutoRecallConfig] = None) -
     return generate_local_embedding(text)
 
 
-def cosine_similarity(v1: List[float], v2: List[float]) -> float:
+def cosine_similarity(v1: list[float], v2: list[float]) -> float:
     """Calculates cosine similarity between two float vectors."""
     if len(v1) != len(v2):
         min_len = min(len(v1), len(v2))
@@ -242,7 +251,7 @@ def cosine_similarity(v1: List[float], v2: List[float]) -> float:
 
 async def store_memory(
     item: MemoryStoreInput,
-    cfg: Optional[AutoRecallConfig] = None,
+    cfg: AutoRecallConfig | None = None,
 ) -> MemoryEntry:
     """Stores a memory entry with computed vector embedding."""
     ensure_vector_memory_schema()
@@ -251,7 +260,7 @@ async def store_memory(
     vector = await compute_embedding(item.text, cfg)
     metadata = item.metadata or {}
 
-    with sqlite3.connect(CONVERSATION_DB) as conn:
+    with _get_db() as conn:
         conn.execute(
             """
             INSERT INTO vector_memories (id, agent_id, text, vector, importance, category, created_at, metadata)
@@ -284,16 +293,16 @@ async def store_memory(
 
 async def search_memories(
     item: MemorySearchInput,
-    cfg: Optional[AutoRecallConfig] = None,
-) -> List[MemorySearchResult]:
+    cfg: AutoRecallConfig | None = None,
+) -> list[MemorySearchResult]:
     """Performs semantic vector search over memories."""
     ensure_vector_memory_schema()
     query_vector = await compute_embedding(item.query, cfg)
 
-    with sqlite3.connect(CONVERSATION_DB) as conn:
+    with _get_db() as conn:
         conn.row_factory = sqlite3.Row
         sql = "SELECT id, agent_id, text, vector, importance, category, created_at, metadata FROM vector_memories WHERE agent_id = ?"
-        params: List[Any] = [item.agent_id]
+        params: list[Any] = [item.agent_id]
         if item.category:
             sql += " AND category = ?"
             params.append(item.category)
@@ -301,7 +310,7 @@ async def search_memories(
         cursor = conn.execute(sql, params)
         rows = cursor.fetchall()
 
-    results: List[MemorySearchResult] = []
+    results: list[MemorySearchResult] = []
     for row in rows:
         try:
             vec = json.loads(row["vector"])
@@ -330,15 +339,15 @@ async def search_memories(
 
 def list_memories(
     agent_id: str = "default",
-    category: Optional[MemoryCategory] = None,
+    category: MemoryCategory | None = None,
     limit: int = 50,
-) -> List[MemoryEntry]:
+) -> list[MemoryEntry]:
     """Lists stored memories for an agent."""
     ensure_vector_memory_schema()
-    with sqlite3.connect(CONVERSATION_DB) as conn:
+    with _get_db() as conn:
         conn.row_factory = sqlite3.Row
         sql = "SELECT id, agent_id, text, importance, category, created_at, metadata FROM vector_memories WHERE agent_id = ?"
-        params: List[Any] = [agent_id]
+        params: list[Any] = [agent_id]
         if category:
             sql += " AND category = ?"
             params.append(category)
@@ -367,7 +376,7 @@ def list_memories(
 def delete_memory(memory_id: str) -> bool:
     """Deletes a memory by ID."""
     ensure_vector_memory_schema()
-    with sqlite3.connect(CONVERSATION_DB) as conn:
+    with _get_db() as conn:
         cursor = conn.execute("DELETE FROM vector_memories WHERE id = ?", (memory_id,))
         conn.commit()
         return cursor.rowcount > 0
@@ -376,13 +385,13 @@ def delete_memory(memory_id: str) -> bool:
 def clear_memories(agent_id: str = "default") -> int:
     """Clears all memories for an agent."""
     ensure_vector_memory_schema()
-    with sqlite3.connect(CONVERSATION_DB) as conn:
+    with _get_db() as conn:
         cursor = conn.execute("DELETE FROM vector_memories WHERE agent_id = ?", (agent_id,))
         conn.commit()
         return cursor.rowcount
 
 
-def format_recalled_memories_context(memories: List[MemorySearchResult], max_chars: int = 2000) -> str:
+def format_recalled_memories_context(memories: list[MemorySearchResult], max_chars: int = 2000) -> str:
     """Formats top-K memories into prompt-injected system instructions."""
     if not memories:
         return ""
@@ -408,7 +417,7 @@ def format_recalled_memories_context(memories: List[MemorySearchResult], max_cha
 async def execute_auto_recall_hook(
     prompt: str,
     agent_id: str = "default",
-    cfg: Optional[AutoRecallConfig] = None,
+    cfg: AutoRecallConfig | None = None,
 ) -> RecallHookResult:
     """
     Executes the auto-recall hook for an upcoming user prompt.

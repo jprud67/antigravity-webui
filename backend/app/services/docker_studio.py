@@ -15,7 +15,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, ConfigDict, Field
@@ -30,32 +30,32 @@ ContainerState = Literal["running", "exited", "paused", "restarting", "dead", "u
 
 class ContainerPort(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    host_ip: Optional[str] = Field(None, alias="hostIp")
-    host_port: Optional[str] = Field(None, alias="hostPort")
-    container_port: Optional[str] = Field(None, alias="containerPort")
+    host_ip: str | None = Field(None, alias="hostIp")
+    host_port: str | None = Field(None, alias="hostPort")
+    container_port: str | None = Field(None, alias="containerPort")
     protocol: str = "tcp"
 
 
 class ContainerSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     id: str
-    names: List[str]
+    names: list[str]
     image: str
     state: ContainerState
     status: str
     created_at: str = Field(..., alias="createdAt")
-    ports: List[str] = Field(default_factory=list)
-    command: Optional[str] = None
+    ports: list[str] = Field(default_factory=list)
+    command: str | None = None
 
 
 class ComposeServiceSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     name: str
-    image: Optional[str] = None
-    build: Optional[str] = None
-    ports: List[str] = Field(default_factory=list)
-    environment: List[str] = Field(default_factory=list)
-    volumes: List[str] = Field(default_factory=list)
+    image: str | None = None
+    build: str | None = None
+    ports: list[str] = Field(default_factory=list)
+    environment: list[str] = Field(default_factory=list)
+    volumes: list[str] = Field(default_factory=list)
 
 
 class WorkspaceDockerItem(BaseModel):
@@ -63,19 +63,19 @@ class WorkspaceDockerItem(BaseModel):
     path: str
     filename: str
     kind: Literal["dockerfile", "compose", "dockerignore"]
-    services: Optional[List[ComposeServiceSummary]] = None
+    services: list[ComposeServiceSummary] | None = None
 
 
 class DockerEngineStatus(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     is_available: bool = Field(..., alias="isAvailable")
     engine: ContainerEngineType
-    binary_path: Optional[str] = Field(None, alias="binaryPath")
-    version: Optional[str] = None
+    binary_path: str | None = Field(None, alias="binaryPath")
+    version: str | None = None
     containers_count: int = Field(0, alias="containersCount")
     running_count: int = Field(0, alias="runningCount")
-    server_info: Dict[str, Any] = Field(default_factory=dict, alias="serverInfo")
-    error: Optional[str] = None
+    server_info: dict[str, Any] = Field(default_factory=dict, alias="serverInfo")
+    error: str | None = None
 
 
 class ContainerActionRequest(BaseModel):
@@ -84,7 +84,7 @@ class ContainerActionRequest(BaseModel):
 
 class ContainerExecRequest(BaseModel):
     command: str
-    workdir: Optional[str] = None
+    workdir: str | None = None
 
 
 class ComposeActionRequest(BaseModel):
@@ -92,7 +92,7 @@ class ComposeActionRequest(BaseModel):
     action: Literal["up", "down", "restart", "ps", "build"]
 
 
-def resolve_container_binary() -> Optional[tuple[ContainerEngineType, str]]:
+def resolve_container_binary() -> tuple[ContainerEngineType, str] | None:
     """Detects available container engine binary in PATH (docker or podman)."""
     docker_bin = shutil.which("docker")
     if docker_bin:
@@ -183,13 +183,13 @@ def get_docker_status() -> DockerEngineStatus:
         )
 
 
-def scan_workspace_docker_files(workspace_dir: str) -> List[WorkspaceDockerItem]:
+def scan_workspace_docker_files(workspace_dir: str) -> list[WorkspaceDockerItem]:
     """Scans workspace directory recursively (max depth 3) for Dockerfile and compose files."""
     root = Path(workspace_dir).resolve()
     if is_blocked_sensitive_path(root) or not root.exists() or not root.is_dir():
         return []
 
-    items: List[WorkspaceDockerItem] = []
+    items: list[WorkspaceDockerItem] = []
     ignored_patterns = {".git", "node_modules", "venv", ".pytest_cache", "dist", ".gemini", "__pycache__"}
 
     for dirpath, dirnames, filenames in os.walk(root):
@@ -228,7 +228,7 @@ def scan_workspace_docker_files(workspace_dir: str) -> List[WorkspaceDockerItem]
                 or fl_lower.startswith(("docker-compose.", "compose."))
             ) and fl_lower.endswith((".yml", ".yaml")):
                 # Parse compose services
-                services: List[ComposeServiceSummary] = []
+                services: list[ComposeServiceSummary] = []
                 try:
                     with open(full_file_path, "r", encoding="utf-8") as f:
                         data = yaml.safe_load(f)
@@ -269,7 +269,7 @@ def scan_workspace_docker_files(workspace_dir: str) -> List[WorkspaceDockerItem]
     return items
 
 
-def list_containers(all_containers: bool = True) -> List[ContainerSummary]:
+def list_containers(all_containers: bool = True) -> list[ContainerSummary]:
     """Lists containers from local Docker/Podman engine."""
     bin_info = resolve_container_binary()
     if not bin_info:
@@ -285,7 +285,7 @@ def list_containers(all_containers: bool = True) -> List[ContainerSummary]:
         if res.returncode != 0:
             return []
 
-        containers: List[ContainerSummary] = []
+        containers: list[ContainerSummary] = []
         for line in res.stdout.strip().split("\n"):
             line = line.strip()
             if not line:
@@ -326,7 +326,7 @@ def list_containers(all_containers: bool = True) -> List[ContainerSummary]:
         return []
 
 
-def inspect_container(container_id: str) -> Optional[Dict[str, Any]]:
+def inspect_container(container_id: str) -> dict[str, Any] | None:
     """Retrieves full inspection dictionary for a given container ID."""
     # Strict alphanumeric validation against command injection
     if not re.match(r"^[a-zA-Z0-9._-]+$", container_id):
@@ -355,7 +355,7 @@ def inspect_container(container_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def execute_container_action(container_id: str, action: str) -> Dict[str, Any]:
+def execute_container_action(container_id: str, action: str) -> dict[str, Any]:
     """Executes a lifecycle action on a container (start, stop, restart, remove, kill)."""
     if not re.match(r"^[a-zA-Z0-9._-]+$", container_id):
         raise ValueError("ID de conteneur invalide.")
@@ -422,8 +422,8 @@ def get_container_logs(container_id: str, tail: int = 200, timestamps: bool = Tr
 def exec_command_in_container(
     container_id: str,
     command: str,
-    workdir: Optional[str] = None,
-) -> Dict[str, Any]:
+    workdir: str | None = None,
+) -> dict[str, Any]:
     """Executes a command inside a running container and returns stdout/stderr/exit_code."""
     if not re.match(r"^[a-zA-Z0-9._-]+$", container_id):
         raise ValueError("ID de conteneur invalide.")
@@ -464,7 +464,7 @@ def exec_command_in_container(
         }
 
 
-def execute_compose_action(compose_file_path: str, action: str) -> Dict[str, Any]:
+def execute_compose_action(compose_file_path: str, action: str) -> dict[str, Any]:
     """Executes a docker compose action (up -d, down, restart, ps)."""
     comp_path = Path(compose_file_path).resolve()
     if is_blocked_sensitive_path(comp_path):

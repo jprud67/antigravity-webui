@@ -2,7 +2,8 @@
 backend/app/api/tool_repair.py — Endpoints API pour le diagnostic et la réparation d'appels d'outils.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -13,12 +14,12 @@ router = APIRouter(prefix="/api/tools", tags=["tools"])
 
 class ToolRepairRequest(BaseModel):
     text: str
-    allowed_tools: Optional[List[str]] = None
+    allowed_tools: list[str] | None = None
     promote_shell: bool = True
 
 
 @router.post("/repair")
-def repair_tool_calls(req: ToolRepairRequest) -> Dict[str, Any]:
+def repair_tool_calls(req: ToolRepairRequest) -> dict[str, Any]:
     """Analyse et répare les appels d'outils émis sous forme de markdown ou JSON mal formé."""
     cleaned_text, tool_calls, was_repaired = tool_repair_engine.repair_and_extract(
         raw_text=req.text,
@@ -34,6 +35,6 @@ def repair_tool_calls(req: ToolRepairRequest) -> Dict[str, Any]:
 
 
 @router.get("/repair/stats")
-def get_repair_stats() -> Dict[str, Any]:
+def get_repair_stats() -> dict[str, Any]:
     """Renvoie les statistiques du moteur de normalisation et réparation."""
     return tool_repair_engine.get_stats()

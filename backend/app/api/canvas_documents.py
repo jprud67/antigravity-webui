@@ -7,7 +7,6 @@ sandboxed Canvas documents with CSP headers.
 from __future__ import annotations
 
 import mimetypes
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse
@@ -34,7 +33,7 @@ CANVAS_CSP_HEADER = "default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval
 
 class PreviewRequest(BaseModel):
     html: str
-    title: Optional[str] = "Live Preview"
+    title: str | None = "Live Preview"
     wrap_with_theme: bool = True
 
 
@@ -56,8 +55,8 @@ def create_document(payload: CanvasDocumentCreateInput):
 
 @router.get("/documents", response_model=list[CanvasDocumentManifest])
 def list_documents(
-    scope: Optional[str] = Query(None, description="Filter by retention scope"),
-    kind: Optional[CanvasDocumentKind] = Query(None, description="Filter by kind"),
+    scope: str | None = Query(None, description="Filter by retention scope"),
+    kind: CanvasDocumentKind | None = Query(None, description="Filter by kind"),
     limit: int = Query(50, ge=1, le=200, description="Max documents to return"),
 ):
     """Lists saved Canvas documents."""

@@ -292,11 +292,11 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       await loadStashes();
       await loadStatus();
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de la création du stash', 'error');
+      showToast(err.message || t('stash_create_error', 'Erreur lors de la création du stash'), 'error');
     } finally {
       setSavingStash(false);
     }
-  }, [currentWorkspace, newStashMessage, newStashUntracked, loadStashes, loadStatus]);
+  }, [currentWorkspace, newStashMessage, newStashUntracked, loadStashes, loadStatus, t]);
 
   const handlePopStash = useCallback(async (index: number) => {
     try {
@@ -310,9 +310,9 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       await loadStatus();
       setViewMode('changes');
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors du dépilage du stash', 'error');
+      showToast(err.message || t('stash_pop_error', 'Erreur lors du dépilage du stash'), 'error');
     }
-  }, [currentWorkspace, loadStashes, loadStatus]);
+  }, [currentWorkspace, loadStashes, loadStatus, t]);
 
   const handleApplyStash = useCallback(async (index: number) => {
     try {
@@ -325,9 +325,9 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       await loadStatus();
       setViewMode('changes');
     } catch (err: any) {
-      showToast(err.message || "Erreur lors de l'application du stash", 'error');
+      showToast(err.message || t('stash_apply_error', "Erreur lors de l'application du stash"), 'error');
     }
-  }, [currentWorkspace, loadStatus]);
+  }, [currentWorkspace, loadStatus, t]);
 
   const handleDropStash = useCallback(async (index: number) => {
     const confirmed = await showConfirm(t('confirm_delete_stash_idx', 'Voulez-vous vraiment supprimer le stash@{0} ?', index), {
@@ -342,9 +342,9 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       showToast(t('stash_deleted', 'Stash supprimé.'), 'info');
       await loadStashes();
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de la suppression du stash', 'error');
+      showToast(err.message || t('stash_delete_error', 'Erreur lors de la suppression du stash'), 'error');
     }
-  }, [currentWorkspace, loadStashes]);
+  }, [currentWorkspace, loadStashes, t]);
 
   const handleClearAllStashes = useCallback(async () => {
     const confirmed = await showConfirm(t('confirm_clear_all_stashes', 'Voulez-vous supprimer TOUS les stashes ? Cette action est irréversible.'), {
@@ -359,9 +359,9 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       showToast(t('all_stashes_cleared', 'Tous les stashes ont été supprimés.'), 'info');
       await loadStashes();
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors du vidage des stashes', 'error');
+      showToast(err.message || t('stash_clear_error', 'Erreur lors du vidage des stashes'), 'error');
     }
-  }, [currentWorkspace, loadStashes]);
+  }, [currentWorkspace, loadStashes, t]);
 
   const handlePreviewStashDiff = useCallback(async (stash: GitStashItem) => {
     if (!onOpenMonacoStudio) return;
@@ -383,11 +383,11 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
 
   const handleCherryPick = useCallback(async (commit: GitCommitItem) => {
     const confirmed = await showConfirm(
-      `Voulez-vous appliquer le commit « ${commit.short_hash} : ${commit.subject} » sur la branche active ?`,
+      t('confirm_cherry_pick_commit', 'Voulez-vous appliquer le commit « {0} : {1} » sur la branche active ?', commit.short_hash, commit.subject),
       {
-        title: 'Cherry-pick commit',
-        confirmLabel: 'Appliquer (Cherry-pick)',
-        cancelLabel: 'Annuler'
+        title: t('cherry_pick_title', 'Cherry-pick commit'),
+        confirmLabel: t('cherry_pick_btn', 'Appliquer (Cherry-pick)'),
+        cancelLabel: t('cancel', 'Annuler')
       }
     );
     if (!confirmed) return;
@@ -403,9 +403,9 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         setViewMode('changes');
       }
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors du cherry-pick', 'error');
+      showToast(err.message || t('cherry_pick_error', 'Erreur lors du cherry-pick'), 'error');
     }
-  }, [currentWorkspace, loadStatus, loadHistory]);
+  }, [currentWorkspace, loadStatus, loadHistory, t]);
 
   const handleCheckoutBranch = useCallback(async (branchName: string) => {
     try {
@@ -420,9 +420,9 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         await loadHistory(true);
       }
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de la bascule de branche', 'error');
+      showToast(err.message || t('switch_branch_error', 'Erreur lors de la bascule de branche'), 'error');
     }
-  }, [currentWorkspace, loadStatus, loadBranches, commits.length, loadHistory]);
+  }, [currentWorkspace, loadStatus, loadBranches, commits.length, loadHistory, t]);
 
   const handleCreateBranch = useCallback(async () => {
     if (!newBranchName.trim()) return;
@@ -445,11 +445,11 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         await loadHistory(true);
       }
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de la création de la branche', 'error');
+      showToast(err.message || t('branch_create_error', 'Erreur lors de la création de la branche'), 'error');
     } finally {
       setCreatingBranch(false);
     }
-  }, [currentWorkspace, newBranchName, newBranchStartPoint, newBranchCheckout, loadBranches, loadStatus, commits.length, loadHistory]);
+  }, [currentWorkspace, newBranchName, newBranchStartPoint, newBranchCheckout, loadBranches, loadStatus, commits.length, loadHistory, t]);
 
   const handleDeleteBranch = useCallback(async (branch: GitBranchDetail) => {
     const isRemote = branch.is_remote;
@@ -501,10 +501,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           }
         }
       } else {
-        showToast(msg || 'Erreur lors de la suppression de la branche', 'error');
+        showToast(msg || t('branch_delete_error', 'Erreur lors de la suppression de la branche'), 'error');
       }
     }
-  }, [currentWorkspace, loadBranches]);
+  }, [currentWorkspace, loadBranches, t]);
 
   const handleMergeBranch = useCallback(async () => {
     if (!mergingBranch) return;
@@ -535,11 +535,11 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         }
       }
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de la fusion', 'error');
+      showToast(err.message || t('branch_merge_error', 'Erreur lors de la fusion'), 'error');
     } finally {
       setMerging(false);
     }
-  }, [currentWorkspace, mergingBranch, mergeNoFF, mergeMessage, loadStatus, loadBranches, commits.length, loadHistory]);
+  }, [currentWorkspace, mergingBranch, mergeNoFF, mergeMessage, loadStatus, loadBranches, commits.length, loadHistory, t]);
 
   const handleRenameBranch = useCallback(async () => {
     if (!renamingBranch || !newRenameName.trim()) return;
@@ -556,11 +556,11 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       await loadBranches();
       await loadStatus();
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors du renommage', 'error');
+      showToast(err.message || t('branch_rename_error', 'Erreur lors du renommage'), 'error');
     } finally {
       setRenaming(false);
     }
-  }, [currentWorkspace, renamingBranch, newRenameName, loadBranches, loadStatus]);
+  }, [currentWorkspace, renamingBranch, newRenameName, loadBranches, loadStatus, t]);
 
   const handleContinueRebase = useCallback(async () => {
     setContinuingRebase(true);
@@ -583,19 +583,19 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         }
       }
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de la poursuite du rebase', 'error');
+      showToast(err.message || t('rebase_continue_error', 'Erreur lors de la poursuite du rebase'), 'error');
     } finally {
       setContinuingRebase(false);
     }
-  }, [currentWorkspace, loadStatus, loadRebaseStatus, loadBranches, commits.length, loadHistory]);
+  }, [currentWorkspace, loadStatus, loadRebaseStatus, loadBranches, commits.length, loadHistory, t]);
 
   const handleAbortRebase = useCallback(async () => {
     const confirmed = await showConfirm(
-      'Voulez-vous abandonner le rebase en cours et restaurer la branche dans son état initial ?',
+      t('confirm_abort_rebase', 'Voulez-vous abandonner le rebase en cours et restaurer la branche dans son état initial ?'),
       {
-        title: 'Abandonner le Rebase',
-        confirmLabel: 'Abandonner (git rebase --abort)',
-        cancelLabel: 'Continuer le rebase',
+        title: t('abort_rebase_title', 'Abandonner le Rebase'),
+        confirmLabel: t('abort_rebase_btn', 'Abandonner (git rebase --abort)'),
+        cancelLabel: t('continue_rebase_btn', 'Continuer le rebase'),
         destructive: true
       }
     );
@@ -612,11 +612,11 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         await loadHistory(true);
       }
     } catch (err: any) {
-      showToast(err.message || "Erreur lors de l'abandon du rebase", 'error');
+      showToast(err.message || t('rebase_abort_error', "Erreur lors de l'abandon du rebase"), 'error');
     } finally {
       setAbortingRebase(false);
     }
-  }, [currentWorkspace, loadStatus, loadRebaseStatus, loadBranches, commits.length, loadHistory]);
+  }, [currentWorkspace, loadStatus, loadRebaseStatus, loadBranches, commits.length, loadHistory, t]);
 
   const handleOpenRebase = useCallback((base: string = 'HEAD~5') => {
     setRebaseBaseRef(base);

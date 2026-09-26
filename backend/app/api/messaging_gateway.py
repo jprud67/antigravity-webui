@@ -1,17 +1,17 @@
 """API router for Omni-channel Messaging Gateway & PIN Pairing."""
 
-from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.services.messaging_gateway import (
-    request_pairing,
     approve_pairing_code,
-    list_pending_pairings,
+    get_gateway_configs,
     list_approved_devices,
+    list_pending_pairings,
+    request_pairing,
     revoke_device,
     save_gateway_config,
-    get_gateway_configs,
 )
 
 router = APIRouter(prefix="/api/gateway", tags=["gateway"])
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/gateway", tags=["gateway"])
 class RequestPairingModel(BaseModel):
     platform: str
     user_id: str
-    user_name: Optional[str] = None
+    user_name: str | None = None
 
 
 class ApprovePairingModel(BaseModel):
@@ -35,10 +35,10 @@ class RevokeDeviceModel(BaseModel):
 class ConfigureBotModel(BaseModel):
     platform: str
     bot_token: str
-    chat_id: Optional[str] = None
-    is_active: Optional[bool] = True
-    notify_on_approval: Optional[bool] = True
-    notify_on_complete: Optional[bool] = True
+    chat_id: str | None = None
+    is_active: bool | None = True
+    notify_on_approval: bool | None = True
+    notify_on_complete: bool | None = True
 
 
 @router.get("/status")

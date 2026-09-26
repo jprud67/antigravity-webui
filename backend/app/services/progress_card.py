@@ -11,7 +11,8 @@ import json
 import logging
 import sqlite3
 import time
-from typing import Any, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.config import SESSIONS_DB
@@ -30,9 +31,9 @@ class ProgressCardStep(BaseModel):
 
 
 class ProgressCardPayload(BaseModel):
-    title: Optional[str] = "Plan d'action"
-    markdown: Optional[str] = None
-    plan: List[ProgressCardStep]
+    title: str | None = "Plan d'action"
+    markdown: str | None = None
+    plan: list[ProgressCardStep]
 
 
 def _get_db():
@@ -87,7 +88,7 @@ def normalize_progress_card_input(data: dict[str, Any]) -> dict[str, Any]:
             steps.append({"label": item.strip(), "status": "pending"})
 
     total = len(steps)
-    percent = round((completed_count / total * 100)) if total > 0 else 0
+    percent = round(completed_count / total * 100) if total > 0 else 0
 
     return {
         "title": title,

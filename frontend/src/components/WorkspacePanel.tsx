@@ -534,7 +534,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
     if (tabToClose.isDirty) {
       const discard = await showConfirm(
-        `Le fichier « ${tabToClose.name} » a des modifications non enregistrées. Fermer quand même ?`,
+        t('unsaved_changes_confirm', 'Le fichier « {0} » a des modifications non enregistrées. Fermer quand même ?', tabToClose.name),
         {
           title: t('unsaved_changes', 'Modifications non enregistrées'),
           confirmLabel: t('close_without_saving', 'Fermer sans enregistrer'),
@@ -551,14 +551,14 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       if (prev === indexToClose) return Math.max(0, openTabs.length - 2);
       return prev;
     });
-  }, [openTabs]);
+  }, [openTabs, t]);
 
   const handleCloseOtherTabs = useCallback(async (keepIndex: number) => {
     const otherTabs = openTabs.filter((_, i) => i !== keepIndex);
     const dirtyOthers = otherTabs.filter(t => t.isDirty);
     if (dirtyOthers.length > 0) {
       const discard = await showConfirm(
-        `Certains onglets comportent des modifications non enregistrées. Fermer les autres onglets quand même ?`,
+        t('close_other_tabs_confirm', 'Certains onglets comportent des modifications non enregistrées. Fermer les autres onglets quand même ?'),
         {
           title: t('close_other_tabs', 'Fermer les autres onglets'),
           confirmLabel: t('close_without_saving', 'Fermer sans enregistrer'),
@@ -574,14 +574,14 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       setActiveTabIndex(0);
     }
     setTabContextMenu(null);
-  }, [openTabs]);
+  }, [openTabs, t]);
 
   const handleCloseTabsToRight = useCallback(async (fromIndex: number) => {
     const rightTabs = openTabs.filter((_, i) => i > fromIndex);
     const dirtyRight = rightTabs.filter(t => t.isDirty);
     if (dirtyRight.length > 0) {
       const discard = await showConfirm(
-        `Certains onglets à droite comportent des modifications non enregistrées. Les fermer quand même ?`,
+        t('close_tabs_right_confirm', 'Certains onglets à droite comportent des modifications non enregistrées. Les fermer quand même ?'),
         {
           title: t('close_tabs_to_right', 'Fermer les onglets à droite'),
           confirmLabel: t('close_without_saving', 'Fermer sans enregistrer'),
@@ -594,7 +594,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     setOpenTabs(prev => prev.slice(0, fromIndex + 1));
     setActiveTabIndex(prev => Math.min(prev, fromIndex));
     setTabContextMenu(null);
-  }, [openTabs]);
+  }, [openTabs, t]);
 
   const handleCloseSavedTabs = useCallback(() => {
     const dirtyOnly = openTabs.filter(t => t.isDirty);
@@ -607,7 +607,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     const dirtyTabs = openTabs.filter(t => t.isDirty);
     if (dirtyTabs.length > 0) {
       const discard = await showConfirm(
-        `Plusieurs onglets comportent des modifications non enregistrées. Tout fermer quand même ?`,
+        t('close_all_tabs_confirm', 'Plusieurs onglets comportent des modifications non enregistrées. Tout fermer quand même ?'),
         {
           title: t('close_all', 'Tout fermer'),
           confirmLabel: t('close_without_saving', 'Fermer sans enregistrer'),
@@ -620,12 +620,12 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     setOpenTabs([]);
     setActiveTabIndex(-1);
     setTabContextMenu(null);
-  }, [openTabs]);
+  }, [openTabs, t]);
 
   const handleRevertActiveTab = useCallback(async () => {
     if (!activeTabItem || !activeTabItem.isDirty) return;
     const confirmed = await showConfirm(
-      `Voulez-vous annuler toutes les modifications non enregistrées pour « ${activeTabItem.name} » et rétablir le contenu du disque ?`,
+      t('revert_tab_confirm', 'Voulez-vous annuler toutes les modifications non enregistrées pour « {0} » et rétablir le contenu du disque ?', activeTabItem.name),
       {
         title: t('revert_changes', 'Annuler les modifications'),
         confirmLabel: t('revert_to_disk', 'Rétablir la version disque'),
@@ -646,7 +646,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       return updated;
     });
     showToast(t('changes_reverted', 'Modifications annulées'), 'info');
-  }, [activeTabItem, activeTabIndex]);
+  }, [activeTabItem, activeTabIndex, t]);
 
   // Load file tree when files tab is active
   const loadTree = useCallback(async () => {
@@ -885,7 +885,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       monacoEditorRef.current.getAction('editor.action.formatDocument')?.run();
       showToast(t('document_formatted', 'Document formaté'), 'info');
     }
-  }, []);
+  }, [t]);
   const handleSelectArtifact = useCallback(async (art: ArtifactItem) => {
     setSelectedArtifact(art);
     try {

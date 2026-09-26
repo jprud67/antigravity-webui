@@ -6,8 +6,6 @@ and manage container lifecycles, streaming logs, and exec commands.
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from fastapi import APIRouter, HTTPException, Query
 
 from app.config import DEFAULT_WORKSPACE
@@ -38,9 +36,9 @@ def api_get_docker_status():
     return get_docker_status()
 
 
-@router.get("/workspace", response_model=List[WorkspaceDockerItem])
+@router.get("/workspace", response_model=list[WorkspaceDockerItem])
 def api_scan_workspace_docker(
-    workspace: Optional[str] = Query(None, description="Workspace path to scan"),
+    workspace: str | None = Query(None, description="Workspace path to scan"),
 ):
     """Discovers Dockerfile and docker-compose files in current workspace."""
     ws = workspace or DEFAULT_WORKSPACE
@@ -49,7 +47,7 @@ def api_scan_workspace_docker(
     return scan_workspace_docker_files(ws)
 
 
-@router.get("/containers", response_model=List[ContainerSummary])
+@router.get("/containers", response_model=list[ContainerSummary])
 def api_list_containers(
     all: bool = Query(True, description="Include stopped containers"),
 ):

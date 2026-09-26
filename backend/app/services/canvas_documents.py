@@ -17,7 +17,7 @@ import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -38,7 +38,7 @@ class CanvasDocumentAsset(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     logical_path: str = Field(..., alias="logicalPath")
     source_path: str = Field(..., alias="sourcePath")
-    content_type: Optional[str] = Field(None, alias="contentType")
+    content_type: str | None = Field(None, alias="contentType")
 
 
 class CanvasDocumentEntrypoint(BaseModel):
@@ -48,15 +48,15 @@ class CanvasDocumentEntrypoint(BaseModel):
 
 class CanvasDocumentCreateInput(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    id: Optional[str] = None
+    id: str | None = None
     kind: CanvasDocumentKind = "html_bundle"
-    title: Optional[str] = None
-    preferred_height: Optional[int] = Field(None, alias="preferredHeight")
+    title: str | None = None
+    preferred_height: int | None = Field(None, alias="preferredHeight")
     entrypoint: CanvasDocumentEntrypoint
-    assets: Optional[List[CanvasDocumentAsset]] = None
-    surface: Optional[CanvasSurface] = "assistant_message"
-    retention_scope: Optional[str] = Field(None, alias="retentionScope")
-    csp_sandbox: Optional[Literal["scripts"]] = Field("scripts", alias="cspSandbox")
+    assets: list[CanvasDocumentAsset] | None = None
+    surface: CanvasSurface | None = "assistant_message"
+    retention_scope: str | None = Field(None, alias="retentionScope")
+    csp_sandbox: Literal["scripts"] | None = Field("scripts", alias="cspSandbox")
     wrap_with_theme: bool = Field(True, alias="wrapWithTheme")
 
 
@@ -64,16 +64,16 @@ class CanvasDocumentManifest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     id: str
     kind: CanvasDocumentKind
-    title: Optional[str] = None
-    preferred_height: Optional[int] = Field(None, alias="preferredHeight")
+    title: str | None = None
+    preferred_height: int | None = Field(None, alias="preferredHeight")
     created_at: str = Field(..., alias="createdAt")
     entry_url: str = Field(..., alias="entryUrl")
-    local_entrypoint: Optional[str] = Field(None, alias="localEntrypoint")
-    external_url: Optional[str] = Field(None, alias="externalUrl")
-    surface: Optional[CanvasSurface] = "assistant_message"
-    retention_scope: Optional[str] = Field(None, alias="retentionScope")
-    csp_sandbox: Optional[Literal["scripts"]] = Field("scripts", alias="cspSandbox")
-    assets: List[Dict[str, str]] = Field(default_factory=list)
+    local_entrypoint: str | None = Field(None, alias="localEntrypoint")
+    external_url: str | None = Field(None, alias="externalUrl")
+    surface: CanvasSurface | None = "assistant_message"
+    retention_scope: str | None = Field(None, alias="retentionScope")
+    csp_sandbox: Literal["scripts"] | None = Field("scripts", alias="cspSandbox")
+    assets: list[dict[str, str]] = Field(default_factory=list)
 
 
 # Theme variables and responsive CSS injected into HTML widgets
@@ -208,7 +208,7 @@ def sanitize_filename(filename: str, default_name: str = "asset") -> str:
     return name if name else default_name
 
 
-def wrap_canvas_html(raw_html: str, title: Optional[str] = None) -> str:
+def wrap_canvas_html(raw_html: str, title: str | None = None) -> str:
     """
     Wraps raw HTML content with Antigravity design tokens, base styles,
     and the postMessage theme & resize bridge.
@@ -268,7 +268,7 @@ def build_canvas_document_entry_url(doc_id: str, entrypoint: str) -> str:
 
 def create_canvas_document(
     input_data: CanvasDocumentCreateInput,
-    workspace_dir: Optional[str] = None,
+    workspace_dir: str | None = None,
     max_documents_per_scope: int = 50,
 ) -> CanvasDocumentManifest:
     """Creates a Canvas document folder, writes files/manifest, and applies scoping."""
@@ -284,7 +284,7 @@ def create_canvas_document(
         shutil.rmtree(doc_dir, ignore_errors=True)
     doc_dir.mkdir(parents=True, exist_ok=True)
 
-    copied_assets: List[Dict[str, str]] = []
+    copied_assets: list[dict[str, str]] = []
     ws_dir = Path(workspace_dir).resolve() if workspace_dir else Path.cwd().resolve()
 
     # Process and copy assets if provided
@@ -314,8 +314,8 @@ def create_canvas_document(
 
     # Materialize entrypoint
     entry = input_data.entrypoint
-    local_entrypoint: Optional[str] = None
-    external_url: Optional[str] = None
+    local_entrypoint: str | None = None
+    external_url: str | None = None
     entry_url: str = ""
 
     if entry.type == "html":
@@ -403,7 +403,7 @@ def create_canvas_document(
     return manifest
 
 
-def get_canvas_document(doc_id: str) -> Optional[CanvasDocumentManifest]:
+def get_canvas_document(doc_id: str) -> CanvasDocumentManifest | None:
     """Load a canvas document manifest by id."""
     try:
         norm_id = normalize_canvas_document_id(doc_id)
@@ -419,13 +419,13 @@ def get_canvas_document(doc_id: str) -> Optional[CanvasDocumentManifest]:
 
 
 def list_canvas_documents(
-    retention_scope: Optional[str] = None,
-    kind: Optional[str] = None,
+    retention_scope: str | None = None,
+    kind: str | None = None,
     limit: int = 50,
-) -> List[CanvasDocumentManifest]:
+) -> list[CanvasDocumentManifest]:
     """List stored canvas documents, newest first."""
     docs_base_dir = resolve_canvas_documents_dir()
-    manifests: List[CanvasDocumentManifest] = []
+    manifests: list[CanvasDocumentManifest] = []
 
     if not docs_base_dir.exists():
         return []
@@ -464,7 +464,7 @@ def delete_canvas_document(doc_id: str) -> bool:
         return False
 
 
-def resolve_canvas_file_path(doc_id: str, relative_path: str = "") -> Optional[Path]:
+def resolve_canvas_file_path(doc_id: str, relative_path: str = "") -> Path | None:
     """
     Safely resolves a file path within a canvas document directory.
     Guarantees no directory traversal outside the document's folder.

@@ -2,31 +2,30 @@
 
 from __future__ import annotations
 
-from typing import Dict, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.services.mcp_catalog import (
-    list_mcp_catalog,
     get_mcp_catalog_item,
     install_mcp_catalog_item,
+    list_mcp_catalog,
+    test_mcp_connection,
     uninstall_mcp_catalog_item,
-    test_mcp_connection
 )
 
 router = APIRouter(prefix="/api/mcp/catalog", tags=["MCP Catalog"])
 
 
 class InstallMcpPayload(BaseModel):
-    api_key: Optional[str] = None
-    env: Optional[Dict[str, str]] = None
-    headers: Optional[list[str]] = None
+    api_key: str | None = None
+    env: dict[str, str] | None = None
+    headers: list[str] | None = None
 
 
 @router.get("")
 async def get_catalog(
-    q: Optional[str] = Query(None, description="Recherche textuelle par nom, slug, mot-clé"),
-    category: Optional[str] = Query(None, description="Filtre de catégorie (ex: Database, Developer Tools)")
+    q: str | None = Query(None, description="Recherche textuelle par nom, slug, mot-clé"),
+    category: str | None = Query(None, description="Filtre de catégorie (ex: Database, Developer Tools)")
 ):
     try:
         items = await list_mcp_catalog(query=q, category=category)

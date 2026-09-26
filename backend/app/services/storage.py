@@ -265,7 +265,7 @@ _ALLOWED_CONVERSATION_SUMMARY_COLUMNS: frozenset[str] = frozenset({
 def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     """Construit le dict conversation à partir d'une ligne SQLite et des métadonnées session."""
     cid = r["conversation_id"]
-    custom_title = (meta.get("customTitle") or "").strip()
+    custom_title = (meta.get("customTitle") or meta.get("custom_title") or "").strip()
     display_title = custom_title or r["title"] or "Nouvelle session"
     raw_tags = meta.get("tags")
     safe_tags = list(raw_tags) if isinstance(raw_tags, list) else []

@@ -13,7 +13,7 @@ import logging
 import secrets
 import sqlite3
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.config import SESSIONS_DB
 
@@ -30,8 +30,11 @@ RATE_LIMIT_SECONDS = 600            # 10 minutes
 
 
 def _get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 
@@ -86,7 +89,7 @@ def generate_pairing_code() -> str:
     return f"{raw[:4]}-{raw[4:]}"
 
 
-def request_pairing(platform: str, user_id: str, user_name: Optional[str] = None) -> Tuple[bool, str, Optional[str]]:
+def request_pairing(platform: str, user_id: str, user_name: str | None = None) -> tuple[bool, str, str | None]:
     """Request a new pairing PIN for a user on a given platform.
     
     Returns (success, message, code).
@@ -155,7 +158,7 @@ def request_pairing(platform: str, user_id: str, user_name: Optional[str] = None
     return True, "Code de couplage généré. Veuillez le valider dans Antigravity WebUI.", code
 
 
-def approve_pairing_code(code: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+def approve_pairing_code(code: str) -> tuple[bool, str, dict[str, Any] | None]:
     """Approve a pending device code by the host operator."""
     ensure_messaging_gateway_schema()
     clean_code = code.strip().upper().replace(" ", "")
@@ -216,7 +219,7 @@ def is_user_approved(platform: str, user_id: str) -> bool:
         return bool(row)
 
 
-def list_pending_pairings() -> List[Dict[str, Any]]:
+def list_pending_pairings() -> list[dict[str, Any]]:
     """List pending pairing requests waiting for operator approval."""
     ensure_messaging_gateway_schema()
     now = time.time()
@@ -228,7 +231,7 @@ def list_pending_pairings() -> List[Dict[str, Any]]:
         return [dict(r) for r in rows]
 
 
-def list_approved_devices() -> List[Dict[str, Any]]:
+def list_approved_devices() -> list[dict[str, Any]]:
     """List all paired and authorized devices."""
     ensure_messaging_gateway_schema()
     with _get_db() as conn:
@@ -253,7 +256,7 @@ def revoke_device(platform: str, user_id: str) -> bool:
 def save_gateway_config(
     platform: str,
     bot_token: str,
-    chat_id: Optional[str] = None,
+    chat_id: str | None = None,
     is_active: bool = True,
     notify_on_approval: bool = True,
     notify_on_complete: bool = True
@@ -276,7 +279,7 @@ def save_gateway_config(
     return True
 
 
-def get_gateway_configs() -> Dict[str, Any]:
+def get_gateway_configs() -> dict[str, Any]:
     """Retrieve gateway configs with masked bot tokens."""
     ensure_messaging_gateway_schema()
     with _get_db() as conn:

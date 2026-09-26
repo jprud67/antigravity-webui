@@ -12,7 +12,7 @@ import logging
 import os
 import shutil
 import subprocess
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ _TAILSCALE_CANDIDATE_PATHS = [
 ]
 
 
-def _find_tailscale_binary() -> Optional[str]:
+def _find_tailscale_binary() -> str | None:
     """Locate the tailscale executable on the host system."""
     for candidate in _TAILSCALE_CANDIDATE_PATHS:
         found = shutil.which(candidate)
@@ -38,7 +38,7 @@ def _find_tailscale_binary() -> Optional[str]:
     return None
 
 
-def _run_tailscale_command(args: List[str], timeout: int = 5) -> subprocess.CompletedProcess[str]:
+def _run_tailscale_command(args: list[str], timeout: int = 5) -> subprocess.CompletedProcess[str]:
     """Execute a tailscale CLI command with timeout."""
     bin_path = _find_tailscale_binary() or "tailscale"
     return subprocess.run(
@@ -52,7 +52,7 @@ def _run_tailscale_command(args: List[str], timeout: int = 5) -> subprocess.Comp
     )
 
 
-def get_tailscale_status() -> Dict[str, Any]:
+def get_tailscale_status() -> dict[str, Any]:
     """Probe Tailscale status, MagicDNS hostname, and Tailscale IPs.
     
     Equivalent to Antigravity Core extractTailnetHostFromStatusJson & extractTailscaleServeGatewayUrls.
@@ -134,7 +134,7 @@ def get_tailscale_status() -> Dict[str, Any]:
         }
 
 
-def toggle_tailscale_serve(enable: bool, port: int = 8000) -> Dict[str, Any]:
+def toggle_tailscale_serve(enable: bool, port: int = 8000) -> dict[str, Any]:
     """Enable or disable Tailscale Serve reverse proxy to local port."""
     if not (1 <= port <= 65535):
         raise ValueError(f"Port invalide: {port}")

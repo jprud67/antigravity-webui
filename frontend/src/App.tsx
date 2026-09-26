@@ -1452,9 +1452,9 @@ export function App() {
       setSessionBookmarks(res.bookmarks);
       showToast(t('bookmark_saved_success', 'Signet enregistré avec succès'), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de l’enregistrement du signet', 'error');
+      showToast(err.message || t('bookmark_save_error', 'Erreur lors de l’enregistrement du signet'), 'error');
     }
-  }, [activeConversationId]);
+  }, [activeConversationId, t]);
 
   const handleRemoveBookmark = useCallback(async (bookmarkId: string) => {
     if (!activeConversationId) return;
@@ -1463,9 +1463,9 @@ export function App() {
       setSessionBookmarks(res.bookmarks);
       showToast(t('bookmark_deleted', 'Signet supprimé'), 'info');
     } catch (err: any) {
-      showToast(err.message || 'Erreur lors de la suppression du signet', 'error');
+      showToast(err.message || t('bookmark_delete_error', 'Erreur lors de la suppression du signet'), 'error');
     }
-  }, [activeConversationId]);
+  }, [activeConversationId, t]);
 
   const handleForkMessage = async (stepIndex: number) => {
     if (!activeConversationId) return;
@@ -1520,11 +1520,11 @@ export function App() {
         setTokenUsage(estimateUsageFromMessages(parsed));
       }
     } catch (e: any) {
-      showToast(e.message || 'Échec du compactage', 'error');
+      showToast(e.message || t('compact_fail_error', 'Échec du compactage'), 'error');
     } finally {
       setIsCompacting(false);
     }
-  }, [activeConversationId, appSettings.contextBudgetTokens, appSettings.preserveLastNTurns]);
+  }, [activeConversationId, appSettings.contextBudgetTokens, appSettings.preserveLastNTurns, t]);
 
   const handlePruneSuccess = useCallback(async (result: PruneResult) => {
     if (!activeConversationId) return;
@@ -1542,7 +1542,7 @@ export function App() {
     } catch (err) {
       console.error('Failed to reload transcript after pruning:', err);
     }
-  }, [activeConversationId]);
+  }, [activeConversationId, t]);
 
   const handleShowStatusCard = () => {
     const currentModelObj = models.find((m) => m.id === selectedModel) ||

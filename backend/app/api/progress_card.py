@@ -5,10 +5,10 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from app.services.progress_card import (
+    ProgressCardPayload,
+    delete_progress_card,
     get_progress_card,
     save_progress_card,
-    delete_progress_card,
-    ProgressCardPayload
 )
 
 router = APIRouter(prefix="/api/conversations/{conversation_id}/progress-card", tags=["Progress Card"])

@@ -23,9 +23,9 @@ import logging
 import os
 import threading
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger("antigravity.skill_curator")
 
@@ -59,7 +59,7 @@ def _get_skills_dir() -> Path:
 class SkillCurator:
     """Orchestrateur de maintenance et cycle de vie des compétences."""
 
-    def __init__(self, skills_dir: Optional[Path] = None):
+    def __init__(self, skills_dir: Path | None = None):
         self.skills_dir = skills_dir or _get_skills_dir()
         self._lock = threading.RLock()
         self.usage_file = self.skills_dir / ".usage.json"
@@ -74,7 +74,7 @@ class SkillCurator:
             except Exception as e:
                 logger.debug(f"Impossible de créer .usage.json: {e}")
 
-    def _load_usage(self) -> Dict[str, Any]:
+    def _load_usage(self) -> dict[str, Any]:
         if not self.usage_file.is_file():
             return {}
         try:
@@ -82,7 +82,7 @@ class SkillCurator:
         except Exception:
             return {}
 
-    def _save_usage(self, data: Dict[str, Any]) -> None:
+    def _save_usage(self, data: dict[str, Any]) -> None:
         try:
             tmp = self.usage_file.with_suffix(".tmp")
             tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -116,7 +116,7 @@ class SkillCurator:
         except Exception as e:
             logger.debug(f"Erreur écriture ledger: {e}")
 
-    def record_skill_usage(self, skill_name: str, actor: str = "agent") -> Dict[str, Any]:
+    def record_skill_usage(self, skill_name: str, actor: str = "agent") -> dict[str, Any]:
         """Incrémente le compteur d'utilisation et réactive la compétence si stale."""
         clean = skill_name.strip()
         with self._lock:
@@ -141,7 +141,7 @@ class SkillCurator:
             self._save_usage(data)
             return record
 
-    def toggle_pin(self, skill_name: str, pinned: Optional[bool] = None, actor: str = "user") -> Dict[str, Any]:
+    def toggle_pin(self, skill_name: str, pinned: bool | None = None, actor: str = "user") -> dict[str, Any]:
         """Bascule l'épinglage protecteur d'une compétence."""
         clean = skill_name.strip()
         with self._lock:
@@ -170,7 +170,7 @@ class SkillCurator:
             )
             return {"skill_name": clean, "pinned": new_pin, "status": record.get("status")}
 
-    def sweep_lifecycle(self, stale_days: int = 14, archive_days: int = 30, actor: str = "curator") -> Dict[str, Any]:
+    def sweep_lifecycle(self, stale_days: int = 14, archive_days: int = 30, actor: str = "curator") -> dict[str, Any]:
         """
         Balayage automatique du cycle de vie des compétences :
           - Active -> Stale après stale_days sans utilisation.
@@ -221,7 +221,7 @@ class SkillCurator:
                 "transitions": transitions,
             }
 
-    def get_skill_telemetry(self, skill_name: str) -> Dict[str, Any]:
+    def get_skill_telemetry(self, skill_name: str) -> dict[str, Any]:
         """Fournit la télémétrie détaillée d'une compétence."""
         clean = skill_name.strip()
         data = self._load_usage()
@@ -247,7 +247,7 @@ class SkillCurator:
             "is_protected": clean in PROTECTED_SKILLS,
         }
 
-    def get_all_skills_telemetry(self) -> List[Dict[str, Any]]:
+    def get_all_skills_telemetry(self) -> list[dict[str, Any]]:
         """Renvoie la télémétrie de l'ensemble des compétences enregistrées."""
         data = self._load_usage()
         # Scan également les dossiers réels de skills
@@ -263,7 +263,7 @@ class SkillCurator:
             results.append(self.get_skill_telemetry(name))
         return results
 
-    def get_ledger(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_ledger(self, limit: int = 50) -> list[dict[str, Any]]:
         """Lit les N dernières lignes du journal d'audit."""
         if not self.ledger_file.is_file():
             return []

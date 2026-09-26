@@ -13,16 +13,18 @@ import shutil
 import time
 from pathlib import Path
 from typing import Any
+
 import httpx
 
 from app.config import GEMINI_DIR
 from app.services.agy_subcommand import (
-    get_mcp_servers,
     add_mcp_server,
-    remove_mcp_server
+    get_mcp_servers,
+    remove_mcp_server,
 )
+from app.services.link_understanding import is_safe_public_url
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("antigravity.mcp_catalog")
 
 _CATALOG_FILE = Path(__file__).parent / "mcp_catalog_data.json"
 _CONFIG_DIR = GEMINI_DIR
@@ -226,6 +228,14 @@ async def test_mcp_connection(slug: str) -> dict[str, Any]:
         url = transport.get("url")
         if not url:
             return {"success": False, "latency_ms": 0, "error": "URL manquante"}
+        if not is_safe_public_url(url):
+            return {
+                "success": False,
+                "status_code": 0,
+                "latency_ms": 0,
+                "transport": "http",
+                "error": "URL non autorisée : protection SSRF contre les adresses locales, privées ou sensibles.",
+            }
         try:
             async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
                 res = await client.get(url, headers={"User-Agent": "Antigravity-MCP-Probe/0.2.28"})
