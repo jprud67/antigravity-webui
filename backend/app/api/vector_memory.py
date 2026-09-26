@@ -7,7 +7,7 @@ and configure embedding parameters.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.api.auth import require_auth
 from app.services.vector_memory import (
@@ -32,12 +32,14 @@ router = APIRouter(prefix="/api/memory/vector", tags=["Vector Memory"], dependen
 
 
 class RecallRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
     prompt: str
-    agent_id: str = "default"
+    agent_id: str = Field(default="default", validation_alias=AliasChoices("agentId", "agent_id"), serialization_alias="agentId")
 
 
 class ClearRequest(BaseModel):
-    agent_id: str = "default"
+    model_config = ConfigDict(populate_by_name=True)
+    agent_id: str = Field(default="default", validation_alias=AliasChoices("agentId", "agent_id"), serialization_alias="agentId")
 
 
 @router.post("/store", response_model=MemoryEntry)
@@ -62,12 +64,14 @@ async def api_search_memories(payload: MemorySearchInput):
 
 @router.get("/list", response_model=list[MemoryEntry])
 def api_list_memories(
-    agent_id: str = Query("default", alias="agentId"),
+    agent_id: str | None = Query(None, alias="agent_id"),
+    agentId: str | None = Query(None, alias="agentId"),
     category: MemoryCategory | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
 ):
     """Lists stored memories for an agent."""
-    return list_memories(agent_id=agent_id, category=category, limit=limit)
+    target_agent = agentId or agent_id or "default"
+    return list_memories(agent_id=target_agent, category=category, limit=limit)
 
 
 @router.delete("/{memory_id}")

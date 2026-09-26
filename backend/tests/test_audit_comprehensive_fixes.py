@@ -171,7 +171,11 @@ def test_vector_memory_schema_indices():
 
 def test_database_studio_as_uri_schema(tmp_path):
     import sqlite3
-    from app.services.database_studio import count_sqlite_tables, inspect_database_schema
+
+    from app.services.database_studio import (
+        count_sqlite_tables,
+        inspect_database_schema,
+    )
 
     test_db = tmp_path / "test_studio.db"
     conn = sqlite3.connect(str(test_db))
@@ -193,6 +197,7 @@ def test_database_studio_as_uri_schema(tmp_path):
 @pytest.mark.asyncio
 async def test_vector_memory_ollama_provider_integration():
     from unittest.mock import MagicMock, patch
+
     from app.services.vector_memory import AutoRecallConfig, compute_embedding
 
     cfg = AutoRecallConfig(provider="ollama", api_base="http://localhost:11434", model="nomic-embed-text")
@@ -204,5 +209,60 @@ async def test_vector_memory_ollama_provider_integration():
     with patch("httpx.AsyncClient.post", return_value=mock_resp):
         vec = await compute_embedding("test prompt for ollama", cfg=cfg)
         assert vec == [0.1, 0.2, 0.3]
+
+
+def test_database_studio_execute_query_directory_and_empty_query(tmp_path):
+    from app.services.database_studio import execute_query
+
+    # Passing directory must return error
+    res_dir = execute_query(str(tmp_path), "SELECT 1;")
+    assert res_dir.error is not None
+    assert "Accès refusé ou fichier inexistant" in res_dir.error
+
+    # Passing empty or whitespace query must return error
+    db_file = tmp_path / "valid.db"
+    import sqlite3
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE t (id INT)")
+    conn.commit()
+    conn.close()
+
+    res_empty = execute_query(str(db_file), "   ")
+    assert res_empty.error == "Requête SQL vide."
+
+
+def test_editor_diagnostics_python_null_byte_syntax_error():
+    from app.api.editor_diagnostics import _lint_python
+
+    # Code containing null bytes must be caught and reported
+    diags = _lint_python("print('hello\x00world')", None)
+    assert len(diags) > 0
+    assert any(d.severity == "error" and d.source == "syntax" for d in diags)
+
+
+def test_vector_memory_request_aliases():
+    from app.api.vector_memory import ClearRequest, RecallRequest
+
+    cr = ClearRequest.model_validate({"agentId": "custom_agent"})
+    assert cr.agent_id == "custom_agent"
+
+    rr = RecallRequest.model_validate({"prompt": "hello", "agentId": "custom_agent"})
+    assert rr.agent_id == "custom_agent"
+    assert rr.prompt == "hello"
+
+
+def test_link_understanding_db_parent_mkdir(tmp_path):
+    from unittest.mock import patch
+
+    from app.services.link_understanding import _get_db
+
+    sub_dir = tmp_path / "nested" / "deep"
+    test_db = sub_dir / "sessions.db"
+
+    assert not sub_dir.exists()
+    with patch("app.services.link_understanding.DB_PATH", test_db), _get_db() as conn:
+        assert test_db.exists()
+        assert conn is not None
+
 
 

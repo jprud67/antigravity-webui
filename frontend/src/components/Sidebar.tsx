@@ -709,7 +709,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 2000);
       setSelectedConvIds(new Set());
       setIsBulkMode(false);
       showToast(t('toast_bulk_zip_exported', '{0} session(s) exportées en ZIP').replace('{0}', String(count)), 'success');
@@ -736,7 +738,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 2000);
       showToast(t('toast_zip_exported', '{0} session(s) exportées en ZIP').replace('{0}', String(ids.length)), 'success');
     } catch (err: any) {
       showToast(err.message || t('err_export_zip', "Erreur lors de l'export ZIP"), 'error');

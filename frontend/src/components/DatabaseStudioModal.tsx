@@ -218,7 +218,9 @@ export const DatabaseStudioModal: React.FC<DatabaseStudioModalProps> = ({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 2000);
       showToast(t('db_export_success', 'Exportation réussie'), 'success');
     } catch (err: any) {
       showToast(err.message || t('db_export_error', 'Échec de l\'export'), 'error');

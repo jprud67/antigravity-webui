@@ -89,6 +89,20 @@ def _lint_python(content: str, file_path: str | None) -> list[DiagnosticItem]:
                 code="E999"
             )
         )
+    except ValueError as e:
+        has_syntax_error = True
+        diagnostics.append(
+            DiagnosticItem(
+                line=1,
+                column=1,
+                endLine=1,
+                endColumn=2,
+                message=str(e),
+                severity="error",
+                source="syntax",
+                code="E999"
+            )
+        )
     except Exception as e:
         logger.debug(f"AST parsing exception: {e}")
 
@@ -101,7 +115,7 @@ def _lint_python(content: str, file_path: str | None) -> list[DiagnosticItem]:
             stdin_filename = base_name if base_name else "temp_check.py"
             proc = subprocess.run(
                 [ruff_bin, "check", "--output-format=json", "--stdin-filename", stdin_filename, "-"],
-                input=content.encode("utf-8"),
+                input=content.encode("utf-8", errors="replace"),
                 capture_output=True,
                 timeout=4
             )
@@ -168,7 +182,7 @@ def _lint_javascript(content: str, file_path: str | None, language: str) -> list
 
     temp_file = None
     try:
-        with tempfile.NamedTemporaryFile(suffix=ext, delete=False, mode="w", encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False, mode="w", encoding="utf-8", errors="replace") as f:
             f.write(content)
             temp_file = f.name
 
@@ -262,6 +276,11 @@ def _lint_yaml(content: str) -> list[DiagnosticItem]:
     diagnostics: list[DiagnosticItem] = []
     try:
         import yaml  # type: ignore[import-untyped]
+    except (ImportError, ModuleNotFoundError):
+        logger.debug("PyYAML is not installed, skipping YAML diagnostics")
+        return []
+
+    try:
         list(yaml.safe_load_all(content))
     except Exception as e:
         mark = getattr(e, "problem_mark", None)

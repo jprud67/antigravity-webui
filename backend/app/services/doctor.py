@@ -143,11 +143,11 @@ def _check_git_status() -> dict[str, Any]:
     dirty_count = 0
     try:
         import subprocess
-        res = subprocess.run(["git", "branch", "--show-current"], cwd=str(WORKSPACE_DIR), capture_output=True, text=True, timeout=2)
+        res = subprocess.run([git_bin, "branch", "--show-current"], cwd=str(WORKSPACE_DIR), capture_output=True, text=True, timeout=2)
         if res.returncode == 0:
             branch = res.stdout.strip()
         
-        status_res = subprocess.run(["git", "status", "--porcelain"], cwd=str(WORKSPACE_DIR), capture_output=True, text=True, timeout=2)
+        status_res = subprocess.run([git_bin, "status", "--porcelain"], cwd=str(WORKSPACE_DIR), capture_output=True, text=True, timeout=2)
         if status_res.returncode == 0:
             lines = [l for l in status_res.stdout.splitlines() if l.strip()]
             dirty_count = len(lines)

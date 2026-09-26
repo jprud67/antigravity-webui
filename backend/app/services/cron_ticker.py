@@ -730,6 +730,8 @@ async def tick_once() -> int:
         job_id = job.get("id")
         try:
             task = asyncio.create_task(_guarded_execute(job))
+            if job_id:
+                _running_job_tasks[job_id] = task
             _background_tasks.add(task)
             task.add_done_callback(_background_tasks.discard)
         except Exception as launch_err:

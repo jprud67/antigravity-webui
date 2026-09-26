@@ -273,8 +273,11 @@ def _serialize_cell(value: Any) -> Any:
 def execute_query(db_path: str, query: str, limit: int = 500, timeout_seconds: float = 10.0) -> QueryResult:
     """Executes a SQL query against an SQLite database with timeout and row bounds."""
     clean_path = str(Path(db_path).resolve())
-    if is_blocked_sensitive_path(clean_path) or not Path(clean_path).exists():
+    if is_blocked_sensitive_path(clean_path) or not Path(clean_path).is_file():
         return QueryResult(error=f"Accès refusé ou fichier inexistant: {db_path}")
+
+    if not query or not query.strip():
+        return QueryResult(error="Requête SQL vide.")
 
     limit = max(1, min(limit, 2000))
     start_time = time.perf_counter()
