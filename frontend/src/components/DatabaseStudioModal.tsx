@@ -214,20 +214,36 @@ export const DatabaseStudioModal: React.FC<DatabaseStudioModalProps> = ({
     setExpandedTables(prev => ({ ...prev, [tableName]: !prev[tableName] }));
   };
 
-  const handleSelectTableQuickQuery = (table: TableInfo) => {
+  const handleSelectTableQuickQuery = useCallback(async (table: TableInfo) => {
+    if (!selectedDbPath) return;
     const q = `SELECT * FROM "${table.name}" LIMIT 50;`;
     setSqlQuery(q);
     if (editorRef.current) {
       editorRef.current.setValue(q);
     }
-    // Auto execute query on quick select
-    setTimeout(() => {
-      databaseApi.executeQuery(selectedDbPath, q, 50).then(res => {
-        setQueryResult(res);
-        setCurrentPage(1);
-      }).catch(() => {});
-    }, 50);
-  };
+    setExecuting(true);
+    setCurrentPage(1);
+    setSortColumn(null);
+    try {
+      const res = await databaseApi.executeQuery(selectedDbPath, q, 50);
+      setQueryResult(res);
+      if (!res.error) {
+        saveRecentQuery(q);
+      }
+    } catch (err: any) {
+      setQueryResult({
+        columns: [],
+        rows: [],
+        total_rows: 0,
+        truncated: false,
+        execution_time_ms: 0,
+        error: err.message || t('db_query_unknown_error', "Erreur d'exécution inconnue")
+      });
+      showToast(err.message || t('db_query_unknown_error', "Erreur d'exécution inconnue"), 'error');
+    } finally {
+      setExecuting(false);
+    }
+  }, [selectedDbPath, saveRecentQuery, t]);
 
   // Filtered Tables
   const filteredTables = useMemo(() => {
@@ -391,7 +407,7 @@ export const DatabaseStudioModal: React.FC<DatabaseStudioModalProps> = ({
                   >
                     {databases.map(db => (
                       <option key={db.path} value={db.path}>
-                        {db.name} ({db.table_count} tables)
+                        {db.name} ({db.table_count} {t('tables', 'tables')})
                       </option>
                     ))}
                   </select>

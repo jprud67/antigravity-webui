@@ -64,11 +64,12 @@ class KernelToolProxy:
             lines = f.readlines()
 
         try:
-            start_idx = max(1, int(start_line)) - 1 if start_line is not None else 0
+            start_idx = max(0, int(start_line) - 1) if start_line is not None else 0
         except (ValueError, TypeError):
             start_idx = 0
         try:
-            end_idx = min(len(lines), int(end_line)) if end_line is not None else len(lines)
+            end_val = int(end_line) if end_line is not None else len(lines)
+            end_idx = max(start_idx, min(len(lines), end_val))
         except (ValueError, TypeError):
             end_idx = len(lines)
         return "".join(lines[start_idx:end_idx])

@@ -108,15 +108,21 @@ def is_sqlite_file(file_path: Path) -> bool:
 
 def count_sqlite_tables(db_path: str) -> int:
     """Quickly returns the number of tables in an SQLite database."""
+    conn = None
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0)
         cursor = conn.cursor()
         cursor.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-        count = cursor.fetchone()[0]
-        conn.close()
-        return int(count)
+        row = cursor.fetchone()
+        return int(row[0]) if row else 0
     except Exception:
         return 0
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception as close_err:
+                logger.debug("Failed to close SQLite connection: %s", close_err)
 
 
 def discover_databases(workspace_path: str, max_depth: int = 4) -> list[DatabaseConnectionInfo]:
@@ -180,6 +186,7 @@ def inspect_database_schema(db_path: str) -> DatabaseSchema:
 
     schema = DatabaseSchema(database_name=p.name, dialect="sqlite")
 
+    conn = None
     try:
         conn = sqlite3.connect(f"file:{clean_path}?mode=ro", uri=True, timeout=5.0)
         cursor = conn.cursor()
@@ -200,7 +207,7 @@ def inspect_database_schema(db_path: str) -> DatabaseSchema:
             try:
                 # PRAGMA doesn't accept parameterized table names, but we use strict identifier escaping
                 safe_name = name.replace('"', '""')
-                cursor.execute(f'PRAGMA table_info("{safe_name}")')
+                cursor.execute(f'PRAGMA table_info("{safe_name}")')  # nosec B608
                 cols_raw = cursor.fetchall()
                 columns: list[ColumnInfo] = []
                 for row in cols_raw:
@@ -222,7 +229,7 @@ def inspect_database_schema(db_path: str) -> DatabaseSchema:
             row_count: int | None = None
             if not is_view:
                 try:
-                    cursor.execute(f'SELECT count(*) FROM "{safe_name}"')
+                    cursor.execute(f'SELECT count(*) FROM "{safe_name}"')  # nosec B608
                     row_count = cursor.fetchone()[0]
                 except Exception:
                     row_count = None
@@ -235,10 +242,14 @@ def inspect_database_schema(db_path: str) -> DatabaseSchema:
                     row_count_estimate=row_count,
                 )
             )
-
-        conn.close()
     except Exception as exc:
         raise ValueError(f"Échec de l'inspection de la base : {exc}") from exc
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception as close_err:
+                logger.debug("Failed to close SQLite schema connection: %s", close_err)
 
     return schema
 
@@ -266,6 +277,7 @@ def execute_query(db_path: str, query: str, limit: int = 500, timeout_seconds: f
     limit = max(1, min(limit, 2000))
     start_time = time.perf_counter()
 
+    conn = None
     try:
         conn = sqlite3.connect(str(clean_path), timeout=timeout_seconds)
         cursor = conn.cursor()
@@ -283,7 +295,6 @@ def execute_query(db_path: str, query: str, limit: int = 500, timeout_seconds: f
                 raw_rows = raw_rows[:limit]
 
             serialized_rows = [[_serialize_cell(cell) for cell in row] for row in raw_rows]
-            conn.close()
 
             return QueryResult(
                 columns=columns,
@@ -297,10 +308,9 @@ def execute_query(db_path: str, query: str, limit: int = 500, timeout_seconds: f
             # DDL / DML query (CREATE, UPDATE, DELETE, etc.)
             conn.commit()
             rowcount = cursor.rowcount
-            conn.close()
             return QueryResult(
                 columns=["status", "affected_rows"],
-                rows=[["Query executed successfully", rowcount if rowcount >= 0 else 0]],
+                rows=[["Query executed successfully", max(rowcount, 0)]],
                 total_rows=1,
                 truncated=False,
                 execution_time_ms=duration_ms,
@@ -316,6 +326,12 @@ def execute_query(db_path: str, query: str, limit: int = 500, timeout_seconds: f
             execution_time_ms=duration_ms,
             error=str(exc),
         )
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception as close_err:
+                logger.debug("Failed to close SQLite query connection: %s", close_err)
 
 
 def export_query_results(db_path: str, query: str, format: str = "csv") -> str:

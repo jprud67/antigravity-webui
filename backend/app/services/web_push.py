@@ -14,6 +14,7 @@ import secrets
 import sqlite3
 import time
 import urllib.parse
+from contextlib import contextmanager
 from typing import Any
 
 from app.config import SESSIONS_DB
@@ -34,13 +35,21 @@ def is_safe_push_endpoint(endpoint: str) -> bool:
         return False
 
 
-def _get_db() -> sqlite3.Connection:
+@contextmanager
+def _get_db():
     conn = sqlite3.connect(DB_PATH, timeout=15.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA busy_timeout=5000")
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug("Failed to close web push connection: %s", e)
 
 
 def ensure_web_push_schema() -> None:

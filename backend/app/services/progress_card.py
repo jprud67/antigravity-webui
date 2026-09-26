@@ -11,6 +11,7 @@ import json
 import logging
 import sqlite3
 import time
+from contextlib import contextmanager
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -36,13 +37,21 @@ class ProgressCardPayload(BaseModel):
     plan: list[ProgressCardStep]
 
 
-def _get_db() -> sqlite3.Connection:
+@contextmanager
+def _get_db():
     conn = sqlite3.connect(str(DB_PATH), timeout=15.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA busy_timeout=5000")
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug("Failed to close progress card connection: %s", e)
 
 
 def ensure_progress_card_schema():

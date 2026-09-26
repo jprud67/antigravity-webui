@@ -3,7 +3,7 @@ lint.ignore = ["B008", "BLE001", "S110", "G201", "PLW1510", "S112", "SIM102", "D
 
 [tool.pytest.ini_options]
 pythonpath = ["app", "."]
-testpaths = ["tests"]
+testpaths = ["tests", "."]
 
 [tool.mypy]
 python_version = "3.12"

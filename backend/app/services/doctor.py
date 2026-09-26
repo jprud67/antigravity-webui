@@ -79,19 +79,26 @@ def _check_sqlite_integrity() -> dict[str, Any]:
     for db_name, p in db_paths:
         if not p.exists():
             continue
+        conn = None
         try:
             size_mb = round(p.stat().st_size / (1024 * 1024), 2)
             total_size_mb += size_mb
-            with sqlite3.connect(str(p), timeout=10.0) as conn:
-                cursor = conn.cursor()
-                cursor.execute("PRAGMA integrity_check;")
-                row = cursor.fetchone()
-                check_result = row[0] if row else "unknown"
-                statuses.append("ok" if check_result == "ok" else "corrupted")
-                integrities.append(f"{db_name}: {check_result}")
+            conn = sqlite3.connect(str(p), timeout=10.0)
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA integrity_check;")
+            row = cursor.fetchone()
+            check_result = row[0] if row else "unknown"
+            statuses.append("ok" if check_result == "ok" else "corrupted")
+            integrities.append(f"{db_name}: {check_result}")
         except Exception as e:
             statuses.append("error")
             integrities.append(f"{db_name}: {e}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception as close_err:
+                    logger.debug("Failed to close SQLite diagnostic connection: %s", close_err)
 
     if not statuses:
         return {"status": "missing", "size_mb": 0, "integrity": "missing"}
@@ -223,15 +230,22 @@ async def run_auto_repair() -> dict[str, Any]:
     vacuumed = []
     for db_name, p in target_dbs:
         if p.exists():
+            conn = None
             try:
-                with sqlite3.connect(str(p), timeout=15.0) as conn:
-                    conn.execute("VACUUM;")
-                    conn.execute("ANALYZE;")
-                    conn.execute("PRAGMA optimize;")
-                    conn.commit()
+                conn = sqlite3.connect(str(p), timeout=15.0)
+                conn.execute("VACUUM;")
+                conn.execute("ANALYZE;")
+                conn.execute("PRAGMA optimize;")
+                conn.commit()
                 vacuumed.append(db_name)
             except Exception as e:
                 logger.warning(f"Failed to vacuum {db_name}: {e}")
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception as close_err:
+                        logger.debug("Failed to close vacuum connection: %s", close_err)
     if vacuumed:
         repaired_actions.append(f"Optimisation et compactage des bases SQLite ({', '.join(vacuumed)}) (VACUUM & ANALYZE)")
 

@@ -147,18 +147,6 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
       .slice(-12)
       .toLowerCase();
 
-  const [tabs, setTabs] = useState<TabData[]>(() => [
-    {
-      id: 'tab-1',
-      sessionId: `${'ws_' + currentWorkspace.replace(/[^a-zA-Z0-9]/g, '_').slice(-12).toLowerCase()}_1`,
-      title: 'Terminal 1',
-      shell: 'default',
-      connected: false,
-      error: null,
-    },
-  ]);
-  const [activeTabId, setActiveTabId] = useState<string>('tab-1');
-
   // Split-View Layout State
   const [splitMode, setSplitMode] = useState<'single' | 'horizontal' | 'vertical'>(() => {
     try {
@@ -167,7 +155,43 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
     } catch {}
     return 'single';
   });
-  const [secondaryTabId, setSecondaryTabId] = useState<string | null>(null);
+
+  const [tabs, setTabs] = useState<TabData[]>(() => {
+    const initialTabs: TabData[] = [
+      {
+        id: 'tab-1',
+        sessionId: `${wsPrefix}_1`,
+        title: 'Terminal 1',
+        shell: 'default',
+        connected: false,
+        error: null,
+      },
+    ];
+    try {
+      const saved = localStorage.getItem('antigravity_terminal_split_mode');
+      if (saved === 'horizontal' || saved === 'vertical') {
+        initialTabs.push({
+          id: 'tab-2',
+          sessionId: `${wsPrefix}_2`,
+          title: 'Terminal 2',
+          shell: 'default',
+          connected: false,
+          error: null,
+        });
+      }
+    } catch {}
+    return initialTabs;
+  });
+  const [activeTabId, setActiveTabId] = useState<string>('tab-1');
+  const [secondaryTabId, setSecondaryTabId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem('antigravity_terminal_split_mode');
+      if (saved === 'horizontal' || saved === 'vertical') {
+        return 'tab-2';
+      }
+    } catch {}
+    return null;
+  });
   const [focusedPane, setFocusedPane] = useState<'primary' | 'secondary'>('primary');
   const [splitRatio, setSplitRatio] = useState<number>(50); // percentage for primary pane
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
@@ -402,32 +426,42 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
     [connectTab, tabs]
   );
 
-  // Tab switching and focus: fit active/focused tab and refocus
+  // Tab switching and focus: fit visible tabs and refocus focused pane
   useEffect(() => {
-    const targetId = (splitMode !== 'single' && focusedPane === 'secondary' && secondaryTabId)
+    const visibleIds = [activeTabId];
+    if (splitMode !== 'single' && secondaryTabId && secondaryTabId !== activeTabId) {
+      visibleIds.push(secondaryTabId);
+    }
+    const focusedId = (splitMode !== 'single' && focusedPane === 'secondary' && secondaryTabId)
       ? secondaryTabId
       : activeTabId;
-    const entry = instancesRef.current.get(targetId);
-    if (entry) {
-      const raf = requestAnimationFrame(() => {
-        try {
-          if (entry.container && entry.container.clientWidth > 0 && entry.container.clientHeight > 0) {
+
+    const raf = requestAnimationFrame(() => {
+      visibleIds.forEach((tabId) => {
+        const entry = instancesRef.current.get(tabId);
+        if (entry && entry.container && entry.container.clientWidth > 0 && entry.container.clientHeight > 0) {
+          try {
             entry.fitAddon.fit();
-            entry.term.focus();
-            if (entry.ws && entry.ws.readyState === WebSocket.OPEN) {
-              entry.ws.send(
-                JSON.stringify({
-                  action: 'resize',
-                  cols: entry.term.cols,
-                  rows: entry.term.rows,
-                })
-              );
+            const cols = entry.term.cols;
+            const rows = entry.term.rows;
+            if (cols > 0 && rows > 0 && (cols !== entry.lastCols || rows !== entry.lastRows)) {
+              entry.lastCols = cols;
+              entry.lastRows = rows;
+              if (entry.ws && entry.ws.readyState === WebSocket.OPEN) {
+                entry.ws.send(JSON.stringify({ action: 'resize', cols, rows }));
+              }
             }
-          }
-        } catch {}
+          } catch {}
+        }
       });
-      return () => cancelAnimationFrame(raf);
-    }
+      const focusedEntry = instancesRef.current.get(focusedId);
+      if (focusedEntry) {
+        try {
+          focusedEntry.term.focus();
+        } catch {}
+      }
+    });
+    return () => cancelAnimationFrame(raf);
   }, [activeTabId, secondaryTabId, focusedPane, splitMode]);
 
   // Window resize handler for all visible tabs (primary + secondary)

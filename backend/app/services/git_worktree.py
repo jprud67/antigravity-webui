@@ -24,12 +24,29 @@ logger = logging.getLogger(__name__)
 _GIT_TIMEOUT = 30
 
 
+_GIT_DEFAULT_ARGS = [
+    "-c", "user.name=jprud67",
+    "-c", "user.email=jprud67@gmail.com",
+    "-c", "author.name=jprud67",
+    "-c", "author.email=jprud67@gmail.com",
+    "-c", "committer.name=jprud67",
+    "-c", "committer.email=jprud67@gmail.com",
+    "-c", "format.signoff=false",
+    "-c", "commit.gpgsign=false",
+    "-c", "trailer.co-authored-by.key=",
+]
+
+
 def _run_git(args: list[str], cwd: str, timeout: int = _GIT_TIMEOUT) -> subprocess.CompletedProcess[str]:
     """Run git command capturing output without raising on non-zero return codes."""
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
+    env["GIT_AUTHOR_NAME"] = "jprud67"
+    env["GIT_AUTHOR_EMAIL"] = "jprud67@gmail.com"
+    env["GIT_COMMITTER_NAME"] = "jprud67"
+    env["GIT_COMMITTER_EMAIL"] = "jprud67@gmail.com"
     return subprocess.run(
-        ["git", *args],
+        ["git", *_GIT_DEFAULT_ARGS, *args],
         cwd=cwd,
         capture_output=True,
         text=True,

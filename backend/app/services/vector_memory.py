@@ -16,6 +16,7 @@ import re
 import sqlite3
 import time
 import uuid
+from contextlib import contextmanager
 from typing import Any, Literal
 
 import httpx
@@ -103,13 +104,21 @@ class RecallHookResult(BaseModel):
     memories: list[MemorySearchResult] = Field(default_factory=list)
 
 
-def _get_db() -> sqlite3.Connection:
+@contextmanager
+def _get_db():
     CONVERSATION_DB.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(CONVERSATION_DB), timeout=15.0)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA busy_timeout=5000")
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug("Failed to close vector memory connection: %s", e)
 
 
 def ensure_vector_memory_schema() -> None:
