@@ -4328,7 +4328,13 @@
     "db_ready_to_query": "Ready to execute a SQL query",
     "db_page_info": "Page {0} / {1}",
     "db_no_results_yet": "No query results to display",
-    "db_no_results_hint": "Type a SQL query above or double-click a table on the left to inspect data."
+    "db_no_results_hint": "Type a SQL query above or double-click a table on the left to inspect data.",
+    "terminal_split_single": "Single view (1 pane)",
+    "terminal_split_horizontal": "Split vertically (columns side-by-side)",
+    "terminal_split_vertical": "Split horizontally (stacked rows)",
+    "terminal_drag_split": "Drag to resize",
+    "terminal_pane_1": "Pane 1",
+    "terminal_pane_2": "Pane 2"
   },
   "it": {
     "offline_title": "Connessione persa",
@@ -8659,7 +8665,13 @@
     "db_ready_to_query": "Pronto per eseguire una query SQL",
     "db_page_info": "Pagina {0} / {1}",
     "db_no_results_yet": "Nessun risultato della query da visualizzare",
-    "db_no_results_hint": "Digita una query SQL in alto o fai doppio clic su una tabella a sinistra per ispezionare i dati."
+    "db_no_results_hint": "Digita una query SQL in alto o fai doppio clic su una tabella a sinistra per ispezionare i dati.",
+    "terminal_split_single": "Vista singola (1 riquadro)",
+    "terminal_split_horizontal": "Dividi verticalmente (colonne affiancate)",
+    "terminal_split_vertical": "Dividi orizzontalmente (righe sovrapposte)",
+    "terminal_drag_split": "Trascina per ridimensionare",
+    "terminal_pane_1": "Riquadro 1",
+    "terminal_pane_2": "Riquadro 2"
   },
   "ja": {
     "offline_title": "接続が切断されました",
@@ -12990,7 +13002,13 @@
     "db_ready_to_query": "SQLクエリを実行する準備ができました",
     "db_page_info": "ページ {0} / {1}",
     "db_no_results_yet": "表示するクエリ結果がありません",
-    "db_no_results_hint": "上部にSQLクエリを入力するか、左側のテーブルをダブルクリックしてデータを読み込みます。"
+    "db_no_results_hint": "上部にSQLクエリを入力するか、左側のテーブルをダブルクリックしてデータを読み込みます。",
+    "terminal_split_single": "シングルビュー（1ペイン）",
+    "terminal_split_horizontal": "左右に分割（横並びカラム）",
+    "terminal_split_vertical": "上下に分割（積み重ね行）",
+    "terminal_drag_split": "ドラッグしてリサイズ",
+    "terminal_pane_1": "ペイン 1",
+    "terminal_pane_2": "ペイン 2"
   },
   "ru": {
     "offline_title": "Соединение потеряно",
@@ -17321,7 +17339,13 @@
     "db_ready_to_query": "Готов к выполнению SQL-запроса",
     "db_page_info": "Страница {0} / {1}",
     "db_no_results_yet": "Нет результатов запроса для отображения",
-    "db_no_results_hint": "Введите SQL-запрос выше или дважды кликните по таблице слева для просмотра данных."
+    "db_no_results_hint": "Введите SQL-запрос выше или дважды кликните по таблице слева для просмотра данных.",
+    "terminal_split_single": "Один экран (1 панель)",
+    "terminal_split_horizontal": "Разделить вертикально (колонки рядом)",
+    "terminal_split_vertical": "Разделить горизонтально (строки друг над другом)",
+    "terminal_drag_split": "Потяните для изменения размера",
+    "terminal_pane_1": "Панель 1",
+    "terminal_pane_2": "Панель 2"
   },
   "es": {
     "offline_title": "Conexión perdida",
@@ -21652,7 +21676,13 @@
     "db_ready_to_query": "Listo para ejecutar una consulta SQL",
     "db_page_info": "Página {0} / {1}",
     "db_no_results_yet": "No hay resultados de consultas para mostrar",
-    "db_no_results_hint": "Escriba una consulta SQL arriba o haga doble clic en una tabla a la izquierda para inspeccionar datos."
+    "db_no_results_hint": "Escriba una consulta SQL arriba o haga doble clic en una tabla a la izquierda para inspeccionar datos.",
+    "terminal_split_single": "Vista única (1 panel)",
+    "terminal_split_horizontal": "Dividir verticalmente (columnas lado a lado)",
+    "terminal_split_vertical": "Dividir horizontalmente (filas apiladas)",
+    "terminal_drag_split": "Arrastrar para redimensionar",
+    "terminal_pane_1": "Panel 1",
+    "terminal_pane_2": "Panel 2"
   },
   "de": {
     "offline_title": "Verbindung verloren",
@@ -25983,7 +26013,13 @@
     "db_ready_to_query": "Bereit zur Ausführung einer SQL-Abfrage",
     "db_page_info": "Seite {0} / {1}",
     "db_no_results_yet": "Keine Abfrageergebnisse anzuzeigen",
-    "db_no_results_hint": "Geben Sie oben eine SQL-Abfrage ein oder doppelklicken Sie links auf eine Tabelle, um Daten zu prüfen."
+    "db_no_results_hint": "Geben Sie oben eine SQL-Abfrage ein oder doppelklicken Sie links auf eine Tabelle, um Daten zu prüfen.",
+    "terminal_split_single": "Einzelfenster (1 Bereich)",
+    "terminal_split_horizontal": "Vertikal teilen (Spalten nebeneinander)",
+    "terminal_split_vertical": "Horizontal teilen (gestapelte Zeilen)",
+    "terminal_drag_split": "Ziehen zum Ändern der Größe",
+    "terminal_pane_1": "Bereich 1",
+    "terminal_pane_2": "Bereich 2"
   },
   "zh": {
     "offline_title": "连接已断开",
@@ -30314,7 +30350,13 @@
     "db_ready_to_query": "准备好执行SQL查询",
     "db_page_info": "第 {0} / {1} 页",
     "db_no_results_yet": "没有可显示的查询结果",
-    "db_no_results_hint": "在上方输入SQL查询，或双击左侧表格以检查数据。"
+    "db_no_results_hint": "在上方输入SQL查询，或双击左侧表格以检查数据。",
+    "terminal_split_single": "单视图（1个面板）",
+    "terminal_split_horizontal": "垂直分屏（左右并排）",
+    "terminal_split_vertical": "水平分屏（上下堆叠）",
+    "terminal_drag_split": "拖动调整大小",
+    "terminal_pane_1": "面板 1",
+    "terminal_pane_2": "面板 2"
   },
   "zh-Hant": {
     "offline_title": "連線中斷",
@@ -34645,7 +34687,13 @@
     "db_ready_to_query": "Ready to execute a SQL query",
     "db_page_info": "Page {0} / {1}",
     "db_no_results_yet": "No query results to display",
-    "db_no_results_hint": "Type a SQL query above or double-click a table on the left to inspect data."
+    "db_no_results_hint": "Type a SQL query above or double-click a table on the left to inspect data.",
+    "terminal_split_single": "單視圖（1個面板）",
+    "terminal_split_horizontal": "垂直分割（左右並排）",
+    "terminal_split_vertical": "水平分割（上下堆疊）",
+    "terminal_drag_split": "拖曳調整大小",
+    "terminal_pane_1": "面板 1",
+    "terminal_pane_2": "面板 2"
   },
   "pt": {
     "offline_title": "Conexão perdida",
@@ -38976,7 +39024,13 @@
     "db_ready_to_query": "Pronto para executar uma consulta SQL",
     "db_page_info": "Página {0} / {1}",
     "db_no_results_yet": "Nenhum resultado de consulta para exibir",
-    "db_no_results_hint": "Digite uma consulta SQL acima ou clique duas vezes em uma tabela à esquerda para inspecionar os dados."
+    "db_no_results_hint": "Digite uma consulta SQL acima ou clique duas vezes em uma tabela à esquerda para inspecionar os dados.",
+    "terminal_split_single": "Vista única (1 painel)",
+    "terminal_split_horizontal": "Dividir verticalmente (colunas lado a lado)",
+    "terminal_split_vertical": "Dividir horizontalmente (linhas empilhadas)",
+    "terminal_drag_split": "Arrastar para redimensionar",
+    "terminal_pane_1": "Painel 1",
+    "terminal_pane_2": "Painel 2"
   },
   "ko": {
     "offline_title": "연결이 끊겼습니다",
@@ -43307,7 +43361,13 @@
     "db_ready_to_query": "SQL 쿼리를 실행할 준비가 되었습니다",
     "db_page_info": "페이지 {0} / {1}",
     "db_no_results_yet": "표시할 쿼리 결과가 없습니다",
-    "db_no_results_hint": "위에 SQL 쿼리를 입력하거나 왼쪽 테이블을 더블 클릭하여 데이터를 검사하세요."
+    "db_no_results_hint": "위에 SQL 쿼리를 입력하거나 왼쪽 테이블을 더블 클릭하여 데이터를 검사하세요.",
+    "terminal_split_single": "단일 뷰 (1개 창)",
+    "terminal_split_horizontal": "세로 분할 (나란히 배치)",
+    "terminal_split_vertical": "가로 분할 (상하 배치)",
+    "terminal_drag_split": "드래그하여 크기 조절",
+    "terminal_pane_1": "창 1",
+    "terminal_pane_2": "창 2"
   },
   "fr": {
     "offline_title": "Connexion perdue",
@@ -47638,7 +47698,13 @@
     "db_ready_to_query": "Prêt à exécuter une requête SQL",
     "db_page_info": "Page {0} / {1}",
     "db_no_results_yet": "Aucun résultat de requête à afficher",
-    "db_no_results_hint": "Saisissez une requête SQL ci-dessus ou double-cliquez sur une table à gauche pour charger les données."
+    "db_no_results_hint": "Saisissez une requête SQL ci-dessus ou double-cliquez sur une table à gauche pour charger les données.",
+    "terminal_split_single": "Vue unique (1 volet)",
+    "terminal_split_horizontal": "Scinder verticalement (colonnes côte à côte)",
+    "terminal_split_vertical": "Scinder horizontalement (lignes empilées)",
+    "terminal_drag_split": "Glisser pour redimensionner",
+    "terminal_pane_1": "Volet 1",
+    "terminal_pane_2": "Volet 2"
   },
   "cs": {
     "_label": "Čeština",
@@ -51969,7 +52035,13 @@
     "db_ready_to_query": "Ready to execute a SQL query",
     "db_page_info": "Page {0} / {1}",
     "db_no_results_yet": "No query results to display",
-    "db_no_results_hint": "Type a SQL query above or double-click a table on the left to inspect data."
+    "db_no_results_hint": "Type a SQL query above or double-click a table on the left to inspect data.",
+    "terminal_split_single": "Jedno zobrazení (1 panel)",
+    "terminal_split_horizontal": "Rozdělit svisle (sloupce vedle sebe)",
+    "terminal_split_vertical": "Rozdělit vodorovně (řádky nad sebou)",
+    "terminal_drag_split": "Přetažením změňte velikost",
+    "terminal_pane_1": "Panel 1",
+    "terminal_pane_2": "Panel 2"
   },
   "tr": {
     "offline_title": "Bağlantı kesildi",
@@ -56300,7 +56372,13 @@
     "db_ready_to_query": "SQL sorgusu çalıştırmaya hazır",
     "db_page_info": "Sayfa {0} / {1}",
     "db_no_results_yet": "Görüntülenecek sorgu sonucu yok",
-    "db_no_results_hint": "Yukarıya bir SQL sorgusu yazın veya verileri incelemek için soldaki bir tabloya çift tıklayın."
+    "db_no_results_hint": "Yukarıya bir SQL sorgusu yazın veya verileri incelemek için soldaki bir tabloya çift tıklayın.",
+    "terminal_split_single": "Tekli görünüm (1 bölme)",
+    "terminal_split_horizontal": "Dikey böl (yan yana sütunlar)",
+    "terminal_split_vertical": "Yatay böl (üst üste satırlar)",
+    "terminal_drag_split": "Yeniden boyutlandırmak için sürükleyin",
+    "terminal_pane_1": "Bölme 1",
+    "terminal_pane_2": "Bölme 2"
   },
   "pl": {
     "offline_title": "Połączenie utracone",
@@ -60631,7 +60709,13 @@
     "db_ready_to_query": "Gotowy do wykonania zapytania SQL",
     "db_page_info": "Strona {0} / {1}",
     "db_no_results_yet": "Brak wyników zapytania do wyświetlenia",
-    "db_no_results_hint": "Wpisz zapytanie SQL powyżej lub kliknij dwukrotnie tabelę po lewej stronie, aby sprawdzić dane."
+    "db_no_results_hint": "Wpisz zapytanie SQL powyżej lub kliknij dwukrotnie tabelę po lewej stronie, aby sprawdzić dane.",
+    "terminal_split_single": "Widok pojedynczy (1 panel)",
+    "terminal_split_horizontal": "Podziel pionowo (kolumny obok siebie)",
+    "terminal_split_vertical": "Podziel poziomo (wiersze jeden nad drugim)",
+    "terminal_drag_split": "Przeciągnij, aby zmienić rozmiar",
+    "terminal_pane_1": "Panel 1",
+    "terminal_pane_2": "Panel 2"
   },
   "vi": {
     "offline_title": "Mất kết nối",
@@ -64962,6 +65046,12 @@
     "db_ready_to_query": "Ready to execute a SQL query",
     "db_page_info": "Page {0} / {1}",
     "db_no_results_yet": "No query results to display",
-    "db_no_results_hint": "Type a SQL query above or double-click a table on the left to inspect data."
+    "db_no_results_hint": "Type a SQL query above or double-click a table on the left to inspect data.",
+    "terminal_split_single": "Chế độ xem đơn (1 ngăn)",
+    "terminal_split_horizontal": "Chia dọc (cột cạnh nhau)",
+    "terminal_split_vertical": "Chia ngang (hàng xếp chồng)",
+    "terminal_drag_split": "Kéo để thay đổi kích thước",
+    "terminal_pane_1": "Ngăn 1",
+    "terminal_pane_2": "Ngăn 2"
   }
 }

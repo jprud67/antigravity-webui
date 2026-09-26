@@ -16,7 +16,7 @@ TEMP_TEST_DIR = (Path(DEFAULT_WORKSPACE) / f"test_search_replace_{uuid.uuid4().h
 @pytest.fixture(scope="module", autouse=True)
 def setup_test_workspace():
     if TEMP_TEST_DIR.exists():
-        shutil.rmtree(TEMP_TEST_DIR)
+        shutil.rmtree(TEMP_TEST_DIR, ignore_errors=True)
     TEMP_TEST_DIR.mkdir(parents=True, exist_ok=True)
 
     # Populate sample files for search and replace tests
@@ -42,7 +42,7 @@ def setup_test_workspace():
     yield
 
     if TEMP_TEST_DIR.exists():
-        shutil.rmtree(TEMP_TEST_DIR)
+        shutil.rmtree(TEMP_TEST_DIR, ignore_errors=True)
 
 
 def get_auth_headers():

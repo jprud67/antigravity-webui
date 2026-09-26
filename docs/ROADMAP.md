@@ -222,10 +222,17 @@ This roadmap outlines the strategic direction for **Antigravity‑webui**, the f
 | **Streaming Logs & In-Container Command Execution** | Visualisation et tail paramétrable des journaux conteneurs, exécution de commandes arbitraires avec capture stdout/stderr et code de retour. | Frontend / UX | 2027‑03‑28 | ✅ **Completed** |
 | **Docker Studio UI Modal & Compose Controls** | Interface complète glassmorphic (`DockerStudioModal.tsx`), actions compose rapides (up/down/build), bouton studio et intégration barre latérale. | Frontend / UX | 2027‑03‑28 | ✅ **Completed** |
 
+### 📌 Jalon v0.3.3 : Terminal Split-View & Multi-Panel Workspace (Dual Pane Layout & Live Resize)
+| Milestone | Description | Owner | Target | Status |
+|---|---|---|---|---|
+| **Multi-Layout Split Engine (Single, Horizontal, Vertical)** | Moteur de disposition multi-volets pour le terminal xterm : modes `single`, `horizontal` (colonnes côte à côte) et `vertical` (lignes empilées), persistance du mode dans `localStorage`, gestion transparente du montage DOM sans reconnexion WebSocket ni perte d'historique PTY. | Frontend / Terminal | 2027‑03‑29 | ✅ **Completed** |
+| **Interactive Draggable Divider & Dynamic Resizing** | Séparateur interactif avec poignée de glissement fluide au pointeur (`onPointerDown`), ratio dynamique borné (20% à 80%), désactivation ciblée des événements canvas xterm pendant le drag, et redimensionnement automatique instantané des PTY via messages WebSocket `resize`. | Frontend / UX | 2027‑03‑29 | ✅ **Completed** |
+| **Dual Pane Session Routing & Focus Tracking** | Gestion conjointe de volet actif (`primary` vs `secondary`), badges d'état visuels (`Volet 1`, `Volet 2`), ciblage contextuel des actions de la barre d'outils (Clear, Restart session, changement d'interpréteur Shell) et routage automatique des commandes (`terminal-run-command`). | Frontend / IDE | 2027‑03‑29 | ✅ **Completed** |
+| **Internationalisation Complète (15 Langues)** | Couverture complète et stricte des clés i18n (`terminal_split_single`, `terminal_split_horizontal`, `terminal_split_vertical`, `terminal_drag_split`, `terminal_pane_1`, `terminal_pane_2`) sur l'ensemble des 15 langues dans `locales.json`. | Release Manager | 2027‑03‑29 | ✅ **Completed** |
+
 ### 📌 Prochaines étapes v0.4 (Cockpit Web IDE & Agentic Workspace)
 | Milestone | Description |
 |---|---|
-| **Terminal Split-View & Multi-Panel Workspace** – Vue scindée multi-terminaux (horizontal/vertical) et dock d'outils intégré. |
 | **Monaco Extended Diagnostics & Live Linting** – Analyse syntaxique et diagnostics en temps réel (Python ruff/flake8, JS/TS eslint). |
 | **Collaborative Session Sharing & Live Preview** – Partage de session par lien direct, synchronisation WebSocket et inspection conjointe. |
 | **Multi-Agent Visual Orchestration Studio** – Visualisation des sous-agents en temps réel, graphe d'exécution et pilotage hiérarchique. |

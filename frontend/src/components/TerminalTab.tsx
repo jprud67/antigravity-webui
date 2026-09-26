@@ -10,6 +10,9 @@ import {
   Plus,
   X,
   ChevronDown,
+  Square,
+  Columns,
+  SplitSquareVertical,
 } from 'lucide-react';
 import { getAuthToken, fetchTerminalShells, deleteTerminalSession, type TerminalShellInfo } from '../services/api';
 import { showConfirm } from '../services/dialog';
@@ -155,6 +158,20 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
     },
   ]);
   const [activeTabId, setActiveTabId] = useState<string>('tab-1');
+
+  // Split-View Layout State
+  const [splitMode, setSplitMode] = useState<'single' | 'horizontal' | 'vertical'>(() => {
+    try {
+      const saved = localStorage.getItem('antigravity_terminal_split_mode');
+      if (saved === 'horizontal' || saved === 'vertical') return saved;
+    } catch {}
+    return 'single';
+  });
+  const [secondaryTabId, setSecondaryTabId] = useState<string | null>(null);
+  const [focusedPane, setFocusedPane] = useState<'primary' | 'secondary'>('primary');
+  const [splitRatio, setSplitRatio] = useState<number>(50); // percentage for primary pane
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Instances reference: tabId -> { term, fitAddon, ws, containerEl }
   const instancesRef = useRef<
@@ -374,14 +391,23 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
         connectTab(tab.id, tab.sessionId, tab.shell);
       } else {
         entry.container = node;
+        try {
+          if (entry.term.element && entry.term.element.parentElement !== node) {
+            node.appendChild(entry.term.element);
+            entry.fitAddon.fit();
+          }
+        } catch {}
       }
     },
     [connectTab, tabs]
   );
 
-  // Tab switching: fit newly active tab and refocus
+  // Tab switching and focus: fit active/focused tab and refocus
   useEffect(() => {
-    const entry = instancesRef.current.get(activeTabId);
+    const targetId = (splitMode !== 'single' && focusedPane === 'secondary' && secondaryTabId)
+      ? secondaryTabId
+      : activeTabId;
+    const entry = instancesRef.current.get(targetId);
     if (entry) {
       const raf = requestAnimationFrame(() => {
         try {
@@ -402,9 +428,9 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
       });
       return () => cancelAnimationFrame(raf);
     }
-  }, [activeTabId]);
+  }, [activeTabId, secondaryTabId, focusedPane, splitMode]);
 
-  // Window resize handler for all tabs
+  // Window resize handler for all visible tabs (primary + secondary)
   useEffect(() => {
     let resizeTimer: number | null = null;
     const handleResize = () => {
@@ -412,7 +438,8 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
       resizeTimer = requestAnimationFrame(() => {
         resizeTimer = null;
         instancesRef.current.forEach((entry, tabId) => {
-          if (tabId === activeTabId && entry.container && entry.container.clientWidth > 0) {
+          const isVisible = tabId === activeTabId || (splitMode !== 'single' && tabId === secondaryTabId);
+          if (isVisible && entry.container && entry.container.clientWidth > 0 && entry.container.clientHeight > 0) {
             try {
               entry.fitAddon.fit();
               const cols = entry.term.cols;
@@ -435,14 +462,17 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
       if (resizeTimer !== null) cancelAnimationFrame(resizeTimer);
       window.removeEventListener('resize', handleResize);
     };
-  }, [activeTabId]);
+  }, [activeTabId, secondaryTabId, splitMode]);
 
-  // Support terminal-run-command event to send commands to the active tab
+  // Support terminal-run-command event to send commands to the focused tab
   useEffect(() => {
     const handleRunCommand = (e: any) => {
       const cmd = e.detail?.command;
       if (cmd) {
-        const entry = instancesRef.current.get(activeTabId);
+        const targetTabId = (splitMode !== 'single' && focusedPane === 'secondary' && secondaryTabId)
+          ? secondaryTabId
+          : activeTabId;
+        const entry = instancesRef.current.get(targetTabId);
         if (entry?.ws && entry.ws.readyState === WebSocket.OPEN) {
           entry.ws.send(cmd.endsWith('\n') ? cmd : cmd + '\n');
         }
@@ -450,7 +480,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
     };
     window.addEventListener('terminal-run-command', handleRunCommand);
     return () => window.removeEventListener('terminal-run-command', handleRunCommand);
-  }, [activeTabId]);
+  }, [activeTabId, secondaryTabId, focusedPane, splitMode]);
 
   // Clean up all instances on unmount
   useEffect(() => {
@@ -502,9 +532,124 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
     };
 
     setTabs((prev) => [...prev, newTab]);
-    setActiveTabId(newId);
+    if (splitMode !== 'single' && focusedPane === 'secondary') {
+      setSecondaryTabId(newId);
+    } else {
+      setActiveTabId(newId);
+    }
     setShellMenuOpen(false);
-  }, [availableShells, defaultShell, tabs.length, wsPrefix]);
+  }, [availableShells, defaultShell, focusedPane, splitMode, tabs.length, wsPrefix]);
+
+  // Set split mode (single, horizontal, vertical) and ensure secondary tab exists
+  const handleSetSplitMode = useCallback(
+    (mode: 'single' | 'horizontal' | 'vertical') => {
+      setSplitMode(mode);
+      try {
+        localStorage.setItem('antigravity_terminal_split_mode', mode);
+      } catch {}
+
+      if (mode !== 'single') {
+        setTabs((currentTabs) => {
+          let secId = secondaryTabId;
+          if (!secId || secId === activeTabId || !currentTabs.some((t) => t.id === secId)) {
+            const candidate = currentTabs.find((t) => t.id !== activeTabId);
+            if (candidate) {
+              setSecondaryTabId(candidate.id);
+            } else {
+              const newId = makeTabId();
+              const newSessionId = makeSessionId(wsPrefix);
+              const nextNum = currentTabs.length + 1;
+              const newTab: TabData = {
+                id: newId,
+                sessionId: newSessionId,
+                title: `Terminal ${nextNum}`,
+                shell: defaultShell || 'default',
+                connected: false,
+                error: null,
+              };
+              setSecondaryTabId(newId);
+              return [...currentTabs, newTab];
+            }
+          }
+          return currentTabs;
+        });
+      }
+
+      requestAnimationFrame(() => {
+        instancesRef.current.forEach((entry) => {
+          try {
+            if (entry.container && entry.container.clientWidth > 0 && entry.container.clientHeight > 0) {
+              entry.fitAddon.fit();
+              const cols = entry.term.cols;
+              const rows = entry.term.rows;
+              if (cols > 0 && rows > 0) {
+                entry.lastCols = cols;
+                entry.lastRows = rows;
+                if (entry.ws && entry.ws.readyState === WebSocket.OPEN) {
+                  entry.ws.send(JSON.stringify({ action: 'resize', cols, rows }));
+                }
+              }
+            }
+          } catch {}
+        });
+      });
+    },
+    [activeTabId, defaultShell, secondaryTabId, wsPrefix]
+  );
+
+  // Drag divider between split panes
+  const handleDividerPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      setIsDraggingSplit(true);
+
+      const onPointerMove = (moveEv: PointerEvent) => {
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+
+        let ratio: number;
+        if (splitMode === 'horizontal') {
+          const offset = moveEv.clientX - rect.left;
+          ratio = (offset / rect.width) * 100;
+        } else {
+          const offset = moveEv.clientY - rect.top;
+          ratio = (offset / rect.height) * 100;
+        }
+
+        const clamped = Math.max(20, Math.min(80, ratio));
+        setSplitRatio(clamped);
+
+        requestAnimationFrame(() => {
+          instancesRef.current.forEach((entry) => {
+            try {
+              if (entry.container && entry.container.clientWidth > 0 && entry.container.clientHeight > 0) {
+                entry.fitAddon.fit();
+                const cols = entry.term.cols;
+                const rows = entry.term.rows;
+                if (cols > 0 && rows > 0 && (cols !== entry.lastCols || rows !== entry.lastRows)) {
+                  entry.lastCols = cols;
+                  entry.lastRows = rows;
+                  if (entry.ws && entry.ws.readyState === WebSocket.OPEN) {
+                    entry.ws.send(JSON.stringify({ action: 'resize', cols, rows }));
+                  }
+                }
+              }
+            } catch {}
+          });
+        });
+      };
+
+      const onPointerUp = () => {
+        setIsDraggingSplit(false);
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+      };
+
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+    },
+    [splitMode]
+  );
 
   // Close a tab
   const handleCloseTab = useCallback(async (e: React.MouseEvent, tabId: string) => {
@@ -544,7 +689,6 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
     const nextTabs = tabs.filter((t) => t.id !== tabId);
 
     if (nextTabs.length === 0) {
-      // Re-create a clean single tab
       const freshId = makeTabId();
       const freshSessionId = makeSessionId(wsPrefix);
       setTabs([
@@ -558,23 +702,40 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
         },
       ]);
       setActiveTabId(freshId);
+      setSecondaryTabId(null);
+      setSplitMode('single');
     } else {
       setTabs(nextTabs);
       if (activeTabId === tabId) {
-        setActiveTabId(nextTabs[nextTabs.length - 1].id);
+        const remainingForPrimary = nextTabs.find((t) => t.id !== secondaryTabId) || nextTabs[0];
+        setActiveTabId(remainingForPrimary.id);
+      }
+      if (secondaryTabId === tabId) {
+        const remainingForSecondary = nextTabs.find((t) => t.id !== activeTabId);
+        if (remainingForSecondary) {
+          setSecondaryTabId(remainingForSecondary.id);
+        } else {
+          setSecondaryTabId(null);
+          setSplitMode('single');
+        }
       }
     }
-  }, [activeTabId, defaultShell, t, tabs, wsPrefix]);
+  }, [activeTabId, defaultShell, secondaryTabId, t, tabs, wsPrefix]);
 
-  // Clear current tab
+  const currentFocusedTabId =
+    splitMode !== 'single' && focusedPane === 'secondary' && secondaryTabId
+      ? secondaryTabId
+      : activeTabId;
+
+  // Clear focused tab
   const handleClear = () => {
-    const entry = instancesRef.current.get(activeTabId);
+    const entry = instancesRef.current.get(currentFocusedTabId);
     if (entry) {
       entry.term.clear();
     }
   };
 
-  // Restart shell in current tab
+  // Restart shell in focused tab
   const handleRestartSession = async () => {
     const ok = await showConfirm(
       t('terminal_reset_confirm', 'Voulez-vous réinitialiser ce terminal ? Les processus en cours seront fermés.'),
@@ -582,8 +743,8 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
     );
     if (!ok) return;
 
-    const entry = instancesRef.current.get(activeTabId);
-    const tab = tabs.find((t) => t.id === activeTabId);
+    const entry = instancesRef.current.get(currentFocusedTabId);
+    const tab = tabs.find((t) => t.id === currentFocusedTabId);
     if (!tab) return;
 
     if (entry?.ws && entry.ws.readyState === WebSocket.OPEN) {
@@ -595,6 +756,29 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
   };
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  const secondaryTab = tabs.find((t) => t.id === secondaryTabId);
+  const focusedTab = tabs.find((t) => t.id === currentFocusedTabId);
+
+  const handleTabClick = (tabId: string) => {
+    if (splitMode === 'single') {
+      setActiveTabId(tabId);
+      setFocusedPane('primary');
+    } else {
+      if (focusedPane === 'primary') {
+        if (tabId === secondaryTabId) {
+          setFocusedPane('secondary');
+        } else {
+          setActiveTabId(tabId);
+        }
+      } else {
+        if (tabId === activeTabId) {
+          setFocusedPane('primary');
+        } else {
+          setSecondaryTabId(tabId);
+        }
+      }
+    }
+  };
 
   return (
     <div
@@ -615,23 +799,46 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
         {/* Tabs Bar */}
         <div className="flex items-center gap-1 overflow-x-auto py-1 scrollbar-none">
           {tabs.map((tab) => {
-            const isActive = tab.id === activeTabId;
+            const isPrimary = tab.id === activeTabId;
+            const isSecondary = splitMode !== 'single' && tab.id === secondaryTabId;
+            const isFocused =
+              (focusedPane === 'primary' && isPrimary) ||
+              (focusedPane === 'secondary' && isSecondary);
+
             return (
               <div
                 key={tab.id}
-                onClick={() => setActiveTabId(tab.id)}
+                onClick={() => handleTabClick(tab.id)}
                 className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-t-md font-mono text-[11px] cursor-pointer transition-all border-b-2 ${
-                  isActive
+                  isFocused
                     ? 'border-[var(--accent)] font-semibold shadow-sm'
-                    : 'border-transparent opacity-70 hover:opacity-100'
+                    : isPrimary || isSecondary
+                    ? 'border-slate-500/40 opacity-90'
+                    : 'border-transparent opacity-60 hover:opacity-100'
                 }`}
                 style={{
-                  backgroundColor: isActive ? 'var(--surface-subtle)' : 'transparent',
-                  color: isActive ? 'var(--strong)' : 'var(--muted)',
+                  backgroundColor: isFocused || isPrimary || isSecondary ? 'var(--surface-subtle)' : 'transparent',
+                  color: isFocused ? 'var(--strong)' : 'var(--muted)',
                 }}
               >
-                <TerminalIcon className={`w-3.5 h-3.5 ${isActive ? 'text-[var(--accent)]' : 'text-slate-400'}`} />
-                <span className="truncate max-w-[130px]">{tab.title}</span>
+                <TerminalIcon className={`w-3.5 h-3.5 ${isFocused ? 'text-[var(--accent)]' : 'text-slate-400'}`} />
+                <span className="truncate max-w-[120px]">{tab.title}</span>
+                {splitMode !== 'single' && isPrimary && (
+                  <span
+                    className="px-1 py-0.2 rounded text-[9px] font-bold bg-[var(--accent)]/20 text-[var(--accent)]"
+                    title={t('terminal_pane_1', 'Volet 1')}
+                  >
+                    1
+                  </span>
+                )}
+                {splitMode !== 'single' && isSecondary && (
+                  <span
+                    className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400"
+                    title={t('terminal_pane_2', 'Volet 2')}
+                  >
+                    2
+                  </span>
+                )}
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
                     tab.connected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'
@@ -717,8 +924,54 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
         </div>
 
         {/* Right Toolbar Controls */}
-        <div className="flex items-center gap-1 py-1">
-          {activeTab && (
+        <div className="flex items-center gap-1.5 py-1">
+          {/* Split View Layout Selector */}
+          <div
+            className="flex items-center gap-0.5 p-0.5 rounded-lg border shadow-2xs"
+            style={{
+              borderColor: 'var(--border-subtle)',
+              backgroundColor: 'var(--surface-subtle)',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => handleSetSplitMode('single')}
+              className={`p-1 rounded-md transition-all cursor-pointer ${
+                splitMode === 'single'
+                  ? 'bg-[var(--accent)] text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+              title={t('terminal_split_single', 'Vue unique (1 volet)')}
+            >
+              <Square className="w-3 h-3" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetSplitMode('horizontal')}
+              className={`p-1 rounded-md transition-all cursor-pointer ${
+                splitMode === 'horizontal'
+                  ? 'bg-[var(--accent)] text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+              title={t('terminal_split_horizontal', 'Scinder verticalement (colonnes côte à côte)')}
+            >
+              <Columns className="w-3 h-3" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetSplitMode('vertical')}
+              className={`p-1 rounded-md transition-all cursor-pointer ${
+                splitMode === 'vertical'
+                  ? 'bg-[var(--accent)] text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+              title={t('terminal_split_vertical', 'Scinder horizontalement (lignes empilées)')}
+            >
+              <SplitSquareVertical className="w-3 h-3" />
+            </button>
+          </div>
+
+          {focusedTab && (
             <span
               className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono border"
               style={{
@@ -727,7 +980,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
                 color: 'var(--muted)',
               }}
             >
-              <span>{activeTab.shell.toUpperCase()}</span>
+              <span>{focusedTab.shell.toUpperCase()}</span>
             </span>
           )}
 
@@ -763,36 +1016,163 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
         </div>
       </div>
 
-      {/* Error Banner */}
-      {activeTab?.error && (
+      {/* Error Banners */}
+      {(activeTab?.error || (splitMode !== 'single' && secondaryTab?.error)) && (
         <div className="p-2 bg-rose-500/10 border-b border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 shrink-0">
           <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
-          <span>{activeTab.error}</span>
+          <span>{activeTab?.error || secondaryTab?.error}</span>
         </div>
       )}
 
-      {/* Multi-Tab Terminals Container */}
+      {/* Multi-Pane Terminals Container */}
       <div
-        className="flex-1 relative overflow-hidden p-2"
+        ref={containerRef}
+        className={`flex-1 min-h-0 relative overflow-hidden p-1.5 select-text ${
+          splitMode === 'horizontal' ? 'flex flex-row gap-0' : splitMode === 'vertical' ? 'flex flex-col gap-0' : ''
+        }`}
         style={{
           backgroundColor: 'var(--bg)',
         }}
       >
-        {tabs.map((tab) => {
-          const isActive = tab.id === activeTabId;
-          return (
+        {/* Pane 1 (Primary) */}
+        <div
+          onClick={() => setFocusedPane('primary')}
+          className={`relative overflow-hidden rounded-lg transition-all ${
+            splitMode === 'single' ? 'h-full w-full' : ''
+          } ${
+            splitMode !== 'single'
+              ? focusedPane === 'primary'
+                ? 'ring-1 ring-[var(--accent)] shadow-sm'
+                : 'opacity-90 hover:opacity-100 ring-1 ring-white/10 dark:ring-white/5'
+              : ''
+          }`}
+          style={
+            splitMode === 'horizontal'
+              ? { width: `${splitRatio}%`, height: '100%' }
+              : splitMode === 'vertical'
+              ? { height: `${splitRatio}%`, width: '100%' }
+              : undefined
+          }
+        >
+          {splitMode !== 'single' && (
             <div
-              key={tab.id}
-              style={{ display: isActive ? 'block' : 'none' }}
-              className="h-full w-full relative"
+              className="absolute top-1.5 right-2 z-10 px-2 py-0.5 rounded text-[10px] font-mono select-none flex items-center gap-1.5 backdrop-blur-md shadow-xs pointer-events-none"
+              style={{
+                backgroundColor: 'var(--surface)',
+                color: focusedPane === 'primary' ? 'var(--accent)' : 'var(--muted)',
+                border: '1px solid var(--border)',
+              }}
             >
-              <div
-                ref={(node) => bindTerminalContainer(tab.id, node)}
-                className="h-full w-full"
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: focusedPane === 'primary' ? 'var(--accent)' : 'var(--muted)' }}
               />
+              <span className="font-semibold">{t('terminal_pane_1', 'Volet 1')}</span>
+              <span className="opacity-60 text-[9px]">({activeTab?.shell.toUpperCase() || 'DEFAULT'})</span>
             </div>
-          );
-        })}
+          )}
+          {tabs.map((tab) => {
+            const isVisible = tab.id === activeTabId;
+            return (
+              <div
+                key={`primary_${tab.id}`}
+                style={{
+                  display: isVisible ? 'block' : 'none',
+                  pointerEvents: isDraggingSplit ? 'none' : 'auto',
+                }}
+                className="h-full w-full relative"
+              >
+                <div
+                  ref={(node) => {
+                    if (isVisible) {
+                      bindTerminalContainer(tab.id, node);
+                    }
+                  }}
+                  className="h-full w-full"
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Draggable Divider */}
+        {splitMode !== 'single' && (
+          <div
+            onPointerDown={handleDividerPointerDown}
+            className={`shrink-0 z-20 flex items-center justify-center transition-colors select-none ${
+              splitMode === 'horizontal'
+                ? 'w-2 cursor-col-resize hover:bg-[var(--accent)]/30 active:bg-[var(--accent)]/50'
+                : 'h-2 cursor-row-resize hover:bg-[var(--accent)]/30 active:bg-[var(--accent)]/50'
+            }`}
+            style={{
+              backgroundColor: isDraggingSplit ? 'var(--accent)' : 'transparent',
+            }}
+            title={t('terminal_drag_split', 'Glisser pour redimensionner')}
+          >
+            <div
+              className={`rounded-full transition-colors ${
+                isDraggingSplit ? 'bg-white' : 'bg-slate-500/40 hover:bg-[var(--accent)]'
+              } ${
+                splitMode === 'horizontal' ? 'w-1 h-7' : 'h-1 w-7'
+              }`}
+            />
+          </div>
+        )}
+
+        {/* Pane 2 (Secondary) */}
+        {splitMode !== 'single' && (
+          <div
+            onClick={() => setFocusedPane('secondary')}
+            className={`relative overflow-hidden rounded-lg transition-all ${
+              focusedPane === 'secondary'
+                ? 'ring-1 ring-[var(--accent)] shadow-sm'
+                : 'opacity-90 hover:opacity-100 ring-1 ring-white/10 dark:ring-white/5'
+            }`}
+            style={
+              splitMode === 'horizontal'
+                ? { width: `${100 - splitRatio}%`, height: '100%' }
+                : { height: `${100 - splitRatio}%`, width: '100%' }
+            }
+          >
+            <div
+              className="absolute top-1.5 right-2 z-10 px-2 py-0.5 rounded text-[10px] font-mono select-none flex items-center gap-1.5 backdrop-blur-md shadow-xs pointer-events-none"
+              style={{
+                backgroundColor: 'var(--surface)',
+                color: focusedPane === 'secondary' ? 'var(--accent)' : 'var(--muted)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: focusedPane === 'secondary' ? 'var(--accent)' : 'var(--muted)' }}
+              />
+              <span className="font-semibold">{t('terminal_pane_2', 'Volet 2')}</span>
+              <span className="opacity-60 text-[9px]">({secondaryTab?.shell.toUpperCase() || 'DEFAULT'})</span>
+            </div>
+            {tabs.map((tab) => {
+              const isVisible = tab.id === secondaryTabId;
+              return (
+                <div
+                  key={`secondary_${tab.id}`}
+                  style={{
+                    display: isVisible ? 'block' : 'none',
+                    pointerEvents: isDraggingSplit ? 'none' : 'auto',
+                  }}
+                  className="h-full w-full relative"
+                >
+                  <div
+                    ref={(node) => {
+                      if (isVisible) {
+                        bindTerminalContainer(tab.id, node);
+                      }
+                    }}
+                    className="h-full w-full"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
