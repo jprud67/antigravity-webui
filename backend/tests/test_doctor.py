@@ -1,7 +1,9 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
+
 from app.main import app
-from app.services.doctor import run_system_diagnostics, run_auto_repair
+from app.services.doctor import run_auto_repair, run_system_diagnostics
+
 
 @pytest.mark.asyncio
 async def test_doctor_diagnostics_service():

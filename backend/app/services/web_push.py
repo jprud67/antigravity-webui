@@ -158,11 +158,10 @@ def send_web_push_notification(
         try:
             # If pywebpush is installed, use native VAPID encryption
             try:
-                from pywebpush import (
-                    webpush,  # type: ignore[import-not-found,import-untyped]
-                )
+                import pywebpush  # type: ignore[import-not-found,import-untyped]
+
                 keys = get_or_create_vapid_keys()
-                webpush(
+                pywebpush.webpush(
                     subscription_info={
                         "endpoint": endpoint,
                         "keys": {

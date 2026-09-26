@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.config import GEMINI_DIR
 from app.platform_utils import is_blocked_sensitive_path
@@ -36,9 +36,9 @@ MAX_CANVAS_DOCUMENT_BYTES = 10 * 1024 * 1024  # 10 MB limit
 
 class CanvasDocumentAsset(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    logical_path: str = Field(..., alias="logicalPath")
-    source_path: str = Field(..., alias="sourcePath")
-    content_type: str | None = Field(None, alias="contentType")
+    logical_path: str = Field(..., validation_alias=AliasChoices("logicalPath", "logical_path"), serialization_alias="logicalPath")
+    source_path: str = Field(..., validation_alias=AliasChoices("sourcePath", "source_path"), serialization_alias="sourcePath")
+    content_type: str | None = Field(default=None, validation_alias=AliasChoices("contentType", "content_type"), serialization_alias="contentType")
 
 
 class CanvasDocumentEntrypoint(BaseModel):
@@ -51,13 +51,13 @@ class CanvasDocumentCreateInput(BaseModel):
     id: str | None = None
     kind: CanvasDocumentKind = "html_bundle"
     title: str | None = None
-    preferred_height: int | None = Field(None, alias="preferredHeight")
+    preferred_height: int | None = Field(default=None, validation_alias=AliasChoices("preferredHeight", "preferred_height"), serialization_alias="preferredHeight")
     entrypoint: CanvasDocumentEntrypoint
     assets: list[CanvasDocumentAsset] | None = None
     surface: CanvasSurface | None = "assistant_message"
-    retention_scope: str | None = Field(None, alias="retentionScope")
-    csp_sandbox: Literal["scripts"] | None = Field("scripts", alias="cspSandbox")
-    wrap_with_theme: bool = Field(True, alias="wrapWithTheme")
+    retention_scope: str | None = Field(default=None, validation_alias=AliasChoices("retentionScope", "retention_scope"), serialization_alias="retentionScope")
+    csp_sandbox: Literal["scripts"] | None = Field(default="scripts", validation_alias=AliasChoices("cspSandbox", "csp_sandbox"), serialization_alias="cspSandbox")
+    wrap_with_theme: bool = Field(default=True, validation_alias=AliasChoices("wrapWithTheme", "wrap_with_theme"), serialization_alias="wrapWithTheme")
 
 
 class CanvasDocumentManifest(BaseModel):
@@ -65,14 +65,14 @@ class CanvasDocumentManifest(BaseModel):
     id: str
     kind: CanvasDocumentKind
     title: str | None = None
-    preferred_height: int | None = Field(None, alias="preferredHeight")
-    created_at: str = Field(..., alias="createdAt")
-    entry_url: str = Field(..., alias="entryUrl")
-    local_entrypoint: str | None = Field(None, alias="localEntrypoint")
-    external_url: str | None = Field(None, alias="externalUrl")
+    preferred_height: int | None = Field(default=None, validation_alias=AliasChoices("preferredHeight", "preferred_height"), serialization_alias="preferredHeight")
+    created_at: str = Field(..., validation_alias=AliasChoices("createdAt", "created_at"), serialization_alias="createdAt")
+    entry_url: str = Field(..., validation_alias=AliasChoices("entryUrl", "entry_url"), serialization_alias="entryUrl")
+    local_entrypoint: str | None = Field(default=None, validation_alias=AliasChoices("localEntrypoint", "local_entrypoint"), serialization_alias="localEntrypoint")
+    external_url: str | None = Field(default=None, validation_alias=AliasChoices("externalUrl", "external_url"), serialization_alias="externalUrl")
     surface: CanvasSurface | None = "assistant_message"
-    retention_scope: str | None = Field(None, alias="retentionScope")
-    csp_sandbox: Literal["scripts"] | None = Field("scripts", alias="cspSandbox")
+    retention_scope: str | None = Field(default=None, validation_alias=AliasChoices("retentionScope", "retention_scope"), serialization_alias="retentionScope")
+    csp_sandbox: Literal["scripts"] | None = Field(default="scripts", validation_alias=AliasChoices("cspSandbox", "csp_sandbox"), serialization_alias="cspSandbox")
     assets: list[dict[str, str]] = Field(default_factory=list)
 
 

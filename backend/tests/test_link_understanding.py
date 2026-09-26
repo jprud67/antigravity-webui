@@ -1,13 +1,16 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 from httpx import ASGITransport, AsyncClient
-from unittest.mock import patch, MagicMock
+
 from app.main import app
 from app.services.link_understanding import (
-    is_safe_public_url,
-    extract_bare_urls,
     _clean_html_to_text,
-    enrich_user_prompt_with_links
+    enrich_user_prompt_with_links,
+    extract_bare_urls,
+    is_safe_public_url,
 )
+
 
 def test_is_safe_public_url_ssrf():
     # Dangerous / local URLs must be rejected

@@ -1,12 +1,14 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
+
 from app.main import app
 from app.services.progress_card import (
-    save_progress_card,
-    get_progress_card,
     delete_progress_card,
-    normalize_progress_card_input
+    get_progress_card,
+    normalize_progress_card_input,
+    save_progress_card,
 )
+
 
 def test_progress_card_normalization():
     raw = {

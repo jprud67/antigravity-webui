@@ -346,11 +346,40 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
   // Handle Code Execution
   const handleExecute = useCallback(() => {
     const activeCode = mode === 'diff' ? modifiedContent : content;
-    if (onExecuteCode && (language === 'python' || language === 'shell' || language === 'javascript')) {
+    const lang = language.toLowerCase();
+    const isSupported = ['python', 'py', 'shell', 'bash', 'sh', 'zsh', 'javascript', 'js', 'node'].includes(lang);
+
+    if (!isSupported) {
+      showToast(t('editor_execute_unsupported', 'Exécution disponible pour Python, Shell et JavaScript.'), 'warning');
+      return;
+    }
+
+    if (onExecuteCode) {
       onExecuteCode(activeCode, language);
       showToast(t('editor_executing', 'Exécution du code en arrière-plan...'), 'info');
-    } else {
-      showToast(t('editor_execute_unsupported', 'Exécution disponible pour Python, Shell et JavaScript.'), 'warning');
+      return;
+    }
+
+    const trimmed = activeCode.trim();
+    if (!trimmed) {
+      showToast(t('editor_execute_empty', 'Aucun code à exécuter'), 'warning');
+      return;
+    }
+
+    let command: string | null = null;
+    if (['shell', 'bash', 'sh', 'zsh'].includes(lang)) {
+      command = trimmed;
+    } else if (['python', 'py'].includes(lang)) {
+      const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+      command = `python -c "${escaped}"`;
+    } else if (['javascript', 'js', 'node'].includes(lang)) {
+      const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+      command = `node -e "${escaped}"`;
+    }
+
+    if (command) {
+      window.dispatchEvent(new CustomEvent('terminal-run-command', { detail: { command } }));
+      showToast(t('code_sent_to_terminal', 'Code envoyé au terminal'), 'success');
     }
   }, [mode, modifiedContent, content, onExecuteCode, language, t]);
 
@@ -494,7 +523,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 bg-zinc-950/40 border-b border-zinc-800/80 text-xs">
         <div className="flex items-center gap-1.5">
           {/* Play Button for executable scripts */}
-          {(language === 'python' || language === 'shell' || language === 'javascript') && (
+          {['python', 'py', 'shell', 'bash', 'sh', 'zsh', 'javascript', 'js', 'node'].includes(language.toLowerCase()) && (
             <button
               type="button"
               onClick={handleExecute}

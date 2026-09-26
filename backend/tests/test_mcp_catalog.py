@@ -1,11 +1,10 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
+
 from app.main import app
-from app.services.mcp_catalog import (
-    list_mcp_catalog,
-    get_mcp_catalog_item,
-    test_mcp_connection as ping_mcp_server
-)
+from app.services.mcp_catalog import get_mcp_catalog_item, list_mcp_catalog
+from app.services.mcp_catalog import test_mcp_connection as ping_mcp_server
+
 
 @pytest.mark.asyncio
 async def test_mcp_catalog_listing():

@@ -1,10 +1,16 @@
 import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
+
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.skill_curator import SkillCurator, STATE_ACTIVE, STATE_STALE, STATE_ARCHIVED
+from app.services.skill_curator import (
+    STATE_ACTIVE,
+    STATE_ARCHIVED,
+    STATE_STALE,
+    SkillCurator,
+)
 
 client = TestClient(app)
 

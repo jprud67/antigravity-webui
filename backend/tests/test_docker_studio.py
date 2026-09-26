@@ -1,6 +1,7 @@
 """Unit tests for Docker & Container Studio service and API."""
 
 from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from app.main import app

@@ -1,16 +1,21 @@
-import pytest
-from unittest.mock import patch
 import urllib.error
+from unittest.mock import patch
 
-from app.services.fts_search import fts_service, reindex_all_conversations
-from app.services.doctor import _check_sqlite_integrity, run_auto_repair
-from app.services.canvas_documents import create_canvas_document, CanvasDocumentCreateInput, CanvasDocumentEntrypoint
+import pytest
+
+from app.services.canvas_documents import (
+    CanvasDocumentCreateInput,
+    CanvasDocumentEntrypoint,
+    create_canvas_document,
+)
 from app.services.code_kernel import KernelToolProxy
 from app.services.docker_studio import execute_compose_action
+from app.services.doctor import _check_sqlite_integrity, run_auto_repair
+from app.services.fts_search import fts_service, reindex_all_conversations
 from app.services.git_worktree import create_subagent_worktree
 from app.services.tailscale import toggle_tailscale_serve
+from app.services.vector_memory import AutoRecallConfig, compute_embedding
 from app.services.web_push import send_web_push_notification
-from app.services.vector_memory import compute_embedding, AutoRecallConfig
 
 
 def test_fts_reindex_alias():

@@ -1,15 +1,16 @@
 import uuid
+
 from app.services.messaging_gateway import (
     ALPHABET,
-    generate_pairing_code,
-    request_pairing,
     approve_pairing_code,
+    generate_pairing_code,
+    get_gateway_configs,
     is_user_approved,
-    list_pending_pairings,
     list_approved_devices,
+    list_pending_pairings,
+    request_pairing,
     revoke_device,
     save_gateway_config,
-    get_gateway_configs,
 )
 
 

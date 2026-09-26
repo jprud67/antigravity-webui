@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml  # type: ignore[import-untyped]
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.platform_utils import is_blocked_sensitive_path
 
@@ -30,9 +30,9 @@ ContainerState = Literal["running", "exited", "paused", "restarting", "dead", "u
 
 class ContainerPort(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    host_ip: str | None = Field(None, alias="hostIp")
-    host_port: str | None = Field(None, alias="hostPort")
-    container_port: str | None = Field(None, alias="containerPort")
+    host_ip: str | None = Field(default=None, validation_alias=AliasChoices("hostIp", "host_ip"), serialization_alias="hostIp")
+    host_port: str | None = Field(default=None, validation_alias=AliasChoices("hostPort", "host_port"), serialization_alias="hostPort")
+    container_port: str | None = Field(default=None, validation_alias=AliasChoices("containerPort", "container_port"), serialization_alias="containerPort")
     protocol: str = "tcp"
 
 
@@ -43,7 +43,7 @@ class ContainerSummary(BaseModel):
     image: str
     state: ContainerState
     status: str
-    created_at: str = Field(..., alias="createdAt")
+    created_at: str = Field(..., validation_alias=AliasChoices("createdAt", "created_at"), serialization_alias="createdAt")
     ports: list[str] = Field(default_factory=list)
     command: str | None = None
 
@@ -68,13 +68,13 @@ class WorkspaceDockerItem(BaseModel):
 
 class DockerEngineStatus(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    is_available: bool = Field(..., alias="isAvailable")
+    is_available: bool = Field(..., validation_alias=AliasChoices("isAvailable", "is_available"), serialization_alias="isAvailable")
     engine: ContainerEngineType
-    binary_path: str | None = Field(None, alias="binaryPath")
+    binary_path: str | None = Field(default=None, validation_alias=AliasChoices("binaryPath", "binary_path"), serialization_alias="binaryPath")
     version: str | None = None
-    containers_count: int = Field(0, alias="containersCount")
-    running_count: int = Field(0, alias="runningCount")
-    server_info: dict[str, Any] = Field(default_factory=dict, alias="serverInfo")
+    containers_count: int = Field(default=0, validation_alias=AliasChoices("containersCount", "containers_count"), serialization_alias="containersCount")
+    running_count: int = Field(default=0, validation_alias=AliasChoices("runningCount", "running_count"), serialization_alias="runningCount")
+    server_info: dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("serverInfo", "server_info"), serialization_alias="serverInfo")
     error: str | None = None
 
 
@@ -88,7 +88,7 @@ class ContainerExecRequest(BaseModel):
 
 
 class ComposeActionRequest(BaseModel):
-    compose_path: str = Field(..., alias="composePath")
+    compose_path: str = Field(..., validation_alias=AliasChoices("composePath", "compose_path"), serialization_alias="composePath")
     action: Literal["up", "down", "restart", "ps", "build"]
 
 

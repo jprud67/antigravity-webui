@@ -3,12 +3,14 @@
 import os
 import subprocess
 from pathlib import Path
+
 import pytest
+
 from app.services.git_worktree import (
-    resolve_repo_root,
     create_subagent_worktree,
     finalize_subagent_worktree,
     list_subagent_worktrees,
+    resolve_repo_root,
 )
 
 

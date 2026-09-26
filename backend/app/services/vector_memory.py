@@ -19,7 +19,7 @@ import uuid
 from typing import Any, Literal
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.config import CONVERSATION_DB, SETTINGS_FILE
 
@@ -51,9 +51,9 @@ class MemoryEntry(BaseModel):
     id: str
     text: str
     category: MemoryCategory = "general"
-    importance: float = Field(0.5, ge=0.0, le=1.0)
-    agent_id: str = Field("default", alias="agentId")
-    created_at: float = Field(default_factory=time.time, alias="createdAt")
+    importance: float = Field(default=0.5, ge=0.0, le=1.0)
+    agent_id: str = Field(default="default", validation_alias=AliasChoices("agentId", "agent_id"), serialization_alias="agentId")
+    created_at: float = Field(default_factory=time.time, validation_alias=AliasChoices("createdAt", "created_at"), serialization_alias="createdAt")
     metadata: dict[str, Any] = Field(default_factory=dict)
     vector: list[float] | None = None
 
@@ -62,18 +62,18 @@ class MemoryStoreInput(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     text: str
     category: MemoryCategory = "general"
-    importance: float = Field(0.5, ge=0.0, le=1.0)
-    agent_id: str = Field("default", alias="agentId")
+    importance: float = Field(default=0.5, ge=0.0, le=1.0)
+    agent_id: str = Field(default="default", validation_alias=AliasChoices("agentId", "agent_id"), serialization_alias="agentId")
     metadata: dict[str, Any] | None = None
 
 
 class MemorySearchInput(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     query: str
-    agent_id: str = Field("default", alias="agentId")
+    agent_id: str = Field(default="default", validation_alias=AliasChoices("agentId", "agent_id"), serialization_alias="agentId")
     category: MemoryCategory | None = None
-    limit: int = Field(5, ge=1, le=50)
-    min_similarity: float = Field(0.5, ge=0.0, le=1.0, alias="minSimilarity")
+    limit: int = Field(default=5, ge=1, le=50)
+    min_similarity: float = Field(default=0.5, ge=0.0, le=1.0, validation_alias=AliasChoices("minSimilarity", "min_similarity"), serialization_alias="minSimilarity")
 
 
 class MemorySearchResult(BaseModel):
@@ -87,18 +87,18 @@ class AutoRecallConfig(BaseModel):
     enabled: bool = True
     provider: EmbeddingProvider = "local"
     model: str = "text-embedding-3-small"
-    api_key: str | None = Field(default=None, alias="apiKey")
-    api_base: str | None = Field(default=None, alias="apiBase")
-    max_results: int = Field(default=3, ge=1, le=10, alias="maxResults")
-    min_similarity: float = Field(default=0.60, ge=0.0, le=1.0, alias="minSimilarity")
-    max_chars: int = Field(default=2000, ge=200, le=10000, alias="maxChars")
+    api_key: str | None = Field(default=None, validation_alias=AliasChoices("apiKey", "api_key"), serialization_alias="apiKey")
+    api_base: str | None = Field(default=None, validation_alias=AliasChoices("apiBase", "api_base"), serialization_alias="apiBase")
+    max_results: int = Field(default=3, ge=1, le=10, validation_alias=AliasChoices("maxResults", "max_results"), serialization_alias="maxResults")
+    min_similarity: float = Field(default=0.60, ge=0.0, le=1.0, validation_alias=AliasChoices("minSimilarity", "min_similarity"), serialization_alias="minSimilarity")
+    max_chars: int = Field(default=2000, ge=200, le=10000, validation_alias=AliasChoices("maxChars", "max_chars"), serialization_alias="maxChars")
 
 
 class RecallHookResult(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    should_inject: bool = Field(..., alias="shouldInject")
-    recalled_count: int = Field(0, alias="recalledCount")
-    context_block: str = Field("", alias="contextBlock")
+    should_inject: bool = Field(..., validation_alias=AliasChoices("shouldInject", "should_inject"), serialization_alias="shouldInject")
+    recalled_count: int = Field(default=0, validation_alias=AliasChoices("recalledCount", "recalled_count"), serialization_alias="recalledCount")
+    context_block: str = Field(default="", validation_alias=AliasChoices("contextBlock", "context_block"), serialization_alias="contextBlock")
     memories: list[MemorySearchResult] = Field(default_factory=list)
 
 

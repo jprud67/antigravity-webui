@@ -19,6 +19,7 @@ export const VoiceWaveformVisualizer: React.FC<VoiceWaveformVisualizerProps> = (
   useEffect(() => {
     if (!isActive) return;
 
+    let isCancelled = false;
     let audioCtx: AudioContext | null = null;
     let analyser: AnalyserNode | null = null;
     let stream: MediaStream | null = null;
@@ -28,30 +29,44 @@ export const VoiceWaveformVisualizer: React.FC<VoiceWaveformVisualizerProps> = (
     const setupAudio = async () => {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          setHasMicAccess(false);
+          if (!isCancelled) setHasMicAccess(false);
           return;
         }
 
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        const userStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        if (isCancelled) {
+          userStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        stream = userStream;
+
         const AudioContextClass =
           window.AudioContext ||
           (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
 
         if (!AudioContextClass) {
-          setHasMicAccess(false);
+          if (!isCancelled) setHasMicAccess(false);
           return;
         }
 
         audioCtx = new AudioContextClass();
+        if (isCancelled) {
+          userStream.getTracks().forEach((track) => track.stop());
+          try {
+            audioCtx.close();
+          } catch {}
+          return;
+        }
+
         const source = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 64;
         analyser.smoothingTimeConstant = 0.75;
         source.connect(analyser);
-        setHasMicAccess(true);
+        if (!isCancelled) setHasMicAccess(true);
       } catch (err) {
         console.warn('Microphone stream access unavailable for visualizer:', err);
-        setHasMicAccess(false);
+        if (!isCancelled) setHasMicAccess(false);
       }
     };
 
@@ -131,6 +146,7 @@ export const VoiceWaveformVisualizer: React.FC<VoiceWaveformVisualizerProps> = (
     animationFrameId = requestAnimationFrame(render);
 
     return () => {
+      isCancelled = true;
       if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId);
       }

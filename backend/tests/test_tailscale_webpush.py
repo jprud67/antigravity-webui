@@ -1,14 +1,15 @@
 """Unit tests for Tailscale and Web Push services."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from app.services.tailscale import (
     get_tailscale_status,
 )
 from app.services.web_push import (
     get_or_create_vapid_keys,
-    save_subscription,
-    remove_subscription,
     list_subscriptions,
+    remove_subscription,
+    save_subscription,
     send_web_push_notification,
 )
 

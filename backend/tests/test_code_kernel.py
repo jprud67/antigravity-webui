@@ -1,7 +1,9 @@
 """Unit tests for Persistent Python Kernel and Tool RPC service."""
 
 from pathlib import Path
+
 import pytest
+
 from app.services.code_kernel import (
     PersistentPythonKernel,
     get_or_create_kernel,
@@ -58,3 +60,45 @@ def test_kernel_reset(clean_kernel: PersistentPythonKernel):
     res = clean_kernel.execute("print(x)")
     assert res["status"] == "error"
     assert "NameError" in res["traceback"]
+
+
+def test_kernel_api_authentication(auth_headers):
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app)
+
+    # 1. Unauthenticated request should be rejected with 401
+    res_unauth = client.get("/api/kernel/status")
+    assert res_unauth.status_code == 401
+
+    res_exec_unauth = client.post("/api/kernel/execute", json={"code": "print(1)"})
+    assert res_exec_unauth.status_code == 401
+
+    # 2. Authenticated requests succeed
+    res_auth = client.get("/api/kernel/status", headers=auth_headers)
+    assert res_auth.status_code == 200
+    assert "active_kernels" in res_auth.json()
+
+    res_exec = client.post(
+        "/api/kernel/execute",
+        json={"session_id": "test-api-session", "code": "val = 123 * 2\nprint(val)"},
+        headers=auth_headers,
+    )
+    assert res_exec.status_code == 200
+    exec_data = res_exec.json()
+    assert exec_data["status"] == "ok"
+    assert "246" in exec_data["stdout"]
+
+    res_reset = client.post(
+        "/api/kernel/reset",
+        json={"session_id": "test-api-session"},
+        headers=auth_headers,
+    )
+    assert res_reset.status_code == 200
+    assert res_reset.json()["success"] is True
+
+    res_stop = client.delete("/api/kernel/test-api-session", headers=auth_headers)
+    assert res_stop.status_code == 200
+    assert res_stop.json()["success"] is True

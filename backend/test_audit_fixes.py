@@ -8962,6 +8962,7 @@ def test_git_run_git_non_interactive_editor():
     """Vérifie que run_git passe core.editor=true et configure GIT_EDITOR pour prévenir les blocages interactifs."""
     import subprocess
     from unittest.mock import patch
+
     import app.api.git as git_mod
 
     captured_args = []
@@ -8986,7 +8987,9 @@ def test_git_resolve_conflict_checkout_failure():
     """Vérifie que resolve_conflict lève une HTTPException 400 si checkout --ours ou --theirs échoue."""
     import subprocess
     from unittest.mock import patch
+
     from fastapi import HTTPException
+
     from app.api.git import ResolveConflictRequest, resolve_conflict
 
     with (
@@ -9009,7 +9012,10 @@ def test_git_resolve_conflict_checkout_failure():
 
 def test_session_metadata_get_trimmed_conversation_id():
     """Vérifie que get_session_meta normalise les identifiants avec des espaces superflus."""
-    from app.services.session_metadata import bulk_update_session_meta_batch, get_session_meta
+    from app.services.session_metadata import (
+        bulk_update_session_meta_batch,
+        get_session_meta,
+    )
 
     bulk_update_session_meta_batch({
         "unit_test_trim_cid": {"customTitle": "Titre Test Espaces"}
@@ -9034,6 +9040,7 @@ def test_files_search_symlink_and_timeout_resilience():
     """Vérifie que search_files ignore les liens symboliques cycliques et s'exécute sans erreur."""
     import tempfile
     from unittest.mock import patch
+
     from app.api.files import search_files
 
     with tempfile.TemporaryDirectory() as td:
@@ -9057,6 +9064,7 @@ def test_project_detector_unified_git_telemetry():
     """Vérifie que _extract_git_info renvoie branch, is_dirty, ahead et behind via un appel unique."""
     import subprocess
     import tempfile
+
     from app.services.project_detector import _extract_git_info
 
     with tempfile.TemporaryDirectory() as td:
@@ -9084,6 +9092,7 @@ def test_project_detector_unified_git_telemetry():
 def test_git_status_unborn_branch_and_detached_head_parsing():
     """Vérifie que get_git_status gère les branches naissantes sans commits et HEAD détaché."""
     from unittest.mock import MagicMock, patch
+
     from app.api.git import get_git_status
 
     def fake_run_git(args, cwd, **kwargs):
@@ -9132,6 +9141,7 @@ def test_session_metadata_custom_title_harmonization():
 
 def test_vector_memory_fips_md5_and_context_formatting():
     import math
+
     from app.services.vector_memory import (
         MemoryEntry,
         MemorySearchResult,
@@ -9161,6 +9171,7 @@ def test_vector_memory_fips_md5_and_context_formatting():
 
 def test_files_upload_and_duplicate_symlink_protection(tmp_path: Path):
     from fastapi import HTTPException
+
     from app.api.files import DuplicateFileRequest, duplicate_file
 
     real_file = tmp_path / "real_file.txt"
