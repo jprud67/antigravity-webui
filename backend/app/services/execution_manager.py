@@ -926,6 +926,28 @@ class ExecutionManager:
         }
         await session.broadcast(event)
 
+    async def broadcast_orchestrator_update(
+        self,
+        conversation_id: str | None,
+        event_type: str = "node_update",
+        node_data: dict[str, Any] | None = None
+    ) -> None:
+        """Broadcasts live multi-agent DAG hierarchy updates to all subscribers of a conversation."""
+        if not conversation_id:
+            return
+        session = self.get_session(conversation_id)
+        if not session:
+            return
+
+        event = {
+            "event": "orchestrator_update",
+            "conversation_id": conversation_id,
+            "update_type": event_type,
+            "node": node_data or {},
+            "timestamp": time.time(),
+        }
+        await session.broadcast(event)
+
     def disconnect_token(self, share_token: str) -> int:
         """Closes all WebSockets attached to a specific share token."""
         to_disconnect = [

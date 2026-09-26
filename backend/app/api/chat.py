@@ -195,6 +195,19 @@ async def chat_websocket(
                     "active_conversations": execution_manager.get_running_conversations()
                 })
 
+            elif action == "orchestrator_refresh":
+                from app.services.agent_orchestrator import build_orchestrator_graph
+                if conv_id:
+                    try:
+                        graph = build_orchestrator_graph(conv_id)
+                        await websocket.send_json({
+                            "event": "orchestrator_graph",
+                            "graph": graph.model_dump()
+                        })
+                    except Exception as e:
+                        logger.debug(f"Error fetching orchestrator graph on ws: {e}")
+
+
     except WebSocketDisconnect:
         logger.info("WebSocket client disconnected")
     except Exception as e:
