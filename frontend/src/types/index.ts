@@ -1076,5 +1076,31 @@ export interface ExportRequest {
   format: 'csv' | 'json';
 }
 
+export interface DiagnosticItem {
+  line: number;
+  column: number;
+  endLine: number;
+  endColumn: number;
+  message: string;
+  severity: 'error' | 'warning' | 'info';
+  source: 'ruff' | 'oxlint' | 'syntax' | 'json';
+  code?: string;
+}
+
+export interface EditorDiagnosticsResponse {
+  diagnostics: DiagnosticItem[];
+  duration_ms: number;
+  total_errors: number;
+  total_warnings: number;
+  total_infos: number;
+}
+
+export interface EditorDiagnosticsPayload {
+  content: string;
+  filePath?: string;
+  language: string;
+  workspace?: string;
+}
+
 
 

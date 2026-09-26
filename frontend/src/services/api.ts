@@ -85,7 +85,9 @@ import type {
   ContainerExecResult,
   DatabaseConnectionInfo,
   DatabaseSchema,
-  QueryResult
+  QueryResult,
+  EditorDiagnosticsPayload,
+  EditorDiagnosticsResponse
 } from '../types';
 
 const API_BASE = '/api';
@@ -3124,6 +3126,21 @@ export const databaseApi = {
     return res.blob();
   },
 };
+
+export async function fetchEditorDiagnostics(
+  payload: EditorDiagnosticsPayload
+): Promise<EditorDiagnosticsResponse> {
+  const res = await fetch(`${API_BASE}/editor/diagnostics`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de l\'analyse des diagnostics' }));
+    throw new Error(err.detail || 'Échec de l\'analyse des diagnostics');
+  }
+  return res.json();
+}
 
 
 
