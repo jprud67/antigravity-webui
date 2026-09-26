@@ -386,6 +386,14 @@ class TranscriptFtsService:
                     all_meta = get_all_session_metadata()
                 except Exception:
                     all_meta = {}
+
+                # Pré-remplir les titres personnalisés depuis les métadonnées de session
+                for sid in session_ids:
+                    meta = all_meta.get(sid, {})
+                    custom_title = (meta.get("customTitle") or meta.get("custom_title") or "").strip()
+                    if custom_title:
+                        titles[sid] = custom_title
+
                 try:
                     placeholders = ",".join("?" * len(session_ids))
                     title_rows = conn.execute(
@@ -394,9 +402,8 @@ class TranscriptFtsService:
                     ).fetchall()
                     for tr in title_rows:
                         cid = tr["conversation_id"]
-                        meta = all_meta.get(cid, {})
-                        custom_title = (meta.get("customTitle") or meta.get("custom_title") or "").strip()
-                        titles[cid] = custom_title or tr["title"] or cid
+                        if cid not in titles or not titles[cid]:
+                            titles[cid] = tr["title"] or cid
                 except Exception:
                     pass
 

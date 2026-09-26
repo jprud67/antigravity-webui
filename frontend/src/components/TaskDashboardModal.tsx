@@ -238,9 +238,11 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
                       <div className="flex items-center gap-2 font-mono">
                         <Terminal className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
                         <span className="font-semibold" style={{ color: 'var(--strong)' }}>{task.task_id}</span>
-                        <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
-                          {t('conv_abbr', 'conv')} {task.conversation_id.substring(0, 8)}...
-                        </span>
+                        {task.conversation_id ? (
+                          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                            {t('conv_abbr', 'conv')} {task.conversation_id.substring(0, 8)}...
+                          </span>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2">
                         {task.status === 'completed' ? (

@@ -2,6 +2,7 @@ import ast
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -320,6 +321,46 @@ def _lint_yaml(content: str) -> list[DiagnosticItem]:
     return diagnostics
 
 
+def _lint_toml(content: str) -> list[DiagnosticItem]:
+    diagnostics: list[DiagnosticItem] = []
+    try:
+        import tomllib
+    except ImportError:
+        try:
+            import tomli as tomllib  # type: ignore[no-redef]
+        except ImportError:
+            return []
+
+    try:
+        tomllib.loads(content)
+    except tomllib.TOMLDecodeError as e:
+        msg = str(e)
+        line = 1
+        col = 1
+        m = re.search(r"\(at line (\d+), column (\d+)\)", msg)
+        if m:
+            line = int(m.group(1))
+            col = int(m.group(2))
+        elif "(at end of document)" in msg:
+            lines = content.splitlines()
+            line = max(1, len(lines))
+            col = (len(lines[-1]) + 1) if lines else 1
+
+        diagnostics.append(
+            DiagnosticItem(
+                line=line,
+                column=col,
+                endLine=line,
+                endColumn=col + 1,
+                message=msg,
+                severity="error",
+                source="toml",
+                code="TOMLDecodeError"
+            )
+        )
+    return diagnostics
+
+
 @router.post("/diagnostics", response_model=EditorDiagnosticsResponse)
 def get_editor_diagnostics(
     req: EditorDiagnosticsRequest
@@ -367,6 +408,8 @@ def get_editor_diagnostics(
             language = "json"
         elif lower_fp.endswith((".yaml", ".yml")):
             language = "yaml"
+        elif lower_fp.endswith(".toml"):
+            language = "toml"
 
     diagnostics: list[DiagnosticItem] = []
 
@@ -379,6 +422,8 @@ def get_editor_diagnostics(
             diagnostics = _lint_json(content)
         elif language in ("yaml", "yml"):
             diagnostics = _lint_yaml(content)
+        elif language == "toml":
+            diagnostics = _lint_toml(content)
 
     # Sort diagnostics by line, then column
     diagnostics.sort(key=lambda d: (d.line, d.column))

@@ -540,6 +540,89 @@ def test_workspaces_add_canonical_deduplication(tmp_path, monkeypatch):
     assert len(fake_settings["trustedWorkspaces"]) == 1
 
 
+def test_editor_diagnostics_toml_linting():
+    from app.api.editor_diagnostics import (
+        EditorDiagnosticsRequest,
+        _lint_toml,
+        get_editor_diagnostics,
+    )
+
+    valid_toml = """
+[package]
+name = "my-tool"
+version = "0.1.0"
+edition = "2021"
+"""
+    diags = _lint_toml(valid_toml)
+    assert len(diags) == 0
+
+    invalid_toml = """
+[package]
+name = "my-tool"
+version = 
+"""
+    diags_invalid = _lint_toml(invalid_toml)
+    assert len(diags_invalid) > 0
+    assert diags_invalid[0].source == "toml"
+    assert diags_invalid[0].severity == "error"
+    assert diags_invalid[0].line >= 1
+
+    # Test endpoint language auto-detection for .toml
+    res = get_editor_diagnostics(EditorDiagnosticsRequest(
+        content=invalid_toml,
+        filePath="Cargo.toml",
+    ))
+    assert res.total_errors > 0
+    assert res.diagnostics[0].source == "toml"
+
+
+def test_database_studio_non_sqlite_rejection(tmp_path):
+    from app.services.database_studio import execute_query, inspect_database_schema
+
+    dummy_file = tmp_path / "fake.db"
+    dummy_file.write_text("This is definitely not a sqlite database header.")
+
+    with pytest.raises(ValueError, match="pas une base de données SQLite valide"):
+        inspect_database_schema(str(dummy_file))
+
+    res = execute_query(str(dummy_file), "SELECT 1")
+    assert res.error is not None
+    assert "pas une base de données SQLite valide" in res.error
+
+
+def test_canvas_protocol_relative_url_rejection(tmp_path):
+    from app.services.canvas_documents import (
+        CanvasDocumentCreateInput,
+        CanvasDocumentEntrypoint,
+        create_canvas_document,
+    )
+
+    with pytest.raises(ValueError, match="URL de schéma non autorisé"):
+        create_canvas_document(
+            CanvasDocumentCreateInput(
+                title="Protocol relative test",
+                entrypoint=CanvasDocumentEntrypoint(type="url", value="//evil.com/phishing")
+            ),
+            workspace_dir=str(tmp_path)
+        )
+
+
+def test_code_kernel_stdout_stderr_restoration(tmp_path):
+    import sys
+    from app.services.code_kernel import get_or_create_kernel
+
+    kernel = get_or_create_kernel("test-stream-restore", cwd=str(tmp_path))
+    orig_stdout = sys.stdout
+    orig_stderr = sys.stderr
+
+    res = kernel.execute("print('hello world')")
+    assert res["status"] == "ok"
+    assert "hello world" in res["stdout"]
+    assert sys.stdout is orig_stdout
+    assert sys.stderr is orig_stderr
+
+
+
 
 
 

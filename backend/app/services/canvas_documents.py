@@ -329,7 +329,7 @@ def create_canvas_document(
     elif entry.type == "url":
         url_val = entry.value.strip()
         lower_url = url_val.lower()
-        if not lower_url.startswith(("http://", "https://", "/")):
+        if not lower_url.startswith(("http://", "https://", "/")) or lower_url.startswith("//"):
             raise ValueError(f"URL de schéma non autorisé : {url_val}")
         if input_data.kind == "document" and url_val.lower().endswith(".pdf"):
             filename = "index.html"

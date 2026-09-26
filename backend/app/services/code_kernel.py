@@ -177,62 +177,63 @@ class PersistentPythonKernel:
         with _GLOBAL_EXECUTION_LOCK:
             orig_stdout = sys.stdout
             orig_stderr = sys.stderr
-            with self.lock:
-                self.execution_count += 1
-                self.last_active_at = time.time()
-                start_time = time.perf_counter()
-                current_exec_count = self.execution_count
-
             out_buf = io.StringIO()
             err_buf = io.StringIO()
-            status = "ok"
-            tb = ""
-            pre_globals = dict(self.globals)
+            try:
+                with self.lock:
+                    self.execution_count += 1
+                    self.last_active_at = time.time()
+                    start_time = time.perf_counter()
+                    current_exec_count = self.execution_count
 
-            def run_code():
-                nonlocal status, tb
-                try:
-                    with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
-                        compiled = compile(code, f"<cell-{current_exec_count}>", "exec")
-                        exec(compiled, self.globals)  # nosec B102
-                except SystemExit as se:
-                    status = "exit"
-                    tb = f"SystemExit: {se.code}"
-                except BaseException:
-                    status = "error"
-                    tb = traceback.format_exc()
+                status = "ok"
+                tb = ""
+                pre_globals = dict(self.globals)
 
-            t = threading.Thread(target=run_code, daemon=True)
-            t.start()
-            t.join(timeout=timeout)
+                def run_code():
+                    nonlocal status, tb
+                    try:
+                        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+                            compiled = compile(code, f"<cell-{current_exec_count}>", "exec")
+                            exec(compiled, self.globals)  # nosec B102
+                    except SystemExit as se:
+                        status = "exit"
+                        tb = f"SystemExit: {se.code}"
+                    except BaseException:
+                        status = "error"
+                        tb = traceback.format_exc()
 
-            if t.is_alive():
-                status = "timeout"
-                tb = f"Execution timed out after {timeout} seconds."
-                self.globals = pre_globals
-                # Prevent permanently hijacked stdout/stderr across process if thread is still running
+                t = threading.Thread(target=run_code, daemon=True)
+                t.start()
+                t.join(timeout=timeout)
+
+                if t.is_alive():
+                    status = "timeout"
+                    tb = f"Execution timed out after {timeout} seconds."
+                    self.globals = pre_globals
+
+                raw_out = out_buf.getvalue()
+                raw_err = err_buf.getvalue()
+
+                stdout_clipped = len(raw_out) > _MAX_OUTPUT_CHARS
+                stderr_clipped = len(raw_err) > _MAX_OUTPUT_CHARS
+
+                return {
+                    "session_id": self.session_id,
+                    "execution_count": current_exec_count,
+                    "status": status,
+                    "stdout": raw_out[:_MAX_OUTPUT_CHARS],
+                    "stderr": raw_err[:_MAX_OUTPUT_CHARS],
+                    "stdout_clipped": stdout_clipped,
+                    "stderr_clipped": stderr_clipped,
+                    "traceback": tb,
+                    "duration_ms": max(0, int((time.perf_counter() - start_time) * 1000))
+                }
+            finally:
                 if sys.stdout is out_buf:
                     sys.stdout = orig_stdout
                 if sys.stderr is err_buf:
                     sys.stderr = orig_stderr
-
-            raw_out = out_buf.getvalue()
-            raw_err = err_buf.getvalue()
-
-            stdout_clipped = len(raw_out) > _MAX_OUTPUT_CHARS
-            stderr_clipped = len(raw_err) > _MAX_OUTPUT_CHARS
-
-            return {
-                "session_id": self.session_id,
-                "execution_count": current_exec_count,
-                "status": status,
-                "stdout": raw_out[:_MAX_OUTPUT_CHARS],
-                "stderr": raw_err[:_MAX_OUTPUT_CHARS],
-                "stdout_clipped": stdout_clipped,
-                "stderr_clipped": stderr_clipped,
-                "traceback": tb,
-                "duration_ms": max(0, int((time.perf_counter() - start_time) * 1000))
-            }
 
 
 _KERNEL_REGISTRY: dict[str, PersistentPythonKernel] = {}

@@ -1083,7 +1083,7 @@ export interface DiagnosticItem {
   endColumn: number;
   message: string;
   severity: 'error' | 'warning' | 'info';
-  source: 'ruff' | 'oxlint' | 'syntax' | 'json' | 'yaml' | 'diagnostics';
+  source: 'ruff' | 'oxlint' | 'syntax' | 'json' | 'yaml' | 'toml' | 'diagnostics';
   code?: string;
 }
 

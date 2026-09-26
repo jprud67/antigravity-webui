@@ -17,7 +17,10 @@ import subprocess
 from pathlib import Path
 from typing import Any, Literal
 
-import yaml  # type: ignore[import-untyped]
+try:
+    import yaml  # type: ignore[import-untyped]
+except ImportError:
+    yaml = None  # type: ignore[assignment]
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.platform_utils import is_blocked_sensitive_path
@@ -230,8 +233,11 @@ def scan_workspace_docker_files(workspace_dir: str) -> list[WorkspaceDockerItem]
                 # Parse compose services
                 services: list[ComposeServiceSummary] = []
                 try:
-                    with open(full_file_path, "r", encoding="utf-8") as f:
-                        data = yaml.safe_load(f)
+                    if yaml is not None:
+                        with open(full_file_path, "r", encoding="utf-8") as f:
+                            data = yaml.safe_load(f)
+                    else:
+                        data = None
                     if isinstance(data, dict) and "services" in data and isinstance(data["services"], dict):
                         for s_name, s_cfg in data["services"].items():
                             if isinstance(s_cfg, dict):

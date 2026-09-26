@@ -187,6 +187,8 @@ def inspect_database_schema(db_path: str) -> DatabaseSchema:
         clean_path = str(p)
         if is_blocked_sensitive_path(clean_path) or not p.is_file():
             raise ValueError(f"Base de données inaccessible ou introuvable : {db_path}")
+        if not is_sqlite_file(p):
+            raise ValueError(f"Le fichier n'est pas une base de données SQLite valide : {db_path}")
     except PermissionError as exc:
         raise PermissionError(f"Accès refusé au fichier de base de données : {exc}") from exc
     except Exception as exc:
@@ -279,9 +281,12 @@ def _serialize_cell(value: Any) -> Any:
 
 def execute_query(db_path: str, query: str, limit: int = 500, timeout_seconds: float = 10.0) -> QueryResult:
     """Executes a SQL query against an SQLite database with timeout and row bounds."""
-    clean_path = str(Path(db_path).resolve())
-    if is_blocked_sensitive_path(clean_path) or not Path(clean_path).is_file():
+    p = Path(db_path).resolve()
+    clean_path = str(p)
+    if is_blocked_sensitive_path(clean_path) or not p.is_file():
         return QueryResult(error=f"Accès refusé ou fichier inexistant: {db_path}")
+    if not is_sqlite_file(p):
+        return QueryResult(error=f"Le fichier n'est pas une base de données SQLite valide: {db_path}")
 
     if not query or not query.strip():
         return QueryResult(error="Requête SQL vide.")
