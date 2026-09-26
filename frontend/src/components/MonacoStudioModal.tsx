@@ -370,10 +370,20 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
     if (['shell', 'bash', 'sh', 'zsh'].includes(lang)) {
       command = trimmed;
     } else if (['python', 'py'].includes(lang)) {
-      const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+      const escaped = trimmed
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\$/g, '\\$')
+        .replace(/`/g, '\\`')
+        .replace(/\n/g, '\\n');
       command = `python -c "${escaped}"`;
     } else if (['javascript', 'js', 'node'].includes(lang)) {
-      const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+      const escaped = trimmed
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\$/g, '\\$')
+        .replace(/`/g, '\\`')
+        .replace(/\n/g, '\\n');
       command = `node -e "${escaped}"`;
     }
 

@@ -136,6 +136,15 @@ def _normalize_meta(meta: dict[str, Any]) -> dict[str, Any]:
     meta["custom_title"] = raw_custom_title
     meta["group_id"] = str(meta.get("group_id") or "").strip()
     meta["project_id"] = raw_project_id or raw_project
+    raw_bookmarks = meta.get("bookmarks")
+    if isinstance(raw_bookmarks, list):
+        cleaned_bms = []
+        for b in raw_bookmarks:
+            if isinstance(b, dict):
+                cleaned_bms.append(b)
+        meta["bookmarks"] = cleaned_bms
+    else:
+        meta["bookmarks"] = []
     return meta
 
 
@@ -144,6 +153,7 @@ def make_default_meta() -> dict[str, Any]:
         "pinned": False,
         "archived": False,
         "tags": [],
+        "bookmarks": [],
         "project": "",
         "projectColor": "",
         "customTitle": "",

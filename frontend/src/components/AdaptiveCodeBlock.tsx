@@ -396,11 +396,21 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
       return trimmed;
     }
     if (['python', 'py'].includes(language)) {
-      const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+      const escaped = trimmed
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\$/g, '\\$')
+        .replace(/`/g, '\\`')
+        .replace(/\n/g, '\\n');
       return `python -c "${escaped}"`;
     }
     if (['javascript', 'js', 'node'].includes(language)) {
-      const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+      const escaped = trimmed
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\$/g, '\\$')
+        .replace(/`/g, '\\`')
+        .replace(/\n/g, '\\n');
       return `node -e "${escaped}"`;
     }
     return null;

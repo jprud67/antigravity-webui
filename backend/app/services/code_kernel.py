@@ -181,6 +181,7 @@ class PersistentPythonKernel:
             err_buf = io.StringIO()
             status = "ok"
             tb = ""
+            pre_globals = dict(self.globals)
 
             def run_code():
                 nonlocal status, tb
@@ -191,7 +192,7 @@ class PersistentPythonKernel:
                 except SystemExit as se:
                     status = "exit"
                     tb = f"SystemExit: {se.code}"
-                except Exception:
+                except BaseException:
                     status = "error"
                     tb = traceback.format_exc()
 
@@ -202,6 +203,7 @@ class PersistentPythonKernel:
             if t.is_alive():
                 status = "timeout"
                 tb = f"Execution timed out after {timeout} seconds."
+                self.globals = pre_globals
 
             raw_out = out_buf.getvalue()
             raw_err = err_buf.getvalue()

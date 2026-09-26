@@ -68,6 +68,20 @@ import { showToast } from './services/toast';
 import { ConfirmDialogContainer } from './components/AppDialog';
 import { getConvIdFromPath, navigateToConversation } from './utils/navigation';
 
+const safeStringifyLen = (val: any): number => {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'string') return val.length;
+  try {
+    return JSON.stringify(val).length;
+  } catch {
+    try {
+      return String(val).length;
+    } catch {
+      return 0;
+    }
+  }
+};
+
 const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
   if (!msgs || msgs.length === 0) {
     return {
@@ -93,9 +107,9 @@ const estimateUsageFromMessages = (msgs: ChatMessage[]): TokenUsageData => {
       if (m.thought) thinkingChars += m.thought.length;
       if (m.toolCalls && m.toolCalls.length > 0) {
         for (const tc of m.toolCalls) {
-          responseChars += (tc.name || '').length + JSON.stringify(tc.args || {}).length;
+          responseChars += (tc.name || '').length + safeStringifyLen(tc.args || {});
           if (tc.result) {
-            promptChars += typeof tc.result === 'string' ? tc.result.length : JSON.stringify(tc.result).length;
+            promptChars += safeStringifyLen(tc.result);
           }
         }
       }

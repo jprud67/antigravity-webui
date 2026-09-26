@@ -600,7 +600,7 @@ def clean_user_prompt(raw: Any) -> str:
         text = matches[-1].strip()
     else:
         # Repli pour les invites brutes sans balise <USER_REQUEST>
-        text = _XML_BLOCKS_RE.sub('', raw)
+        text = _XML_BLOCKS_RE.sub('', text_no_context)
         text = _XML_TAGS_RE.sub('', text)
 
     # 3. Retirer les préfixes de guidage/file d'attente

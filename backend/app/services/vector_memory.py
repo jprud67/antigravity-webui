@@ -128,6 +128,7 @@ def ensure_vector_memory_schema() -> None:
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_vm_agent ON vector_memories(agent_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_vm_created ON vector_memories(created_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_vm_agent_cat ON vector_memories(agent_id, category)")
         conn.commit()
 
 

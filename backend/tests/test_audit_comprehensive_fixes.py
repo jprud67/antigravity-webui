@@ -106,3 +106,65 @@ async def test_vector_memory_gemini_fallback():
     vec = await compute_embedding("test prompt", cfg)
     assert len(vec) == 384  # Falls back to local 384-dim unit vector
     assert any(x != 0.0 for x in vec)
+
+
+def test_clean_user_prompt_context_summary_fallback():
+    from app.services.storage import clean_user_prompt
+    raw = (
+        "<CONTEXT_SUMMARY>\nOld conversation summary\n</CONTEXT_SUMMARY>\n"
+        "Please fix the bug in server.py"
+    )
+    cleaned = clean_user_prompt(raw)
+    assert cleaned == "Please fix the bug in server.py"
+    assert "CONTEXT_SUMMARY" not in cleaned
+    assert "Old conversation" not in cleaned
+
+
+def test_session_metadata_bookmarks_normalization():
+    from app.services.session_metadata import _normalize_meta, make_default_meta
+    meta = make_default_meta()
+    assert "bookmarks" in meta
+    assert meta["bookmarks"] == []
+
+    # Non-list bookmarks should be sanitized to []
+    norm = _normalize_meta({"bookmarks": "invalid"})
+    assert norm["bookmarks"] == []
+
+    # Invalid items inside bookmarks list should be filtered out
+    norm2 = _normalize_meta({"bookmarks": [{"id": "b1", "label": "test"}, "not-a-dict", None]})
+    assert len(norm2["bookmarks"]) == 1
+    assert norm2["bookmarks"][0]["id"] == "b1"
+
+
+def test_code_kernel_timeout_globals_isolation(tmp_path):
+    import time
+
+    from app.services.code_kernel import PersistentPythonKernel
+    kernel = PersistentPythonKernel(session_id="test-timeout-kernel", cwd=str(tmp_path))
+    kernel.execute("safe_var = 100")
+    assert kernel.globals.get("safe_var") == 100
+
+    timeout_code = """
+import time
+time.sleep(0.3)
+safe_var = 999
+"""
+    res = kernel.execute(timeout_code, timeout=0.05)
+    assert res["status"] == "timeout"
+    assert "timed out" in res["traceback"]
+    # Wait for the background thread to finish its sleep and assignment attempt
+    time.sleep(0.35)
+    # The kernel globals must retain the original safe_var value
+    assert kernel.globals.get("safe_var") == 100
+
+
+def test_vector_memory_schema_indices():
+    from app.services.vector_memory import _get_db, ensure_vector_memory_schema
+    ensure_vector_memory_schema()
+    with _get_db() as conn:
+        cursor = conn.execute("PRAGMA index_list('vector_memories')")
+        indices = [row[1] for row in cursor.fetchall()]
+        assert "idx_vm_agent" in indices
+        assert "idx_vm_created" in indices
+        assert "idx_vm_agent_cat" in indices
+
