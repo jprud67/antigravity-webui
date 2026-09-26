@@ -171,11 +171,20 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
   const handleApplyUrl = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     let url = previewUrl.trim();
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) {
       url = `http://${url}`;
     }
-    setIframeSrc(url);
-    setIframeKey((prev) => prev + 1);
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return;
+      }
+      setIframeSrc(parsed.href);
+      setIframeKey((prev) => prev + 1);
+    } catch {
+      // Invalid URL syntax
+    }
   };
 
   const getViewportWidth = () => {
@@ -379,7 +388,7 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
                 key={iframeKey}
                 ref={iframeRef}
                 src={iframeSrc}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                sandbox="allow-scripts allow-forms allow-popups allow-modals"
                 className="w-full h-full border-0"
                 onLoad={() => setIframeLoading(false)}
                 onError={() => setIframeLoading(false)}

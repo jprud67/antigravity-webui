@@ -849,17 +849,29 @@ class ExecutionManager:
         info = self.socket_info.pop(ws, None)
         bound_cid = info.get("bound_conversation_id") if info else None
 
-        # Detach from all sessions WITHOUT stopping or cancelling anything!
-        for s in list(self.sessions.values()):
-            s.remove_subscriber(ws)
-        if self.active_session:
-            self.active_session.remove_subscriber(ws)
-
+        # Track all affected conversation IDs to refresh live presence
+        affected_cids: set[str] = set()
         if bound_cid:
+            affected_cids.add(bound_cid)
+
+        # Detach from all sessions WITHOUT stopping or cancelling anything!
+        for cid, s in list(self.sessions.items()):
+            if ws in s.subscribers:
+                s.remove_subscriber(ws)
+                if cid:
+                    affected_cids.add(cid)
+        if self.active_session:
+            if ws in self.active_session.subscribers:
+                self.active_session.remove_subscriber(ws)
+                if getattr(self.active_session, "conversation_id", None):
+                    affected_cids.add(self.active_session.conversation_id)
+
+        if affected_cids:
             try:
                 loop = asyncio.get_running_loop()
                 if loop.is_running():
-                    loop.create_task(self.broadcast_presence(bound_cid))
+                    for target_cid in affected_cids:
+                        loop.create_task(self.broadcast_presence(target_cid))
             except Exception as e:
                 logger.debug(f"Could not broadcast presence on socket unregister: {e}")
 

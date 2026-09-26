@@ -122,7 +122,12 @@ if (typeof window !== 'undefined' && !(window as any).__antigravity_fetch_interc
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const res = await originalFetch(input, init);
     const url = typeof input === 'string' ? input : (input instanceof Request ? input.url : input.toString());
-    if (res.status === 401 && !url.includes('/api/auth/login') && !url.includes('/api/auth/status')) {
+    if (
+      res.status === 401 &&
+      !url.includes('/api/auth/login') &&
+      !url.includes('/api/auth/status') &&
+      !url.includes('/api/share/')
+    ) {
       window.dispatchEvent(new CustomEvent('antigravity:unauthorized'));
     }
     return res;

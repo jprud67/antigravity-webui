@@ -229,8 +229,8 @@ def get_file_content(path: str = Query(...), workspace: str | None = Query(None)
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
 
     stat = resolved_path.stat()
-    if stat.st_size > 1024 * 1024 * 2: # 2MB limit
-        raise HTTPException(status_code=400, detail="Fichier trop volumineux pour l'éditeur (max 2 Mo).")
+    if stat.st_size > MAX_FILE_EDITOR_BYTES:
+        raise HTTPException(status_code=400, detail=f"Fichier trop volumineux pour l'éditeur (max {MAX_FILE_EDITOR_BYTES // (1024 * 1024)} Mo).")
 
     try:
         with open(resolved_path, "r", encoding="utf-8", errors="replace") as f:
@@ -253,7 +253,8 @@ class SaveFileRequest(BaseModel):
     content: str
     workspace: str | None = None
 
-MAX_FILE_SAVE_BYTES = 5 * 1024 * 1024  # 5 Mo max
+MAX_FILE_EDITOR_BYTES = 5 * 1024 * 1024  # 5 Mo max
+MAX_FILE_SAVE_BYTES = MAX_FILE_EDITOR_BYTES
 
 @router.post("/save")
 def save_file_content(req: SaveFileRequest, _ = Depends(require_auth)):

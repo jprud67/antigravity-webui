@@ -7,7 +7,7 @@ import type { ShareVerificationResult } from '../types';
 interface SharePinModalProps {
   isOpen: boolean;
   token: string;
-  onUnlocked: (result: ShareVerificationResult) => void;
+  onUnlocked: (result: ShareVerificationResult, pin: string) => void;
   onCancel?: () => void;
 }
 
@@ -26,14 +26,15 @@ export const SharePinModal: React.FC<SharePinModalProps> = ({
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!pin.trim()) return;
+    const cleanPin = pin.trim();
+    if (!cleanPin) return;
 
     setLoading(true);
     setError(null);
     try {
-      const res = await unlockShareToken(token, pin.trim());
+      const res = await unlockShareToken(token, cleanPin);
       if (res.valid) {
-        onUnlocked(res);
+        onUnlocked(res, cleanPin);
       } else {
         setError(res.reason || 'Code PIN incorrect');
       }

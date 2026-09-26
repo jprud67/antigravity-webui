@@ -189,3 +189,29 @@ def test_ws_share_copilot_allowed():
         assert resp["event"] == "pong"
 
 
+def test_ws_share_pin_protection():
+    cid = "conv_ws_pin"
+    link = share_service.create_share_link(cid, permission="write", pin_code="9876")
+    token = link["token"]
+
+    # Connect without pin -> should be rejected with 1008
+    with pytest.raises(Exception):
+        with client.websocket_connect(f"/ws/chat?share_token={token}") as ws:
+            ws.receive_json()
+
+    # Connect with wrong pin -> should be rejected
+    with pytest.raises(Exception):
+        with client.websocket_connect(f"/ws/chat?share_token={token}&pin_code=0000") as ws:
+            ws.receive_json()
+
+    # Connect with correct pin -> should succeed
+    with client.websocket_connect(f"/ws/chat?share_token={token}&pin_code=9876") as ws:
+        ev1 = ws.receive_json()
+        assert ev1["event"] == "connected"
+        assert ev1["role"] == "copilot"
+        ev2 = ws.receive_json()
+        assert ev2["event"] == "presence_update"
+        assert ev2["count"] >= 1
+
+
+

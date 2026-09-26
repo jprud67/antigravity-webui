@@ -60,6 +60,7 @@ import {
   addConversationBookmark,
   removeConversationBookmark,
   verifyShareToken,
+  fetchSharedTranscript,
   type GoogleAccountInfo,
   type UpdateCheckResult,
   type PruneResult
@@ -336,6 +337,7 @@ export function App() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [activeShareToken, setActiveShareToken] = useState<string | null>(null);
+  const [activePinCode, setActivePinCode] = useState<string | null>(null);
   const [isSharedSession, setIsSharedSession] = useState(false);
   const [sharePermission, setSharePermission] = useState<'read' | 'write' | null>(null);
   const [presenceCount, setPresenceCount] = useState<number>(1);
@@ -391,9 +393,25 @@ export function App() {
   };
 
   // Switch Conversation
-  const handleSelectConversation = async (convId: string, updateUrl = true) => {
+  const handleSelectConversation = async (
+    convId: string,
+    updateUrl = true,
+    overrideShareToken?: string,
+    overridePinCode?: string
+  ) => {
     setIsMobileSidebarOpen(false);
-    if (updateUrl) {
+    const effShareToken = overrideShareToken || (isSharedSession ? activeShareToken : null);
+    const effPin = overridePinCode || (isSharedSession ? activePinCode : null);
+
+    if (updateUrl && !overrideShareToken && isSharedSession) {
+      setIsSharedSession(false);
+      setSharePermission(null);
+      setActiveShareToken(null);
+      setActivePinCode(null);
+      chatSocket.setShareToken(null);
+    }
+
+    if (updateUrl && !effShareToken) {
       navigateToConversation(convId);
     }
     activeConversationIdRef.current = convId;
@@ -403,14 +421,18 @@ export function App() {
     setQueueCount(0);
     setActiveProgressCard(null);
     try {
-      // Load any active progress card for this conversation
-      fetchProgressCard(convId).then((res) => {
-        if (activeConversationIdRef.current === convId) {
-          setActiveProgressCard(res?.card || null);
-        }
-      }).catch(() => {});
+      if (!effShareToken) {
+        // Load any active progress card for this conversation (host mode only)
+        fetchProgressCard(convId).then((res) => {
+          if (activeConversationIdRef.current === convId) {
+            setActiveProgressCard(res?.card || null);
+          }
+        }).catch(() => {});
+      }
 
-      const data = await fetchConversationTranscript(convId);
+      const data = effShareToken
+        ? await fetchSharedTranscript(effShareToken, effPin || undefined)
+        : await fetchConversationTranscript(convId);
       
       // Prevent race conditions from rapid clicking
       if (activeConversationIdRef.current !== convId) return;
@@ -466,6 +488,33 @@ export function App() {
 
   const loadInitialData = async () => {
     try {
+      // 1. Priority: check for collaborative session share token in URL (/share/:token or ?share=:token)
+      const urlShareToken = getShareTokenFromUrl();
+      if (urlShareToken) {
+        setActiveShareToken(urlShareToken);
+        try {
+          const verifyRes = await verifyShareToken(urlShareToken);
+          if (verifyRes.requires_pin) {
+            setIsPinModalOpen(true);
+            return;
+          } else if (verifyRes.valid) {
+            setIsSharedSession(true);
+            setSharePermission(verifyRes.permission || 'read');
+            chatSocket.setShareToken(urlShareToken);
+            chatSocket.connect();
+            if (verifyRes.conversation_id) {
+              await handleSelectConversation(verifyRes.conversation_id, false, urlShareToken);
+            }
+            return;
+          } else {
+            showToast(verifyRes.reason || 'Lien de partage invalide ou expiré', 'error');
+          }
+        } catch (err: any) {
+          showToast(err.message || 'Lien de partage invalide', 'error');
+        }
+      }
+
+      // 2. Standard authenticated host flow
       const auth = await checkAuthStatus();
       if (auth.enabled && !auth.authenticated) {
         setIsAuthenticated(false);
@@ -534,33 +583,10 @@ export function App() {
         setCurrentWorkspace(savedWorkspace);
       }
 
-      // Check for share token in URL (/share/:token or ?share=:token)
-      const urlShareToken = getShareTokenFromUrl();
-      if (urlShareToken) {
-        setActiveShareToken(urlShareToken);
-        try {
-          const verifyRes = await verifyShareToken(urlShareToken);
-          if (verifyRes.requires_pin) {
-            setIsPinModalOpen(true);
-          } else if (verifyRes.valid) {
-            setIsSharedSession(true);
-            setSharePermission(verifyRes.permission || 'read');
-            chatSocket.setShareToken(urlShareToken);
-            if (verifyRes.conversation_id) {
-              await handleSelectConversation(verifyRes.conversation_id, false);
-            }
-          } else {
-            showToast(verifyRes.reason || 'Lien de partage invalide ou expiré', 'error');
-          }
-        } catch (err: any) {
-          showToast(err.message || 'Lien de partage invalide', 'error');
-        }
-      } else {
-        // Check if URL matches a conversation route (/c/:id or /chat/:id)
-        const routeConvId = getConvIdFromPath(window.location.pathname);
-        if (routeConvId) {
-          await handleSelectConversation(routeConvId, false);
-        }
+      // Check if URL matches a conversation route (/c/:id or /chat/:id)
+      const routeConvId = getConvIdFromPath(window.location.pathname);
+      if (routeConvId) {
+        await handleSelectConversation(routeConvId, false);
       }
     } catch (e) {
       console.error('Error loading initial data:', e);
@@ -2454,13 +2480,15 @@ export function App() {
         <SharePinModal
           isOpen={isPinModalOpen}
           token={activeShareToken}
-          onUnlocked={async (res) => {
+          onUnlocked={async (res, pin) => {
             setIsPinModalOpen(false);
             setIsSharedSession(true);
+            setActivePinCode(pin);
             setSharePermission(res.permission || 'read');
-            chatSocket.setShareToken(activeShareToken);
+            chatSocket.setShareToken(activeShareToken, pin);
+            chatSocket.connect();
             if (res.conversation_id) {
-              await handleSelectConversation(res.conversation_id, false);
+              await handleSelectConversation(res.conversation_id, false, activeShareToken, pin);
             }
             showToast(t('share_session') || 'Session partagée déverrouillée', 'success');
           }}

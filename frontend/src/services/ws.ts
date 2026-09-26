@@ -10,6 +10,7 @@ export class ChatWebSocketClient {
   private heartbeatTimeout: any = null;
   private _status: 'connected' | 'disconnected' | 'reconnecting' = 'disconnected';
   private shareToken: string | null = null;
+  private pinCode: string | null = null;
   private currentConversationId: string | null = null;
   private pendingPayloads: any[] = [];
   private reconnectAttempts: number = 0;
@@ -30,9 +31,10 @@ export class ChatWebSocketClient {
     return this._status;
   }
 
-  public setShareToken(token: string | null) {
-    if (this.shareToken !== token) {
+  public setShareToken(token: string | null, pinCode: string | null = null) {
+    if (this.shareToken !== token || this.pinCode !== pinCode) {
       this.shareToken = token;
+      this.pinCode = pinCode;
       if (this.ws) {
         this.reconnect();
       } else if (token) {
@@ -88,6 +90,9 @@ export class ChatWebSocketClient {
 
     if (shareToken) {
       wsUrl = `${baseUrl}?share_token=${encodeURIComponent(shareToken)}`;
+      if (this.pinCode) {
+        wsUrl += `&pin_code=${encodeURIComponent(this.pinCode)}`;
+      }
     } else if (token) {
       try {
         // Safe UTF-8 to base64 encoding avoiding Latin1 DOMException

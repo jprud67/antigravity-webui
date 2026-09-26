@@ -17,6 +17,7 @@ import {
 import { useI18n } from '../services/i18n';
 import { createShareLink, fetchShareLinks, revokeShareLink } from '../services/api';
 import { showToast } from '../services/toast';
+import { copyText } from '../utils/codeBlockUtils';
 import type { ShareLinkItem } from '../types';
 
 interface ShareSessionModalProps {
@@ -95,10 +96,16 @@ export const ShareSessionModal: React.FC<ShareSessionModalProps> = ({
       const shareUrl = `${window.location.origin}/share/${res.token}`;
       setNewlyCreatedUrl(shareUrl);
 
-      // Copy automatically
-      await navigator.clipboard.writeText(shareUrl);
-      setCopiedLink(true);
-      showToast(t('share_link_copied') || 'Link copied to clipboard!', 'success');
+      // Copy automatically with resilient fallback
+      try {
+        const copied = await copyText(shareUrl);
+        if (copied) {
+          setCopiedLink(true);
+          showToast(t('share_link_copied') || 'Link copied to clipboard!', 'success');
+        }
+      } catch {
+        // Fallback silently if clipboard unavailable
+      }
 
       // Refresh list
       await loadLinks();
@@ -127,8 +134,10 @@ export const ShareSessionModal: React.FC<ShareSessionModalProps> = ({
 
   const copyExistingLink = async (token: string) => {
     const url = `${window.location.origin}/share/${token}`;
-    await navigator.clipboard.writeText(url);
-    showToast(t('share_link_copied') || 'Link copied!', 'success');
+    const copied = await copyText(url);
+    if (copied) {
+      showToast(t('share_link_copied') || 'Link copied!', 'success');
+    }
   };
 
   const formatRemainingTime = (expiresAt: string | null) => {
@@ -344,9 +353,13 @@ export const ShareSessionModal: React.FC<ShareSessionModalProps> = ({
                 <button
                   type="button"
                   onClick={async () => {
-                    await navigator.clipboard.writeText(newlyCreatedUrl);
-                    setCopiedLink(true);
-                    setTimeout(() => setCopiedLink(false), 2000);
+                    if (newlyCreatedUrl) {
+                      const copied = await copyText(newlyCreatedUrl);
+                      if (copied) {
+                        setCopiedLink(true);
+                        setTimeout(() => setCopiedLink(false), 2000);
+                      }
+                    }
                   }}
                   className="p-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition"
                 >
