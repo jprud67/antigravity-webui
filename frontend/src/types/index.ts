@@ -1102,5 +1102,51 @@ export interface EditorDiagnosticsPayload {
   workspace?: string;
 }
 
+// Collaborative Session Sharing & Live Preview Types
+export interface ShareLinkItem {
+  token: string;
+  conversation_id: string;
+  permission: 'read' | 'write';
+  has_pin: boolean;
+  expires_at: string | null;
+  created_at: string;
+  created_by: string;
+  is_revoked: boolean;
+  is_expired: boolean;
+  is_active: boolean;
+}
+
+export interface ShareLinkCreatePayload {
+  conversation_id: string;
+  permission: 'read' | 'write';
+  duration_hours?: number | null;
+  pin_code?: string | null;
+}
+
+export interface ShareVerificationResult {
+  valid: boolean;
+  token?: string;
+  permission?: 'read' | 'write';
+  requires_pin?: boolean;
+  reason?: string;
+  title?: string;
+  conversation_id?: string;
+  expires_at?: string | null;
+}
+
+export interface PresenceParticipant {
+  client_id: string;
+  role: 'host' | 'copilot' | 'spectator';
+  nickname: string;
+  avatar_color: string;
+}
+
+export interface PresenceUpdateEvent {
+  event: 'presence_update';
+  conversation_id: string;
+  count: number;
+  participants: PresenceParticipant[];
+}
+
 
 

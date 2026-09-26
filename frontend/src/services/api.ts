@@ -87,7 +87,10 @@ import type {
   DatabaseSchema,
   QueryResult,
   EditorDiagnosticsPayload,
-  EditorDiagnosticsResponse
+  EditorDiagnosticsResponse,
+  ShareLinkItem,
+  ShareLinkCreatePayload,
+  ShareVerificationResult
 } from '../types';
 
 const API_BASE = '/api';
@@ -3143,6 +3146,78 @@ export async function fetchEditorDiagnostics(
   }
   return res.json();
 }
+
+// Collaborative Session Sharing API
+export async function createShareLink(payload: ShareLinkCreatePayload): Promise<ShareLinkItem> {
+  const res = await fetch(`${API_BASE}/share/create`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de création du lien' }));
+    throw new Error(err.detail || 'Échec de création du lien');
+  }
+  return res.json();
+}
+
+export async function fetchShareLinks(conversationId: string): Promise<{ links: ShareLinkItem[]; count: number }> {
+  const res = await fetch(`${API_BASE}/share/links/${encodeURIComponent(conversationId)}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de récupération des liens' }));
+    throw new Error(err.detail || 'Échec de récupération des liens');
+  }
+  return res.json();
+}
+
+export async function revokeShareLink(token: string): Promise<{ success: boolean; token: string }> {
+  const res = await fetch(`${API_BASE}/share/revoke/${encodeURIComponent(token)}`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la révocation du lien' }));
+    throw new Error(err.detail || 'Échec de la révocation du lien');
+  }
+  return res.json();
+}
+
+export async function verifyShareToken(token: string): Promise<ShareVerificationResult> {
+  const res = await fetch(`${API_BASE}/share/verify/${encodeURIComponent(token)}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Lien invalide ou introuvable' }));
+    throw new Error(err.detail || 'Lien invalide ou introuvable');
+  }
+  return res.json();
+}
+
+export async function unlockShareToken(token: string, pinCode: string): Promise<ShareVerificationResult> {
+  const res = await fetch(`${API_BASE}/share/unlock/${encodeURIComponent(token)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin_code: pinCode }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Code PIN incorrect' }));
+    throw new Error(err.detail || 'Code PIN incorrect');
+  }
+  return res.json();
+}
+
+export async function fetchSharedTranscript(token: string, pinCode?: string): Promise<any> {
+  const url = pinCode
+    ? `${API_BASE}/share/transcript/${encodeURIComponent(token)}?pin_code=${encodeURIComponent(pinCode)}`
+    : `${API_BASE}/share/transcript/${encodeURIComponent(token)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de chargement du transcript partagé' }));
+    throw new Error(err.detail || 'Échec de chargement du transcript partagé');
+  }
+  return res.json();
+}
+
 
 
 
