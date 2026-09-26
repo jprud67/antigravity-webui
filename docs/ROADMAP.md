@@ -214,13 +214,22 @@ This roadmap outlines the strategic direction for **Antigravity‑webui**, the f
 | **Data Grid & Instant CSV/JSON Export** | Grille de données interactive avec tri multi-colonnes, pagination dynamique, indicateurs de valeurs NULL, et export instantané des résultats de requêtes au format CSV et JSON (`/api/database/export`). | Frontend / UX | 2027‑03‑28 | ✅ **Completed** |
 | **Intégration & Internationalisation Complète** | Commandes slash `/db`, `/database`, `/sql`, raccourci studio dans la barre latérale, et couverture i18n intégrale à 100% sur les 15 langues dans `locales.json`. | Release Manager | 2027‑03‑28 | ✅ **Completed** |
 
-### 📌 Long‑Term (v0.4 / 3‑6 mois)
+### 📌 Jalon v0.3.2 : Docker & Container Management Studio (Docker Studio)
+| Milestone | Description | Owner | Target | Status |
+|---|---|---|---|---|
+| **Docker Engine Detection & Workspace Scan** | Détection automatique de Docker / Podman, scan récursif sécurisé des Dockerfiles et docker-compose (.yml, .yaml), validation des chemins workspace. | Backend / DevOps | 2027‑03‑28 | ✅ **Completed** |
+| **Container Lifecycle & Interactive Inspection** | Démarrage, arrêt, redémarrage, suppression sécurisée de conteneurs, inspection des stats en temps réel (CPU %, RAM, ports exposés). | Backend / Frontend | 2027‑03‑28 | ✅ **Completed** |
+| **Streaming Logs & In-Container Command Execution** | Visualisation et tail paramétrable des journaux conteneurs, exécution de commandes arbitraires avec capture stdout/stderr et code de retour. | Frontend / UX | 2027‑03‑28 | ✅ **Completed** |
+| **Docker Studio UI Modal & Compose Controls** | Interface complète glassmorphic (`DockerStudioModal.tsx`), actions compose rapides (up/down/build), bouton studio et intégration barre latérale. | Frontend / UX | 2027‑03‑28 | ✅ **Completed** |
+
+### 📌 Prochaines étapes v0.4 (Cockpit Web IDE & Agentic Workspace)
 | Milestone | Description |
 |---|---|
-| **Integrated Docker & Container Management Studio** – Détection automatique des Dockerfiles/Compose, logs streaming et terminal interactif dans les conteneurs. |
-| **Collaborative Editing** – Real‑time shared sessions via WebSocket + CRDT. |
-| **Full IDE Integration** – Monaco avec live linting étendu, terminal split-view et orchestration multi-agents. |
-| **Release v0.4 – Premium‑grade Web IDE & Autonomous Agent Cockpit** |
+| **Terminal Split-View & Multi-Panel Workspace** – Vue scindée multi-terminaux (horizontal/vertical) et dock d'outils intégré. |
+| **Monaco Extended Diagnostics & Live Linting** – Analyse syntaxique et diagnostics en temps réel (Python ruff/flake8, JS/TS eslint). |
+| **Collaborative Session Sharing & Live Preview** – Partage de session par lien direct, synchronisation WebSocket et inspection conjointe. |
+| **Multi-Agent Visual Orchestration Studio** – Visualisation des sous-agents en temps réel, graphe d'exécution et pilotage hiérarchique. |
+| **Release v0.4 – Premium Web IDE & Autonomous Agent Cockpit** |
 
 
 
