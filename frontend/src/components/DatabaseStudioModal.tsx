@@ -235,7 +235,8 @@ export const DatabaseStudioModal: React.FC<DatabaseStudioModalProps> = ({
 
   const handleSelectTableQuickQuery = useCallback(async (table: TableInfo) => {
     if (!selectedDbPath) return;
-    const q = `SELECT * FROM "${table.name}" LIMIT 50;`;
+    const safeName = table.name.replace(/"/g, '""');
+    const q = `SELECT * FROM "${safeName}" LIMIT 50;`;
     setSqlQuery(q);
     if (editorRef.current) {
       editorRef.current.setValue(q);

@@ -200,7 +200,15 @@ def _lint_javascript(content: str, file_path: str | None, language: str) -> list
         raw_out = (proc.stdout or "").strip()
         if raw_out:
             try:
-                parsed = json.loads(raw_out)
+                # Isolate JSON object or array even if oxlint prepends banners or notices
+                s_obj = raw_out.find("{")
+                s_arr = raw_out.find("[")
+                start_idx = min(idx for idx in (s_obj, s_arr) if idx != -1) if (s_obj != -1 or s_arr != -1) else -1
+                e_obj = raw_out.rfind("}")
+                e_arr = raw_out.rfind("]")
+                end_idx = max(e_obj, e_arr)
+                json_str = raw_out[start_idx : end_idx + 1] if (start_idx != -1 and end_idx > start_idx) else raw_out
+                parsed = json.loads(json_str)
                 items = parsed.get("diagnostics", []) if isinstance(parsed, dict) else parsed
                 for item in items:
                     msg = item.get("message") or ""

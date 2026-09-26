@@ -14,6 +14,7 @@ import io
 import logging
 import os
 import re
+import sys
 import threading
 import time
 import traceback
@@ -172,6 +173,8 @@ class PersistentPythonKernel:
 
     def execute(self, code: str, timeout: int = 30) -> dict[str, Any]:
         """Execute a Python code cell inside the persistent namespace."""
+        orig_stdout = sys.stdout
+        orig_stderr = sys.stderr
         with self.lock:
             self.execution_count += 1
             self.last_active_at = time.time()
@@ -205,6 +208,11 @@ class PersistentPythonKernel:
                 status = "timeout"
                 tb = f"Execution timed out after {timeout} seconds."
                 self.globals = pre_globals
+                # Prevent permanently hijacked stdout/stderr across process if thread is still running
+                if sys.stdout is out_buf:
+                    sys.stdout = orig_stdout
+                if sys.stderr is err_buf:
+                    sys.stderr = orig_stderr
 
             raw_out = out_buf.getvalue()
             raw_err = err_buf.getvalue()

@@ -67,8 +67,24 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
         console.error('Error fetching tasks list:', e);
         if (active) setLoading(false);
       });
+
+    // Periodic live refresh while dashboard is open
+    const pollInterval = setInterval(() => {
+      if (!active) return;
+      fetchTasksList(conversationId || undefined)
+        .then((res) => {
+          if (active) {
+            setData(res);
+          }
+        })
+        .catch((e) => {
+          console.debug('Error polling tasks list:', e);
+        });
+    }, 5000);
+
     return () => {
       active = false;
+      clearInterval(pollInterval);
     };
   }, [isOpen, conversationId]);
 

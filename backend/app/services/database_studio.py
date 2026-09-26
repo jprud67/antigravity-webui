@@ -279,7 +279,7 @@ def execute_query(db_path: str, query: str, limit: int = 500, timeout_seconds: f
     if not query or not query.strip():
         return QueryResult(error="Requête SQL vide.")
 
-    limit = max(1, min(limit, 2000))
+    limit = max(1, min(limit, 10000))
     start_time = time.perf_counter()
 
     conn = None

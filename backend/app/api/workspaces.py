@@ -153,6 +153,9 @@ def delete_workspace(path: str = Query(...), _ = Depends(require_auth)):
     if DEFAULT_WORKSPACE not in workspaces:
         workspaces.insert(0, DEFAULT_WORKSPACE)
     settings["trustedWorkspaces"] = workspaces
+    cur_default = settings.get("defaultWorkspace")
+    if cur_default and _safe_resolve(cur_default) == p:
+        settings["defaultWorkspace"] = DEFAULT_WORKSPACE
     save_settings(settings)
     return {"status": "ok", "workspaces": workspaces}
 

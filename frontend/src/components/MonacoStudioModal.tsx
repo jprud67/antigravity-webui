@@ -124,6 +124,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
   }, [diffRanges]);
 
   const editorRef = useRef<any>(null);
+  const diagRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
     return () => {
@@ -137,6 +138,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
 
   const runDiagnostics = useCallback(
     async (codeToLint: string, langToLint: string, path?: string) => {
+      const reqId = ++diagRequestIdRef.current;
       if (!codeToLint.trim() || mode !== 'editor') {
         setDiagnostics([]);
         if (editorRef.current && monacoInstanceRef.current) {
@@ -152,18 +154,22 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
           filePath: path || config.filePath,
           workspace: currentWorkspace,
         });
-        setDiagnostics(res.diagnostics || []);
-        if (editorRef.current && monacoInstanceRef.current) {
-          applyMonacoDiagnostics(
-            monacoInstanceRef.current,
-            editorRef.current.getModel(),
-            res.diagnostics || []
-          );
+        if (reqId === diagRequestIdRef.current) {
+          setDiagnostics(res.diagnostics || []);
+          if (editorRef.current && monacoInstanceRef.current) {
+            applyMonacoDiagnostics(
+              monacoInstanceRef.current,
+              editorRef.current.getModel(),
+              res.diagnostics || []
+            );
+          }
         }
       } catch (err) {
         console.debug('Diagnostics run failed:', err);
       } finally {
-        setIsLinting(false);
+        if (reqId === diagRequestIdRef.current) {
+          setIsLinting(false);
+        }
       }
     },
     [mode, config.filePath, currentWorkspace]

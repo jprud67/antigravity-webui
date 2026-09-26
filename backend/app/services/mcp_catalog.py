@@ -238,7 +238,7 @@ async def test_mcp_connection(slug: str) -> dict[str, Any]:
             }
         try:
             async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
-                res = await client.get(url, headers={"User-Agent": "Antigravity-MCP-Probe/0.2.28"})
+                res = await client.get(url, headers={"User-Agent": "Antigravity-MCP-Probe/0.3.4"})
                 latency = round((time.perf_counter() - start) * 1000, 1)
                 # HTTP 200, 401 (auth required), 405 (method not allowed for GET on MCP endpoint) are valid signals of a live server!
                 is_live = res.status_code in (200, 204, 401, 403, 405)

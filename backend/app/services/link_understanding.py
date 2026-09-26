@@ -131,10 +131,10 @@ def _clean_html_to_text(raw_html: str) -> tuple[str, str, str]:
     if title_match:
         title = html.unescape(title_match.group(1).strip())
 
-    # 2. Meta description
-    meta_desc_match = re.search(r'<meta[^>]*name=["\'](?:description|og:description)["\'][^>]*content=["\'](.*?)["\']', raw_html, re.IGNORECASE)
+    # 2. Meta description (supports name="description" and property="og:description")
+    meta_desc_match = re.search(r'<meta[^>]*(?:name|property)=["\'](?:description|og:description)["\'][^>]*content=["\'](.*?)["\']', raw_html, re.IGNORECASE)
     if not meta_desc_match:
-        meta_desc_match = re.search(r'<meta[^>]*content=["\'](.*?)["\'][^>]*name=["\'](?:description|og:description)["\']', raw_html, re.IGNORECASE)
+        meta_desc_match = re.search(r'<meta[^>]*content=["\'](.*?)["\'][^>]*(?:name|property)=["\'](?:description|og:description)["\']', raw_html, re.IGNORECASE)
     if meta_desc_match:
         description = html.unescape(meta_desc_match.group(1).strip())
 

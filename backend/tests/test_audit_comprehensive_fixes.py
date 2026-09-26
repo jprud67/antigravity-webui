@@ -265,4 +265,168 @@ def test_link_understanding_db_parent_mkdir(tmp_path):
         assert conn is not None
 
 
+def test_database_studio_query_limit_extended(tmp_path):
+    import sqlite3
+
+    from app.services.database_studio import execute_query
+
+    test_db = tmp_path / "large_limit.db"
+    conn = sqlite3.connect(str(test_db))
+    conn.execute("CREATE TABLE items (id INT)")
+    for i in range(2500):
+        conn.execute("INSERT INTO items VALUES (?)", (i,))
+    conn.commit()
+    conn.close()
+
+    res = execute_query(str(test_db), "SELECT * FROM items;", limit=3000)
+    assert res.error is None
+    assert res.total_rows == 2500
+    assert not res.truncated
+
+
+def test_editor_diagnostics_oxlint_banner_tolerance(monkeypatch, tmp_path):
+    from app.api.editor_diagnostics import _lint_javascript
+
+    fake_oxlint = tmp_path / "fake_oxlint.sh"
+    fake_oxlint.write_text(
+        '#!/bin/sh\n'
+        'echo "No files found to lint. Please check your paths and ignore patterns."\n'
+        'echo \'{"diagnostics": [{"message": "Unused var", "code": "no-unused-vars", "severity": "warning", "labels": [{"span": {"line": 1, "column": 5, "length": 1}}]}]}\'\n',
+        encoding="utf-8"
+    )
+    fake_oxlint.chmod(0o755)
+
+    monkeypatch.setattr("app.api.editor_diagnostics._get_oxlint_executable", lambda: str(fake_oxlint))
+    diags = _lint_javascript("const a = 1;", "test.ts", "typescript")
+    assert len(diags) == 1
+    assert diags[0].message == "Unused var"
+    assert diags[0].code == "no-unused-vars"
+
+
+def test_code_kernel_stdout_restore_on_timeout():
+    import sys
+
+    from app.services.code_kernel import PersistentPythonKernel
+
+    orig_stdout = sys.stdout
+    orig_stderr = sys.stderr
+
+    kernel = PersistentPythonKernel("test-timeout-session")
+    # Execute a code cell that times out
+    res = kernel.execute("import time; time.sleep(2)", timeout=1)
+    assert res["status"] == "timeout"
+    assert "timed out" in res["traceback"]
+
+    # Verify that sys.stdout and sys.stderr are NOT hijacked
+    assert sys.stdout is orig_stdout
+    assert sys.stderr is orig_stderr
+
+
+def test_link_understanding_property_og_description():
+    from app.services.link_understanding import _clean_html_to_text
+
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Article Title</title>
+        <meta property="og:description" content="This is an OpenGraph description" />
+    </head>
+    <body>
+        <p>Main body content goes here.</p>
+    </body>
+    </html>
+    """
+    title, desc, text = _clean_html_to_text(html_content)
+    assert title == "Article Title"
+    assert desc == "This is an OpenGraph description"
+    assert "Main body content" in text
+
+
+def test_canvas_documents_url_scheme_security(tmp_path):
+    import pytest
+
+    from app.services.canvas_documents import (
+        CanvasDocumentCreateInput,
+        CanvasDocumentEntrypoint,
+        create_canvas_document,
+    )
+
+    bad_input = CanvasDocumentCreateInput(
+        id="test-xss-doc",
+        kind="html_bundle",
+        entrypoint=CanvasDocumentEntrypoint(type="url", value="javascript:alert(document.cookie)"),
+    )
+    with pytest.raises(ValueError, match="URL de schéma non autorisé"):
+        create_canvas_document(bad_input, workspace_dir=str(tmp_path))
+
+
+def test_workspaces_delete_cleans_default_workspace(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from app.api.workspaces import delete_workspace
+    from app.config import DEFAULT_WORKSPACE
+
+    ws1 = str(tmp_path / "ws1")
+    ws2 = str(tmp_path / "ws2")
+    Path(ws1).mkdir()
+    Path(ws2).mkdir()
+
+    fake_settings = {
+        "trustedWorkspaces": [DEFAULT_WORKSPACE, ws1, ws2],
+        "defaultWorkspace": ws1
+    }
+
+    monkeypatch.setattr("app.api.workspaces.get_settings", lambda: dict(fake_settings))
+    def fake_save(s):
+        fake_settings.clear()
+        fake_settings.update(s)
+        return s
+    monkeypatch.setattr("app.api.workspaces.save_settings", fake_save)
+
+    delete_workspace(path=ws1)
+    assert ws1 not in fake_settings["trustedWorkspaces"]
+    # defaultWorkspace should have been reset to DEFAULT_WORKSPACE
+    assert fake_settings["defaultWorkspace"] == DEFAULT_WORKSPACE
+
+
+def test_project_detector_level2_file_count(tmp_path):
+    from app.services.project_detector import _extract_stats
+
+    sub1 = tmp_path / "sub1"
+    sub1.mkdir()
+    (sub1 / "file1.txt").write_text("hello", encoding="utf-8")
+    (sub1 / "file2.py").write_text("world", encoding="utf-8")
+    (tmp_path / "root_file.md").write_text("readme", encoding="utf-8")
+
+    stats = _extract_stats(tmp_path)
+    # Should count root_file.md (1) + file1.txt (1) + file2.py (1) = 3 files
+    assert stats["file_count"] == 3
+    assert stats["disk_size_mb"] >= 0.0
+
+
+def test_fts_rebuild_missing_summaries_table(tmp_path, monkeypatch):
+    from app.services.fts_search import fts_service
+
+    test_db = tmp_path / "empty_fts.db"
+    monkeypatch.setattr("app.services.fts_search.CONVERSATION_DB", test_db)
+    monkeypatch.setattr("app.services.fts_search._fts_initialized", False)
+
+    # Rebuild must not fail even if conversation_summaries table does not exist
+    res = fts_service.rebuild_all_sessions()
+    assert res["success"] is True
+    assert res["total_sessions"] == 0
+
+
+def test_mcp_catalog_user_agent_version():
+
+    # Inspect module source or test probe
+    import inspect
+
+    import app.services.mcp_catalog as mc
+    source = inspect.getsource(mc.test_mcp_connection)
+    assert "Antigravity-MCP-Probe/0.3.4" in source
+
+
+
 

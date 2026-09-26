@@ -431,14 +431,29 @@ class TranscriptFtsService:
         start_time = time.perf_counter()
         conn = _get_connection()
         try:
+            ensure_fts_schema(conn)
             with _fts_lock:
                 conn.execute("DELETE FROM session_transcript_fts")
                 conn.execute("DELETE FROM session_fts_indexed_messages")
                 conn.execute("DELETE FROM session_fts_index_state")
                 conn.commit()
 
-            cursor = conn.execute("SELECT conversation_id FROM conversation_summaries")
-            sessions = [r["conversation_id"] for r in cursor.fetchall()]
+            sessions: list[str] = []
+            try:
+                cursor = conn.execute("SELECT conversation_id FROM conversation_summaries")
+                sessions = [r["conversation_id"] for r in cursor.fetchall()]
+            except (sqlite3.OperationalError, sqlite3.DatabaseError):
+                sessions = []
+
+            # If summaries table is empty or not yet initialized, discover directly from BRAIN_DIR
+            if not sessions and BRAIN_DIR.exists():
+                try:
+                    for d in BRAIN_DIR.iterdir():
+                        if d.is_dir() and not d.name.startswith("."):
+                            if (d / ".system_generated" / "logs" / "transcript.jsonl").exists():
+                                sessions.append(d.name)
+                except Exception:
+                    pass
 
             total_messages_indexed = 0
             for sid in sessions:

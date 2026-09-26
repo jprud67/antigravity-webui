@@ -863,9 +863,11 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const [isProblemsOpen, setIsProblemsOpen] = useState<boolean>(false);
 
   const lastLintedPathRef = useRef<string | null>(null);
+  const diagRequestIdRef = useRef<number>(0);
 
   const loadDiagnostics = useCallback(
     async (codeToLint: string, langToLint: string, path?: string, clearPrevious: boolean = false) => {
+      const reqId = ++diagRequestIdRef.current;
       if (!codeToLint.trim()) {
         setDiagnostics([]);
         if (monacoEditorRef.current && monacoInstanceRef.current) {
@@ -884,18 +886,22 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
           filePath: path,
           workspace: currentWorkspace,
         });
-        setDiagnostics(res.diagnostics || []);
-        if (monacoEditorRef.current && monacoInstanceRef.current) {
-          applyMonacoDiagnostics(
-            monacoInstanceRef.current,
-            monacoEditorRef.current.getModel(),
-            res.diagnostics || []
-          );
+        if (reqId === diagRequestIdRef.current) {
+          setDiagnostics(res.diagnostics || []);
+          if (monacoEditorRef.current && monacoInstanceRef.current) {
+            applyMonacoDiagnostics(
+              monacoInstanceRef.current,
+              monacoEditorRef.current.getModel(),
+              res.diagnostics || []
+            );
+          }
         }
       } catch {
         // Ignore linting errors gracefully
       } finally {
-        setIsLinting(false);
+        if (reqId === diagRequestIdRef.current) {
+          setIsLinting(false);
+        }
       }
     },
     [currentWorkspace]

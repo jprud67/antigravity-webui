@@ -531,9 +531,24 @@ def _extract_stats(p: Path) -> dict[str, Any]:
                 continue
             try:
                 st = entry.stat(follow_symlinks=False)
-                total_bytes += st.st_size
-                count += 1
                 last_modified_ts = max(last_modified_ts, st.st_mtime)
+                if entry.is_file():
+                    total_bytes += st.st_size
+                    count += 1
+                elif entry.is_dir():
+                    for sub in entry.iterdir():
+                        if sub.name.startswith(".") and sub.name not in [".github"]:
+                            continue
+                        if sub.name in ["node_modules", "venv", ".venv", "vendor", "dist", "build", "__pycache__"]:
+                            continue
+                        try:
+                            st_sub = sub.stat(follow_symlinks=False)
+                            last_modified_ts = max(last_modified_ts, st_sub.st_mtime)
+                            if sub.is_file():
+                                total_bytes += st_sub.st_size
+                                count += 1
+                        except Exception:
+                            continue
             except Exception:
                 continue
         file_count = count
