@@ -77,10 +77,10 @@ def is_safe_public_url(url: str) -> bool:
             try:
                 resolved_ip = socket.gethostbyname(hostname)
                 ip = ipaddress.ip_address(resolved_ip)
-                if ip.is_private or ip.is_loopback or ip.is_link_local:
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
                     return False
             except Exception:
-                pass
+                return False
 
         return True
     except Exception:

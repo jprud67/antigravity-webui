@@ -6,8 +6,9 @@ and manage container lifecycles, streaming logs, and exec commands.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
 from app.platform_utils import is_blocked_sensitive_path
 from app.services.docker_studio import (
@@ -27,7 +28,7 @@ from app.services.docker_studio import (
     scan_workspace_docker_files,
 )
 
-router = APIRouter(prefix="/api/docker", tags=["Docker Studio"])
+router = APIRouter(prefix="/api/docker", tags=["Docker Studio"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/status", response_model=DockerEngineStatus)

@@ -446,16 +446,31 @@ def _spawn_login_process(env):
     if not HAS_PTY:
         raise RuntimeError("La connexion Google nécessite les modules POSIX pty/select.")
     master_fd, slave_fd = pty.openpty()
-    proc = subprocess.Popen(
-        [AGY_BIN, "-p", "auth_login_init"],
-        stdin=slave_fd,
-        stdout=slave_fd,
-        stderr=slave_fd,
-        close_fds=True,
-        env=env,
-        cwd=str(spawn_cwd)
-    )  # nosec B603
-    os.close(slave_fd)
+    try:
+        proc = subprocess.Popen(
+            [AGY_BIN, "-p", "auth_login_init"],
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            close_fds=True,
+            env=env,
+            cwd=str(spawn_cwd)
+        )  # nosec B603
+    except Exception:
+        try:
+            os.close(master_fd)
+        except OSError:
+            pass
+        try:
+            os.close(slave_fd)
+        except OSError:
+            pass
+        raise
+    finally:
+        try:
+            os.close(slave_fd)
+        except OSError:
+            pass
     return proc, master_fd, None
 
 

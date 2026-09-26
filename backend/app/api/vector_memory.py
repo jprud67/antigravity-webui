@@ -6,9 +6,10 @@ and configure embedding parameters.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from app.api.auth import require_auth
 from app.services.vector_memory import (
     AutoRecallConfig,
     MemoryCategory,
@@ -27,7 +28,7 @@ from app.services.vector_memory import (
     store_memory,
 )
 
-router = APIRouter(prefix="/api/memory/vector", tags=["Vector Memory"])
+router = APIRouter(prefix="/api/memory/vector", tags=["Vector Memory"], dependencies=[Depends(require_auth)])
 
 
 class RecallRequest(BaseModel):

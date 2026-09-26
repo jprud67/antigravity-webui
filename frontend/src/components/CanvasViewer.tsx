@@ -226,7 +226,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
             srcDoc={srcDoc}
             title={effectiveTitle}
             className="w-full h-full border-0 bg-transparent block"
-            sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
+            sandbox="allow-scripts allow-forms allow-popups"
             loading="lazy"
           />
         )}

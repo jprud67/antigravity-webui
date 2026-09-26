@@ -970,8 +970,8 @@ def rename_branch(req: BranchRenameRequest, _ = Depends(require_auth)):
 
 
 class RebaseCommitAction(BaseModel):
-    sha: str
-    action: str = "pick"
+    sha: str = Field(..., pattern=r"^[a-fA-F0-9]{4,40}$")
+    action: str = Field("pick", pattern=r"^(pick|reword|edit|squash|fixup|drop)$")
     new_message: str | None = None
 
 

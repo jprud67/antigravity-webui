@@ -45,16 +45,19 @@ def test_fts_service_crud_and_search():
     assert any(m["role"] == "user" for m in res_user["matches"])
 
 
-def test_fts_api_endpoints():
+def test_fts_api_endpoints(auth_headers: dict):
+    # Test unauthenticated access rejected
+    assert client.get("/api/search/fts", params={"q": "FastAPI"}).status_code == 401
+
     # Test GET /api/search/fts
-    resp = client.get("/api/search/fts", params={"q": "FastAPI"})
+    resp = client.get("/api/search/fts", params={"q": "FastAPI"}, headers=auth_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert "matches" in data
     assert "took_ms" in data
 
     # Test GET /api/search/fts/stats
-    resp_stats = client.get("/api/search/fts/stats")
+    resp_stats = client.get("/api/search/fts/stats", headers=auth_headers)
     assert resp_stats.status_code == 200
     stats = resp_stats.json()
     assert "total_indexed_rows" in stats

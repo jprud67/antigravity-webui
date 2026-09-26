@@ -4,12 +4,13 @@ backend/app/api/tool_repair.py — Endpoints API pour le diagnostic et la répar
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from app.api.auth import require_auth
 from app.services.tool_repair import tool_repair_engine
 
-router = APIRouter(prefix="/api/tools", tags=["tools"])
+router = APIRouter(prefix="/api/tools", tags=["tools"], dependencies=[Depends(require_auth)])
 
 
 class ToolRepairRequest(BaseModel):

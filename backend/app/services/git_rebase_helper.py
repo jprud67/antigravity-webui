@@ -4,6 +4,7 @@ Helper script invoked by Git during interactive rebase:
 - As GIT_EDITOR to automatically supply new commit messages for reword/squash without interactive prompts
 """
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -45,6 +46,8 @@ def handle_sequence(config_path: str, todo_path: str):
     # Build lines in the exact order requested by user
     for item in user_commits:
         sha = item.get("sha", "").strip()
+        if not re.match(r"^[a-fA-F0-9]{4,40}$", sha):
+            continue
         action = item.get("action", "pick").strip().lower()
         if action not in ["pick", "reword", "edit", "squash", "fixup", "drop"]:
             action = "pick"
@@ -56,7 +59,9 @@ def handle_sequence(config_path: str, todo_path: str):
                 subject = v
                 break
         
-        new_lines.append(f"{action} {sha} {subject}\n")
+        # Strip CR/LF to prevent todo sequence injection
+        clean_subject = subject.replace("\r", " ").replace("\n", " ").strip()
+        new_lines.append(f"{action} {sha} {clean_subject}\n")
 
     try:
         with open(todo_file, "w", encoding="utf-8") as f:

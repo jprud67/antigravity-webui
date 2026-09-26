@@ -89,9 +89,12 @@ def test_memory_store_save_raw():
         assert "pytest" in entries[0]
 
 
-def test_memory_api_endpoints():
+def test_memory_api_endpoints(auth_headers):
+    # Test unauthenticated access rejected
+    assert client.get("/api/memory").status_code == 401
+
     # Test GET /api/memory
-    resp = client.get("/api/memory")
+    resp = client.get("/api/memory", headers=auth_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert "user" in data
@@ -100,7 +103,7 @@ def test_memory_api_endpoints():
     assert "char_limit" in data["memory"]
 
     # Test GET /api/memory/snapshot
-    resp_snap = client.get("/api/memory/snapshot")
+    resp_snap = client.get("/api/memory/snapshot", headers=auth_headers)
     assert resp_snap.status_code == 200
     assert "snapshot" in resp_snap.json()
 
@@ -109,7 +112,7 @@ def test_memory_api_endpoints():
         "target": "user",
         "action": "add",
         "content": "Développeur senior Python et TypeScript."
-    })
+    }, headers=auth_headers)
     assert resp_add.status_code == 200
     assert resp_add.json()["success"] is True
 
@@ -118,6 +121,6 @@ def test_memory_api_endpoints():
         "target": "user",
         "action": "remove",
         "old_text": "Développeur senior"
-    })
+    }, headers=auth_headers)
     assert resp_rm.status_code == 200
     assert resp_rm.json()["success"] is True

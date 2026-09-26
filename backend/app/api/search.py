@@ -4,11 +4,12 @@ backend/app/api/search.py — Endpoints API pour la recherche plein-texte FTS5 c
 
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.api.auth import require_auth
 from app.services.fts_search import fts_service
 
-router = APIRouter(prefix="/api/search", tags=["search"])
+router = APIRouter(prefix="/api/search", tags=["search"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/fts")

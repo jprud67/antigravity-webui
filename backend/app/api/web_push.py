@@ -1,9 +1,10 @@
 """API router for Web Push notifications."""
 
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
+from app.api.auth import require_auth
 from app.services.web_push import (
     get_or_create_vapid_keys,
     list_subscriptions,
@@ -12,7 +13,7 @@ from app.services.web_push import (
     send_web_push_notification,
 )
 
-router = APIRouter(prefix="/api/push", tags=["push"])
+router = APIRouter(prefix="/api/push", tags=["push"], dependencies=[Depends(require_auth)])
 
 
 class SubscriptionKeys(BaseModel):

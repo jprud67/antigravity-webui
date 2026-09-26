@@ -1012,7 +1012,7 @@ def workspace_replace(req: WorkspaceReplaceRequest, _ = Depends(require_auth)):
             if matches_count == 0:
                 continue
 
-            modified = regex.sub(req.replace_text, original)
+            modified = regex.sub(lambda _: req.replace_text, original)
             try:
                 rel_path = str(file_p.relative_to(resolved_root))
             except Exception:

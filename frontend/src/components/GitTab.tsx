@@ -644,6 +644,19 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
 
   useEffect(() => {
     let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      setLoading(true);
+      setError(null);
+      setCommits([]);
+      setSelectedCommit(null);
+      setCommitDiff(null);
+      setBranches([]);
+      setStashes([]);
+      setSelectedFile(null);
+      setDiff(null);
+    });
+
     fetchGitStatus(currentWorkspace)
       .then((data) => {
         if (active) {

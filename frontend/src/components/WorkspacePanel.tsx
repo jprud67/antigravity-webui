@@ -1009,7 +1009,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     if (!selectedFilePath) return;
     try {
       const token = getAuthToken();
-      const downloadUrl = `/api/files/download?path=${encodeURIComponent(selectedFilePath)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+      const downloadUrl = `/api/files/download?path=${encodeURIComponent(selectedFilePath)}`;
       const res = await fetch(downloadUrl, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });

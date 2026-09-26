@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.api.auth import require_auth
 from app.services.link_understanding import (
     enrich_user_prompt_with_links,
     extract_bare_urls,
     fetch_and_extract_url,
 )
 
-router = APIRouter(prefix="/api/links", tags=["Link Understanding"])
+router = APIRouter(prefix="/api/links", tags=["Link Understanding"], dependencies=[Depends(require_auth)])
 
 
 class ExtractUrlPayload(BaseModel):

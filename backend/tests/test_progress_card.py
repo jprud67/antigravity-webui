@@ -51,11 +51,14 @@ def test_progress_card_persistence():
 
 
 @pytest.mark.asyncio
-async def test_progress_card_api():
+async def test_progress_card_api(auth_headers: dict):
     session_id = "test-api-progress-conv-456"
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        unauth_res = await ac.get(f"/api/conversations/{session_id}/progress-card")
+        assert unauth_res.status_code == 401
+
         # Initial check
-        res0 = await ac.get(f"/api/conversations/{session_id}/progress-card")
+        res0 = await ac.get(f"/api/conversations/{session_id}/progress-card", headers=auth_headers)
         assert res0.status_code == 200
         assert res0.json()["exists"] is False
 
@@ -69,7 +72,8 @@ async def test_progress_card_api():
                     {"label": "Step A", "status": "completed"},
                     {"label": "Step B", "status": "in_progress"}
                 ]
-            }
+            },
+            headers=auth_headers,
         )
         assert res1.status_code == 200
         data1 = res1.json()
@@ -77,12 +81,12 @@ async def test_progress_card_api():
         assert data1["card"]["percent"] == 50
 
         # Get updated
-        res2 = await ac.get(f"/api/conversations/{session_id}/progress-card")
+        res2 = await ac.get(f"/api/conversations/{session_id}/progress-card", headers=auth_headers)
         assert res2.status_code == 200
         assert res2.json()["exists"] is True
         assert res2.json()["card"]["title"] == "Sprint 24 Plan"
 
         # Cleanup
-        del_res = await ac.delete(f"/api/conversations/{session_id}/progress-card")
+        del_res = await ac.delete(f"/api/conversations/{session_id}/progress-card", headers=auth_headers)
         assert del_res.status_code == 200
         assert del_res.json()["success"] is True

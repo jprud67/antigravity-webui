@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.auth import require_auth
 from app.services.progress_card import (
     ProgressCardPayload,
     delete_progress_card,
@@ -11,7 +12,7 @@ from app.services.progress_card import (
     save_progress_card,
 )
 
-router = APIRouter(prefix="/api/conversations/{conversation_id}/progress-card", tags=["Progress Card"])
+router = APIRouter(prefix="/api/conversations/{conversation_id}/progress-card", tags=["Progress Card"], dependencies=[Depends(require_auth)])
 
 
 @router.get("")

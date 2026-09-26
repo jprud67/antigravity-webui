@@ -1,9 +1,10 @@
 """API router for Omni-channel Messaging Gateway & PIN Pairing."""
 
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.api.auth import require_auth
 from app.services.messaging_gateway import (
     approve_pairing_code,
     get_gateway_configs,
@@ -14,7 +15,7 @@ from app.services.messaging_gateway import (
     save_gateway_config,
 )
 
-router = APIRouter(prefix="/api/gateway", tags=["gateway"])
+router = APIRouter(prefix="/api/gateway", tags=["gateway"], dependencies=[Depends(require_auth)])
 
 
 class RequestPairingModel(BaseModel):

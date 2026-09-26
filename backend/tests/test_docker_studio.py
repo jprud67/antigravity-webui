@@ -69,9 +69,12 @@ services:
     assert "8080:80" in web_svc.ports
 
 
-def test_docker_api_status_and_workspace(tmp_path: Path):
+def test_docker_api_status_and_workspace(tmp_path: Path, auth_headers: dict):
+    # Test unauthenticated access rejected
+    assert client.get("/api/docker/status").status_code == 401
+
     # Status endpoint
-    res = client.get("/api/docker/status")
+    res = client.get("/api/docker/status", headers=auth_headers)
     assert res.status_code == 200
     data = res.json()
     assert "isAvailable" in data
@@ -81,22 +84,22 @@ def test_docker_api_status_and_workspace(tmp_path: Path):
     dockerfile = tmp_path / "Dockerfile.prod"
     dockerfile.write_text("FROM node:20-alpine\n", encoding="utf-8")
 
-    res_ws = client.get(f"/api/docker/workspace?workspace={tmp_path}")
+    res_ws = client.get(f"/api/docker/workspace?workspace={tmp_path}", headers=auth_headers)
     assert res_ws.status_code == 200
     items = res_ws.json()
     assert len(items) >= 1
     assert any(it["filename"] == "Dockerfile.prod" for it in items)
 
     # Containers endpoint
-    res_ct = client.get("/api/docker/containers")
+    res_ct = client.get("/api/docker/containers", headers=auth_headers)
     assert res_ct.status_code == 200
     assert isinstance(res_ct.json(), list)
 
 
-def test_invalid_container_id_validation():
+def test_invalid_container_id_validation(auth_headers: dict):
     # Attempt command injection in container id
-    res = client.get("/api/docker/containers/id_with_space%20bad")
+    res = client.get("/api/docker/containers/id_with_space%20bad", headers=auth_headers)
     assert res.status_code == 400
 
-    res_action = client.post("/api/docker/containers/id;rm%20-rf/action", json={"action": "start"})
+    res_action = client.post("/api/docker/containers/id;rm%20-rf/action", json={"action": "start"}, headers=auth_headers)
     assert res_action.status_code == 400

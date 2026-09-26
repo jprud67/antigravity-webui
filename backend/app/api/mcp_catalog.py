@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from app.api.auth import require_auth
 from app.services.mcp_catalog import (
     get_mcp_catalog_item,
     install_mcp_catalog_item,
@@ -13,7 +14,7 @@ from app.services.mcp_catalog import (
     uninstall_mcp_catalog_item,
 )
 
-router = APIRouter(prefix="/api/mcp/catalog", tags=["MCP Catalog"])
+router = APIRouter(prefix="/api/mcp/catalog", tags=["MCP Catalog"], dependencies=[Depends(require_auth)])
 
 
 class InstallMcpPayload(BaseModel):

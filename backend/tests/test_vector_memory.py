@@ -141,7 +141,10 @@ async def test_auto_recall_hook():
     clear_memories("test_recall_agent")
 
 
-def test_vector_memory_api():
+def test_vector_memory_api(auth_headers: dict):
+    # Test unauthenticated access rejected
+    assert client.get("/api/memory/vector/config").status_code == 401
+
     # 1. Store memory
     store_res = client.post(
         "/api/memory/vector/store",
@@ -151,12 +154,13 @@ def test_vector_memory_api():
             "importance": 0.8,
             "agentId": "api_test_agent",
         },
+        headers=auth_headers,
     )
     assert store_res.status_code == 200
     mem_id = store_res.json()["id"]
 
     # 2. List memories
-    list_res = client.get("/api/memory/vector/list?agentId=api_test_agent")
+    list_res = client.get("/api/memory/vector/list?agentId=api_test_agent", headers=auth_headers)
     assert list_res.status_code == 200
     assert any(m["id"] == mem_id for m in list_res.json())
 
@@ -168,12 +172,13 @@ def test_vector_memory_api():
             "agentId": "api_test_agent",
             "minSimilarity": 0.1,
         },
+        headers=auth_headers,
     )
     assert search_res.status_code == 200
     assert len(search_res.json()) >= 1
 
     # 4. Config endpoint
-    cfg_res = client.get("/api/memory/vector/config")
+    cfg_res = client.get("/api/memory/vector/config", headers=auth_headers)
     assert cfg_res.status_code == 200
     assert "enabled" in cfg_res.json()
 
@@ -184,11 +189,12 @@ def test_vector_memory_api():
             "prompt": "ok thanks",
             "agent_id": "api_test_agent",
         },
+        headers=auth_headers,
     )
     assert recall_res.status_code == 200
     assert recall_res.json()["shouldInject"] is False
 
     # 6. Delete memory
-    del_res = client.delete(f"/api/memory/vector/{mem_id}")
+    del_res = client.delete(f"/api/memory/vector/{mem_id}", headers=auth_headers)
     assert del_res.status_code == 200
     assert del_res.json()["status"] == "ok"

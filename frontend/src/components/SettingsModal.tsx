@@ -345,9 +345,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleDeleteActiveConv = async () => {
     if (!activeConversation) return;
     const ok = await showConfirm({
-      title: t('confirm_delete_session_title', 'Delete session'),
-      message: t('confirm_delete_session_msg', 'Permanently delete session "{0}"? This action cannot be undone.').replace('{0}', convTitle || activeConversation.title || activeConversation.conversation_id.slice(0, 8)),
-      confirmText: t('confirm_delete_session_btn', 'Permanently delete'),
+      title: t('confirm_delete_session_title', 'Supprimer la session'),
+      message: t('confirm_delete_session_msg', 'Supprimer définitivement la session « {0} » ? Cette action est irréversible.').replace('{0}', convTitle || activeConversation.title || activeConversation.conversation_id.slice(0, 8)),
+      confirmText: t('confirm_delete_session_btn', 'Supprimer définitivement'),
       destructive: true
     });
     if (ok) {

@@ -1,15 +1,16 @@
 """API router for Tailscale Remote Access."""
 
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from app.api.auth import require_auth
 from app.services.tailscale import (
     get_tailscale_status,
     toggle_tailscale_serve,
 )
 
-router = APIRouter(prefix="/api/tailscale", tags=["tailscale"])
+router = APIRouter(prefix="/api/tailscale", tags=["tailscale"], dependencies=[Depends(require_auth)])
 
 
 class ToggleServeRequest(BaseModel):

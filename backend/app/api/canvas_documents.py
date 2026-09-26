@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import mimetypes
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
+from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
 from app.services.canvas_documents import (
     CanvasDocumentCreateInput,
@@ -25,10 +26,10 @@ from app.services.canvas_documents import (
     wrap_canvas_html,
 )
 
-router = APIRouter(prefix="/api/canvas", tags=["Canvas Documents"])
+router = APIRouter(prefix="/api/canvas", tags=["Canvas Documents"], dependencies=[Depends(require_auth)])
 
-# Standard CSP header for sandboxed interactive widgets
-CANVAS_CSP_HEADER = "default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval' https:; sandbox allow-scripts allow-forms allow-same-origin;"
+# Standard CSP header for sandboxed interactive widgets (excluding allow-same-origin to prevent sandbox escape)
+CANVAS_CSP_HEADER = "default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval' https:; sandbox allow-scripts allow-forms;"
 
 
 class PreviewRequest(BaseModel):

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.auth import require_auth
 from app.services.doctor import run_auto_repair, run_system_diagnostics
 
-router = APIRouter(prefix="/api/doctor", tags=["System Doctor"])
+router = APIRouter(prefix="/api/doctor", tags=["System Doctor"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/diagnose")

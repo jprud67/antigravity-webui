@@ -1,9 +1,10 @@
 """API router for subagent Git Worktree isolation."""
 
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from app.api.auth import require_auth
 from app.services.git_worktree import (
     _run_git,
     create_subagent_worktree,
@@ -12,7 +13,7 @@ from app.services.git_worktree import (
     resolve_repo_root,
 )
 
-router = APIRouter(prefix="/api/worktrees", tags=["worktrees"])
+router = APIRouter(prefix="/api/worktrees", tags=["worktrees"], dependencies=[Depends(require_auth)])
 
 
 class CreateWorktreeRequest(BaseModel):

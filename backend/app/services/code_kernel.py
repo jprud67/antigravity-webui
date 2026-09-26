@@ -226,13 +226,36 @@ class PersistentPythonKernel:
 
 _KERNEL_REGISTRY: dict[str, PersistentPythonKernel] = {}
 _REGISTRY_LOCK = threading.Lock()
+_MAX_KERNELS = 50
+_KERNEL_TTL_SECONDS = 7200  # 2 hours
+
+
+def _prune_expired_kernels_locked(now: float) -> None:
+    # 1. Prune by TTL
+    expired = [
+        sid for sid, k in _KERNEL_REGISTRY.items()
+        if (now - k.last_active_at) > _KERNEL_TTL_SECONDS
+    ]
+    for sid in expired:
+        _KERNEL_REGISTRY.pop(sid, None)
+
+    # 2. Prune by capacity (LRU)
+    if len(_KERNEL_REGISTRY) >= _MAX_KERNELS:
+        sorted_kernels = sorted(_KERNEL_REGISTRY.items(), key=lambda item: item[1].last_active_at)
+        to_evict = len(_KERNEL_REGISTRY) - _MAX_KERNELS + 1
+        for sid, _ in sorted_kernels[:to_evict]:
+            _KERNEL_REGISTRY.pop(sid, None)
 
 
 def get_or_create_kernel(session_id: str = "default", cwd: str = ".") -> PersistentPythonKernel:
     with _REGISTRY_LOCK:
+        now = time.time()
+        _prune_expired_kernels_locked(now)
         if session_id not in _KERNEL_REGISTRY:
             _KERNEL_REGISTRY[session_id] = PersistentPythonKernel(session_id, cwd)
-        return _KERNEL_REGISTRY[session_id]
+        kernel = _KERNEL_REGISTRY[session_id]
+        kernel.last_active_at = now
+        return kernel
 
 
 def stop_kernel(session_id: str) -> bool:

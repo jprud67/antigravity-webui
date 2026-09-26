@@ -930,6 +930,13 @@ export function App() {
           });
         }
       } else if (event.event === 'result') {
+        // Refresh conversations in sidebar regardless of active session
+        fetchConversations(100).then((c) => setConversations(c));
+
+        if (event.conversation_id && activeConversationIdRef.current && event.conversation_id !== activeConversationIdRef.current) {
+          return;
+        }
+
         setAgentActivityTimestamp(Date.now());
         const res = event.result;
         if (res?.usage) {
@@ -962,9 +969,10 @@ export function App() {
             ];
           }
         });
-        // Refresh conversations in sidebar
-        fetchConversations(100).then((c) => setConversations(c));
       } else if (event.event === 'command_result') {
+        if (event.conversation_id && activeConversationIdRef.current && event.conversation_id !== activeConversationIdRef.current) {
+          return;
+        }
         const cmd = event.command || {};
         const cName = cmd.name;
         const cData = cmd.data || {};
@@ -1037,8 +1045,14 @@ export function App() {
           setQueueCount(event.queue_size);
         }
       } else if (event.event === 'steered') {
+        if (event.conversation_id && activeConversationIdRef.current && event.conversation_id !== activeConversationIdRef.current) {
+          return;
+        }
         setIsStreaming(true);
       } else if (event.event === 'model_failover') {
+        if (event.conversation_id && activeConversationIdRef.current && event.conversation_id !== activeConversationIdRef.current) {
+          return;
+        }
         setPendingApproval(null);
         showToast(
           `🔄 Quota atteint avec ${event.previous_model}. Basculement automatique sur ${event.new_model} et relance...`,
@@ -1063,6 +1077,9 @@ export function App() {
         });
         setIsStreaming(true);
       } else if (event.event === 'account_failover') {
+        if (event.conversation_id && activeConversationIdRef.current && event.conversation_id !== activeConversationIdRef.current) {
+          return;
+        }
         setPendingApproval(null);
         showToast(
           `🔄 Quota atteint sur ${event.previous_account}. Basculement automatique sur ${event.new_account} et relance...`,
@@ -1087,6 +1104,9 @@ export function App() {
         });
         setIsStreaming(true);
       } else if (event.event === 'interrupted') {
+        if (event.conversation_id && activeConversationIdRef.current && event.conversation_id !== activeConversationIdRef.current) {
+          return;
+        }
         setIsStreaming(false);
         setQueueCount(0);
         setPendingApproval(null);
@@ -1102,11 +1122,17 @@ export function App() {
           return prev;
         });
       } else if (event.event === 'loop_warning') {
+        if (event.conversation_id && activeConversationIdRef.current && event.conversation_id !== activeConversationIdRef.current) {
+          return;
+        }
         setLoopWarning({
           errorCount: event.consecutive_errors || 3,
           message: event.message || "Boucle d'erreurs détectée (3 échecs consécutifs)."
         });
       } else if (event.event === 'queue_cleared') {
+        if (event.conversation_id && activeConversationIdRef.current && event.conversation_id !== activeConversationIdRef.current) {
+          return;
+        }
         setQueueCount(0);
       } else if (event.event === 'error') {
         if (event.conversation_id && activeConversationIdRef.current && event.conversation_id !== activeConversationIdRef.current) {

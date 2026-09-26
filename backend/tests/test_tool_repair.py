@@ -75,17 +75,20 @@ npm run build
     assert calls3[0]["arguments"]["CommandLine"] == "npm run build"
 
 
-def test_tool_repair_api():
+def test_tool_repair_api(auth_headers: dict):
+    # Test unauthenticated access rejected
+    assert client.get("/api/tools/repair/stats").status_code == 401
+
     resp = client.post("/api/tools/repair", json={
         "text": '<function=read_file>{"path": "README.md"}</function>',
         "allowed_tools": ["read_file"]
-    })
+    }, headers=auth_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert data["was_repaired"] is True
     assert len(data["tool_calls"]) == 1
     assert data["tool_calls"][0]["name"] == "read_file"
 
-    resp_stats = client.get("/api/tools/repair/stats")
+    resp_stats = client.get("/api/tools/repair/stats", headers=auth_headers)
     assert resp_stats.status_code == 200
     assert "total_repaired" in resp_stats.json()

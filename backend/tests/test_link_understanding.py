@@ -78,11 +78,16 @@ async def test_enrich_user_prompt_with_links():
 
 
 @pytest.mark.asyncio
-async def test_link_understanding_api():
+async def test_link_understanding_api(auth_headers: dict):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        res = await ac.post("/api/links/parse-prompt", json={
+        unauth_res = await ac.post("/api/links/parse-prompt", json={
             "prompt": "Regarde https://github.com/astral-sh/uv pour comprendre"
         })
+        assert unauth_res.status_code == 401
+
+        res = await ac.post("/api/links/parse-prompt", json={
+            "prompt": "Regarde https://github.com/astral-sh/uv pour comprendre"
+        }, headers=auth_headers)
         assert res.status_code == 200
         data = res.json()
         assert "found_urls" in data

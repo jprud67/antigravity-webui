@@ -4,12 +4,13 @@ backend/app/api/memory.py — Endpoints API pour la Mémoire Continue (USER.md +
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.api.auth import require_auth
 from app.services.memory_store import memory_store
 
-router = APIRouter(prefix="/api/memory", tags=["memory"])
+router = APIRouter(prefix="/api/memory", tags=["memory"], dependencies=[Depends(require_auth)])
 
 
 class MemoryOperationRequest(BaseModel):

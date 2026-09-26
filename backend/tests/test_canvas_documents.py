@@ -95,7 +95,10 @@ def test_create_and_delete_canvas_document(tmp_path):
     assert get_canvas_document(manifest.id) is None
 
 
-def test_canvas_api_endpoints():
+def test_canvas_api_endpoints(auth_headers):
+    # Test unauthenticated access rejected
+    assert client.get("/api/canvas/documents").status_code == 401
+
     # 1. Create document via API
     payload = {
         "kind": "html_bundle",
@@ -107,7 +110,7 @@ def test_canvas_api_endpoints():
         },
         "retentionScope": "api_test"
     }
-    create_res = client.post("/api/canvas/documents", json=payload)
+    create_res = client.post("/api/canvas/documents", json=payload, headers=auth_headers)
     assert create_res.status_code == 200
     manifest = create_res.json()
     doc_id = manifest["id"]
@@ -116,12 +119,12 @@ def test_canvas_api_endpoints():
     assert manifest["preferredHeight"] == 400
 
     # 2. Get document manifest
-    get_res = client.get(f"/api/canvas/documents/{doc_id}")
+    get_res = client.get(f"/api/canvas/documents/{doc_id}", headers=auth_headers)
     assert get_res.status_code == 200
     assert get_res.json()["id"] == doc_id
 
     # 3. Serve entrypoint and verify CSP headers
-    serve_res = client.get(f"/api/canvas/documents/{doc_id}/serve")
+    serve_res = client.get(f"/api/canvas/documents/{doc_id}/serve", headers=auth_headers)
     assert serve_res.status_code == 200
     assert "Content-Security-Policy" in serve_res.headers
     assert "sandbox allow-scripts" in serve_res.headers["Content-Security-Policy"]
@@ -131,20 +134,20 @@ def test_canvas_api_endpoints():
     preview_res = client.post("/api/canvas/preview", json={
         "html": "<p>Instant preview snippet</p>",
         "title": "Quick Preview"
-    })
+    }, headers=auth_headers)
     assert preview_res.status_code == 200
     assert "Instant preview snippet" in preview_res.text
     assert "Content-Security-Policy" in preview_res.headers
 
     # 5. List documents
-    list_res = client.get("/api/canvas/documents?scope=api_test")
+    list_res = client.get("/api/canvas/documents?scope=api_test", headers=auth_headers)
     assert list_res.status_code == 200
     assert any(d["id"] == doc_id for d in list_res.json())
 
     # 6. Delete document
-    del_res = client.delete(f"/api/canvas/documents/{doc_id}")
+    del_res = client.delete(f"/api/canvas/documents/{doc_id}", headers=auth_headers)
     assert del_res.status_code == 200
     assert del_res.json()["status"] == "ok"
 
     # Confirm 404 after deletion
-    assert client.get(f"/api/canvas/documents/{doc_id}").status_code == 404
+    assert client.get(f"/api/canvas/documents/{doc_id}", headers=auth_headers).status_code == 404

@@ -13,6 +13,26 @@ import type { FtsSearchResultItem, FtsSearchResponse } from '../types';
 import { showToast } from '../services/toast';
 import { useI18n } from '../services/i18n';
 
+function sanitizeFtsSnippet(raw: string): string {
+  if (!raw) return '';
+  const markStart = '___FTS_MARK_START___';
+  const markEnd = '___FTS_MARK_END___';
+  const preserved = raw
+    .replace(/<mark>/gi, markStart)
+    .replace(/<\/mark>/gi, markEnd);
+
+  const escaped = preserved
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  return escaped
+    .replaceAll(markStart, '<mark>')
+    .replaceAll(markEnd, '</mark>');
+}
+
 interface FtsSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -227,7 +247,7 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
                   {/* Highlighted Snippet */}
                   <div 
                     className="text-xs text-slate-600 dark:text-slate-300 font-mono leading-relaxed bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800/80 [&_mark]:bg-cyan-500/30 [&_mark]:text-cyan-800 dark:[&_mark]:text-cyan-200 [&_mark]:px-1 [&_mark]:rounded"
-                    dangerouslySetInnerHTML={{ __html: item.snippet }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeFtsSnippet(item.snippet) }}
                   />
                 </div>
               ))}

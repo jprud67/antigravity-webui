@@ -29,15 +29,18 @@ async def test_doctor_auto_repair():
 
 
 @pytest.mark.asyncio
-async def test_doctor_api():
+async def test_doctor_api(auth_headers: dict):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        res = await ac.get("/api/doctor/diagnose")
+        unauth_res = await ac.get("/api/doctor/diagnose")
+        assert unauth_res.status_code == 401
+
+        res = await ac.get("/api/doctor/diagnose", headers=auth_headers)
         assert res.status_code == 200
         data = res.json()
         assert "health_status" in data
         assert "system" in data
 
-        res_repair = await ac.post("/api/doctor/repair")
+        res_repair = await ac.post("/api/doctor/repair", headers=auth_headers)
         assert res_repair.status_code == 200
         rep_data = res_repair.json()
         assert rep_data["success"] is True

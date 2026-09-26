@@ -131,7 +131,7 @@ export const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({
         {submitted && (
           <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
             <CheckCircle2 className="w-3 h-3" />
-            {t('question_answered', 'Answered')}
+            {t('question_answered', 'Répondu')}
           </span>
         )}
       </div>
@@ -145,7 +145,7 @@ export const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({
           }}
         >
           <span className="text-[10px] text-emerald-500 font-semibold uppercase tracking-wider">
-            {t('question_choice_transmitted', 'Choice transmitted to Antigravity:')}
+            {t('question_choice_transmitted', 'Choix transmis à Antigravity :')}
           </span>
           <p className="font-mono whitespace-pre-wrap" style={{ color: 'var(--text)' }}>
             {finalAnswer}
@@ -199,7 +199,7 @@ export const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({
                           </span>
                           {isRecommended && !isSelected && (
                             <span className="ml-2 text-[9px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded font-mono">
-                              {t('question_recommended', 'Recommended')}
+                              {t('question_recommended', 'Recommandé')}
                             </span>
                           )}
                         </div>
@@ -212,7 +212,7 @@ export const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({
                 <div className="pt-1">
                   <input
                     type="text"
-                    placeholder={t('question_custom_placeholder', 'Or enter a custom answer...')}
+                    placeholder={t('question_custom_placeholder', 'Ou saisissez une réponse personnalisée...')}
                     value={customInputs[qIdx] || ''}
                     onChange={(e) =>
                       setCustomInputs((prev) => ({ ...prev, [qIdx]: e.target.value }))
@@ -243,7 +243,7 @@ export const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({
               style={{ backgroundColor: 'var(--accent)' }}
             >
               <Send className="w-3.5 h-3.5" />
-              <span>{t('question_submit', 'Submit choice')}</span>
+              <span>{t('question_submit', 'Valider le choix')}</span>
             </button>
           </div>
         </div>

@@ -37,14 +37,17 @@ async def test_mcp_catalog_get_and_test():
 
 
 @pytest.mark.asyncio
-async def test_mcp_catalog_api():
+async def test_mcp_catalog_api(auth_headers: dict):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        res = await ac.get("/api/mcp/catalog")
+        unauth_res = await ac.get("/api/mcp/catalog")
+        assert unauth_res.status_code == 401
+
+        res = await ac.get("/api/mcp/catalog", headers=auth_headers)
         assert res.status_code == 200
         data = res.json()
         assert "items" in data
         assert data["total"] >= 65
 
-        res_entry = await ac.get("/api/mcp/catalog/supabase")
+        res_entry = await ac.get("/api/mcp/catalog/supabase", headers=auth_headers)
         assert res_entry.status_code == 200
         assert res_entry.json()["slug"] == "supabase"

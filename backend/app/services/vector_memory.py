@@ -21,7 +21,8 @@ from typing import Any, Literal
 import httpx
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-from app.config import CONVERSATION_DB, SETTINGS_FILE
+from app.config import CONVERSATION_DB
+from app.services.storage import get_settings, save_settings
 
 logger = logging.getLogger("antigravity.vector_memory")
 
@@ -134,27 +135,18 @@ def ensure_vector_memory_schema() -> None:
 
 def get_auto_recall_config() -> AutoRecallConfig:
     """Read AutoRecallConfig from settings or defaults."""
-    if SETTINGS_FILE.exists():
-        try:
-            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-            mem_cfg = data.get("vector_memory", {})
-            return AutoRecallConfig(**mem_cfg)
-        except Exception as e:
-            logger.debug(f"Failed to read vector memory config: {e}")
+    try:
+        data = get_settings()
+        mem_cfg = data.get("vector_memory", {})
+        return AutoRecallConfig(**mem_cfg)
+    except Exception as e:
+        logger.debug(f"Failed to read vector memory config: {e}")
     return AutoRecallConfig()
 
 
 def save_auto_recall_config(cfg: AutoRecallConfig) -> None:
     """Save AutoRecallConfig into settings."""
-    data: dict[str, Any] = {}
-    if SETTINGS_FILE.exists():
-        try:
-            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
-    data["vector_memory"] = cfg.model_dump(by_alias=True)
-    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    save_settings({"vector_memory": cfg.model_dump(by_alias=True)})
 
 
 def generate_local_embedding(text: str, dim: int = 384) -> list[float]:
