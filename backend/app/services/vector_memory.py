@@ -12,6 +12,7 @@ import hashlib
 import json
 import logging
 import math
+import os
 import re
 import sqlite3
 import time
@@ -197,41 +198,43 @@ async def compute_embedding(text: str, cfg: AutoRecallConfig | None = None) -> l
     """Compute embedding using configured provider with automatic fallback to local."""
     config = cfg or get_auto_recall_config()
 
-    if config.provider == "openai" and config.api_key:
-        api_key = config.api_key.strip()
-        api_base = (config.api_base.strip() if config.api_base else "https://api.openai.com/v1").rstrip("/")
-        model = (config.model or "").strip() or "text-embedding-3-small"
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                res = await client.post(
-                    f"{api_base}/embeddings",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    json={"model": model, "input": text},
-                )
-                if res.status_code == 200:
-                    data = res.json()
-                    return data["data"][0]["embedding"]
-        except Exception as e:
-            logger.warning(f"OpenAI embedding call failed, falling back to local: {e}")
+    if config.provider == "openai":
+        api_key = (config.api_key or os.environ.get("OPENAI_API_KEY") or "").strip()
+        if api_key:
+            api_base = (config.api_base.strip() if config.api_base else "https://api.openai.com/v1").rstrip("/")
+            model = (config.model or "").strip() or "text-embedding-3-small"
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    res = await client.post(
+                        f"{api_base}/embeddings",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        json={"model": model, "input": text},
+                    )
+                    if res.status_code == 200:
+                        data = res.json()
+                        return data["data"][0]["embedding"]
+            except Exception as e:
+                logger.warning(f"OpenAI embedding call failed, falling back to local: {e}")
 
-    elif config.provider == "gemini" and config.api_key:
-        api_key = config.api_key.strip()
-        api_base = (config.api_base.strip() if config.api_base else "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
-        model = config.model if config.model and "embedding" in config.model else "text-embedding-004"
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                res = await client.post(
-                    f"{api_base}/models/{model}:embedContent",
-                    headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
-                    json={"content": {"parts": [{"text": text}]}},
-                )
-                if res.status_code == 200:
-                    data = res.json()
-                    embedding_data = data.get("embedding", {})
-                    if "values" in embedding_data:
-                        return embedding_data["values"]
-        except Exception as e:
-            logger.warning(f"Gemini embedding call failed, falling back to local: {e}")
+    elif config.provider == "gemini":
+        api_key = (config.api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+        if api_key:
+            api_base = (config.api_base.strip() if config.api_base else "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
+            model = config.model if config.model and "embedding" in config.model else "text-embedding-004"
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    res = await client.post(
+                        f"{api_base}/models/{model}:embedContent",
+                        headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                        json={"content": {"parts": [{"text": text}]}},
+                    )
+                    if res.status_code == 200:
+                        data = res.json()
+                        embedding_data = data.get("embedding", {})
+                        if "values" in embedding_data:
+                            return embedding_data["values"]
+            except Exception as e:
+                logger.warning(f"Gemini embedding call failed, falling back to local: {e}")
 
     elif config.provider == "ollama":
         api_base = (config.api_base.strip() if config.api_base else "http://localhost:11434").rstrip("/")

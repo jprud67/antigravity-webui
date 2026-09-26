@@ -278,7 +278,7 @@ export const TaskDashboardModal: React.FC<TaskDashboardModalProps> = ({
                           </div>
                         )}
                         <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
-                          {new Date(task.last_modified * 1000).toLocaleTimeString()}
+                          {task.last_modified ? new Date(task.last_modified * 1000).toLocaleTimeString() : t('recent', 'Récemment')}
                         </span>
                       </div>
                     </div>

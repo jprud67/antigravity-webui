@@ -142,6 +142,36 @@ class KernelToolProxy:
         return results
 
 
+class IsolatedStream(io.StringIO):
+    """Buffered in-memory stream that can be detached to prevent late/zombie thread leakage."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._active = True
+        self._stream_lock = threading.Lock()
+
+    def deactivate(self) -> None:
+        with self._stream_lock:
+            self._active = False
+
+    def write(self, s: str) -> int:
+        with self._stream_lock:
+            if not self._active:
+                return len(s)
+            try:
+                return super().write(s)
+            except ValueError:
+                return len(s)
+
+    def flush(self) -> None:
+        with self._stream_lock:
+            if self._active:
+                try:
+                    super().flush()
+                except ValueError:
+                    pass
+
+
 class PersistentPythonKernel:
     """Session-persistent Python kernel maintaining active namespace and RPC bridge."""
 
@@ -177,8 +207,8 @@ class PersistentPythonKernel:
         with _GLOBAL_EXECUTION_LOCK:
             orig_stdout = sys.stdout
             orig_stderr = sys.stderr
-            out_buf = io.StringIO()
-            err_buf = io.StringIO()
+            out_buf = IsolatedStream()
+            err_buf = IsolatedStream()
             try:
                 with self.lock:
                     self.execution_count += 1
@@ -230,6 +260,8 @@ class PersistentPythonKernel:
                     "duration_ms": max(0, int((time.perf_counter() - start_time) * 1000))
                 }
             finally:
+                out_buf.deactivate()
+                err_buf.deactivate()
                 if sys.stdout is out_buf:
                     sys.stdout = orig_stdout
                 if sys.stderr is err_buf:

@@ -14,6 +14,7 @@ import secrets
 import sqlite3
 import time
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
 from app.config import SESSIONS_DB
@@ -32,7 +33,7 @@ RATE_LIMIT_SECONDS = 600            # 10 minutes
 
 @contextmanager
 def _get_db():
-    SESSIONS_DB.parent.mkdir(parents=True, exist_ok=True)
+    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=15.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -173,8 +174,17 @@ def approve_pairing_code(code: str) -> tuple[bool, str, dict[str, Any] | None]:
     ensure_messaging_gateway_schema()
     clean_code = code.strip().upper().replace(" ", "")
     now = time.time()
+    global_rate_key = "global_pin_approval"
 
     with _get_db() as conn:
+        rl = conn.execute(
+            "SELECT failed_attempts, last_request_at, lockout_until FROM messaging_pairing_rate_limits WHERE key = ?",
+            (global_rate_key,)
+        ).fetchone()
+        if rl and rl["lockout_until"] > now:
+            remaining = int(rl["lockout_until"] - now)
+            return False, f"Trop de tentatives d'approbation infructueuses. Réessayez dans {remaining}s.", None
+
         row = conn.execute(
             "SELECT code, platform, user_id, user_name, expires_at FROM messaging_pairing_codes WHERE code = ?",
             (clean_code,)
@@ -188,12 +198,26 @@ def approve_pairing_code(code: str) -> tuple[bool, str, dict[str, Any] | None]:
             ).fetchone()
 
         if not row:
+            failed = (rl["failed_attempts"] + 1) if rl else 1
+            lockout = (now + 300) if failed >= MAX_FAILED_ATTEMPTS else 0
+            conn.execute("""
+                INSERT INTO messaging_pairing_rate_limits (key, failed_attempts, last_request_at, lockout_until)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    failed_attempts = excluded.failed_attempts,
+                    last_request_at = excluded.last_request_at,
+                    lockout_until = excluded.lockout_until
+            """, (global_rate_key, failed, now, lockout))
+            conn.commit()
             return False, "Code de couplage introuvable ou expiré.", None
 
         if row["expires_at"] < now:
             conn.execute("DELETE FROM messaging_pairing_codes WHERE code = ?", (row["code"],))
             conn.commit()
             return False, "Ce code de couplage a expiré (validité 1 heure).", None
+
+        # Reset failed attempts counter on valid PIN approval
+        conn.execute("DELETE FROM messaging_pairing_rate_limits WHERE key = ?", (global_rate_key,))
 
         # Add to approved devices
         conn.execute("""
@@ -216,6 +240,14 @@ def approve_pairing_code(code: str) -> tuple[bool, str, dict[str, Any] | None]:
         }
         logger.info("messaging_gateway: approved device %s on %s", row["user_id"], row["platform"])
         return True, f"Appareil {row['user_name']} ({row['platform']}) approuvé avec succès !", approved_device
+
+
+def reset_approval_rate_limits() -> None:
+    """Reset failed PIN approval attempts counter and lockout."""
+    ensure_messaging_gateway_schema()
+    with _get_db() as conn:
+        conn.execute("DELETE FROM messaging_pairing_rate_limits WHERE key = 'global_pin_approval'")
+        conn.commit()
 
 
 def is_user_approved(platform: str, user_id: str) -> bool:

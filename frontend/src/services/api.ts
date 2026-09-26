@@ -2907,7 +2907,9 @@ export const canvasApi = {
   },
 
   getServeUrl(docId: string, subpath: string = 'index.html'): string {
-    return `${API_BASE}/canvas/documents/${encodeURIComponent(docId)}/serve/${subpath.replace(/^\/+/, '')}`;
+    const token = getAuthToken();
+    const query = token ? `?token=${encodeURIComponent(token)}` : '';
+    return `${API_BASE}/canvas/documents/${encodeURIComponent(docId)}/serve/${subpath.replace(/^\/+/, '')}${query}`;
   },
 };
 

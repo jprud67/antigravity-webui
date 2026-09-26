@@ -26,7 +26,7 @@ from app.services.canvas_documents import (
     wrap_canvas_html,
 )
 
-router = APIRouter(prefix="/api/canvas", tags=["Canvas Documents"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/api/canvas", tags=["Canvas Documents"])
 
 # Standard CSP header for sandboxed interactive widgets (excluding allow-same-origin to prevent sandbox escape)
 CANVAS_CSP_HEADER = "default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval' https:; sandbox allow-scripts allow-forms;"
@@ -39,7 +39,7 @@ class PreviewRequest(BaseModel):
 
 
 @router.post("/documents", response_model=CanvasDocumentManifest)
-def create_document(payload: CanvasDocumentCreateInput):
+def create_document(payload: CanvasDocumentCreateInput, _ = Depends(require_auth)):
     """Creates a new Canvas document."""
     try:
         ws = payload.workspace or DEFAULT_WORKSPACE
@@ -60,13 +60,14 @@ def list_documents(
     scope: str | None = Query(None, description="Filter by retention scope"),
     kind: CanvasDocumentKind | None = Query(None, description="Filter by kind"),
     limit: int = Query(50, ge=1, le=200, description="Max documents to return"),
+    _ = Depends(require_auth),
 ):
     """Lists saved Canvas documents."""
     return list_canvas_documents(retention_scope=scope, kind=kind, limit=limit)
 
 
 @router.get("/documents/{doc_id}", response_model=CanvasDocumentManifest)
-def get_document(doc_id: str):
+def get_document(doc_id: str, _ = Depends(require_auth)):
     """Retrieves a single Canvas document manifest."""
     manifest = get_canvas_document(doc_id)
     if not manifest:
@@ -75,7 +76,7 @@ def get_document(doc_id: str):
 
 
 @router.delete("/documents/{doc_id}")
-def delete_document(doc_id: str):
+def delete_document(doc_id: str, _ = Depends(require_auth)):
     """Deletes a Canvas document and all its assets."""
     success = delete_canvas_document(doc_id)
     if not success:
@@ -126,7 +127,7 @@ def serve_document_asset(doc_id: str, filename: str):
 
 
 @router.post("/preview")
-def preview_canvas_html(payload: PreviewRequest):
+def preview_canvas_html(payload: PreviewRequest, _ = Depends(require_auth)):
     """
     Returns an instant wrapped HTML preview for rendering in an iframe srcDoc.
     """

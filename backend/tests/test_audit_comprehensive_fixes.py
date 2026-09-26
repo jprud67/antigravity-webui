@@ -1,4 +1,6 @@
+import sys
 import urllib.error
+import uuid
 from unittest.mock import patch
 
 import pytest
@@ -8,11 +10,17 @@ from app.services.canvas_documents import (
     CanvasDocumentEntrypoint,
     create_canvas_document,
 )
-from app.services.code_kernel import KernelToolProxy
+from app.services.code_kernel import (
+    IsolatedStream,
+    KernelToolProxy,
+    get_or_create_kernel,
+)
+from app.services.database_studio import execute_query
 from app.services.docker_studio import execute_compose_action
 from app.services.doctor import _check_sqlite_integrity, run_auto_repair
 from app.services.fts_search import fts_service, reindex_all_conversations
 from app.services.git_worktree import create_subagent_worktree
+from app.services.messaging_gateway import approve_pairing_code, request_pairing, reset_approval_rate_limits
 from app.services.tailscale import toggle_tailscale_serve
 from app.services.vector_memory import AutoRecallConfig, compute_embedding
 from app.services.web_push import send_web_push_notification
@@ -608,9 +616,6 @@ def test_canvas_protocol_relative_url_rejection(tmp_path):
 
 
 def test_code_kernel_stdout_stderr_restoration(tmp_path):
-    import sys
-    from app.services.code_kernel import get_or_create_kernel
-
     kernel = get_or_create_kernel("test-stream-restore", cwd=str(tmp_path))
     orig_stdout = sys.stdout
     orig_stderr = sys.stderr
@@ -620,6 +625,62 @@ def test_code_kernel_stdout_stderr_restoration(tmp_path):
     assert "hello world" in res["stdout"]
     assert sys.stdout is orig_stdout
     assert sys.stderr is orig_stderr
+
+
+def test_isolated_stream_detachment():
+    stream = IsolatedStream()
+    stream.write("first write\n")
+    assert "first write" in stream.getvalue()
+
+    stream.deactivate()
+    # Writes after deactivate are discarded without raising error
+    written = stream.write("second write\n")
+    assert written == len("second write\n")
+    assert "second write" not in stream.getvalue()
+    stream.flush()
+
+
+def test_database_studio_query_timeout(tmp_path):
+    import sqlite3
+    db_file = tmp_path / "timeout_test.db"
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, val TEXT);")
+    conn.commit()
+    conn.close()
+
+    # Normal quick query succeeds
+    res_ok = execute_query(str(db_file), "SELECT * FROM items;", limit=50, timeout_seconds=2.0)
+    assert res_ok.error is None
+
+    # Query with tiny timeout on recursive loop triggers interruption
+    runaway_sql = "WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt) SELECT count(*) FROM cnt;"
+    res_timeout = execute_query(str(db_file), runaway_sql, limit=50, timeout_seconds=0.2)
+    assert res_timeout.error is not None
+    assert "interrompue" in res_timeout.error.lower() or "délai" in res_timeout.error.lower()
+
+
+def test_messaging_gateway_pin_rate_limiting():
+    reset_approval_rate_limits()
+    try:
+        user_id = f"user_{uuid.uuid4().hex}"
+        # 1. Generate valid pairing code
+        ok, _msg, code = request_pairing("telegram", user_id, "RateTester")
+        assert ok is True
+        assert code is not None
+
+        # 2. Enter 5 invalid codes
+        for _ in range(5):
+            approved, _err_msg, dev = approve_pairing_code("INVALID-CODE-99")
+            assert approved is False
+            assert dev is None
+
+        # 3. Next attempt is locked out
+        locked, lock_msg, _ = approve_pairing_code(code)
+        assert locked is False
+        assert "Trop de tentatives" in lock_msg
+    finally:
+        reset_approval_rate_limits()
+
 
 
 

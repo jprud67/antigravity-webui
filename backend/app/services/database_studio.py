@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import sqlite3
+import threading
 import time
 from pathlib import Path
 from typing import Any, Literal
@@ -295,8 +296,13 @@ def execute_query(db_path: str, query: str, limit: int = 500, timeout_seconds: f
     start_time = time.perf_counter()
 
     conn = None
+    interrupt_timer = None
     try:
         conn = sqlite3.connect(str(clean_path), timeout=timeout_seconds)
+        interrupt_timer = threading.Timer(timeout_seconds, conn.interrupt)
+        interrupt_timer.daemon = True
+        interrupt_timer.start()
+
         cursor = conn.cursor()
 
         cursor.execute(query)
@@ -333,6 +339,19 @@ def execute_query(db_path: str, query: str, limit: int = 500, timeout_seconds: f
                 execution_time_ms=duration_ms,
                 error=None,
             )
+    except sqlite3.OperationalError as exc:
+        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        err_msg = str(exc)
+        if "interrupted" in err_msg.lower():
+            err_msg = f"Requête SQL interrompue : délai d'exécution dépassé ({timeout_seconds}s)."
+        return QueryResult(
+            columns=[],
+            rows=[],
+            total_rows=0,
+            truncated=False,
+            execution_time_ms=duration_ms,
+            error=err_msg,
+        )
     except Exception as exc:
         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
         return QueryResult(
@@ -344,6 +363,11 @@ def execute_query(db_path: str, query: str, limit: int = 500, timeout_seconds: f
             error=str(exc),
         )
     finally:
+        if interrupt_timer is not None:
+            try:
+                interrupt_timer.cancel()
+            except Exception:
+                pass
         if conn is not None:
             try:
                 conn.close()

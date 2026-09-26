@@ -9,6 +9,7 @@ from app.services.messaging_gateway import (
     list_approved_devices,
     list_pending_pairings,
     request_pairing,
+    reset_approval_rate_limits,
     revoke_device,
     save_gateway_config,
 )
@@ -26,6 +27,7 @@ def test_pairing_code_format():
 
 
 def test_pairing_lifecycle(tmp_path):
+    reset_approval_rate_limits()
     user_id = f"tg_user_{uuid.uuid4().hex}"
     
     # 1. Initially not approved

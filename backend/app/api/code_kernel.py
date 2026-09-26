@@ -39,7 +39,8 @@ def api_execute_kernel(req: ExecuteCodeRequest, _=Depends(require_auth)):
     if not req.code.strip():
         raise HTTPException(status_code=400, detail="Le code à exécuter ne peut pas être vide.")
     kernel = get_or_create_kernel(req.session_id or "default", req.cwd or ".")
-    result = kernel.execute(req.code, timeout=req.timeout or 30)
+    effective_timeout = max(1, min(req.timeout or 30, 300))
+    result = kernel.execute(req.code, timeout=effective_timeout)
     return result
 
 
