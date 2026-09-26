@@ -24,11 +24,14 @@ import {
   Wand2,
   Layers,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  AlertTriangle,
+  RotateCw,
+  Info
 } from 'lucide-react';
 import Editor, { DiffEditor } from '@monaco-editor/react';
-import { saveFileContent, fetchFileContent, fetchGitFileVersions, fetchGitDiffRanges } from '../services/api';
-import type { MonacoStudioConfig, GitDiffRange, GitDiffSummary } from '../types';
+import { saveFileContent, fetchFileContent, fetchGitFileVersions, fetchGitDiffRanges, fetchEditorDiagnostics } from '../services/api';
+import type { MonacoStudioConfig, GitDiffRange, GitDiffSummary, DiagnosticItem } from '../types';
 import { showToast } from '../services/toast';
 import { useI18n } from '../services/i18n';
 import { SUPPORTED_LANGUAGES, detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
@@ -39,6 +42,7 @@ import {
   applyGitDecorations,
   navigateGitDiff
 } from '../services/monacoAnnotations';
+import { applyMonacoDiagnostics, clearMonacoDiagnostics } from '../services/monacoDiagnostics';
 import { CopilotActionModal } from './CopilotActionModal';
 
 interface MonacoStudioModalProps {
@@ -106,6 +110,15 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
   const monacoInstanceRef = useRef<any>(null);
   const diffRangesRef = useRef<GitDiffRange[]>([]);
 
+  // Live Diagnostics & Linting state
+  const [diagnostics, setDiagnostics] = useState<DiagnosticItem[]>([]);
+  const [isLinting, setIsLinting] = useState<boolean>(false);
+  const [isAutoLint, setIsAutoLint] = useState<boolean>(() => {
+    const saved = localStorage.getItem('antigravity_auto_lint');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [isProblemsOpen, setIsProblemsOpen] = useState<boolean>(false);
+
   useEffect(() => {
     diffRangesRef.current = diffRanges;
   }, [diffRanges]);
@@ -121,6 +134,60 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
   }, []);
 
   const configFilePath = config.filePath;
+
+  const runDiagnostics = useCallback(
+    async (codeToLint: string, langToLint: string, path?: string) => {
+      if (!codeToLint.trim() || mode !== 'editor') {
+        setDiagnostics([]);
+        if (editorRef.current && monacoInstanceRef.current) {
+          clearMonacoDiagnostics(monacoInstanceRef.current, editorRef.current.getModel());
+        }
+        return;
+      }
+      setIsLinting(true);
+      try {
+        const res = await fetchEditorDiagnostics({
+          content: codeToLint,
+          language: langToLint,
+          filePath: path || config.filePath,
+          workspace: currentWorkspace,
+        });
+        setDiagnostics(res.diagnostics || []);
+        if (editorRef.current && monacoInstanceRef.current) {
+          applyMonacoDiagnostics(
+            monacoInstanceRef.current,
+            editorRef.current.getModel(),
+            res.diagnostics || []
+          );
+        }
+      } catch (err) {
+        console.debug('Diagnostics run failed:', err);
+      } finally {
+        setIsLinting(false);
+      }
+    },
+    [mode, config.filePath, currentWorkspace]
+  );
+
+  useEffect(() => {
+    if (!isAutoLint || mode !== 'editor') return;
+    const timer = setTimeout(() => {
+      runDiagnostics(content, language, config.filePath);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [content, language, isAutoLint, mode, config.filePath, runDiagnostics]);
+
+  const handleJumpToProblem = useCallback((item: DiagnosticItem) => {
+    if (!editorRef.current) return;
+    const line = item.line || 1;
+    const col = item.column || 1;
+    editorRef.current.revealPositionInCenter({ lineNumber: line, column: col });
+    editorRef.current.setPosition({ lineNumber: line, column: col });
+    editorRef.current.focus();
+  }, []);
+
+  const totalErrors = useMemo(() => diagnostics.filter((d) => d.severity === 'error').length, [diagnostics]);
+  const totalWarnings = useMemo(() => diagnostics.filter((d) => d.severity === 'warning').length, [diagnostics]);
 
   const loadGitDiffRanges = useCallback(async (filePath?: string) => {
     const targetPath = filePath || configFilePath;
@@ -780,6 +847,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
               if (config.filePath) {
                 loadGitDiffRanges(config.filePath);
               }
+              runDiagnostics(content, language, config.filePath);
             }}
             loading={
               <div className="flex items-center justify-center h-full gap-2 text-zinc-500">
@@ -791,6 +859,117 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
         )}
       </div>
 
+      {/* Collapsible Problems Drawer */}
+      {mode === 'editor' && isProblemsOpen && (
+        <div className="flex flex-col max-h-56 min-h-[130px] bg-zinc-950 border-t border-zinc-800 text-xs transition-all select-none">
+          {/* Drawer Header */}
+          <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900/90 border-b border-zinc-800/80">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-zinc-200 flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                <span>{t('editor_diagnostics_problems', 'Problèmes')}</span>
+              </span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-300 border border-zinc-700">
+                {diagnostics.length}
+              </span>
+              {totalErrors > 0 && (
+                <span className="flex items-center gap-1 text-[11px] text-rose-400 font-medium">
+                  <span>{totalErrors}</span> {t('editor_diagnostics_errors', 'erreurs')}
+                </span>
+              )}
+              {totalWarnings > 0 && (
+                <span className="flex items-center gap-1 text-[11px] text-amber-400 font-medium">
+                  <span>{totalWarnings}</span> {t('editor_diagnostics_warnings', 'avertissements')}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Auto lint toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !isAutoLint;
+                  setIsAutoLint(next);
+                  localStorage.setItem('antigravity_auto_lint', String(next));
+                }}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border transition-colors cursor-pointer ${
+                  isAutoLint
+                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                    : 'bg-zinc-800/60 text-zinc-500 border-zinc-700 hover:text-zinc-300'
+                }`}
+                title={t('editor_diagnostics_auto_lint', 'Lint automatique')}
+              >
+                <span>{t('editor_diagnostics_auto_lint', 'Auto-lint')}</span>
+                <span className="text-[9px] font-mono">[{isAutoLint ? 'ON' : 'OFF'}]</span>
+              </button>
+
+              {/* Refresh button */}
+              <button
+                type="button"
+                onClick={() => runDiagnostics(content, language, config.filePath)}
+                disabled={isLinting}
+                className="p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+                title={t('editor_diagnostics_refresh', 'Actualiser les diagnostics')}
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${isLinting ? 'animate-spin text-emerald-400' : ''}`} />
+              </button>
+
+              {/* Close Drawer */}
+              <button
+                type="button"
+                onClick={() => setIsProblemsOpen(false)}
+                className="p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+                title={t('close', 'Fermer')}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Drawer Body List */}
+          <div className="flex-1 overflow-y-auto divide-y divide-zinc-900 p-1">
+            {diagnostics.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 text-zinc-500 gap-1.5">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500/80" />
+                <span className="text-xs">{t('editor_diagnostics_no_problems', 'Aucun problème détecté')}</span>
+              </div>
+            ) : (
+              diagnostics.map((item, idx) => (
+                <div
+                  key={`${item.line}-${item.column}-${idx}`}
+                  onClick={() => handleJumpToProblem(item)}
+                  className="flex items-center justify-between gap-3 px-3 py-1.5 hover:bg-zinc-900/80 cursor-pointer rounded transition-colors group"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {item.severity === 'error' ? (
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                    ) : item.severity === 'warning' ? (
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    ) : (
+                      <Info className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                    )}
+                    <span className="text-zinc-200 truncate font-mono text-[11px] group-hover:text-emerald-300">
+                      {item.message}
+                    </span>
+                    {item.code && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700/60 shrink-0">
+                        {item.source}:{item.code}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 text-zinc-500 font-mono text-[10px]">
+                    <span>
+                      Ln {item.line}, Col {item.column}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Bottom Footer Info Bar */}
       <div className="flex items-center justify-between px-4 py-2 bg-zinc-950 border-t border-zinc-800 text-[11px] text-zinc-500 select-none">
         <div className="flex items-center gap-3">
@@ -798,6 +977,42 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             <Sparkles className="w-3 h-3" />
             <span>Antigravity Monaco Studio</span>
           </span>
+          {/* Diagnostics Problem Counter Badge in Status Bar */}
+          {mode === 'editor' && (
+            <>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => setIsProblemsOpen(!isProblemsOpen)}
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${
+                  isProblemsOpen
+                    ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
+                    : totalErrors > 0
+                    ? 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25'
+                    : totalWarnings > 0
+                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+                    : 'text-zinc-500 hover:text-zinc-300 border-transparent hover:border-zinc-800'
+                }`}
+                title={t('editor_diagnostics_toggle_drawer', 'Afficher/Masquer le panneau des problèmes')}
+              >
+                {isLinting ? (
+                  <RotateCw className="w-3 h-3 animate-spin text-emerald-400" />
+                ) : totalErrors > 0 ? (
+                  <AlertCircle className="w-3 h-3 text-rose-400" />
+                ) : totalWarnings > 0 ? (
+                  <AlertTriangle className="w-3 h-3 text-amber-400" />
+                ) : (
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                )}
+                <span>
+                  {diagnostics.length > 0
+                    ? `${totalErrors > 0 ? `❌ ${totalErrors}` : ''} ${totalWarnings > 0 ? `⚠️ ${totalWarnings}` : ''}`.trim()
+                    : t('editor_diagnostics_problems', 'Problèmes')}
+                </span>
+                <span className="text-[9px] opacity-70">({diagnostics.length})</span>
+              </button>
+            </>
+          )}
           {cursorCount > 1 && (
             <>
               <span>•</span>
