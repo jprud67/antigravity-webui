@@ -87,6 +87,7 @@ interface ChatInputProps {
   onOpenDatabaseStudio?: (query?: string) => void;
   onOpenShare?: () => void;
   onOpenLivePreview?: () => void;
+  onOpenOrchestrator?: () => void;
   isReadOnly?: boolean;
   contextBudgetTokens?: number;
 }
@@ -151,6 +152,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
   onOpenDatabaseStudio,
   onOpenShare,
   onOpenLivePreview,
+  onOpenOrchestrator,
   isReadOnly = false,
   contextBudgetTokens
 }) => {
@@ -854,6 +856,16 @@ export const ChatInput = React.memo<ChatInputProps>(({
           onOpenLivePreview();
         } else {
           window.dispatchEvent(new CustomEvent('toggle-live-preview'));
+        }
+        return true;
+
+      case '/orchestrator':
+      case '/agents':
+      case '/subagents':
+        if (onOpenOrchestrator) {
+          onOpenOrchestrator();
+        } else {
+          window.dispatchEvent(new CustomEvent('open-orchestrator-studio'));
         }
         return true;
 

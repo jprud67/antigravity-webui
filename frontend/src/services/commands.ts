@@ -52,7 +52,8 @@ import {
   Gauge,
   Database,
   Share2,
-  Eye
+  Eye,
+  Network
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -732,6 +733,33 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'panel',
     icon: Eye,
     color: 'text-cyan-400',
+    isAction: true
+  },
+  {
+    cmd: '/orchestrator',
+    descKey: 'orchestrator_title',
+    desc: 'Ouvrir le studio d\'orchestration visuelle multi-agents',
+    category: 'action',
+    icon: Network,
+    color: 'text-cyan-400',
+    isAction: true
+  },
+  {
+    cmd: '/agents',
+    descKey: 'orchestrator_title',
+    desc: 'Ouvrir le graphe d\'orchestration et télémétrie des sous-agents',
+    category: 'action',
+    icon: Network,
+    color: 'text-indigo-400',
+    isAction: true
+  },
+  {
+    cmd: '/subagents',
+    descKey: 'orchestrator_title',
+    desc: 'Superviser les sous-agents en temps réel',
+    category: 'action',
+    icon: Network,
+    color: 'text-purple-400',
     isAction: true
   },
   {

@@ -41,7 +41,8 @@ import {
   Bookmark,
   Share2,
   Eye,
-  Users
+  Users,
+  Network
 } from 'lucide-react';
 import type { ChatMessage, ToolCallItem, BookmarkItem, MonacoStudioConfig, ProgressCardData, PresenceParticipant } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
@@ -103,6 +104,7 @@ interface ChatCanvasProps {
   onOpenShare?: () => void;
   onToggleLivePreview?: () => void;
   isLivePreviewOpen?: boolean;
+  onOpenOrchestrator?: () => void;
 }
 
 const copyTextToClipboard = async (text: string): Promise<boolean> => {
@@ -829,6 +831,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   onOpenShare,
   onToggleLivePreview,
   isLivePreviewOpen = false,
+  onOpenOrchestrator,
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -1245,6 +1248,19 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
               title={t('share_live_preview', 'Aperçu Live & Inspection (/preview)')}
             >
               <Eye className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Agent Orchestration Studio Button */}
+          {onOpenOrchestrator && (
+            <button
+              type="button"
+              onClick={onOpenOrchestrator}
+              className="py-1.5 px-2.5 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20"
+              title={t('orchestrator_modal_title', 'Multi-Agent Visual Orchestration Studio (Ctrl+Alt+A)')}
+            >
+              <Network className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-[11px] font-medium hidden sm:inline">{t('orchestrator_title', 'Agents')}</span>
             </button>
           )}
 

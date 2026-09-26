@@ -41,7 +41,8 @@ import {
   Brain,
   Container,
   Database,
-  ChevronDown
+  ChevronDown,
+  Network
 } from 'lucide-react';
 import type { Conversation } from '../types';
 import { AntigravityIcon } from './AntigravityLogo';
@@ -144,6 +145,7 @@ interface SidebarProps {
   onOpenVectorMemory?: () => void;
   onOpenDockerStudio?: () => void;
   onOpenDatabaseStudio?: () => void;
+  onOpenOrchestrator?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = React.memo(({
@@ -183,6 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   onOpenVectorMemory,
   onOpenDockerStudio,
   onOpenDatabaseStudio,
+  onOpenOrchestrator,
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -1860,10 +1863,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 ? 'bg-sky-500/10 text-sky-500 border-sky-500/30'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
-            title={isToolsExpanded ? t('collapse_studios', 'Réduire les studios') : t('expand_studios', 'Afficher tous les outils et studios (12)')}
+            title={isToolsExpanded ? t('collapse_studios', 'Réduire les studios') : t('expand_studios', 'Afficher tous les outils et studios (13)')}
           >
             <span>{t('studios', 'Studios')}</span>
-            <span className="text-[9px] px-1 rounded-full bg-black/5 dark:bg-white/10 font-mono">12</span>
+            <span className="text-[9px] px-1 rounded-full bg-black/5 dark:bg-white/10 font-mono">13</span>
             <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isToolsExpanded ? 'rotate-180' : ''}`} />
           </button>
         </div>
@@ -2051,6 +2054,20 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                   <Database className="w-3 h-3 text-emerald-400" />
                 </div>
                 <span className="font-medium text-[11px] truncate">{t('studio_database', 'Base de données')}</span>
+              </button>
+            )}
+
+            {onOpenOrchestrator && (
+              <button
+                type="button"
+                onClick={onOpenOrchestrator}
+                className="p-1.5 rounded-lg text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-cyan-500/20"
+                style={{ color: 'var(--text)' }}
+              >
+                <div className="w-5 h-5 rounded-md bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
+                  <Network className="w-3 h-3 text-cyan-400" />
+                </div>
+                <span className="font-medium text-[11px] truncate">{t('orchestrator_title', 'Orchestrateur')}</span>
               </button>
             )}
           </div>

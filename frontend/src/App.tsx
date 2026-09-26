@@ -34,6 +34,7 @@ const DatabaseStudioModal = lazy(() => import('./components/DatabaseStudioModal'
 const ShareSessionModal = lazy(() => import('./components/ShareSessionModal').then(m => ({ default: m.ShareSessionModal })));
 const SharePinModal = lazy(() => import('./components/SharePinModal').then(m => ({ default: m.SharePinModal })));
 const LivePreviewDrawer = lazy(() => import('./components/LivePreviewDrawer').then(m => ({ default: m.LivePreviewDrawer })));
+const AgentOrchestrationModal = lazy(() => import('./components/AgentOrchestrationModal').then(m => ({ default: m.AgentOrchestrationModal })));
 
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig, AppSettings, ProgressCardData, PresenceParticipant } from './types';
@@ -289,6 +290,9 @@ export function App() {
     const handleToggleLivePreview = () => {
       setIsLivePreviewOpen((prev) => !prev);
     };
+    const handleOpenOrchestrator = () => {
+      setIsOrchestratorOpen(true);
+    };
     window.addEventListener('open-workspace-file', handleOpenFile);
     window.addEventListener('terminal-run-command', handleRunTerminal);
     window.addEventListener('open-quick-open', handleQuickOpen);
@@ -297,6 +301,8 @@ export function App() {
     window.addEventListener('antigravity:open-database-studio', handleOpenDatabaseStudio);
     window.addEventListener('open-share-modal', handleOpenShareModal);
     window.addEventListener('toggle-live-preview', handleToggleLivePreview);
+    window.addEventListener('open-orchestrator-studio', handleOpenOrchestrator);
+    window.addEventListener('antigravity:open-orchestrator-studio', handleOpenOrchestrator);
     return () => {
       window.removeEventListener('open-workspace-file', handleOpenFile);
       window.removeEventListener('terminal-run-command', handleRunTerminal);
@@ -306,6 +312,8 @@ export function App() {
       window.removeEventListener('antigravity:open-database-studio', handleOpenDatabaseStudio);
       window.removeEventListener('open-share-modal', handleOpenShareModal);
       window.removeEventListener('toggle-live-preview', handleToggleLivePreview);
+      window.removeEventListener('open-orchestrator-studio', handleOpenOrchestrator);
+      window.removeEventListener('antigravity:open-orchestrator-studio', handleOpenOrchestrator);
     };
   }, []);
 
@@ -334,6 +342,7 @@ export function App() {
   const [isCanvasStudioOpen, setIsCanvasStudioOpen] = useState(false);
   const [isVectorMemoryOpen, setIsVectorMemoryOpen] = useState(false);
   const [isDockerStudioOpen, setIsDockerStudioOpen] = useState(false);
+  const [isOrchestratorOpen, setIsOrchestratorOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [activeShareToken, setActiveShareToken] = useState<string | null>(null);
@@ -1519,6 +1528,13 @@ export function App() {
         return;
       }
 
+      // Ctrl+Alt+A — Multi-Agent Visual Orchestration Studio
+      if (mod && e.altKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        setIsOrchestratorOpen((prev) => !prev);
+        return;
+      }
+
       // Ctrl+Shift+P — Live Preview & Inspection
       if (mod && shift && (e.key === 'P' || e.key === 'p')) {
         e.preventDefault();
@@ -1547,6 +1563,7 @@ export function App() {
         if (isWorktreeOpen) { setIsWorktreeOpen(false); return; }
         if (isDockerStudioOpen) { setIsDockerStudioOpen(false); return; }
         if (isDatabaseStudioOpen) { setIsDatabaseStudioOpen(false); return; }
+        if (isOrchestratorOpen) { setIsOrchestratorOpen(false); return; }
         if (isShareModalOpen) { setIsShareModalOpen(false); return; }
         if (isPinModalOpen) { setIsPinModalOpen(false); return; }
         if (isLivePreviewOpen) { setIsLivePreviewOpen(false); return; }
@@ -2071,6 +2088,7 @@ export function App() {
         onOpenVectorMemory={() => setIsVectorMemoryOpen(true)}
         onOpenDockerStudio={() => setIsDockerStudioOpen(true)}
         onOpenDatabaseStudio={() => { setDatabaseStudioInitialQuery(undefined); setIsDatabaseStudioOpen(true); }}
+        onOpenOrchestrator={() => setIsOrchestratorOpen(true)}
       />
 
       {/* Main Chat Area */}
@@ -2152,6 +2170,7 @@ export function App() {
           onOpenShare={() => setIsShareModalOpen(true)}
           onToggleLivePreview={() => setIsLivePreviewOpen((prev) => !prev)}
           isLivePreviewOpen={isLivePreviewOpen}
+          onOpenOrchestrator={() => setIsOrchestratorOpen(true)}
         />
 
         <ChatInput
@@ -2222,6 +2241,7 @@ export function App() {
           isReadOnly={isSharedSession && sharePermission === 'read'}
           onOpenShare={() => setIsShareModalOpen(true)}
           onOpenLivePreview={() => setIsLivePreviewOpen((prev) => !prev)}
+          onOpenOrchestrator={() => setIsOrchestratorOpen(true)}
         />
       </main>
 
@@ -2465,6 +2485,14 @@ export function App() {
           onClose={() => setIsDatabaseStudioOpen(false)}
           currentWorkspace={currentWorkspace}
           initialQuery={databaseStudioInitialQuery}
+        />
+      )}
+
+      {isOrchestratorOpen && (
+        <AgentOrchestrationModal
+          isOpen={isOrchestratorOpen}
+          onClose={() => setIsOrchestratorOpen(false)}
+          conversationId={activeConversationId}
         />
       )}
 
