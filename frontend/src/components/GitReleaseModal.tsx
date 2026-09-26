@@ -18,6 +18,7 @@ import remarkGfm from 'remark-gfm';
 import { fetchReleaseNotes, publishGitRelease } from '../services/api';
 import type { GitTagDetail, ReleaseNotesResponse } from '../types';
 import { showToast } from '../services/toast';
+import { useI18n } from '../services/i18n';
 
 export interface GitReleaseModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
   onReleasePublished,
   onNotify
 }) => {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [releaseData, setReleaseData] = useState<ReleaseNotesResponse | null>(null);
   const [title, setTitle] = useState('');
@@ -71,7 +73,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          const msg = err instanceof Error ? err.message : 'Erreur chargement des notes';
+          const msg = err instanceof Error ? err.message : t('git_error_loading_notes', 'Erreur chargement des notes');
           notify(msg, 'error');
           setLoading(false);
         }
@@ -128,7 +130,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
         onClose();
       } else if (res.url) {
         window.open(res.url, '_blank', 'noopener,noreferrer');
-        notify('Brouillon de release ouvert dans GitHub Web', 'info');
+        notify(t('release_draft_opened_github', 'Brouillon de release ouvert dans GitHub Web'), 'info');
         if (onReleasePublished) onReleasePublished();
         onClose();
       } else {
@@ -136,7 +138,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
         onClose();
       }
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Erreur de publication';
+      const errMsg = err instanceof Error ? err.message : t('git_error_publishing', 'Erreur de publication');
       notify(`Échec de publication : ${errMsg}`, 'error');
     } finally {
       setSubmitting(false);
@@ -190,7 +192,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center py-24 text-slate-400 gap-3">
             <RefreshCw className="w-8 h-8 animate-spin text-indigo-400" />
-            <span className="text-sm">Génération du changelog avec Conventional Commits...</span>
+            <span className="text-sm">{t('generating_changelog_conventional', 'Génération du changelog avec Conventional Commits...')}</span>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -200,7 +202,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                 <div className="flex items-center gap-1.5 text-slate-300">
                   <GitCommit className="w-3.5 h-3.5 text-indigo-400" />
                   <span>
-                    <strong>{releaseData?.commit_count || 0}</strong> commit(s) inclus
+                    <strong>{releaseData?.commit_count || 0}</strong> {t('commits_included', 'commit(s) inclus')}
                   </span>
                 </div>
                 {releaseData?.previous_tag && (
@@ -220,7 +222,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                 ) : (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[11px] font-medium">
                     <Globe className="w-3 h-3 text-amber-400" />
-                    Publication Web GitHub
+                    {t('github_web_publishing', 'Publication Web GitHub')}
                   </span>
                 )}
               </div>
@@ -229,7 +231,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
             {/* Release Title */}
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">
-                Titre de la Release <span className="text-rose-400">*</span>
+                {t('release_title_label', 'Titre de la Release')} <span className="text-rose-400">*</span>
               </label>
               <input
                 type="text"
@@ -254,7 +256,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                     }`}
                   >
                     <Edit3 className="w-3 h-3" />
-                    <span>Éditer Markdown</span>
+                    <span>{t('edit_markdown', 'Éditer Markdown')}</span>
                   </button>
                   <button
                     type="button"
@@ -266,7 +268,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                     }`}
                   >
                     <Eye className="w-3 h-3" />
-                    <span>Aperçu Rendu</span>
+                    <span>{t('preview_rendered', 'Aperçu Rendu')}</span>
                   </button>
                 </div>
 
@@ -278,12 +280,12 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                   {copied ? (
                     <>
                       <Check className="w-3 h-3 text-emerald-400" />
-                      <span className="text-emerald-300">Copié !</span>
+                      <span className="text-emerald-300">{t('copied_exclamation', 'Copié !')}</span>
                     </>
                   ) : (
                     <>
                       <Copy className="w-3 h-3" />
-                      <span>Copier Markdown</span>
+                      <span>{t('copy_markdown', 'Copier Markdown')}</span>
                     </>
                   )}
                 </button>
@@ -294,7 +296,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                   rows={10}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Notes de version en Markdown..."
+                  placeholder={t('release_notes_placeholder', 'Notes de version en Markdown...')}
                   className="w-full p-3 text-xs rounded-b-xl bg-slate-950 border-0 text-slate-200 placeholder-slate-500 focus:outline-none font-mono resize-y leading-relaxed"
                 />
               ) : (
@@ -302,7 +304,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                   {notes ? (
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{notes}</ReactMarkdown>
                   ) : (
-                    <span className="text-slate-500 italic">Aucune note de version rédigée.</span>
+                    <span className="text-slate-500 italic">{t('no_release_notes', 'Aucune note de version rédigée.')}</span>
                   )}
                 </div>
               )}
@@ -318,9 +320,9 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                   className="mt-0.5 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500"
                 />
                 <div className="text-xs">
-                  <span className="font-medium text-slate-200">Enregistrer comme brouillon</span>
+                  <span className="font-medium text-slate-200">{t('save_as_draft', 'Enregistrer comme brouillon')}</span>
                   <p className="text-slate-400 text-[11px]">
-                    Non visible publiquement tant que non validée.
+                    {t('save_as_draft_desc', 'Non visible publiquement tant que non validée.')}
                   </p>
                 </div>
               </label>
@@ -333,9 +335,9 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                   className="mt-0.5 rounded bg-slate-900 border-slate-700 text-amber-600 focus:ring-amber-500"
                 />
                 <div className="text-xs">
-                  <span className="font-medium text-amber-300">Marquer comme pré-version</span>
+                  <span className="font-medium text-amber-300">{t('mark_as_prerelease', 'Marquer comme pré-version')}</span>
                   <p className="text-slate-400 text-[11px]">
-                    Indique qu’il s’agit d’une version alpha/bêta/rc.
+                    {t('mark_as_prerelease_desc', 'Indique qu’il s’agit d’une version alpha/bêta/rc.')}
                   </p>
                 </div>
               </label>
@@ -352,7 +354,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors disabled:opacity-50"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            <span>Ouvrir sur GitHub Web</span>
+            <span>{t('open_on_github_web', 'Ouvrir sur GitHub Web')}</span>
           </button>
 
           <div className="flex items-center gap-2">
@@ -361,7 +363,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
               onClick={onClose}
               className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
             >
-              Annuler
+              {t('cancel', 'Annuler')}
             </button>
             <button
               type="button"
@@ -376,8 +378,8 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
               )}
               <span>
                 {releaseData?.has_gh_cli
-                  ? 'Publier via GitHub CLI'
-                  : 'Préparer la Release (Web)'}
+                  ? t('git_publish_via_cli', 'Publier via GitHub CLI')
+                  : t('git_prepare_release_web', 'Préparer la Release (Web)')}
               </span>
             </button>
           </div>

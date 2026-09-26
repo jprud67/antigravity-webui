@@ -264,10 +264,10 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
               borderColor: currentBreakdown.context >= 15 ? 'rgba(16, 185, 129, 0.3)' : 'var(--border)',
               color: currentBreakdown.context >= 15 ? '#10b981' : 'var(--muted)',
             }}
-            title="Présence de fichiers, snippets de code ou logs d'erreur"
+            title={t('prompt_crit_context', "Présence de fichiers, snippets de code ou logs d'erreur")}
           >
             <FileText className="w-3 h-3" />
-            <span>Contexte ({currentBreakdown.context}/25)</span>
+            <span>{t('context', 'Contexte')} ({currentBreakdown.context}/25)</span>
           </div>
 
           <div
@@ -277,10 +277,10 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
               borderColor: currentBreakdown.objective >= 15 ? 'rgba(56, 189, 248, 0.3)' : 'var(--border)',
               color: currentBreakdown.objective >= 15 ? '#38bdf8' : 'var(--muted)',
             }}
-            title="Action claire et verbe explicite"
+            title={t('prompt_crit_action', 'Action claire et verbe explicite')}
           >
             <Target className="w-3 h-3" />
-            <span>Objectif ({currentBreakdown.objective}/25)</span>
+            <span>{t('objective', 'Objectif')} ({currentBreakdown.objective}/25)</span>
           </div>
 
           <div
@@ -290,10 +290,10 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
               borderColor: currentBreakdown.constraints >= 15 ? 'rgba(234, 179, 8, 0.3)' : 'var(--border)',
               color: currentBreakdown.constraints >= 15 ? '#eab308' : 'var(--muted)',
             }}
-            title="Règles négatives, non-régression et contraintes"
+            title={t('prompt_crit_constraints', 'Règles négatives, non-régression et contraintes')}
           >
             <Shield className="w-3 h-3" />
-            <span>Contraintes ({currentBreakdown.constraints}/25)</span>
+            <span>{t('constraints', 'Contraintes')} ({currentBreakdown.constraints}/25)</span>
           </div>
 
           <div
@@ -303,7 +303,7 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
               borderColor: (('output_format' in currentBreakdown ? (currentBreakdown as any).output_format : (currentBreakdown as any).outputFormat) ?? 0) >= 15 ? 'rgba(168, 85, 247, 0.3)' : 'var(--border)',
               color: (('output_format' in currentBreakdown ? (currentBreakdown as any).output_format : (currentBreakdown as any).outputFormat) ?? 0) >= 15 ? '#a855f7' : 'var(--muted)',
             }}
-            title="Format de livrable attendu (diff, étapes, explication)"
+            title={t('prompt_crit_format', 'Format de livrable attendu (diff, étapes, explication)')}
           >
             <Code2 className="w-3 h-3" />
             <span>Format ({(('output_format' in currentBreakdown ? (currentBreakdown as any).output_format : (currentBreakdown as any).outputFormat) ?? 0)}/25)</span>
@@ -351,7 +351,7 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
               title={opt.desc}
             >
               <span>{opt.icon}</span>
-              <span>{opt.label}</span>
+              <span>{opt.id === 'general' ? t('general', 'Général') : opt.id === 'debug' ? t('debugging', 'Débogage') : opt.id === 'plan' ? t('plan_and_tasks', 'Plan & Tâches') : opt.id === 'refactor' ? t('refactoring', 'Refactoring') : opt.id === 'review' ? t('code_review', 'Revue de Code') : opt.label}</span>
             </button>
           );
         })}
@@ -385,7 +385,7 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
             onChange={(e) => {
               setDraftPrompt(e.target.value);
             }}
-            placeholder="Saisissez votre prompt ou requête brute ici..."
+            placeholder={t('prompt_opt_input_placeholder', 'Saisissez votre prompt ou requête brute ici...')}
             className="flex-1 p-4 bg-transparent outline-none resize-none text-xs sm:text-sm font-sans leading-relaxed select-text"
             style={{
               color: 'var(--text, #f4f4f5)',
@@ -406,7 +406,7 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white transition-all cursor-pointer shadow-md shadow-sky-600/20"
             >
               {isOptimizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              <span>{isOptimizing ? 'Optimisation en cours...' : 'Régénérer'}</span>
+              <span>{isOptimizing ? t('prompt_opt_optimizing', 'Optimisation en cours...') : t('regenerate', 'Régénérer')}</span>
             </button>
 
             <button
@@ -415,7 +415,7 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
               className="text-xs transition-colors hover:underline cursor-pointer"
               style={{ color: 'var(--muted, #71717a)' }}
             >
-              {isAnalyzing ? 'Analyse...' : 'Réanalyser'}
+              {isAnalyzing ? t('prompt_opt_analyzing', 'Analyse...') : t('reanalyze', 'Réanalyser')}
             </button>
           </div>
         </div>
@@ -445,14 +445,14 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
             {isOptimizing ? (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-zinc-500">
                 <Loader2 className="w-6 h-6 animate-spin text-sky-400" />
-                <span className="text-xs">Structuration du prompt en cours...</span>
+                <span className="text-xs">{t('prompt_opt_structuring', 'Structuration du prompt en cours...')}</span>
               </div>
             ) : optimizedText ? (
               optimizedText
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center text-xs gap-2 text-zinc-600">
                 <Wand2 className="w-8 h-8 opacity-40 text-purple-400" />
-                <span>Cliquez sur "Régénérer" pour structurer votre requête.</span>
+                <span>{t('prompt_opt_regenerate_hint', "Cliquez sur 'Régénérer' pour structurer votre requête.")}</span>
               </div>
             )}
           </div>
@@ -482,7 +482,7 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
               disabled={!optimizedText && !draftPrompt.trim()}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-all cursor-pointer shadow-md shadow-emerald-600/20"
             >
-              <span>Appliquer au chat</span>
+              <span>{t('apply_to_chat', 'Appliquer au chat')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

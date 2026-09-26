@@ -252,11 +252,11 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
           {loading && items.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 text-slate-400 space-y-2">
               <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-              <p className="text-xs">Chargement du catalogue MCP officiel...</p>
+              <p className="text-xs">{t('mcp_loading_catalog', 'Chargement du catalogue MCP officiel...')}</p>
             </div>
           ) : filteredItems.length === 0 ? (
             <div className="p-12 text-center text-xs text-slate-400">
-              Aucun serveur MCP ne correspond à votre recherche.
+              {t('mcp_no_servers_matched', 'Aucun serveur MCP ne correspond à votre recherche.')}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -316,7 +316,7 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
                           onClick={(e) => handleTestConnection(item.slug, e)}
                           disabled={isTesting}
                           className="py-1 px-2 rounded-lg text-[10px] font-medium border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                          title="Tester la connectivité en direct"
+                          title={t('mcp_test_connectivity', 'Tester la connectivité en direct')}
                         >
                           <Activity className={`w-3 h-3 text-cyan-500 ${isTesting ? 'animate-pulse' : ''}`} />
                           <span>{isTesting ? 'Test...' : 'Ping'}</span>
@@ -328,7 +328,7 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
                             target="_blank"
                             rel="noreferrer"
                             className="p-1 rounded-lg text-slate-400 hover:text-indigo-500 transition-colors"
-                            title="Documentation officielle"
+                            title={t('official_documentation', 'Documentation officielle')}
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
@@ -373,7 +373,7 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
                 <div className="flex items-center gap-2">
                   <Boxes className="w-4 h-4 text-indigo-500" />
                   <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                    Configuration de {installTarget.name}
+                    {t('mcp_config_of', 'Configuration de')} {installTarget.name}
                   </span>
                 </div>
                 <button onClick={() => setInstallTarget(null)} className="text-slate-400 hover:text-slate-600">
@@ -389,17 +389,17 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <Key className="w-3 h-3 text-amber-500" />
-                    <span>Clé d'API ({installTarget.auth?.env_var || 'API_KEY'})</span>
+                    <span>{t('api_key', "Clé d'API")} ({installTarget.auth?.env_var || 'API_KEY'})</span>
                   </label>
                   <input
                     type="password"
-                    placeholder="Saisissez votre clé d'API secrète..."
+                    placeholder={t('mcp_enter_api_key', "Saisissez votre clé d'API secrète...")}
                     value={apiKeyInput}
                     onChange={(e) => setApiKeyInput(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <p className="text-[10px] text-slate-400">
-                    Stockée de façon chiffrée et injectée automatiquement dans les variables d'environnement de l'agent.
+                    {t('mcp_key_storage_hint', "Stockée de façon chiffrée et injectée automatiquement dans les variables d'environnement de l'agent.")}
                   </p>
                 </div>
               ) : (

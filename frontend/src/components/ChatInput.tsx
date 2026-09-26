@@ -789,7 +789,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         if (onOpenBranchTree) {
           onOpenBranchTree();
         } else {
-          showToast('Arbre des branches non disponible.', 'info');
+          showToast(t('branch_tree_unavailable', 'Arbre des branches non disponible.'), 'info');
         }
         return true;
 
@@ -800,7 +800,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         } else if (onOpenBranchTree) {
           onOpenBranchTree();
         } else {
-          showToast('Gestionnaire de signets non disponible.', 'info');
+          showToast(t('bookmark_manager_unavailable', 'Gestionnaire de signets non disponible.'), 'info');
         }
         return true;
 
@@ -1343,7 +1343,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
             >
               <div className="flex items-center gap-2">
                 <History className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
-                <span className="uppercase tracking-wider font-bold">Historique des prompts</span>
+                <span className="uppercase tracking-wider font-bold">{t('prompt_history', 'Historique des prompts')}</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">
                   {getMergedHistory().length}
                 </span>
@@ -1359,7 +1359,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
-                <span className="text-[10px] font-mono opacity-70">↑↓ naviguer · esc fermer</span>
+                <span className="text-[10px] font-mono opacity-70">{t('navigate_shortcuts_hint', '↑↓ naviguer · esc fermer')}</span>
               </div>
             </div>
 

@@ -238,7 +238,7 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
     if (!confirmed) return;
     try {
       await canvasApi.deleteDocument(id);
-      showToast('Canvas supprimé', 'info');
+      showToast(t('canvas_deleted', 'Canvas supprimé'), 'info');
       if (selectedDoc?.id === id) {
         setSelectedDoc(null);
       }
@@ -420,7 +420,9 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                       <Code2 className="w-3.5 h-3.5 text-indigo-400" />
                       <span>{t('canvas_code_editor', 'CODE HTML / JS EMBARQUÉ')}</span>
                     </span>
-                    <span className="text-[10px] text-indigo-400">CSS variables & postMessage supportés</span>
+                    <span className="text-[10px] text-indigo-400">
+                      {t('canvas_css_postmessage', 'Variables CSS & postMessage supportés')}
+                    </span>
                   </div>
                   <textarea
                     value={htmlCode}
@@ -432,7 +434,7 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                       borderColor: 'var(--border)',
                       color: 'var(--text)'
                     }}
-                    placeholder="Entrez votre HTML, CSS, ou Javascript ici..."
+                    placeholder={t('canvas_editor_placeholder', 'Entrez votre HTML, CSS, ou Javascript ici...')}
                   />
                 </div>
               </div>
@@ -578,7 +580,7 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                             onClick={(e) => e.stopPropagation()}
                             className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                             style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
-                            title="Open in new window"
+                            title={t('canvas_open_new_window', 'Ouvrir dans une nouvelle fenêtre')}
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
@@ -605,7 +607,9 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Eye className="w-4 h-4 text-indigo-400" />
-                      <span className="font-semibold text-xs text-slate-200">Aperçu : {selectedDoc.title}</span>
+                      <span className="font-semibold text-xs" style={{ color: 'var(--strong)' }}>
+                        {t('canvas_preview_prefix', 'Aperçu : {0}', selectedDoc.title || '')}
+                      </span>
                     </div>
                     <button
                       onClick={() => setSelectedDoc(null)}
@@ -634,9 +638,9 @@ export const CanvasStudioModal: React.FC<CanvasStudioModalProps> = ({
         >
           <div className="flex items-center gap-2">
             <Layers className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="text-[11px]">Antigravity Sandboxed Canvas Architecture</span>
+            <span className="text-[11px]">{t('canvas_footer_engine', 'Architecture Canvas Sandboxée Antigravity')}</span>
           </div>
-          <span className="text-[10px] font-mono">HTML / React Live Widgets</span>
+          <span className="text-[10px] font-mono">{t('canvas_footer_widgets', 'Widgets Interactifs HTML / React')}</span>
         </div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { useI18n } from '../services/i18n';
 import React, { useState } from 'react';
 import { 
   CheckCircle2, 
@@ -19,6 +20,7 @@ export const ProgressCardWidget: React.FC<ProgressCardWidgetProps> = ({
   card,
   onDismiss
 }) => {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(true);
 
   if (!card || !card.steps || card.steps.length === 0) {
@@ -66,7 +68,7 @@ export const ProgressCardWidget: React.FC<ProgressCardWidgetProps> = ({
               type="button"
               onClick={() => setExpanded(!expanded)}
               className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer"
-              title={expanded ? "Réduire le plan" : "Développer le plan"}
+              title={expanded ? t('collapse_plan', "Réduire le plan") : t('expand_plan', "Développer le plan")}
             >
               {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
@@ -75,7 +77,7 @@ export const ProgressCardWidget: React.FC<ProgressCardWidgetProps> = ({
                 type="button"
                 onClick={onDismiss}
                 className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                title="Fermer la carte"
+                title={t('close_card_tooltip', 'Fermer la carte')}
               >
                 <X className="w-4 h-4" />
               </button>

@@ -294,7 +294,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
                     onOpenCompactor();
                   }}
                   className="w-full py-1.5 px-2 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  title="Studio d'élagage chirurgical et de réduction des tokens"
+                  title={t('context_pruning_studio_title', "Studio d'élagage chirurgical et de réduction des tokens")}
                 >
                   <Scissors className="w-3 h-3 text-sky-400" />
                   <span>{t('btn_prune_studio', "Studio d'élagage chirurgical...")}</span>
@@ -310,7 +310,7 @@ export const ContextRing: React.FC<ContextRingProps> = ({
                     onCompact();
                   }}
                   className="w-full py-1.5 px-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                  title="Compresse les sorties d'outils volumineuses des tours passés pour économiser jusqu'à 80% de tokens"
+                  title={t('context_compact_auto_title', "Compresse les sorties d'outils volumineuses des tours passés pour économiser jusqu'à 80% de tokens")}
                 >
                   <Zap className="w-3 h-3 text-emerald-400" />
                   <span>{isCompacting ? t('compacting', 'Compactage...') : t('btn_compact_context', 'Compacter l\'historique (-80% tokens)')}</span>

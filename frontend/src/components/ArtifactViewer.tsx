@@ -268,7 +268,7 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
                 { id: 'all', label: t('all', 'Tous') },
                 { id: 'markdown', label: 'Markdown' },
                 { id: 'code', label: 'Code' },
-                { id: 'plans', label: 'Plans & Tâches' },
+                { id: 'plans', label: t('plans_and_tasks', 'Plans & Tâches') },
               ].map((cat) => (
                 <button
                   key={cat.id}

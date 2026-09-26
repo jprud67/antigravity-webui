@@ -109,7 +109,7 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
                 onClick={handleReindex}
                 disabled={reindexing}
                 className="px-2.5 py-1 text-[11px] font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                title="Reconstruire l'index FTS5 depuis les conversations"
+                title={t('rebuild_fts5_index', "Reconstruire l'index FTS5 depuis les conversations")}
               >
                 <RefreshCw className={`w-3 h-3 ${reindexing ? 'animate-spin' : ''}`} />
                 <span>{reindexing ? t('fts_reindexing', 'Indexation...') : t('fts_reindex_btn', 'Réindexer')}</span>
@@ -184,7 +184,7 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
           {loading ? (
             <div className="flex flex-col items-center justify-center p-12 text-slate-400 gap-2">
               <RefreshCw className="w-6 h-6 animate-spin text-cyan-500" />
-              <p className="text-xs">Recherche dans l'index FTS5...</p>
+              <p className="text-xs">{t('searching_fts5_index', "Recherche dans l'index FTS5...")}</p>
             </div>
           ) : results && results.matches.length > 0 ? (
             <div className="space-y-2.5">

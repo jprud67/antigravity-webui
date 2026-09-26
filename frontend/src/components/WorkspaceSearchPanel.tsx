@@ -28,6 +28,7 @@ import type {
 import { FileIcon } from './FileIcon';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
+import { useI18n } from '../services/i18n';
 
 interface WorkspaceSearchPanelProps {
   currentWorkspace: string;
@@ -46,6 +47,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
   onPreviewDiff,
   onFileModified
 }) => {
+  const { t } = useI18n();
   const [query, setQuery] = useState(initialQuery);
   const [replaceText, setReplaceText] = useState('');
   const [isReplaceOpen, setIsReplaceOpen] = useState(initialMode === 'replace');
@@ -172,7 +174,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
         replace_text: replaceText,
         expected_match: match.match_text
       });
-      showToast('Occurrence remplacée avec succès', 'success');
+      showToast(t('match_replaced_success', 'Occurrence remplacée avec succès'), 'success');
       onFileModified?.(fileResult.file_path);
       // Re-run search to update match positions
       await handleExecuteSearch();
@@ -203,7 +205,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
         const item = preview.previews[0];
         onPreviewDiff(item.file_path, item.original_content, item.modified_content);
       } else {
-        showToast("Aucune modification à prévisualiser", 'info');
+        showToast(t('no_changes_to_preview', 'Aucune modification à prévisualiser'), 'info');
       }
     } catch (err: any) {
       showToast(err.message || 'Erreur lors de la prévisualisation', 'error');
@@ -217,7 +219,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
     e.stopPropagation();
     const confirmed = await showConfirm(
       `Remplacer toutes les occurrences (${fileResult.matches.length}) dans ${fileResult.relative_path} par "${replaceText}" ?`,
-      { title: 'Remplacer dans ce fichier', confirmLabel: 'Remplacer' }
+      { title: t('replace_in_this_file', 'Remplacer dans ce fichier'), confirmLabel: t('replace', 'Remplacer') }
     );
     if (!confirmed) return;
 
@@ -316,7 +318,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleExecuteSearch();
               }}
-              placeholder="Rechercher dans les fichiers..."
+              placeholder={t('search_files_placeholder', 'Rechercher dans les fichiers...')}
               className="w-full pl-7 pr-7 py-1 text-xs rounded-lg border bg-black/10 dark:bg-white/5 outline-none font-mono text-slate-100 focus:border-sky-500"
               style={{ borderColor: 'var(--border)' }}
             />
@@ -328,7 +330,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
                   setResultsData(null);
                 }}
                 className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-200 cursor-pointer"
-                title="Effacer la recherche"
+                title={t('search_clear_tooltip', 'Effacer la recherche')}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -343,7 +345,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
               className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded transition-colors cursor-pointer ${
                 isCaseSensitive ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Respecter la casse (Alt+C)"
+              title={t('search_match_case_tooltip', 'Respecter la casse (Alt+C)')}
             >
               Aa
             </button>
@@ -353,7 +355,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
               className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded transition-colors cursor-pointer ${
                 isWholeWord ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Mot entier (Alt+W)"
+              title={t('search_whole_word_tooltip', 'Mot entier (Alt+W)')}
             >
               \b
             </button>
@@ -363,7 +365,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
               className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded transition-colors cursor-pointer ${
                 isRegex ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Expression régulière (Alt+R)"
+              title={t('search_regex_tooltip', 'Expression régulière (Alt+R)')}
             >
               .*
             </button>
@@ -374,7 +376,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
             onClick={() => handleExecuteSearch()}
             disabled={isSearching || !query.trim()}
             className="p-1.5 rounded-lg border bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-50 cursor-pointer shrink-0"
-            title="Lancer la recherche (Entrée)"
+            title={t('search_run_tooltip', 'Lancer la recherche (Entrée)')}
           >
             {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
           </button>
@@ -388,7 +390,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
             className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-200 cursor-pointer"
           >
             {isReplaceOpen ? <ChevronDown className="w-3 h-3 text-sky-400" /> : <ChevronRight className="w-3 h-3" />}
-            <span>Remplacement</span>
+            <span>{t('search_replace_tab', 'Remplacement')}</span>
           </button>
 
           <button
@@ -397,10 +399,10 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
             className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
               isFiltersOpen || includePattern || excludePattern ? 'text-sky-400 bg-sky-500/10' : 'text-slate-400 hover:text-slate-200'
             }`}
-            title="Filtres d'inclusion et exclusion de fichiers"
+            title={t('search_filters_toggle_tooltip', "Filtres d'inclusion et exclusion de fichiers")}
           >
             <SlidersHorizontal className="w-3 h-3" />
-            <span>Filtres</span>
+            <span>{t('search_filters_label', 'Filtres')}</span>
           </button>
         </div>
 
@@ -413,7 +415,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
                 type="text"
                 value={replaceText}
                 onChange={(e) => setReplaceText(e.target.value)}
-                placeholder="Remplacer par..."
+                placeholder={t('search_replace_with_placeholder', 'Remplacer par...')}
                 className="w-full pl-7 pr-2 py-1 text-xs rounded-lg border bg-black/10 dark:bg-white/5 outline-none font-mono text-slate-100 focus:border-amber-500"
                 style={{ borderColor: 'var(--border)' }}
               />
@@ -424,10 +426,10 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
               onClick={handleReplaceAll}
               disabled={isReplacing || !resultsData || resultsData.total_matches === 0}
               className="flex items-center gap-1 px-2 py-1 rounded-lg border bg-amber-600/80 hover:bg-amber-600 text-white text-[11px] font-medium disabled:opacity-40 cursor-pointer shrink-0"
-              title="Remplacer tout dans le workspace"
+              title={t('search_replace_all_workspace', 'Remplacer tout dans le workspace')}
             >
               {isReplacing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-              <span>Tout remplacer</span>
+              <span>{t('search_replace_all_btn', 'Tout remplacer')}</span>
             </button>
           </div>
         )}
@@ -436,7 +438,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
         {isFiltersOpen && (
           <div className="p-2 rounded-lg border bg-black/5 dark:bg-white/5 flex flex-col gap-1.5 animate-fadeIn text-[11px]" style={{ borderColor: 'var(--border)' }}>
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-slate-400">Fichiers à inclure (ex: *.ts, src/**) :</span>
+              <span className="text-[10px] text-slate-400">{t('search_files_to_include', 'Fichiers à inclure (ex: *.ts, src/**) :')}</span>
               <input
                 type="text"
                 value={includePattern}
@@ -447,7 +449,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-slate-400">Fichiers à exclure (ex: node_modules, dist) :</span>
+              <span className="text-[10px] text-slate-400">{t('search_files_to_exclude', 'Fichiers à exclure (ex: node_modules, dist) :')}</span>
               <input
                 type="text"
                 value={excludePattern}
@@ -468,13 +470,13 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
             <span className="font-semibold text-slate-200">
               {resultsData.total_matches} occurrence{resultsData.total_matches > 1 ? 's' : ''}
             </span>
-            <span>dans</span>
+            <span>{t('in', 'dans')}</span>
             <span className="font-semibold text-slate-200">
               {resultsData.total_files} fichier{resultsData.total_files > 1 ? 's' : ''}
             </span>
             <span className="text-[10px] opacity-70">({resultsData.duration_ms} ms)</span>
             {resultsData.truncated && (
-              <span className="text-amber-400 text-[10px] font-medium">• Limité</span>
+              <span className="text-amber-400 text-[10px] font-medium">• {t('limited', 'Limité')}</span>
             )}
           </div>
 
@@ -483,7 +485,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
               type="button"
               onClick={handleToggleExpandAll}
               className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-slate-200 cursor-pointer"
-              title="Tout déplier / replier"
+              title={t('search_toggle_all_expand', 'Tout déplier / replier')}
             >
               <ChevronsUpDown className="w-3.5 h-3.5" />
             </button>
@@ -491,7 +493,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
               type="button"
               onClick={() => handleExecuteSearch()}
               className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-slate-200 cursor-pointer"
-              title="Actualiser la recherche"
+              title={t('search_refresh_tooltip', 'Actualiser la recherche')}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin' : ''}`} />
             </button>
@@ -512,18 +514,18 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
         {isSearching ? (
           <div className="flex flex-col items-center justify-center p-8 gap-2 text-slate-400 text-xs">
             <Loader2 className="w-5 h-5 animate-spin text-sky-400" />
-            <span>Recherche dans les fichiers du workspace...</span>
+            <span>{t('search_in_progress', 'Recherche dans les fichiers du workspace...')}</span>
           </div>
         ) : !resultsData ? (
           <div className="flex flex-col items-center justify-center p-8 text-center gap-2 text-slate-500 text-xs">
             <FileCode2 className="w-8 h-8 opacity-40 text-slate-400" />
-            <span>Saisissez un terme pour lancer une recherche multi-fichiers.</span>
-            <span className="text-[10px] text-slate-600">Raccourci : Ctrl+Shift+F</span>
+            <span>{t('search_enter_term_hint', 'Saisissez un terme pour lancer une recherche multi-fichiers.')}</span>
+            <span className="text-[10px] text-slate-600">{t('search_shortcut_hint', 'Raccourci : Ctrl+Shift+F')}</span>
           </div>
         ) : resultsData.total_matches === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center gap-2 text-slate-400 text-xs">
             <Search className="w-6 h-6 opacity-40 text-slate-400" />
-            <span>Aucun résultat trouvé pour "{resultsData.query}".</span>
+            <span>{t('search_no_results_for', 'Aucun résultat trouvé pour "{0}".', resultsData.query)}</span>
           </div>
         ) : (
           resultsData.files.map((fileResult) => {
@@ -554,7 +556,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
                           type="button"
                           onClick={(e) => handlePreviewFileDiff(e, fileResult)}
                           className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-sky-300 cursor-pointer"
-                          title="Prévisualiser le diff pour ce fichier"
+                          title={t('search_preview_diff_file', 'Prévisualiser le diff pour ce fichier')}
                         >
                           <FileDiff className="w-3 h-3" />
                         </button>
@@ -563,7 +565,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
                         type="button"
                         onClick={(e) => handleReplaceAllInFile(e, fileResult)}
                         className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-amber-300 cursor-pointer"
-                        title="Remplacer tout dans ce fichier"
+                        title={t('search_replace_all_file', 'Remplacer tout dans ce fichier')}
                       >
                         <Replace className="w-3 h-3" />
                       </button>
@@ -594,7 +596,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
                               type="button"
                               onClick={(e) => handleReplaceSingle(e, fileResult, match)}
                               className="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-amber-300 cursor-pointer"
-                              title="Remplacer cette occurrence"
+                              title={t('search_replace_this_occurrence', 'Remplacer cette occurrence')}
                             >
                               <Replace className="w-2.5 h-2.5" />
                             </button>
@@ -606,7 +608,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
                               onSelectMatch(fileResult.file_path, match.line_number, match.column, match.match_length);
                             }}
                             className="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-sky-300 cursor-pointer"
-                            title="Ouvrir dans l'éditeur"
+                            title={t('search_open_in_editor', "Ouvrir dans l'éditeur")}
                           >
                             <ExternalLink className="w-2.5 h-2.5" />
                           </button>

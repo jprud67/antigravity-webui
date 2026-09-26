@@ -536,9 +536,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       const discard = await showConfirm(
         `Le fichier « ${tabToClose.name} » a des modifications non enregistrées. Fermer quand même ?`,
         {
-          title: 'Modifications non enregistrées',
-          confirmLabel: 'Fermer sans enregistrer',
-          cancelLabel: 'Annuler',
+          title: t('unsaved_changes', 'Modifications non enregistrées'),
+          confirmLabel: t('close_without_saving', 'Fermer sans enregistrer'),
+          cancelLabel: t('cancel', 'Annuler'),
           destructive: true
         }
       );
@@ -560,9 +560,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       const discard = await showConfirm(
         `Certains onglets comportent des modifications non enregistrées. Fermer les autres onglets quand même ?`,
         {
-          title: 'Fermer les autres onglets',
-          confirmLabel: 'Fermer sans enregistrer',
-          cancelLabel: 'Annuler',
+          title: t('close_other_tabs', 'Fermer les autres onglets'),
+          confirmLabel: t('close_without_saving', 'Fermer sans enregistrer'),
+          cancelLabel: t('cancel', 'Annuler'),
           destructive: true
         }
       );
@@ -583,9 +583,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       const discard = await showConfirm(
         `Certains onglets à droite comportent des modifications non enregistrées. Les fermer quand même ?`,
         {
-          title: 'Fermer les onglets à droite',
-          confirmLabel: 'Fermer sans enregistrer',
-          cancelLabel: 'Annuler',
+          title: t('close_tabs_to_right', 'Fermer les onglets à droite'),
+          confirmLabel: t('close_without_saving', 'Fermer sans enregistrer'),
+          cancelLabel: t('cancel', 'Annuler'),
           destructive: true
         }
       );
@@ -609,9 +609,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       const discard = await showConfirm(
         `Plusieurs onglets comportent des modifications non enregistrées. Tout fermer quand même ?`,
         {
-          title: 'Tout fermer',
-          confirmLabel: 'Fermer sans enregistrer',
-          cancelLabel: 'Annuler',
+          title: t('close_all', 'Tout fermer'),
+          confirmLabel: t('close_without_saving', 'Fermer sans enregistrer'),
+          cancelLabel: t('cancel', 'Annuler'),
           destructive: true
         }
       );
@@ -627,9 +627,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     const confirmed = await showConfirm(
       `Voulez-vous annuler toutes les modifications non enregistrées pour « ${activeTabItem.name} » et rétablir le contenu du disque ?`,
       {
-        title: 'Annuler les modifications',
-        confirmLabel: 'Rétablir la version disque',
-        cancelLabel: 'Continuer l\'édition',
+        title: t('revert_changes', 'Annuler les modifications'),
+        confirmLabel: t('revert_to_disk', 'Rétablir la version disque'),
+        cancelLabel: t('continue_editing', 'Continuer l\'édition'),
         destructive: true
       }
     );
@@ -645,7 +645,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       }
       return updated;
     });
-    showToast('Modifications annulées', 'info');
+    showToast(t('changes_reverted', 'Modifications annulées'), 'info');
   }, [activeTabItem, activeTabIndex]);
 
   // Load file tree when files tab is active
@@ -883,7 +883,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const handleFormatCode = useCallback(() => {
     if (monacoEditorRef.current) {
       monacoEditorRef.current.getAction('editor.action.formatDocument')?.run();
-      showToast('Document formaté', 'info');
+      showToast(t('document_formatted', 'Document formaté'), 'info');
     }
   }, []);
   const handleSelectArtifact = useCallback(async (art: ArtifactItem) => {
@@ -1127,7 +1127,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   type="button"
                   onClick={handleRenameItem}
                   className="p-1 rounded bg-sky-600 hover:bg-sky-500 text-white cursor-pointer"
-                  title="Valider"
+                  title={t('confirm', 'Valider')}
                 >
                   <Check className="w-3 h-3" />
                 </button>
@@ -1135,7 +1135,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   type="button"
                   onClick={() => setRenamingPath(null)}
                   className="p-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 cursor-pointer"
-                  title="Annuler"
+                  title={t('cancel', 'Annuler')}
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -1185,7 +1185,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           setCreatingType('file');
                           setNewItemName('');
                         }}
-                        title="Nouveau fichier ici"
+                        title={t('new_file_here', 'Nouveau fichier ici')}
                         className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
                       >
                         <FilePlus className="w-3 h-3" />
@@ -1198,7 +1198,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           setCreatingType('folder');
                           setNewItemName('');
                         }}
-                        title="Nouveau dossier ici"
+                        title={t('new_folder_here', 'Nouveau dossier ici')}
                         className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
                       >
                         <FolderPlus className="w-3 h-3" />
@@ -1217,7 +1217,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           openFiles: openTabs.map(t => ({ path: t.path, name: t.name, content: t.content })),
                         });
                       }}
-                      title="Ouvrir dans Monaco Studio"
+                      title={t('open_in_monaco_studio', 'Ouvrir dans Monaco Studio')}
                       className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
                     >
                       <Code2 className="w-3 h-3" />
@@ -1230,7 +1230,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         e.stopPropagation();
                         handleDuplicateFile(item.path);
                       }}
-                      title="Dupliquer le fichier"
+                      title={t('duplicate_file', 'Dupliquer le fichier')}
                       className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300 cursor-pointer"
                     >
                       <Copy className="w-3 h-3" />
@@ -1254,7 +1254,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       e.stopPropagation();
                       handleDeleteItem(item.path, isDir, item.name);
                     }}
-                    title="Supprimer"
+                    title={t('delete', 'Supprimer')}
                     className="p-1 hover:bg-rose-500/20 rounded text-slate-400 hover:text-rose-400"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -1335,7 +1335,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                 borderColor: 'var(--border2)',
                 color: 'var(--accent-text)',
               }}
-              title="Défiler vers la gauche"
+              title={t('scroll_left', 'Défiler vers la gauche')}
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
@@ -1373,10 +1373,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                 ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 font-semibold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
             }`}
-            title="Recherche globale dans le workspace (Ctrl+Shift+F)"
+            title={t('workspace_search_global_tooltip', 'Recherche globale dans le workspace (Ctrl+Shift+F)')}
           >
             <Search className="w-3.5 h-3.5" />
-            <span>Recherche</span>
+            <span>{t('search', 'Recherche')}</span>
           </button>
 
           <button
@@ -1412,7 +1412,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             }`}
           >
             <GitBranch className="w-3.5 h-3.5" />
-            <span>Git</span>
+            <span>{t('git', 'Git')}</span>
           </button>
 
           <button
@@ -1439,7 +1439,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
               title="Monaco Code Studio (/editor)"
             >
               <Code2 className="w-3.5 h-3.5 text-sky-400" />
-              <span>Éditeur</span>
+              <span>{t('editor', 'Éditeur')}</span>
             </button>
           )}
 
@@ -1452,7 +1452,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
               title={t("session_branches_tooltip", "Arbre des branches et signets mémoire (/branch)")}
             >
               <GitBranch className="w-3.5 h-3.5 text-purple-400" />
-              <span>Branches</span>
+              <span>{t('branches', 'Branches')}</span>
             </button>
           )}
 
@@ -1465,7 +1465,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
               title={t("task_cron_scheduler", "Task & Cron Scheduler (/crons)")}
             >
               <Clock className="w-3.5 h-3.5 text-amber-400" />
-              <span>Crons</span>
+              <span>{t('crons', 'Crons')}</span>
             </button>
           )}
 
@@ -1516,7 +1516,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   >
                     <Globe className="w-4 h-4 text-sky-400 shrink-0" />
                     <div className="flex flex-col text-left">
-                      <span className="font-semibold text-[11px]">HTML Autonome</span>
+                      <span className="font-semibold text-[11px]">{t('standalone_html', 'HTML Autonome')}</span>
                       <span className="text-[9px]" style={{ color: 'var(--muted)' }}>{t("offline_styled", "Complete & styled offline")}</span>
                     </div>
                   </a>
@@ -1549,7 +1549,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     <Code2 className="w-4 h-4 text-amber-400 shrink-0" />
                     <div className="flex flex-col text-left">
                       <span className="font-semibold text-[11px]">{t("json_data", "JSON Data (.json)")}</span>
-                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>Transcript brut complet</span>
+                      <span className="text-[9px]" style={{ color: 'var(--muted)' }}>{t('raw_transcript_full', 'Transcript brut complet')}</span>
                     </div>
                   </a>
                 </div>
@@ -1568,7 +1568,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
               borderColor: 'var(--border2)',
               color: 'var(--accent-text)',
             }}
-            title="Défiler vers la droite"
+            title={t('scroll_right', 'Défiler vers la droite')}
           >
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
@@ -1742,7 +1742,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   <button
                     type="button"
                     onClick={() => window.dispatchEvent(new CustomEvent('open-quick-open'))}
-                    title="Recherche rapide de fichiers (Ctrl+P)"
+                    title={t('quick_file_search_tooltip', 'Recherche rapide de fichiers (Ctrl+P)')}
                     className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-sky-400 cursor-pointer shrink-0"
                     style={{ borderColor: 'var(--border)' }}
                   >
@@ -1752,7 +1752,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   <button
                     type="button"
                     onClick={() => handleTabClick('search')}
-                    title="Recherche & Remplacement global dans le workspace (Ctrl+Shift+F)"
+                    title={t('search_replace_global_tooltip', 'Recherche & Remplacement global dans le workspace (Ctrl+Shift+F)')}
                     className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-amber-400 cursor-pointer shrink-0"
                     style={{ borderColor: 'var(--border)' }}
                   >
@@ -1762,7 +1762,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    title="Importer des fichiers depuis votre ordinateur"
+                    title={t('upload_files_tooltip', 'Importer des fichiers depuis votre ordinateur')}
                     className="p-1.5 rounded-lg border hover:bg-emerald-500/10 text-emerald-400 border-emerald-500/30 cursor-pointer shrink-0"
                   >
                     <Upload className="w-3.5 h-3.5" />
@@ -1775,7 +1775,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       setCreatingType('file');
                       setNewItemName('');
                     }}
-                    title="Nouveau fichier à la racine"
+                    title={t('new_file_root', 'Nouveau fichier à la racine')}
                     className="p-1.5 rounded-lg border hover:bg-sky-500/10 text-sky-400 border-sky-500/30 cursor-pointer shrink-0"
                   >
                     <FilePlus className="w-3.5 h-3.5" />
@@ -1788,7 +1788,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       setCreatingType('folder');
                       setNewItemName('');
                     }}
-                    title="Nouveau dossier à la racine"
+                    title={t('new_folder_root', 'Nouveau dossier à la racine')}
                     className="p-1.5 rounded-lg border hover:bg-sky-500/10 text-sky-400 border-sky-500/30 cursor-pointer shrink-0"
                   >
                     <FolderPlus className="w-3.5 h-3.5" />
@@ -1828,7 +1828,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       type="button"
                       onClick={handleCreateNewItem}
                       className="p-1 rounded bg-sky-600 hover:bg-sky-500 text-white cursor-pointer"
-                      title="Créer (Entrée)"
+                      title={t('create_enter_tooltip', 'Créer (Entrée)')}
                     >
                       <Check className="w-3 h-3" />
                     </button>
@@ -1836,7 +1836,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       type="button"
                       onClick={() => setCreatingType(null)}
                       className="p-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 cursor-pointer"
-                      title="Annuler (Échap)"
+                      title={t('cancel_escape_tooltip', 'Annuler (Échap)')}
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -1884,13 +1884,13 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           <FileIcon filename={tab.name} isDir={false} className="w-3 h-3 shrink-0" />
                           <span className="truncate flex-1 text-[11px]">{tab.name}</span>
                           {tab.isDirty && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Modifications non enregistrées" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title={t('unsaved_changes', 'Modifications non enregistrées')} />
                           )}
                           <button
                             type="button"
                             onClick={(e) => handleCloseTab(idx, e)}
                             className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/20 text-slate-400 hover:text-slate-200 cursor-pointer"
-                            title="Fermer l'onglet"
+                            title={t('close_tab', "Fermer l'onglet")}
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -1919,8 +1919,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           onClick={() => handleCloseTab(tabContextMenu.tabIndex)}
                           className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
                         >
-                          <span>Fermer</span>
-                          <span className="text-[10px] text-slate-500 font-mono">Fermer onglet</span>
+                          <span>{t('close', 'Fermer')}</span>
+                          <span className="text-[10px] text-slate-500 font-mono">{t('close_tab', 'Fermer onglet')}</span>
                         </button>
 
                         <button
@@ -1928,7 +1928,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           onClick={() => handleCloseOtherTabs(tabContextMenu.tabIndex)}
                           className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
                         >
-                          <span>Fermer les autres</span>
+                          <span>{t('close_others', 'Fermer les autres')}</span>
                         </button>
 
                         <button
@@ -1936,7 +1936,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           onClick={() => handleCloseTabsToRight(tabContextMenu.tabIndex)}
                           className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
                         >
-                          <span>Fermer à droite</span>
+                          <span>{t('close_to_the_right', 'Fermer à droite')}</span>
                         </button>
 
                         <button
@@ -1944,7 +1944,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           onClick={handleCloseSavedTabs}
                           className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
                         >
-                          <span>Fermer les onglets enregistrés</span>
+                          <span>{t('close_saved_tabs', 'Fermer les onglets enregistrés')}</span>
                         </button>
 
                         <button
@@ -1952,7 +1952,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           onClick={handleCloseAllTabs}
                           className="w-full text-left px-3 py-1.5 hover:bg-rose-500/10 flex items-center justify-between text-rose-400 hover:text-rose-300 cursor-pointer"
                         >
-                          <span>Tout fermer</span>
+                          <span>{t('close_all', 'Tout fermer')}</span>
                         </button>
 
                         <div className="my-1 border-t border-white/5" />
@@ -1966,7 +1966,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           }}
                           className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
                         >
-                          <span>Dupliquer ce fichier</span>
+                          <span>{t('duplicate_this_file', 'Dupliquer ce fichier')}</span>
                         </button>
 
                         <button
@@ -1975,13 +1975,13 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             const tab = openTabs[tabContextMenu.tabIndex];
                             if (tab) {
                               navigator.clipboard.writeText(tab.path);
-                              showToast('Chemin absolu copié', 'info');
+                              showToast(t('absolute_path_copied', 'Chemin absolu copié'), 'info');
                             }
                             setTabContextMenu(null);
                           }}
                           className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
                         >
-                          <span>Copier le chemin absolu</span>
+                          <span>{t('copy_absolute_path', 'Copier le chemin absolu')}</span>
                         </button>
                       </div>
                     )}
@@ -2054,7 +2054,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               borderColor: showMarkdownPreview ? 'var(--accent)' : 'var(--border)',
                               color: showMarkdownPreview ? 'var(--accent)' : 'var(--text)',
                             }}
-                            title="Bascule Aperçu Markdown"
+                            title={t('toggle_markdown_preview', 'Bascule Aperçu Markdown')}
                           >
                             {showMarkdownPreview ? <Code className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
                             <span>{showMarkdownPreview ? 'Source' : 'Aperçu'}</span>
@@ -2072,10 +2072,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                                 borderColor: 'var(--border)',
                                 color: 'var(--text)',
                               }}
-                              title="Formater le code (Shift+Alt+F)"
+                              title={t('format_code_tooltip', 'Formater le code (Shift+Alt+F)')}
                             >
                               <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
-                              <span>Format</span>
+                              <span>{t('format', 'Format')}</span>
                             </button>
 
                             <button
@@ -2085,7 +2085,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                                 isWordWrap ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'hover:bg-black/5 dark:hover:bg-white/5'
                               }`}
                               style={{ borderColor: isWordWrap ? undefined : 'var(--border)' }}
-                              title="Retour à la ligne automatique"
+                              title={t('word_wrap_toggle', 'Retour à la ligne automatique')}
                             >
                               <WrapText className="w-2.5 h-2.5" />
                             </button>
@@ -2117,10 +2117,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               openFiles: openTabs.map(t => ({ path: t.path, name: t.name, content: t.content })),
                             })}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:bg-sky-500/10 text-sky-400 border-sky-500/30"
-                            title="Ouvrir dans Monaco Studio plein écran"
+                            title={t('open_in_monaco_studio_fullscreen', 'Ouvrir dans Monaco Studio plein écran')}
                           >
                             <Code2 className="w-2.5 h-2.5" />
-                            <span>Studio</span>
+                            <span>{t('studio', 'Studio')}</span>
                           </button>
                         )}
 
@@ -2130,10 +2130,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             type="button"
                             onClick={handleRunInTerminal}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"
-                            title="Exécuter dans le terminal intégré"
+                            title={t('run_in_terminal_tooltip', 'Exécuter dans le terminal intégré')}
                           >
                             <Play className="w-2.5 h-2.5 fill-amber-300" />
-                            <span>Exécuter</span>
+                            <span>{t('run', 'Exécuter')}</span>
                           </button>
                         )}
 
@@ -2153,10 +2153,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               : 'hover:bg-black/5 dark:hover:bg-white/5 border-transparent text-slate-400 hover:text-slate-200'
                           }`}
                           style={{ borderColor: isTerminalSplitOpen ? undefined : 'var(--border)' }}
-                          title="Basculer le terminal intégré (Ctrl+`)"
+                          title={t('toggle_terminal_tooltip', 'Basculer le terminal intégré (Ctrl+`)')}
                         >
                           <TerminalIcon className="w-2.5 h-2.5" />
-                          <span>Terminal</span>
+                          <span>{t('terminal', 'Terminal')}</span>
                         </button>
 
                         {/* Diff with disk */}
@@ -2171,10 +2171,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               workspace: currentWorkspace,
                             })}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"
-                            title="Comparer les modifications avec la version enregistrée sur disque"
+                            title={t('diff_compare_tooltip', 'Comparer les modifications avec la version enregistrée sur disque')}
                           >
                             <SplitSquareVertical className="w-2.5 h-2.5" />
-                            <span>Diff</span>
+                            <span>{t('diff', 'Diff')}</span>
                           </button>
                         )}
 
@@ -2184,10 +2184,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             type="button"
                             onClick={() => setIsCopilotActionOpen(true)}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
-                            title="Actions de Code IA (Refactor, Typage, Docs, Tests)"
+                            title={t('ai_actions_tooltip', 'Actions de Code IA (Refactor, Typage, Docs, Tests)')}
                           >
                             <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
-                            <span>Actions IA</span>
+                            <span>{t('ai_actions', 'Actions IA')}</span>
                           </button>
                         )}
 
@@ -2197,10 +2197,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             type="button"
                             onClick={handleRevertActiveTab}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:bg-rose-500/10 text-rose-400 border-rose-500/30"
-                            title="Annuler toutes les modifications non enregistrées"
+                            title={t('discard_unsaved_tooltip', 'Annuler toutes les modifications non enregistrées')}
                           >
                             <RotateCcw className="w-2.5 h-2.5" />
-                            <span>Annuler</span>
+                            <span>{t('cancel', 'Annuler')}</span>
                           </button>
                         )}
 
@@ -2210,7 +2210,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             onClick={handleSaveActiveTab}
                             disabled={savingFile}
                             className="flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-50"
-                            title="Enregistrer (Ctrl+S)"
+                            title={t('save_ctrl_s_tooltip', 'Enregistrer (Ctrl+S)')}
                           >
                             {saveSuccess ? <Check className="w-2.5 h-2.5" /> : savingFile ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Save className="w-2.5 h-2.5" />}
                             <span>{saveSuccess ? 'Enregistré' : savingFile ? '...' : 'Enregistrer'}</span>
@@ -2318,7 +2318,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           loading={
                             <div className="flex items-center justify-center h-full gap-2 text-zinc-500">
                               <Loader2 className="w-5 h-5 animate-spin text-sky-400" />
-                              <span className="text-xs">Chargement de Monaco Editor...</span>
+                              <span className="text-xs">{t('monaco_loading_editor', 'Chargement de Monaco Editor...')}</span>
                             </div>
                           }
                         />
@@ -2343,7 +2343,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               type="button"
                               onClick={() => multiCursorControllerRef.current?.resetToSingleCursor()}
                               className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[9px] hover:bg-amber-500/25 transition-colors cursor-pointer"
-                              title="Curseurs multiples actifs. Cliquez pour réinitialiser à un seul curseur (ou Échap)."
+                              title={t('multiple_cursors_tooltip', 'Curseurs multiples actifs. Cliquez pour réinitialiser à un seul curseur (ou Échap).')}
                             >
                               <Layers className="w-2.5 h-2.5" />
                               <span>{cursorCount} curseurs</span>
@@ -2363,7 +2363,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             <span
                               onClick={() => navigateGitDiff(monacoEditorRef.current, diffRangesRef.current, 'next')}
                               className="cursor-pointer hover:underline flex items-center gap-1 font-semibold"
-                              title="Modifications Git. Cliquez pour aller à la modification suivante (F7)."
+                              title={t('git_next_change_hint', 'Modifications Git. Cliquez pour aller à la modification suivante (F7).')}
                             >
                               <span className="text-emerald-400">+{diffSummary.added_lines}</span>
                               <span className="text-sky-400">~{diffSummary.modified_lines}</span>
@@ -2374,7 +2374,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                                 type="button"
                                 onClick={() => navigateGitDiff(monacoEditorRef.current, diffRangesRef.current, 'prev')}
                                 className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
-                                title="Modification précédente (Shift+F7)"
+                                title={t('git_prev_change_hint', 'Modification précédente (Shift+F7)')}
                               >
                                 <ChevronUp className="w-2.5 h-2.5" />
                               </button>
@@ -2382,7 +2382,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                                 type="button"
                                 onClick={() => navigateGitDiff(monacoEditorRef.current, diffRangesRef.current, 'next')}
                                 className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
-                                title="Modification suivante (F7)"
+                                title={t('git_next_change_f7', 'Modification suivante (F7)')}
                               >
                                 <ChevronDown className="w-2.5 h-2.5" />
                               </button>
@@ -2407,7 +2407,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             borderColor: copilotActive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(113, 113, 122, 0.3)',
                             color: copilotActive ? '#34d399' : '#a1a1aa'
                           }}
-                          title="Activer/Désactiver AI Copilot Inline"
+                          title={t('toggle_copilot_tooltip', 'Activer/Désactiver AI Copilot Inline')}
                         >
                           {copilotStatus === 'generating' ? (
                             <Loader2 className="w-2.5 h-2.5 animate-spin text-amber-400" />
@@ -2443,7 +2443,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-sky-600 hover:bg-sky-500 text-white cursor-pointer shadow-sm transition-all"
                       >
                         <FilePlus className="w-3.5 h-3.5" />
-                        <span>Nouveau fichier</span>
+                        <span>{t('new_file', 'Nouveau fichier')}</span>
                       </button>
 
                       <button
@@ -2479,7 +2479,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     <div
                       onMouseDown={handleSplitResizeMouseDown}
                       className="h-1.5 w-full cursor-row-resize hover:bg-sky-500/50 transition-colors flex items-center justify-center group relative -top-0.5 z-10 select-none"
-                      title="Glisser pour redimensionner le terminal (double-clic pour réinitialiser)"
+                      title={t('resize_terminal_tooltip', 'Glisser pour redimensionner le terminal (double-clic pour réinitialiser)')}
                       onDoubleClick={() => {
                         setTerminalSplitHeight(260);
                         setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
@@ -2499,7 +2499,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="flex items-center gap-1.5 text-sky-400 font-semibold text-[11px]">
                           <TerminalIcon className="w-3.5 h-3.5" />
-                          <span>Terminal Intégré</span>
+                          <span>{t('integrated_terminal', 'Terminal Intégré')}</span>
                         </div>
                         <span className="text-slate-500 text-[10px]">•</span>
                         <span
@@ -2535,7 +2535,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
                             }}
                             className={`px-1.5 py-0.5 transition-colors cursor-pointer ${terminalSplitHeight === 160 ? 'bg-sky-500 text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
-                            title="Hauteur compacte (160px)"
+                            title={t('compact_height_tooltip', 'Hauteur compacte (160px)')}
                           >
                             160
                           </button>
@@ -2547,7 +2547,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             }}
                             className={`px-1.5 py-0.5 transition-colors cursor-pointer border-l ${terminalSplitHeight === 260 ? 'bg-sky-500 text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
                             style={{ borderColor: 'var(--border)' }}
-                            title="Hauteur standard (260px)"
+                            title={t('standard_height_tooltip', 'Hauteur standard (260px)')}
                           >
                             260
                           </button>
@@ -2559,7 +2559,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             }}
                             className={`px-1.5 py-0.5 transition-colors cursor-pointer border-l ${terminalSplitHeight === 420 ? 'bg-sky-500 text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
                             style={{ borderColor: 'var(--border)' }}
-                            title="Hauteur haute (420px)"
+                            title={t('tall_height_tooltip', 'Hauteur haute (420px)')}
                           >
                             420
                           </button>

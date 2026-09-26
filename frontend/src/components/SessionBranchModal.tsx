@@ -92,12 +92,12 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
   const handleCreateBookmark = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bmLabel.trim()) {
-      showToast('Veuillez indiquer un libellé pour le marque-page', 'warning');
+      showToast(t('bookmark_specify_label', 'Veuillez indiquer un libellé pour le marque-page'), 'warning');
       return;
     }
     try {
       await addConversationBookmark(currentConversationId, bmStepIndex, bmLabel.trim(), bmPreview.trim());
-      showToast('Marque-page enregistré avec succès', 'success');
+      showToast(t('bookmark_saved_success', 'Marque-page enregistré avec succès'), 'success');
       setBmLabel('');
       setBmPreview('');
       setIsAddingBm(false);
@@ -110,7 +110,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
   const handleDeleteBookmark = async (convId: string, bookmarkId: string) => {
     try {
       await removeConversationBookmark(convId, bookmarkId);
-      showToast('Marque-page supprimé', 'info');
+      showToast(t('bookmark_deleted', 'Marque-page supprimé'), 'info');
       await loadData();
     } catch (err: any) {
       showToast(err.message || 'Erreur lors de la suppression', 'error');
@@ -186,7 +186,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
               type="button"
               onClick={loadData}
               disabled={loading}
-              title="Actualiser la généalogie"
+              title={t('branch_refresh_tooltip', 'Actualiser la généalogie')}
               className="p-2 rounded-lg transition-colors hover:opacity-100 opacity-70 cursor-pointer"
               style={{ color: 'var(--muted)' }}
             >
@@ -285,7 +285,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
             }}
           >
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className="text-xs font-semibold whitespace-nowrap opacity-75">Étape #</span>
+              <span className="text-xs font-semibold whitespace-nowrap opacity-75">{t('step_number_prefix', 'Étape #')}</span>
               <input
                 type="number"
                 min={0}
@@ -304,7 +304,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
               required
               value={bmLabel}
               onChange={(e) => setBmLabel(e.target.value)}
-              placeholder="Libellé du signet (ex: Architecture validée, Refactoring auth...)"
+              placeholder={t('branch_bookmark_label_placeholder', 'Libellé du signet (ex: Architecture validée, Refactoring auth...)')}
               className="flex-1 w-full px-3 py-1.5 text-xs rounded-lg border"
               style={{
                 backgroundColor: 'var(--surface)',
@@ -316,7 +316,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
               type="text"
               value={bmPreview}
               onChange={(e) => setBmPreview(e.target.value)}
-              placeholder="Note ou aperçu contextuel (optionnel)"
+              placeholder={t('branch_bookmark_note_placeholder', 'Note ou aperçu contextuel (optionnel)')}
               className="flex-1 w-full px-3 py-1.5 text-xs rounded-lg border hidden md:block"
               style={{
                 backgroundColor: 'var(--surface)',
@@ -330,7 +330,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
                 onClick={() => setIsAddingBm(false)}
                 className="px-3 py-1.5 rounded-lg text-xs hover:opacity-100 opacity-70 cursor-pointer"
               >
-                Annuler
+                {t('cancel', 'Annuler')}
               </button>
               <button
                 type="submit"
@@ -340,7 +340,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
                   color: '#ffffff',
                 }}
               >
-                Enregistrer
+                {t('save', 'Enregistrer')}
               </button>
             </div>
           </form>
@@ -351,7 +351,7 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
           {loading && !data && (
             <div className="py-12 flex flex-col items-center justify-center text-xs opacity-60 gap-2">
               <RefreshCw className="w-5 h-5 animate-spin text-[var(--accent)]" />
-              <span>Chargement de la structure des branches...</span>
+              <span>{t('branch_loading', 'Chargement de la structure des branches...')}</span>
             </div>
           )}
 
@@ -446,19 +446,19 @@ export const SessionBranchModal: React.FC<SessionBranchModalProps> = ({
                               onSelectConversation(bm.conversation_id!);
                               onClose();
                             }}
-                            title="Basculer vers cette session"
+                            title={t('switch_to_session_tooltip', 'Basculer vers cette session')}
                             className="p-1.5 rounded-lg border hover:bg-[var(--accent-bg)] hover:text-[var(--accent-text)] transition-colors cursor-pointer text-xs flex items-center gap-1"
                             style={{ borderColor: 'var(--border)' }}
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Ouvrir</span>
+                            <span className="hidden sm:inline">{t('open', 'Ouvrir')}</span>
                           </button>
                         )}
                         {bm.conversation_id && (
                           <button
                             type="button"
                             onClick={() => handleDeleteBookmark(bm.conversation_id!, bm.id)}
-                            title="Supprimer ce signet"
+                            title={t('branch_delete_bookmark', 'Supprimer ce signet')}
                             className="p-1.5 rounded-lg border hover:bg-rose-500/10 hover:text-rose-400 transition-colors cursor-pointer text-xs"
                             style={{ borderColor: 'var(--border)' }}
                           >
@@ -521,6 +521,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   onFork,
   level,
 }) => {
+  const { t } = useI18n();
   const isCurrent = node.conversation_id === currentId;
 
   return (
@@ -622,7 +623,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
             <button
               type="button"
               onClick={() => onFork(node.step_count)}
-              title="Bifurquer à partir de cette étape"
+              title={t('branch_fork_step', 'Bifurquer à partir de cette étape')}
               className="p-1 rounded-md border hover:bg-purple-500/10 hover:text-purple-400 transition-colors cursor-pointer"
               style={{ borderColor: 'var(--border)' }}
             >

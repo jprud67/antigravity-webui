@@ -1,3 +1,4 @@
+import { useI18n } from '../services/i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { 
   Maximize2, 
@@ -32,6 +33,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   allowFullscreen = true,
   className = '',
 }) => {
+  const { t } = useI18n();
   const [doc, setDoc] = useState<CanvasDocumentManifest | undefined>(propDoc);
   const [height, setHeight] = useState<number>(propDoc?.preferredHeight || initialHeight);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -159,7 +161,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
         <div className="flex items-center gap-1">
           <button
             onClick={() => setRefreshKey((k) => k + 1)}
-            title="Rafraîchir"
+            title={t('refresh', 'Rafraîchir')}
             className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -179,7 +181,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
             <>
               <button
                 onClick={handleCopyLink}
-                title="Copier le lien"
+                title={t('copy_link', 'Copier le lien')}
                 className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -187,7 +189,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
 
               <button
                 onClick={handleOpenNewTab}
-                title="Ouvrir dans un nouvel onglet"
+                title={t('open_in_new_tab', 'Ouvrir dans un nouvel onglet')}
                 className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
               >
                 <ExternalLink className="w-3.5 h-3.5" />

@@ -213,7 +213,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
               <div className="mt-2 truncate font-semibold text-xs" style={{ color: 'var(--strong)' }}>
                 {activeAccount?.email || activeAccount?.account || 'Connecté'}
               </div>
-              <span className="text-[10px] text-emerald-400 mt-0.5">● Opérationnel</span>
+              <span className="text-[10px] text-emerald-400 mt-0.5">● {t('status_operational', 'Opérationnel')}</span>
             </div>
 
             {/* Active Model */}
@@ -267,10 +267,10 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                 <Database className="w-3.5 h-3.5 text-amber-400" />
               </div>
               <div className="mt-2 font-bold text-lg" style={{ color: 'var(--strong)' }}>
-                {stats.projects} <span className="text-xs font-normal text-slate-400">projets</span>
+                {stats.projects} <span className="text-xs font-normal text-slate-400">{t('projects', 'projets')}</span>
               </div>
               <div className="text-[10px]" style={{ color: 'var(--muted)' }}>
-                {stats.tagsCount} tags distincts
+                {stats.tagsCount} {t('distinct_tags', 'tags distincts')}
               </div>
             </div>
           </div>
@@ -497,7 +497,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
 
                               {b.reset_time && (
                                 <div className="flex items-center justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
-                                  <span>Réinitialisation :</span>
+                                  <span>{t('reset_prefix', 'Réinitialisation :')}</span>
                                   <span className="font-mono font-medium text-slate-300">
                                     {formatResetTime(b.reset_time)}
                                   </span>
@@ -524,8 +524,8 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
           }}
         >
           <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--muted)' }}>
-            <span>Bascule multi-comptes :</span>
-            <span className="text-emerald-400 font-semibold">Active (~1s)</span>
+            <span>{t('analytics_multi_account', 'Bascule multi-comptes :')}</span>
+            <span className="text-emerald-400 font-semibold">{t('active', 'Actif')} (~1s)</span>
           </div>
 
           <button

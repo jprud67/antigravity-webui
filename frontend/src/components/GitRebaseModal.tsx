@@ -16,6 +16,7 @@ import {
 import { fetchRebaseTodo, executeGitRebase } from '../services/api';
 import type { RebaseCommitItem } from '../types';
 import { showToast } from '../services/toast';
+import { useI18n } from '../services/i18n';
 
 interface GitRebaseModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
   onRebaseCompleted,
   onRebaseConflict
 }) => {
+  const { t } = useI18n();
   const [baseRef, setBaseRef] = useState(initialBaseRef);
   const [commits, setCommits] = useState<RebaseCommitItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,11 +137,11 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
 
       const res = await executeGitRebase(payload);
       if (res.status === 'completed') {
-        showToast('Rebase interactif terminé avec succès !', 'success');
+        showToast(t('git_rebase_interactive_success', 'Rebase interactif terminé avec succès !'), 'success');
         onClose();
         onRebaseCompleted();
       } else if (res.status === 'conflict') {
-        showToast('Conflits détectés pendant le rebase. Résolvez-les pour continuer.', 'error');
+        showToast(t('git_rebase_conflicts_detected', 'Conflits détectés pendant le rebase. Résolvez-les pour continuer.'), 'error');
         onClose();
         if (onRebaseConflict) {
           onRebaseConflict();
@@ -147,7 +149,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
           onRebaseCompleted();
         }
       } else {
-        showToast(res.message || 'Rebase arrêté.', 'info');
+        showToast(res.message || t('git_rebase_stopped', 'Rebase arrêté.'), 'info');
         onClose();
         onRebaseCompleted();
       }
@@ -190,10 +192,10 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold" style={{ color: 'var(--strong)' }}>
-                Studio de Rebase Interactif
+                {t('rebase_studio_title', 'Studio de Rebase Interactif')}
               </h3>
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                Réordonnez, reformulez, fusionnez ou supprimez vos commits non poussés
+                {t('rebase_studio_subtitle', 'Réordonnez, reformulez, fusionnez ou supprimez vos commits non poussés')}
               </p>
             </div>
           </div>
@@ -219,7 +221,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
         >
           <div className="flex items-center gap-2 flex-1 min-w-[280px]">
             <span className="font-medium shrink-0" style={{ color: 'var(--muted)' }}>
-              Base de départ :
+              {t('rebase_start_base', 'Base de départ :')}
             </span>
             <input
               type="text"
@@ -228,7 +230,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleManualReload();
               }}
-              placeholder="ex: HEAD~5, main, origin/main, ou sha..."
+              placeholder={t('git_rebase_base_placeholder', 'ex: HEAD~5, main, origin/main, or sha...')}
               className="flex-1 px-3 py-1.5 rounded-lg border font-mono text-xs outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30"
               style={{
                 backgroundColor: 'var(--bg)',
@@ -247,13 +249,13 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
               }}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-sky-400' : ''}`} />
-              <span>Charger</span>
+              <span>{t('load', 'Charger')}</span>
             </button>
           </div>
 
           {/* Quick Presets */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Presets :</span>
+            <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{t('presets', 'Presets :')}</span>
             {['HEAD~3', 'HEAD~5', 'HEAD~10'].map((preset) => (
               <button
                 key={preset}
@@ -286,14 +288,14 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
           {loading ? (
             <div className="flex flex-col items-center justify-center h-48 text-xs gap-2" style={{ color: 'var(--muted)' }}>
               <RefreshCw className="w-6 h-6 animate-spin text-sky-400" />
-              <span>Analyse des commits pour le rebase...</span>
+              <span>{t('analyzing_commits_rebase', 'Analyse des commits pour le rebase...')}</span>
             </div>
           ) : commits.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-xs text-center space-y-2" style={{ color: 'var(--muted)' }}>
               <RotateCcw className="w-8 h-8 opacity-40 mx-auto" />
-              <p className="font-medium">Aucun commit à rebaser sur cette base.</p>
+              <p className="font-medium">{t('git_rebase_no_commits', 'Aucun commit à rebaser sur cette base.')}</p>
               <p className="text-[11px] opacity-75">
-                Vérifiez la référence de base choisie (ex: HEAD~3 pour les 3 derniers commits).
+                {t('git_rebase_check_ref_hint', 'Vérifiez la référence de base choisie (ex: HEAD~3 pour les 3 derniers commits).')}
               </p>
             </div>
           ) : (
@@ -325,7 +327,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
                           onClick={() => moveCommit(index, 'up')}
                           disabled={index === 0 || executing}
                           className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
-                          title="Déplacer vers le haut (appliqué plus tôt)"
+                          title={t('git_move_up_tooltip', 'Déplacer vers le haut (appliqué plus tôt)')}
                         >
                           <ArrowUp className="w-3.5 h-3.5" />
                         </button>
@@ -334,7 +336,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
                           onClick={() => moveCommit(index, 'down')}
                           disabled={index === commits.length - 1 || executing}
                           className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
-                          title="Déplacer vers le bas (appliqué plus tard)"
+                          title={t('git_move_down_tooltip', 'Déplacer vers le bas (appliqué plus tard)')}
                         >
                           <ArrowDown className="w-3.5 h-3.5" />
                         </button>
@@ -353,7 +355,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
                             type="text"
                             value={c.new_message || ''}
                             onChange={(e) => updateMessage(index, e.target.value)}
-                            placeholder="Nouveau message de commit..."
+                            placeholder={t('git_new_commit_msg_placeholder', 'Nouveau message de commit...')}
                             className="w-full px-2.5 py-1 text-xs rounded-lg border outline-none font-medium focus:border-sky-500"
                             style={{
                               backgroundColor: 'var(--bg)',
@@ -389,7 +391,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
                             ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-semibold'
                             : 'border-transparent hover:bg-black/5 dark:hover:bg-white/5 opacity-60'
                         }`}
-                        title="Conserver le commit tel quel"
+                        title={t('git_pick_commit_tooltip', 'Conserver le commit tel quel')}
                       >
                         <Check className="w-3 h-3" />
                         <span>pick</span>
@@ -405,7 +407,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
                             ? 'bg-sky-500/20 text-sky-400 border-sky-500/40 font-semibold'
                             : 'border-transparent hover:bg-black/5 dark:hover:bg-white/5 opacity-60'
                         }`}
-                        title="Modifier le message du commit"
+                        title={t("git_reword_commit_tooltip", "Modifier le message du commit")}
                       >
                         <Edit2 className="w-3 h-3" />
                         <span>reword</span>
@@ -421,7 +423,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
                             ? 'bg-purple-500/20 text-purple-400 border-purple-500/40 font-semibold'
                             : 'border-transparent hover:bg-black/5 dark:hover:bg-white/5 opacity-60 disabled:opacity-20'
                         }`}
-                        title={index === 0 ? "Le premier commit ne peut pas être squashé" : "Fusionner dans le commit précédent"}
+                        title={index === 0 ? t("git_cannot_squash_first", "Le premier commit ne peut pas être squashé") : t("git_squash_commit_tooltip", "Fusionner dans le commit précédent")}
                       >
                         <Layers className="w-3 h-3" />
                         <span>squash</span>
@@ -437,7 +439,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
                             ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
                             : 'border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-rose-400 opacity-60'
                         }`}
-                        title={isDrop ? "Restaurer le commit" : "Supprimer ce commit"}
+                        title={isDrop ? t("git_restore_commit", "Restaurer le commit") : t("git_drop_commit_tooltip", "Supprimer ce commit")}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -495,7 +497,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
                 borderColor: 'var(--border)'
               }}
             >
-              Annuler
+              {t('cancel', 'Annuler')}
             </button>
 
             <button
@@ -512,7 +514,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
               ) : (
                 <>
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Exécuter le Rebase</span>
+                  <span>{t('git_execute_rebase', 'Exécuter le Rebase')}</span>
                 </>
               )}
             </button>

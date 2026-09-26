@@ -379,7 +379,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
       );
       setCustomTemplates(updated);
       persistCustomTemplates(updated);
-      showToast('Modèle personnalisé mis à jour', 'success');
+      showToast(t('prompt_tpl_updated_toast', 'Modèle personnalisé mis à jour'), 'success');
     } else {
       // Create new
       const newTmpl: PromptTemplate = {
@@ -393,7 +393,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
       const updated = [newTmpl, ...customTemplates];
       setCustomTemplates(updated);
       persistCustomTemplates(updated);
-      showToast('Nouveau modèle personnalisé enregistré', 'success');
+      showToast(t('prompt_tpl_saved_toast', 'Nouveau modèle personnalisé enregistré'), 'success');
     }
 
     setIsEditingCustom(false);
@@ -410,7 +410,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
     setCustomTemplates(updated);
     persistCustomTemplates(updated);
     if (selectedTemplate?.id === id) setSelectedTemplate(null);
-    showToast('Modèle supprimé', 'info');
+    showToast(t('prompt_tpl_deleted_toast', 'Modèle supprimé'), 'info');
   };
 
   // Custom template edit start
@@ -427,12 +427,12 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
   if (!isOpen) return null;
 
   const categories = [
-    { id: 'all', label: 'Tous', icon: Sparkles },
-    { id: 'code', label: 'Code & Tests', icon: Code2 },
-    { id: 'architecture', label: 'Architecture', icon: Layers },
-    { id: 'debug', label: 'Diagnostic', icon: Bug },
-    { id: 'docs', label: 'Documentation', icon: FileText },
-    { id: 'custom', label: 'Mes modèles', icon: Bookmark }
+    { id: 'all', label: t('all', 'Tous'), icon: Sparkles },
+    { id: 'code', label: t('prompt_cat_code_tests', 'Code & Tests'), icon: Code2 },
+    { id: 'architecture', label: t('prompt_cat_architecture', 'Architecture'), icon: Layers },
+    { id: 'debug', label: t('prompt_cat_diagnostic', 'Diagnostic'), icon: Bug },
+    { id: 'docs', label: t('prompt_cat_documentation', 'Documentation'), icon: FileText },
+    { id: 'custom', label: t('my_templates', 'Mes modèles'), icon: Bookmark }
   ];
 
   return (
@@ -495,7 +495,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
               }}
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Nouveau modèle</span>
+              <span>{t('prompt_tpl_new', 'Nouveau modèle')}</span>
             </button>
             <button
               type="button"
@@ -521,7 +521,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Rechercher un modèle ou snippet..."
+                  placeholder={t('prompt_tpl_search_placeholder', 'Rechercher un modèle ou snippet...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs outline-none transition-colors"
@@ -563,7 +563,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
             <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
               {filteredTemplates.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs">
-                  Aucun modèle trouvé pour cette recherche.
+                  {t('prompt_tpl_no_results', 'Aucun modèle trouvé pour cette recherche.')}
                 </div>
               ) : (
                 filteredTemplates.map((tmpl) => {
@@ -582,7 +582,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                       <div className="flex items-center justify-between gap-1.5 mb-1">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="font-semibold text-xs truncate" style={{ color: active ? 'var(--accent)' : 'var(--strong)' }}>
-                            {tmpl.title}
+                            {tmpl.isCustom ? tmpl.title : t(`prompt_tpl_${tmpl.id}_title`, tmpl.title)}
                           </span>
                           {tmpl.isCustom && (
                             <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-500 font-mono">
@@ -597,7 +597,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                               type="button"
                               onClick={(e) => handleStartEdit(tmpl, e)}
                               className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 text-slate-400 hover:text-slate-200"
-                              title="Modifier ce modèle"
+                              title={t('prompt_tpl_edit_tooltip', 'Modifier ce modèle')}
                             >
                               <Edit3 className="w-3 h-3" />
                             </button>
@@ -605,7 +605,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                               type="button"
                               onClick={(e) => handleDeleteCustom(tmpl.id, e)}
                               className="p-1 rounded hover:bg-rose-500/10 text-slate-400 hover:text-rose-500"
-                              title="Supprimer ce modèle"
+                              title={t('prompt_tpl_delete_tooltip', 'Supprimer ce modèle')}
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -614,7 +614,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                       </div>
 
                       <p className="text-[11px] line-clamp-2 leading-relaxed" style={{ color: 'var(--muted)' }}>
-                        {tmpl.description}
+                        {tmpl.isCustom ? tmpl.description : t(`prompt_tpl_${tmpl.id}_desc`, tmpl.description)}
                       </p>
 
                       {vars.length > 0 && (
@@ -650,7 +650,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                   <div className="flex items-center gap-2">
                     <Edit3 className="w-4 h-4 text-amber-500" />
                     <h3 className="font-semibold text-sm" style={{ color: 'var(--strong)' }}>
-                      {editId ? 'Modifier le modèle personnalisé' : 'Créer un nouveau modèle'}
+                      {editId ? t('prompt_tpl_edit_custom', 'Modifier le modèle personnalisé') : t('prompt_tpl_create_new', 'Créer un nouveau modèle')}
                     </h3>
                   </div>
                   <button
@@ -658,18 +658,18 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                     onClick={() => setIsEditingCustom(false)}
                     className="text-xs text-slate-400 hover:text-slate-200"
                   >
-                    Annuler
+                    {t('cancel', 'Annuler')}
                   </button>
                 </div>
 
                 <div className="space-y-3">
                   <div>
                     <label className="text-[11px] font-semibold block mb-1" style={{ color: 'var(--muted)' }}>
-                      Titre du modèle :
+                      {t('prompt_tpl_title_label', 'Titre du modèle :')}
                     </label>
                     <input
                       type="text"
-                      placeholder="Ex: Analyse de sécurité OWASP, Refactoring SQL..."
+                      placeholder={t('prompt_tpl_title_placeholder', 'Ex: Analyse de sécurité OWASP, Refactoring SQL...')}
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl text-xs outline-none"
@@ -683,11 +683,11 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
 
                   <div>
                     <label className="text-[11px] font-semibold block mb-1" style={{ color: 'var(--muted)' }}>
-                      Description courte :
+                      {t('prompt_tpl_desc_label', 'Description courte :')}
                     </label>
                     <input
                       type="text"
-                      placeholder="Ex: Examine les failles d'injection et l'authentification..."
+                      placeholder={t('prompt_tpl_desc_placeholder', "Ex: Examine les failles d'injection et l'authentification...")}
                       value={editDescription}
                       onChange={(e) => setEditDescription(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl text-xs outline-none"
@@ -701,7 +701,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
 
                   <div>
                     <label className="text-[11px] font-semibold block mb-1" style={{ color: 'var(--muted)' }}>
-                      Catégorie :
+                      {t('category_colon', 'Catégorie :')}
                     </label>
                     <select
                       value={editCategory}
@@ -713,26 +713,26 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                         color: 'var(--text)'
                       }}
                     >
-                      <option value="code">Code & Tests</option>
-                      <option value="architecture">Architecture</option>
-                      <option value="debug">Diagnostic</option>
-                      <option value="docs">Documentation</option>
-                      <option value="custom">Autre / Perso</option>
+                      <option value="code">{t('prompt_cat_code_tests', 'Code & Tests')}</option>
+                      <option value="architecture">{t('prompt_cat_architecture', 'Architecture')}</option>
+                      <option value="debug">{t('prompt_cat_diagnostic', 'Diagnostic')}</option>
+                      <option value="docs">{t('prompt_cat_documentation', 'Documentation')}</option>
+                      <option value="custom">{t('prompt_cat_other', 'Autre / Perso')}</option>
                     </select>
                   </div>
 
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-[11px] font-semibold" style={{ color: 'var(--muted)' }}>
-                        Contenu du prompt (support des balises {'{variable}'}) :
+                        {t('prompt_tpl_content_label', 'Contenu du prompt (support des balises {variable}) :')}
                       </label>
                       <span className="text-[10px] text-amber-500 font-mono">
-                        Syntaxe : {'{code}'}, {'{file}'}, {'{goal}'}...
+                        {t('prompt_tpl_syntax_hint', 'Syntaxe : {code}, {file}, {goal}...')}
                       </span>
                     </div>
                     <textarea
                       rows={8}
-                      placeholder="Tapez le prompt avec des variables entre accolades comme {code} ou {goal}..."
+                      placeholder={t('prompt_tpl_content_placeholder', 'Tapez le prompt avec des variables entre accolades comme {code} ou {goal}...')}
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl text-xs font-mono outline-none leading-relaxed"
@@ -752,7 +752,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                     className="px-3 py-1.5 rounded-xl border text-xs"
                     style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
                   >
-                    Annuler
+                    {t('cancel', 'Annuler')}
                   </button>
                   <button
                     type="button"
@@ -760,7 +760,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                     className="px-4 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
                     style={{ backgroundColor: 'var(--accent)' }}
                   >
-                    Enregistrer le modèle
+                    {t('prompt_tpl_save_model', 'Enregistrer le modèle')}
                   </button>
                 </div>
               </div>
@@ -774,10 +774,10 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                 >
                   <div className="min-w-0">
                     <h3 className="font-bold text-sm truncate" style={{ color: 'var(--strong)' }}>
-                      {selectedTemplate.title}
+                      {selectedTemplate.isCustom ? selectedTemplate.title : t(`prompt_tpl_${selectedTemplate.id}_title`, selectedTemplate.title)}
                     </h3>
                     <p className="text-[11px] truncate" style={{ color: 'var(--muted)' }}>
-                      {selectedTemplate.description}
+                      {selectedTemplate.isCustom ? selectedTemplate.description : t(`prompt_tpl_${selectedTemplate.id}_desc`, selectedTemplate.description)}
                     </p>
                   </div>
 
@@ -787,7 +787,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                       onClick={handleCopy}
                       className="px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
                       style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
-                      title="Copier le prompt résolu"
+                      title={t('prompt_tpl_copy_resolved_tooltip', 'Copier le prompt résolu')}
                     >
                       {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>{copied ? 'Copié' : 'Copier'}</span>
@@ -808,10 +808,10 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] uppercase font-bold tracking-wider text-amber-500 flex items-center gap-1">
                           <Sparkles className="w-3 h-3" />
-                          Variables à renseigner ({activeVariables.length})
+                          {t('prompt_tpl_variables_to_fill', 'Variables à renseigner')} ({activeVariables.length})
                         </span>
                         <span className="text-[10px] text-slate-400">
-                          (Optionnel : vous pouvez insérer brut et remplir après)
+                          {t('prompt_tpl_optional_fill_after', '(Optionnel : vous pouvez insérer brut et remplir après)')}
                         </span>
                       </div>
 
@@ -824,7 +824,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                             {v.toLowerCase().includes('code') || v.toLowerCase().includes('logs') || v.toLowerCase().includes('commits') ? (
                               <textarea
                                 rows={3}
-                                placeholder={`Collez le contenu pour {${v}}...`}
+                                placeholder={`${t('prompt_tpl_paste_content_for', 'Collez le contenu pour')} {${v}}...`}
                                 value={variableValues[v] || ''}
                                 onChange={(e) => setVariableValues({ ...variableValues, [v]: e.target.value })}
                                 className="w-full px-3 py-1.5 rounded-xl text-xs font-mono outline-none"
@@ -837,7 +837,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                             ) : (
                               <input
                                 type="text"
-                                placeholder={`Valeur pour {${v}}...`}
+                                placeholder={`${t('prompt_tpl_value_for', 'Valeur pour')} {${v}}...`}
                                 value={variableValues[v] || ''}
                                 onChange={(e) => setVariableValues({ ...variableValues, [v]: e.target.value })}
                                 className="w-full px-3 py-1.5 rounded-xl text-xs outline-none"
@@ -857,7 +857,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                   {/* Preview Area */}
                   <div>
                     <label className="text-[10px] uppercase font-bold tracking-wider block mb-1.5" style={{ color: 'var(--muted)' }}>
-                      Aperçu du prompt généré :
+                      {t('prompt_tpl_preview_title', 'Aperçu du prompt généré :')}
                     </label>
                     <pre 
                       className="p-3.5 rounded-2xl border text-xs font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto max-h-72"
@@ -882,9 +882,9 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                     onClick={() => handleInsert(true)}
                     className="px-3 py-1.5 rounded-xl border text-xs transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
                     style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
-                    title="Insérer le texte tel quel avec les balises {variable}"
+                    title={t('prompt_tpl_insert_raw_tooltip', 'Insérer le texte tel quel avec les balises {variable}')}
                   >
-                    Insérer avec balises brutes
+                    {t('prompt_tpl_insert_raw_btn', 'Insérer avec balises brutes')}
                   </button>
 
                   <div className="flex items-center gap-2">
@@ -895,7 +895,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                       style={{ backgroundColor: 'var(--accent)' }}
                     >
                       <Send className="w-3.5 h-3.5" />
-                      <span>Insérer dans le prompt</span>
+                      <span>{t('prompt_tpl_insert_in_prompt', 'Insérer dans le prompt')}</span>
                     </button>
                   </div>
                 </div>
@@ -914,10 +914,10 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
                   <FileCode2 className="w-6 h-6" />
                 </div>
                 <h4 className="font-semibold text-sm" style={{ color: 'var(--strong)' }}>
-                  Sélectionnez un modèle de prompt
+                  {t('prompt_tpl_select_title', 'Sélectionnez un modèle de prompt')}
                 </h4>
                 <p className="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
-                  Choisissez un modèle prédéfini à gauche ou créez votre propre template avec des variables dynamiques réutilisables.
+                  {t('prompt_tpl_select_desc', 'Choisissez un modèle prédéfini à gauche ou créez votre propre template avec des variables dynamiques réutilisables.')}
                 </p>
               </div>
             )}

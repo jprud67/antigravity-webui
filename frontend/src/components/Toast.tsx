@@ -1,3 +1,4 @@
+import { useI18n } from '../services/i18n';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, CheckCircle, AlertTriangle, Info, AlertCircle } from 'lucide-react';
 import { type ToastType, type ToastItem, registerToastListener } from '../services/toast';
@@ -26,6 +27,7 @@ const BG_MAP: Record<ToastType, string> = {
 
 // ─── Single Toast ────────────────────────────────────────────────
 const ToastEntry: React.FC<{ item: ToastItem; onDismiss: (id: string) => void }> = ({ item, onDismiss }) => {
+  const { t } = useI18n();
   const [exiting, setExiting] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -74,7 +76,7 @@ const ToastEntry: React.FC<{ item: ToastItem; onDismiss: (id: string) => void }>
       <button
         onClick={handleDismiss}
         className="btn-icon shrink-0"
-        aria-label="Fermer la notification"
+        aria-label={t('close_notification', 'Fermer la notification')}
       >
         <X className="w-3 h-3" />
       </button>

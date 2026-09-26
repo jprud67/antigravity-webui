@@ -322,7 +322,7 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
                     type="text"
                     value={searchFilter}
                     onChange={(e) => setSearchFilter(e.target.value)}
-                    placeholder="Filter by name, image, status..."
+                    placeholder={t('docker_filter_placeholder', 'Filter by name, image, status...')}
                     className="w-full bg-transparent focus:outline-hidden text-xs"
                     style={{ color: 'var(--text)' }}
                   />
@@ -430,10 +430,10 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
                               setActiveTab('logs');
                             }}
                             className="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs flex items-center gap-1 transition-all cursor-pointer"
-                            title="Inspect logs"
+                            title={t('docker_inspect_logs', 'Inspect logs')}
                           >
                             <Terminal className="w-3 h-3" />
-                            <span>Logs</span>
+                            <span>{t('logs', 'Logs')}</span>
                           </button>
 
                           <button
@@ -471,7 +471,9 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
                   style={{ backgroundColor: 'var(--surface-subtle)', borderColor: 'var(--border)' }}
                 >
                   <FileCode className="w-8 h-8 text-slate-500/40" />
-                  <p className="text-xs text-slate-400">No Dockerfile or docker-compose.yml found in workspace.</p>
+                  <p className="text-xs text-slate-400">
+                    {t('docker_no_compose_found', 'Aucun fichier Dockerfile ou docker-compose.yml trouvé dans le workspace.')}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3">
@@ -584,7 +586,7 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
                     onClick={() => loadContainerLogs(selectedContainerId, logsTail)}
                     disabled={logsLoading}
                     className="p-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all cursor-pointer"
-                    title="Refresh logs"
+                    title={t('docker_refresh_logs', 'Refresh logs')}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${logsLoading ? 'animate-spin' : ''}`} />
                   </button>
@@ -598,7 +600,7 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
                 {logsLoading ? (
                   <div className="flex items-center gap-2 text-slate-500">
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Loading logs...</span>
+                    <span>{t('docker_loading_logs', 'Chargement des logs...')}</span>
                   </div>
                 ) : (
                   <pre className="whitespace-pre-wrap">{logsContent}</pre>
@@ -653,7 +655,7 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
         >
           <div className="flex items-center gap-2">
             <Activity className="w-3.5 h-3.5 text-sky-400" />
-            <span className="text-[11px]">Antigravity Container Engine & Isolation</span>
+            <span className="text-[11px]">{t('docker_footer_title', 'Antigravity Container Engine & Isolation')}</span>
           </div>
           <span className="text-[10px] font-mono">v0.4.0 Studio</span>
         </div>

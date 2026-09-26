@@ -909,7 +909,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       <div className="p-3 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
         <button
           onClick={onOpenWorkspaces}
-          title="Studio Projets & Workspaces (Ctrl+Alt+W)"
+          title={t('projects_workspace_studio_tooltip', 'Studio Projets & Workspaces (Ctrl+Alt+W)')}
           className="w-full p-2.5 rounded-xl transition-all text-left flex items-center justify-between cursor-pointer group shadow-xs hover:border-sky-500/50"
           style={{
             backgroundColor: 'var(--surface)',
@@ -1002,7 +1002,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               color: 'var(--muted)',
             }}
             title={t('fts_search_shortcut', 'Recherche Plein-Texte FTS5 Cross-Sessions (Ctrl+Shift+K)')}
-            aria-label="Recherche Plein-Texte FTS5"
+            aria-label={t('fts_search_aria', 'Recherche Plein-Texte FTS5')}
           >
             <span className="text-[10px] font-mono font-bold px-1 bg-indigo-500/10 text-indigo-400 rounded group-hover:bg-indigo-500/20">
               FTS
@@ -1191,7 +1191,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                     title={t('reset_filters', 'Réinitialiser tous les filtres')}
                   >
                     <RotateCcw className="w-3 h-3" />
-                    <span className="text-[10px]">Reset</span>
+                    <span className="text-[10px]">{t('reset', 'Reset')}</span>
                   </button>
                 )}
               </div>
@@ -1208,10 +1208,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                     style={{
                       borderColor: 'rgba(245, 158, 11, 0.3)',
                     }}
-                    title="Sauvegarder cette combinaison de filtres"
+                    title={t('save_filters_tooltip', 'Sauvegarder cette combinaison de filtres')}
                   >
                     <BookmarkPlus className="w-3 h-3" />
-                    <span>Sauvegarder</span>
+                    <span>{t('save', 'Sauvegarder')}</span>
                   </button>
                 )}
 
@@ -1261,7 +1261,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                     type="button"
                     onClick={(e) => handleDeleteSavedView(v.id, e)}
                     className="opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-opacity ml-0.5 cursor-pointer"
-                    title="Supprimer cette vue"
+                    title={t('delete_view_tooltip', 'Supprimer cette vue')}
                   >
                     <X className="w-2.5 h-2.5" />
                   </button>
@@ -1455,7 +1455,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               title={t("manage_tags", "Manage tags")}
             >
               <Tag className="w-3 h-3 text-emerald-500" />
-              <span className="hidden sm:inline">Tags</span>
+              <span className="hidden sm:inline">{t('tags', 'Tags')}</span>
             </button>
 
             {/* Project */}
@@ -1543,14 +1543,14 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               title={t("delete_selection_permanently", "Permanently delete selection")}
             >
               {isBulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3 text-red-500" />}
-              <span className="hidden sm:inline">Supprimer</span>
+              <span className="hidden sm:inline">{t('delete', 'Supprimer')}</span>
             </button>
           </div>
 
           {/* Helper hint */}
           <div className="text-[10px] text-center pt-0.5" style={{ color: 'var(--muted)' }}>
             {selectedConvIds.size === 0 ? (
-              <span className="italic">💡 Cochez les cases des conversations ci-dessous pour appliquer une action.</span>
+              <span className="italic">{t('bulk_select_hint', '💡 Cochez les cases des conversations ci-dessous pour appliquer une action.')}</span>
             ) : (
               <span className="text-sky-500 font-medium">✓ {t("conversations_selected", "{0} conversation(s) selected").replace("{0}", String(selectedConvIds.size))}</span>
             )}
@@ -1855,7 +1855,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             }`}
             title={isToolsExpanded ? t('collapse_studios', 'Réduire les studios') : t('expand_studios', 'Afficher tous les outils et studios (12)')}
           >
-            <span>Studios</span>
+            <span>{t('studios', 'Studios')}</span>
             <span className="text-[9px] px-1 rounded-full bg-black/5 dark:bg-white/10 font-mono">12</span>
             <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isToolsExpanded ? 'rotate-180' : ''}`} />
           </button>
@@ -2244,8 +2244,8 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                       color: bulkTagMode === 'add' ? 'var(--accent)' : 'var(--text)',
                     }}
                   >
-                    <div className="font-semibold text-xs">Ajouter</div>
-                    <div className="text-[10px] opacity-80">Conserve les tags actuels</div>
+                    <div className="font-semibold text-xs">{t('add', 'Ajouter')}</div>
+                    <div className="text-[10px] opacity-80">{t('keep_current_tags', 'Conserve les tags actuels')}</div>
                   </button>
                   <button
                     type="button"
@@ -2257,8 +2257,8 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                       color: bulkTagMode === 'replace' ? 'var(--accent)' : 'var(--text)',
                     }}
                   >
-                    <div className="font-semibold text-xs">Remplacer</div>
-                    <div className="text-[10px] opacity-80">Remplace tous les tags</div>
+                    <div className="font-semibold text-xs">{t('replace', 'Remplacer')}</div>
+                    <div className="text-[10px] opacity-80">{t('replace_all_tags', 'Remplace tous les tags')}</div>
                   </button>
                 </div>
               </div>
@@ -2284,7 +2284,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 }}
               >
                 {isBulkLoading && <Loader2 className="w-3 h-3 animate-spin" />}
-                <span>Appliquer</span>
+                <span>{t('apply', 'Appliquer')}</span>
               </button>
             </div>
           </div>
@@ -2398,7 +2398,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                   }}
                 >
                   {isBulkLoading && <Loader2 className="w-3 h-3 animate-spin" />}
-                  <span>Appliquer</span>
+                  <span>{t('apply', 'Appliquer')}</span>
                 </button>
               </div>
             </div>
@@ -2453,7 +2453,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Bugs Frontend, Projet Alpha, 7 derniers jours..."
+                  placeholder={t('saved_views_placeholder', 'Ex: Bugs Frontend, Projet Alpha, 7 derniers jours...')}
                   value={newViewName}
                   onChange={(e) => setNewViewName(e.target.value)}
                   onKeyDown={(e) => {
@@ -2499,12 +2499,12 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
 
               {/* Active criteria summary */}
               <div className="p-2.5 rounded-xl border space-y-1 text-[11px]" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface-subtle)' }}>
-                <div className="text-[10px] uppercase font-semibold" style={{ color: 'var(--muted)' }}>Critères enregistrés :</div>
-                {selectedTags.length > 0 && <div>Tags : <span className="font-mono text-emerald-400">{selectedTags.map(t => `#${t}`).join(', ')}</span></div>}
-                {projectFilter && <div>Projet : <span className="font-medium text-sky-400">{projectFilter}</span></div>}
-                {dateFilter !== 'all' && <div>Période : <span className="font-medium">{dateFilter}</span></div>}
-                {sortOrder !== 'recent' && <div>Tri : <span className="font-medium">{sortOrder}</span></div>}
-                {searchFilter && <div>Recherche : <span className="italic">"{searchFilter}"</span></div>}
+                <div className="text-[10px] uppercase font-semibold" style={{ color: 'var(--muted)' }}>{t('saved_criteria_prefix', 'Critères enregistrés :')}</div>
+                {selectedTags.length > 0 && <div>{t('tags_colon', 'Tags :')} <span className="font-mono text-emerald-400">{selectedTags.map(t => `#${t}`).join(', ')}</span></div>}
+                {projectFilter && <div>{t('project_prefix', 'Projet :')} <span className="font-medium text-sky-400">{projectFilter}</span></div>}
+                {dateFilter !== 'all' && <div>{t('period_prefix', 'Période :')} <span className="font-medium">{dateFilter}</span></div>}
+                {sortOrder !== 'recent' && <div>{t('sort_colon', 'Tri :')} <span className="font-medium">{sortOrder}</span></div>}
+                {searchFilter && <div>{t('search_prefix', 'Recherche :')} <span className="italic">"{searchFilter}"</span></div>}
               </div>
             </div>
 
@@ -2515,7 +2515,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 className="px-3.5 py-1.5 rounded-xl text-xs font-medium border hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                 style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
               >
-                Annuler
+                {t('cancel', 'Annuler')}
               </button>
               <button
                 type="button"
@@ -2528,7 +2528,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 }}
               >
                 <BookmarkPlus className="w-3.5 h-3.5" />
-                <span>Enregistrer</span>
+                <span>{t('save', 'Enregistrer')}</span>
               </button>
             </div>
           </div>

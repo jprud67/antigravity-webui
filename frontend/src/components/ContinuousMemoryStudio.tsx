@@ -209,7 +209,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
           onClick={handleRefreshSnapshot}
           disabled={refreshingSnapshot}
           className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50"
-          title="Met à jour le snapshot gelé utilisé pour les prochaines requêtes au modèle"
+          title={t('memory_update_snapshot_tooltip', 'Met à jour le snapshot gelé utilisé pour les prochaines requêtes au modèle')}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${refreshingSnapshot ? 'animate-spin' : ''}`} />
           <span>{refreshingSnapshot ? t('memory_refreshing', 'Actualisation...') : t('memory_refresh_snapshot', 'Rafraîchir Snapshot')}</span>
@@ -280,25 +280,25 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
         <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-              <span className="font-semibold text-slate-800 dark:text-slate-100">Fichier :</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-100">{t('file_prefix', 'Fichier :')}</span>
               <code className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[11px] font-mono text-cyan-600 dark:text-cyan-400 truncate max-w-sm">
                 {currentTargetData.path}
               </code>
               {currentTargetData.exists ? (
                 <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                  <CheckCircle2 className="w-3 h-3" /> Synchronisé
+                  <CheckCircle2 className="w-3 h-3" /> {t('synchronized', 'Synchronisé')}
                 </span>
               ) : (
                 <span className="text-[10px] text-slate-400 bg-slate-500/10 px-1.5 py-0.5 rounded">
-                  Non créé
+                  {t('memory_not_created', 'Non créé')}
                 </span>
               )}
             </div>
 
             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 font-mono text-xs">
-              <span>Budget :</span>
+              <span>{t('memory_budget_label', 'Budget :')}</span>
               <span className={`font-bold ${isNearLimit ? 'text-rose-500' : 'text-cyan-600 dark:text-cyan-400'}`}>
-                {currentTargetData.char_count.toLocaleString()} / {currentTargetData.char_limit.toLocaleString()} chars
+                {t('memory_chars_format', '{0} / {1} caractères', currentTargetData.char_count.toLocaleString(), currentTargetData.char_limit.toLocaleString())}
               </span>
               <span>({usagePercent}%)</span>
             </div>
@@ -461,7 +461,7 @@ export const ContinuousMemoryStudio: React.FC<ContinuousMemoryStudioProps> = ({ 
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
             className="w-full h-80 p-3.5 font-mono text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-1 focus:ring-cyan-500 leading-relaxed"
-            placeholder="# Titre..."
+            placeholder={t('title_placeholder', '# Titre...')}
           />
         </div>
       )}

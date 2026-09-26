@@ -337,7 +337,7 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
                   .replace('{2}', String(successResult.reduction_pct))}
               </span>
             </div>
-            <span className="text-[10px] opacity-75 font-mono">transcript_full.jsonl conservé</span>
+            <span className="text-[10px] opacity-75 font-mono">{t('transcript_full_preserved', 'transcript_full.jsonl conservé')}</span>
           </div>
         )}
 
@@ -586,7 +586,7 @@ export const ContextCompactorModal: React.FC<ContextCompactorModalProps> = ({
               onClick={handleApplyBudget}
               disabled={pruning}
               className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
-              title="Plafonne et compresse automatiquement le contexte selon le budget configuré (Parité IDE)"
+              title={t('auto_compact_tooltip', 'Plafonne et compresse automatiquement le contexte selon le budget configuré (Parité IDE)')}
             >
               <Zap className="w-3.5 h-3.5" />
               <span>{t('apply_budget_manager', 'Appliquer le Budget')}</span>

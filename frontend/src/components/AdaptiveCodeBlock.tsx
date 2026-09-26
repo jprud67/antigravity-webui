@@ -588,7 +588,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
                     title: filename || `Extrait ${language}`
                   })
                 }
-                title="Ouvrir dans Monaco Studio"
+                title={t('open_in_monaco_studio', 'Ouvrir dans Monaco Studio')}
                 className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer border hover:text-emerald-400"
                 style={{
                   backgroundColor: 'var(--surface)',
@@ -597,7 +597,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
                 }}
               >
                 <Code2 className="w-3 h-3 text-emerald-400" />
-                <span className="hidden sm:inline">Studio</span>
+                <span className="hidden sm:inline">{t('studio', 'Studio')}</span>
               </button>
             )}
 

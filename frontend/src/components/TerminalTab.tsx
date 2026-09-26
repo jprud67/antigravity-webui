@@ -641,7 +641,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
                 <button
                   type="button"
                   onClick={(e) => handleCloseTab(e, tab.id)}
-                  title="Fermer ce terminal"
+                  title={t('terminal_close_tooltip', 'Fermer ce terminal')}
                   className="ml-1 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-rose-500/20 hover:text-rose-400 transition-opacity"
                 >
                   <X className="w-3 h-3" />
@@ -655,7 +655,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
             <button
               type="button"
               onClick={() => handleCreateTab()}
-              title="Ouvrir un nouveau terminal"
+              title={t('terminal_new_tooltip', 'Ouvrir un nouveau terminal')}
               className="flex items-center gap-0.5 px-2 py-1 rounded text-xs transition-colors hover:opacity-100 opacity-75 cursor-pointer"
               style={{
                 backgroundColor: 'var(--surface-subtle)',
@@ -669,7 +669,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ currentWorkspace, onCl
             <button
               type="button"
               onClick={() => setShellMenuOpen(!shellMenuOpen)}
-              title="Sélectionner un interpréteur (PowerShell, CMD, Git Bash...)"
+              title={t('terminal_select_shell', 'Sélectionner un interpréteur (PowerShell, CMD, Git Bash...)')}
               className="p-1 rounded ml-0.5 text-xs transition-colors hover:opacity-100 opacity-75 cursor-pointer"
               style={{
                 backgroundColor: 'var(--surface-subtle)',

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { type ConfirmRequest, registerConfirmListener } from '../services/dialog';
+import { useI18n } from '../services/i18n';
 
 // ─── Confirm Dialog Container (mount once in App.tsx) ────────────
 export const ConfirmDialogContainer: React.FC = () => {
+  const { t } = useI18n();
   const [queue, setQueue] = useState<ConfirmRequest[]>([]);
   const overlayRef = useRef<HTMLDivElement>(null);
   const queueRef = useRef<ConfirmRequest[]>(queue);
@@ -78,7 +80,7 @@ export const ConfirmDialogContainer: React.FC = () => {
           <button
             onClick={() => handleResolve(false)}
             className="btn-icon"
-            aria-label="Fermer"
+            aria-label={t('close', 'Fermer')}
           >
             <X className="w-3.5 h-3.5" />
           </button>

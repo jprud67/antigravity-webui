@@ -15,6 +15,7 @@ import Editor, { DiffEditor } from '@monaco-editor/react';
 import { fetchConflictFileInfo, resolveGitConflict } from '../services/api';
 import type { ConflictFileInfo } from '../types';
 import { showToast } from '../services/toast';
+import { useI18n } from '../services/i18n';
 import { detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
 import { FileIcon } from './FileIcon';
 
@@ -33,6 +34,7 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
   workspace,
   onResolved
 }) => {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [resolving, setResolving] = useState(false);
   const [conflictInfo, setConflictInfo] = useState<ConflictFileInfo | null>(null);
@@ -123,11 +125,11 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
                   {filePath}
                 </h3>
                 <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3" /> Conflit Git
+                  <AlertTriangle className="w-3 h-3" /> {t('git_conflict_detected', 'Conflit Git')}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Studio de résolution de conflit : choisissez une branche ou éditez le code final.
+                {t('git_conflict_subtitle', 'Studio de résolution de conflit : choisissez une branche ou éditez le code final.')}
               </p>
             </div>
           </div>
@@ -141,10 +143,10 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
                   activeView === 'editor' ? 'bg-sky-500 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
                 }`}
-                title="Éditeur de code manuel"
+                title={t('git_manual_editor_tooltip', 'Éditeur de code manuel')}
               >
                 <Code2 className="w-3.5 h-3.5" />
-                <span>Éditeur Final</span>
+                <span>{t('git_final_editor', 'Éditeur Final')}</span>
               </button>
               <button
                 type="button"
@@ -152,10 +154,10 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
                   activeView === 'diff' ? 'bg-sky-500 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
                 }`}
-                title="Comparaison côte-à-côte (Ours vs Leur)"
+                title={t('git_side_by_side_tooltip', 'Comparaison côte-à-côte (Ours vs Leur)')}
               >
                 <Columns className="w-3.5 h-3.5" />
-                <span>Diff (Ours / Leur)</span>
+                <span>{t('git_diff_ours_theirs', 'Diff (Ours / Leur)')}</span>
               </button>
             </div>
 
@@ -164,7 +166,7 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
               onClick={onClose}
               className="p-1.5 rounded-lg border hover:bg-white/5 text-slate-400 hover:text-slate-200 cursor-pointer ml-2"
               style={{ borderColor: 'var(--border)' }}
-              title="Fermer"
+              title={t('close', 'Fermer')}
             >
               <X className="w-4 h-4" />
             </button>
@@ -174,8 +176,8 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
         {/* Quick Decision Banner */}
         <div className="px-5 py-2.5 bg-black/25 border-b flex flex-wrap items-center justify-between gap-3 shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div className="flex items-center gap-2 text-xs text-slate-300">
-            <span className="font-semibold text-slate-200">Actions rapides :</span>
-            <span>Résolvez directement en adoptant une version</span>
+            <span className="font-semibold text-slate-200">{t('git_quick_actions', 'Actions rapides :')}</span>
+            <span>{t('git_resolve_adopt_version', 'Résolvez directement en adoptant une version')}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -184,10 +186,10 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
               disabled={resolving || loading}
               onClick={() => handleResolve('ours')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-sky-600/20 text-sky-300 border border-sky-500/40 hover:bg-sky-600/30 transition-colors disabled:opacity-50 cursor-pointer"
-              title="Conserver notre version (HEAD / locale)"
+              title={t('git_keep_ours_tooltip', 'Conserver notre version (HEAD / locale)')}
             >
               <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>Garder la nôtre (HEAD / Ours)</span>
+              <span>{t('git_keep_ours_btn', 'Garder la nôtre (HEAD / Ours)')}</span>
             </button>
 
             <button
@@ -195,10 +197,10 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
               disabled={resolving || loading}
               onClick={() => handleResolve('theirs')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600/20 text-purple-300 border border-purple-500/40 hover:bg-purple-600/30 transition-colors disabled:opacity-50 cursor-pointer"
-              title="Conserver leur version (branche fusionnée / entrante)"
+              title={t('git_keep_theirs_tooltip', 'Conserver leur version (branche fusionnée / entrante)')}
             >
               <ArrowDownLeft className="w-3.5 h-3.5" />
-              <span>Garder la leur (Theirs / Entrante)</span>
+              <span>{t('git_keep_theirs_btn', 'Garder la leur (Theirs / Entrante)')}</span>
             </button>
 
             <button
@@ -206,10 +208,10 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
               disabled={resolving || loading || !editedContent}
               onClick={() => handleResolve('custom')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-colors disabled:opacity-50 cursor-pointer"
-              title="Valider l'édition manuelle courante et marquer comme résolu"
+              title={t('git_validate_current_edit_tooltip', "Valider l'édition manuelle courante et marquer comme résolu")}
             >
               {resolving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              <span>Valider l'édition actuelle</span>
+              <span>{t('git_validate_current_edit', "Valider l'édition actuelle")}</span>
             </button>
           </div>
         </div>
@@ -219,7 +221,7 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
           {loading ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
               <Loader2 className="w-7 h-7 text-sky-400 animate-spin" />
-              <p className="text-xs text-slate-400">Chargement des informations du conflit...</p>
+              <p className="text-xs text-slate-400">{t('git_loading_conflict', 'Chargement des informations du conflit...')}</p>
             </div>
           ) : activeView === 'diff' ? (
             <div className="h-full w-full">
@@ -259,9 +261,9 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
         {/* Footer */}
         <div className="px-5 py-3 border-t flex items-center justify-between text-xs text-slate-400 shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div className="flex items-center gap-2">
-            <span>Langage détecté : <strong className="text-slate-200">{language}</strong></span>
+            <span>{t('detected_language', 'Langage détecté :')} <strong className="text-slate-200">{language}</strong></span>
             {conflictInfo?.base_content && (
-              <span className="text-emerald-400">• Version ancêtre (base) détectée</span>
+              <span className="text-emerald-400">{t('ancestor_version_detected', '• Version ancêtre (base) détectée')}</span>
             )}
           </div>
 
@@ -272,7 +274,7 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
               className="px-3 py-1.5 rounded-lg border text-slate-300 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
               style={{ borderColor: 'var(--border)' }}
             >
-              Fermer
+              {t('close', 'Fermer')}
             </button>
             <button
               type="button"
@@ -281,7 +283,7 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors cursor-pointer disabled:opacity-50"
             >
               {resolving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-              <span>Marquer comme résolu</span>
+              <span>{t('git_mark_resolved', 'Marquer comme résolu')}</span>
             </button>
           </div>
         </div>

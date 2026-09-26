@@ -285,7 +285,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         message: newStashMessage.trim() || undefined,
         include_untracked: newStashUntracked
       });
-      showToast('Stash enregistré avec succès !', 'success');
+      showToast(t('stash_saved_success', 'Stash enregistré avec succès !'), 'success');
       setIsCreateStashOpen(false);
       setNewStashMessage('');
       setNewStashUntracked(false);
@@ -304,7 +304,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       if (res.status === 'conflict') {
         showToast(`Stash dépilé avec des conflits: ${res.message}`, 'error');
       } else {
-        showToast('Stash dépilé et appliqué !', 'success');
+        showToast(t('stash_popped_success', 'Stash dépilé et appliqué !'), 'success');
       }
       await loadStashes();
       await loadStatus();
@@ -320,7 +320,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       if (res.status === 'conflict') {
         showToast(`Stash appliqué avec des conflits: ${res.message}`, 'error');
       } else {
-        showToast('Stash appliqué avec succès !', 'success');
+        showToast(t('stash_applied_success', 'Stash appliqué avec succès !'), 'success');
       }
       await loadStatus();
       setViewMode('changes');
@@ -331,15 +331,15 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
 
   const handleDropStash = useCallback(async (index: number) => {
     const confirmed = await showConfirm(`Voulez-vous vraiment supprimer le stash@{${index}} ?`, {
-      title: 'Supprimer le stash',
-      confirmLabel: 'Supprimer',
+      title: t('delete_stash', 'Supprimer le stash'),
+      confirmLabel: t('delete', 'Supprimer'),
       cancelLabel: 'Annuler',
       destructive: true
     });
     if (!confirmed) return;
     try {
       await dropGitStash(currentWorkspace, index);
-      showToast('Stash supprimé.', 'info');
+      showToast(t('stash_deleted', 'Stash supprimé.'), 'info');
       await loadStashes();
     } catch (err: any) {
       showToast(err.message || 'Erreur lors de la suppression du stash', 'error');
@@ -348,15 +348,15 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
 
   const handleClearAllStashes = useCallback(async () => {
     const confirmed = await showConfirm('Voulez-vous supprimer TOUS les stashes ? Cette action est irréversible.', {
-      title: 'Vider tous les stashes',
-      confirmLabel: 'Tout supprimer',
+      title: t('clear_all_stashes', 'Vider tous les stashes'),
+      confirmLabel: t('delete_all', 'Tout supprimer'),
       cancelLabel: 'Annuler',
       destructive: true
     });
     if (!confirmed) return;
     try {
       await dropGitStash(currentWorkspace);
-      showToast('Tous les stashes ont été supprimés.', 'info');
+      showToast(t('all_stashes_cleared', 'Tous les stashes ont été supprimés.'), 'info');
       await loadStashes();
     } catch (err: any) {
       showToast(err.message || 'Erreur lors du vidage des stashes', 'error');
@@ -394,7 +394,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
     try {
       const res = await cherryPickCommit({ workspace: currentWorkspace, commit_hash: commit.hash });
       if (res.status === 'applied') {
-        showToast('Commit appliqué avec succès via Cherry-pick !', 'success');
+        showToast(t('cherry_pick_success', 'Commit appliqué avec succès via Cherry-pick !'), 'success');
         await loadStatus();
         await loadHistory(true);
       } else if (res.status === 'conflict') {
@@ -458,7 +458,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
       : `Voulez-vous vraiment supprimer la branche locale '${branch.name}' ?`;
 
     const confirmed = await showConfirm(confirmMessage, {
-      title: 'Supprimer la branche',
+      title: t('delete_branch', 'Supprimer la branche'),
       confirmLabel: 'Supprimer',
       cancelLabel: 'Annuler',
       destructive: true
@@ -567,7 +567,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
     try {
       const res = await continueGitRebase(currentWorkspace);
       if (res.status === 'completed') {
-        showToast('Rebase terminé avec succès !', 'success');
+        showToast(t('rebase_finished_success', 'Rebase terminé avec succès !'), 'success');
         await loadStatus();
         await loadRebaseStatus();
         await loadBranches();
@@ -575,7 +575,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           await loadHistory(true);
         }
       } else if (res.status === 'conflict') {
-        showToast('Conflits subsistants. Résolvez-les avant de poursuivre.', 'error');
+        showToast(t('rebase_conflicts_remaining', 'Conflits subsistants. Résolvez-les avant de poursuivre.'), 'error');
         await loadStatus();
         await loadRebaseStatus();
         if (res.conflicts && res.conflicts.length > 0) {
@@ -604,7 +604,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
     setAbortingRebase(true);
     try {
       await abortGitRebase(currentWorkspace);
-      showToast('Rebase annulé, état initial restauré.', 'info');
+      showToast(t('rebase_aborted_restored', 'Rebase annulé, état initial restauré.'), 'info');
       await loadStatus();
       await loadRebaseStatus();
       await loadBranches();
@@ -968,7 +968,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           style={{ color: viewMode === 'stashes' ? undefined : 'var(--text)' }}
         >
           <Archive className="w-3.5 h-3.5" />
-          <span>Stashes</span>
+          <span>{t('stashes', 'Stashes')}</span>
           {stashes.length > 0 && (
             <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-500/20 text-purple-400 font-mono">
               {stashes.length}
@@ -1009,7 +1009,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           style={{ color: viewMode === 'remotes' ? undefined : 'var(--text)' }}
         >
           <Globe className="w-3.5 h-3.5" />
-          <span>Remotes</span>
+          <span>{t('remotes', 'Remotes')}</span>
         </button>
 
         <button
@@ -1023,7 +1023,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           style={{ color: viewMode === 'tags' ? undefined : 'var(--text)' }}
         >
           <Tag className="w-3.5 h-3.5" />
-          <span>Tags & Releases</span>
+          <span>{t('tags_and_releases', 'Tags & Releases')}</span>
         </button>
       </div>
 
@@ -1045,20 +1045,20 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                 onClick={handleContinueRebase}
                 disabled={continuingRebase || abortingRebase}
                 className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                title="Poursuivre le rebase (git rebase --continue)"
+                title={t('git_rebase_continue_tooltip', 'Poursuivre le rebase (git rebase --continue)')}
               >
                 {continuingRebase ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
-                <span>Continuer</span>
+                <span>{t('continue', 'Continuer')}</span>
               </button>
               <button
                 type="button"
                 onClick={handleAbortRebase}
                 disabled={continuingRebase || abortingRebase}
                 className="px-2.5 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-medium flex items-center gap-1 cursor-pointer transition-colors"
-                title="Abandonner le rebase (git rebase --abort)"
+                title={t('git_rebase_abort_tooltip', 'Abandonner le rebase (git rebase --abort)')}
               >
                 {abortingRebase ? <RefreshCw className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
-                <span>Abandonner</span>
+                <span>{t('abort', 'Abandonner')}</span>
               </button>
             </div>
           </div>
@@ -1126,7 +1126,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                 {t('git_conflict_warning', '{0} conflit(s) de fusion non résolu(s).').replace('{0}', String(status.conflicts.length))}
               </span>
             </div>
-            <span className="text-[10px] text-rose-400/80">Action requise</span>
+            <span className="text-[10px] text-rose-400/80">{t('action_required', 'Action requise')}</span>
           </div>
           <div className="flex flex-col gap-1.5">
             {status.conflicts.map((confFile) => (
@@ -1138,7 +1138,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                   className="flex items-center gap-1 px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-medium text-[11px] cursor-pointer shadow-xs transition-colors shrink-0"
                 >
                   <GitMerge className="w-3 h-3" />
-                  <span>Résoudre le conflit</span>
+                  <span>{t('resolve_conflict', 'Résoudre le conflit')}</span>
                 </button>
               </div>
             ))}
@@ -1269,7 +1269,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                           })
                         }
                         className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30 transition-colors cursor-pointer"
-                        title="Ouvrir dans le studio de diff sémantique Monaco"
+                        title={t('open_in_monaco_diff_tooltip', 'Ouvrir dans le studio de diff sémantique Monaco')}
                       >
                         <Code2 className="w-3 h-3" />
                         <span>Monaco Studio</span>
@@ -1536,7 +1536,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                             <div className="flex items-center gap-1.5 min-w-0">
                               <span 
                                 onClick={(e) => handleCopyHash(c.hash, e)}
-                                title="Cliquer pour copier le SHA"
+                                title={t('click_copy_sha', 'Cliquer pour copier le SHA')}
                                 className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-500/15 hover:bg-slate-500/25 text-sky-400 font-semibold flex items-center gap-1 shrink-0"
                               >
                                 {copiedHash === c.hash ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : null}
@@ -1591,7 +1591,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                           {selectedCommit.subject}
                         </h4>
                         <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--muted)' }}>
-                          <span>Par <strong style={{ color: 'var(--text)' }}>{selectedCommit.author}</strong> &lt;{selectedCommit.email}&gt;</span>
+                          <span>{t('by', 'Par')} <strong style={{ color: 'var(--text)' }}>{selectedCommit.author}</strong> &lt;{selectedCommit.email}&gt;</span>
                           <span>•</span>
                           <span>{formatCommitTime(selectedCommit.timestamp)}</span>
                         </div>
@@ -1606,12 +1606,12 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                           borderColor: 'var(--border)',
                           color: 'var(--text)'
                         }}
-                        title="Copier le hash complet du commit"
+                        title={t('copy_full_commit_hash', 'Copier le hash complet du commit')}
                       >
                         {copiedHash === selectedCommit.hash ? (
                           <>
                             <Check className="w-3 h-3 text-emerald-400" />
-                            <span>Copié</span>
+                            <span>{t('copied', 'Copié')}</span>
                           </>
                         ) : (
                           <>
@@ -1624,7 +1624,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                         type="button"
                         onClick={() => handleCherryPick(selectedCommit)}
                         className="px-2 py-1 rounded-md border text-[10px] font-semibold flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30 transition-colors cursor-pointer shrink-0"
-                        title="Appliquer ce commit sur la branche courante (git cherry-pick)"
+                        title={t('cherry_pick_tooltip', 'Appliquer ce commit sur la branche courante (git cherry-pick)')}
                       >
                         <GitMerge className="w-3 h-3 text-amber-400" />
                         <span>Cherry-pick</span>
@@ -1633,7 +1633,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                         type="button"
                         onClick={() => handleOpenRebase(selectedCommit.hash)}
                         className="px-2 py-1 rounded-md border text-[10px] font-semibold flex items-center gap-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border-sky-500/30 transition-colors cursor-pointer shrink-0"
-                        title="Démarrer un rebase interactif depuis ce commit (git rebase -i)"
+                        title={t('start_rebase_tooltip', 'Démarrer un rebase interactif depuis ce commit (git rebase -i)')}
                       >
                         <RotateCcw className="w-3 h-3 text-sky-400" />
                         <span>Rebase</span>
@@ -1649,7 +1649,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                             })
                           }
                           className="px-2 py-1 rounded-md border text-[10px] font-medium flex items-center gap-1 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25 transition-colors cursor-pointer shrink-0"
-                          title="Inspecter le patch dans Monaco Studio"
+                          title={t('inspect_patch_tooltip', 'Inspecter le patch dans Monaco Studio')}
                         >
                           <Code2 className="w-3 h-3" />
                           <span>Monaco Studio</span>
@@ -1721,7 +1721,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium cursor-pointer shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Nouveau Stash</span>
+                <span>{t('git_new_stash', 'Nouveau Stash')}</span>
               </button>
 
               {stashes.length > 0 && (
@@ -1729,10 +1729,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                   type="button"
                   onClick={handleClearAllStashes}
                   className="flex items-center gap-1 px-2 py-1 rounded-lg border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-xs cursor-pointer"
-                  title="Supprimer tous les stashes (`git stash clear`)"
+                  title={t('git_clear_all_stashes_tooltip', 'Supprimer tous les stashes (`git stash clear`)')}
                 >
                   <Trash2 className="w-3 h-3" />
-                  <span>Tout vider</span>
+                  <span>{t('clear_all', 'Tout vider')}</span>
                 </button>
               )}
             </div>
@@ -1742,7 +1742,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           {isCreateStashOpen && (
             <div className="p-3 rounded-xl border border-sky-500/30 bg-sky-500/5 space-y-2.5 animate-in fade-in">
               <div className="flex items-center justify-between text-xs font-semibold text-sky-400">
-                <span>Créer un nouveau stash</span>
+                <span>{t('git_create_new_stash', 'Créer un nouveau stash')}</span>
                 <button type="button" onClick={() => setIsCreateStashOpen(false)} className="text-slate-400 hover:text-white">
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -1763,7 +1763,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                     onChange={(e) => setNewStashUntracked(e.target.checked)}
                     className="rounded text-sky-500"
                   />
-                  <span>Inclure les fichiers non suivis (-u)</span>
+                  <span>{t('git_include_untracked', 'Inclure les fichiers non suivis (-u)')}</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <button
@@ -1771,7 +1771,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                     onClick={() => setIsCreateStashOpen(false)}
                     className="px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200"
                   >
-                    Annuler
+                    {t('cancel', 'Annuler')}
                   </button>
                   <button
                     type="button"
@@ -1780,7 +1780,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                     className="flex items-center gap-1 px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
                   >
                     {savingStash ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                    <span>Enregistrer le Stash</span>
+                    <span>{t('git_save_stash', 'Enregistrer le Stash')}</span>
                   </button>
                 </div>
               </div>
@@ -1791,13 +1791,13 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           {loadingStashes && stashes.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
               <RefreshCw className="w-4 h-4 animate-spin text-sky-400" />
-              <span>Chargement des stashes...</span>
+              <span>{t('git_loading_stashes', 'Chargement des stashes...')}</span>
             </div>
           ) : stashes.length === 0 ? (
             <div className="p-8 text-center text-xs italic text-slate-500 space-y-1">
               <Archive className="w-8 h-8 mx-auto text-slate-600 mb-2" />
-              <p>Aucun stash dans la pile.</p>
-              <p className="text-[11px] text-slate-600">Utilisez « Nouveau Stash » pour remiser vos modifications courantes.</p>
+              <p>{t('git_no_stashes_in_stack', 'Aucun stash dans la pile.')}</p>
+              <p className="text-[11px] text-slate-600">{t('git_use_new_stash_hint', 'Utilisez « Nouveau Stash » pour remiser vos modifications courantes.')}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -1821,7 +1821,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                         type="button"
                         onClick={() => handlePreviewStashDiff(s)}
                         className="px-2 py-1 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
-                        title="Voir le diff complet du stash"
+                        title={t('git_view_stash_diff_tooltip', 'Voir le diff complet du stash')}
                       >
                         <FileDiff className="w-3 h-3" />
                         <span>Diff</span>
@@ -1830,25 +1830,25 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                         type="button"
                         onClick={() => handleApplyStash(s.index)}
                         className="px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
-                        title="Appliquer les modifications sans supprimer le stash (git stash apply)"
+                        title={t('git_stash_apply_tooltip', 'Appliquer les modifications sans supprimer le stash (git stash apply)')}
                       >
                         <Layers className="w-3 h-3" />
-                        <span>Appliquer</span>
+                        <span>{t('apply', 'Appliquer')}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handlePopStash(s.index)}
                         className="px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
-                        title="Appliquer et dépiler le stash (git stash pop)"
+                        title={t('git_stash_pop_tooltip', 'Appliquer et dépiler le stash (git stash pop)')}
                       >
                         <ArrowUpRight className="w-3 h-3" />
-                        <span>Dépiler</span>
+                        <span>{t('git_stash_pop', 'Dépiler')}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDropStash(s.index)}
                         className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                        title="Supprimer ce stash (`git stash drop`)"
+                        title={t('git_stash_drop_tooltip', 'Supprimer ce stash (`git stash drop`)')}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1911,10 +1911,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                     type="button"
                     onClick={() => handleOpenRebase('HEAD~5')}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium cursor-pointer shadow-xs transition-colors"
-                    title="Lancer un rebase interactif sur les derniers commits"
+                    title={t('git_interactive_rebase_tooltip', 'Lancer un rebase interactif sur les derniers commits')}
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Rebase Interactif</span>
+                    <span>{t('git_interactive_rebase', 'Rebase Interactif')}</span>
                   </button>
                 </div>
               </div>
@@ -1936,7 +1936,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                 type="text"
                 value={branchSearch}
                 onChange={(e) => setBranchSearch(e.target.value)}
-                placeholder="Filtrer les branches..."
+                placeholder={t('git_filter_branches_placeholder', 'Filtrer les branches...')}
                 className="w-full bg-transparent text-xs outline-none"
                 style={{ color: 'var(--text)' }}
               />
@@ -1985,7 +1985,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium cursor-pointer shadow-xs transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Nouvelle branche</span>
+                <span>{t('git_new_branch', 'Nouvelle branche')}</span>
               </button>
             </div>
           </div>
@@ -1994,7 +1994,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           {isCreateBranchOpen && (
             <div className="p-3.5 rounded-xl border border-sky-500/30 bg-sky-500/5 space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between text-xs font-semibold text-sky-400">
-                <span>Créer une nouvelle branche</span>
+                <span>{t('git_create_new_branch', 'Créer une nouvelle branche')}</span>
                 <button type="button" onClick={() => setIsCreateBranchOpen(false)} className="text-slate-400 hover:text-white">
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -2022,7 +2022,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                     type="text"
                     value={newBranchStartPoint}
                     onChange={(e) => setNewBranchStartPoint(e.target.value)}
-                    placeholder="ex: main, HEAD, ou sha (défaut: courant)"
+                    placeholder={t('git_start_point_placeholder', 'ex: main, HEAD, or sha (default: current)')}
                     className="w-full px-3 py-1.5 border rounded-lg text-xs outline-none bg-black/20 focus:border-sky-500 text-slate-100 font-mono"
                     style={{ borderColor: 'var(--border)' }}
                   />
@@ -2037,7 +2037,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                     onChange={(e) => setNewBranchCheckout(e.target.checked)}
                     className="rounded text-sky-500"
                   />
-                  <span>Basculer immédiatement sur cette branche (-b)</span>
+                  <span>{t('git_switch_branch_immediately', 'Basculer immédiatement sur cette branche (-b)')}</span>
                 </label>
 
                 <div className="flex items-center gap-2">
@@ -2046,7 +2046,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                     onClick={() => setIsCreateBranchOpen(false)}
                     className="px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
                   >
-                    Annuler
+                    {t('cancel', 'Annuler')}
                   </button>
                   <button
                     type="button"
@@ -2055,7 +2055,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                     className="flex items-center gap-1 px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
                   >
                     {creatingBranch ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                    <span>Créer la branche</span>
+                    <span>{t('git_create_branch', 'Créer la branche')}</span>
                   </button>
                 </div>
               </div>
@@ -2066,12 +2066,12 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           {loadingBranches && branches.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
               <RefreshCw className="w-4 h-4 animate-spin text-sky-400" />
-              <span>Chargement des branches...</span>
+              <span>{t('git_loading_branches', 'Chargement des branches...')}</span>
             </div>
           ) : filteredBranches.length === 0 ? (
             <div className="p-8 text-center text-xs italic text-slate-500 space-y-1">
               <GitBranch className="w-8 h-8 mx-auto text-slate-600 mb-2" />
-              <p>Aucune branche trouvée.</p>
+              <p>{t('git_no_branches_found', 'Aucune branche trouvée.')}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -2133,10 +2133,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                             type="button"
                             onClick={() => handleCheckoutBranch(b.name)}
                             className="px-2 py-1 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
-                            title="Basculer sur cette branche (git checkout)"
+                            title={t('git_checkout_tooltip', 'Basculer sur cette branche (git checkout)')}
                           >
                             <ArrowRight className="w-3 h-3" />
-                            <span>Bascule</span>
+                            <span>{t('git_checkout', 'Bascule')}</span>
                           </button>
                         )}
 
@@ -2148,10 +2148,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                               setMergeMessage(`Merge branch '${b.name}' into ${status?.branch || 'main'}`);
                             }}
                             className="px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
-                            title="Fusionner cette branche dans la branche active (git merge)"
+                            title={t('git_merge_tooltip', 'Fusionner cette branche dans la branche active (git merge)')}
                           >
                             <GitMerge className="w-3 h-3" />
-                            <span>Fusionner</span>
+                            <span>{t('git_merge', 'Fusionner')}</span>
                           </button>
                         )}
 
@@ -2160,7 +2160,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                             type="button"
                             onClick={() => handleOpenRebase(b.name)}
                             className="px-2 py-1 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
-                            title="Rebase interactif sur la base de cette branche"
+                            title={t('git_rebase_branch_tooltip', 'Rebase interactif sur la base de cette branche')}
                           >
                             <RotateCcw className="w-3 h-3" />
                             <span>Rebase</span>
@@ -2175,7 +2175,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                               setNewRenameName(b.name);
                             }}
                             className="p-1 rounded text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 transition-colors cursor-pointer"
-                            title="Renommer la branche (git branch -m)"
+                            title={`${t('git_rename_branch', 'Renommer la branche')} (git branch -m)`}
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
@@ -2225,7 +2225,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
                     <GitMerge className="w-4 h-4" />
-                    <span>Fusionner la branche</span>
+                    <span>{t('git_merge_branch', 'Fusionner la branche')}</span>
                   </div>
                   <button type="button" onClick={() => setMergingBranch(null)} className="text-slate-400 hover:text-white">
                     <X className="w-4 h-4" />
@@ -2233,7 +2233,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                 </div>
 
                 <p className="text-xs text-slate-300">
-                  Fusion de <strong className="text-emerald-400 font-mono">{mergingBranch.name}</strong> dans la branche courante <strong className="text-sky-400 font-mono">{status?.branch}</strong>.
+                  Fusion de <strong className="text-emerald-400 font-mono">{mergingBranch.name}</strong> {t('git_into_current_branch', 'dans la branche courante')} <strong className="text-sky-400 font-mono">{status?.branch}</strong>.
                 </p>
 
                 <div className="space-y-2 text-xs">
@@ -2276,7 +2276,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                     className="flex items-center gap-1 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer shadow-md"
                   >
                     {merging ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <GitMerge className="w-3.5 h-3.5" />}
-                    <span>Confirmer la fusion</span>
+                    <span>{t('git_confirm_merge', 'Confirmer la fusion')}</span>
                   </button>
                 </div>
               </div>
@@ -2293,7 +2293,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-semibold text-sky-400">
                     <Edit3 className="w-4 h-4" />
-                    <span>Renommer la branche</span>
+                    <span>{t('git_rename_branch', 'Renommer la branche')}</span>
                   </div>
                   <button type="button" onClick={() => setRenamingBranch(null)} className="text-slate-400 hover:text-white">
                     <X className="w-4 h-4" />
@@ -2308,7 +2308,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                     type="text"
                     value={newRenameName}
                     onChange={(e) => setNewRenameName(e.target.value)}
-                    placeholder="Nouveau nom..."
+                    placeholder={t('git_new_name_placeholder', 'Nouveau nom...')}
                     className="w-full px-3 py-1.5 border rounded-lg text-xs outline-none bg-black/20 focus:border-sky-500 text-slate-100 font-mono"
                     style={{ borderColor: 'var(--border)' }}
                   />
@@ -2330,7 +2330,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                     className="flex items-center gap-1 px-4 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold cursor-pointer shadow-md disabled:opacity-50"
                   >
                     {renaming ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                    <span>Renommer</span>
+                    <span>{t('rename', 'Renommer')}</span>
                   </button>
                 </div>
               </div>

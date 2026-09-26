@@ -28,6 +28,7 @@ import {
 import type { WorkspaceProjectDetail, ProjectRuntimeInfo } from '../types';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
+import { useI18n } from '../services/i18n';
 
 export interface ProjectSwitcherModalProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
   onSelectWorkspace,
   onRunTerminalCommand
 }) => {
+  const { t } = useI18n();
   const [projects, setProjects] = useState<WorkspaceProjectDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -161,7 +163,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
     setActionLoading(path);
     try {
       await setDefaultWorkspace(path);
-      showToast('Workspace par défaut mis à jour', 'success');
+      showToast(t('default_workspace_updated', 'Workspace par défaut mis à jour'), 'success');
       loadProjects();
     } catch (err: any) {
       showToast(err.message || 'Impossible de définir comme défaut', 'error');
@@ -173,7 +175,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
   const handleRemove = async (path: string, isDef: boolean, e: React.MouseEvent) => {
     e.stopPropagation();
     if (isDef) {
-      showToast('Impossible de retirer le workspace par défaut', 'warning');
+      showToast(t('cannot_remove_default_workspace', 'Impossible de retirer le workspace par défaut'), 'warning');
       return;
     }
     const confirmed = await showConfirm(`Retirer le projet "${path.split(/[\\/]/).pop()}" de la liste des workspaces ?`, { destructive: true });
@@ -184,7 +186,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
     setActionLoading(path);
     try {
       await removeWorkspaceProject(path);
-      showToast('Workspace retiré de la liste', 'info');
+      showToast(t('workspace_removed_from_list', 'Workspace retiré de la liste'), 'info');
       loadProjects();
     } catch (err: any) {
       showToast(err.message || 'Erreur lors de la suppression', 'error');
@@ -212,7 +214,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
     setActionLoading('add');
     try {
       await addWorkspaceProject(newPath.trim());
-      showToast('Nouveau projet ajouté avec succès', 'success');
+      showToast(t('new_project_added_success', 'Nouveau projet ajouté avec succès'), 'success');
       setNewPath('');
       setIsAdding(false);
       loadProjects();
@@ -280,7 +282,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
         className="w-full max-w-4xl max-h-[90vh] bg-surface-1 rounded-2xl border border-border/80 shadow-2xl flex flex-col overflow-hidden text-text-main"
         role="dialog"
         aria-modal="true"
-        aria-label="Studio Projets & Workspaces"
+        aria-label={t('projects_workspace_studio', 'Studio Projets & Workspaces')}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border/60 bg-surface-0/60">
@@ -305,14 +307,14 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={loadProjects}
-              title="Rafraîchir les projets"
+              title={t('project_refresh_tooltip', 'Rafraîchir les projets')}
               className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-surface-2 transition-colors border border-transparent hover:border-border"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={onClose}
-              title="Fermer (Échap)"
+              title={t('project_close_tooltip', 'Fermer (Échap)')}
               className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-surface-2 transition-colors border border-transparent hover:border-border"
             >
               <X className="w-5 h-5" />
@@ -383,14 +385,14 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                       )}
                     </div>
                   ) : (
-                    <span className="text-xs text-text-muted italic">Hors Git</span>
+                    <span className="text-xs text-text-muted italic">{t('git_not_git', 'Hors Git')}</span>
                   )}
 
                   {/* Health status badge */}
                   <div className="flex items-center gap-2">
                     {activeProject.health.warnings.length === 0 ? (
                       <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                        <Check className="w-3.5 h-3.5" /> Santé optimale
+                        <Check className="w-3.5 h-3.5" /> {t('optimal_health', 'Santé optimale')}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-xs text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
@@ -404,14 +406,14 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                       onClick={() => {
                         if (onRunTerminalCommand) {
                           onRunTerminalCommand(`cd "${activeProject.path}"`);
-                          showToast('Terminal synchronisé avec ce dossier', 'info');
+                          showToast(t('terminal_synced_folder', 'Terminal synchronisé avec ce dossier'), 'info');
                           onClose();
                         }
                       }}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-surface-2 hover:bg-surface-3 text-text-main rounded-lg border border-border transition-colors shadow-sm"
                     >
                       <Terminal className="w-3.5 h-3.5 text-accent" />
-                      Terminal ici
+                      {t('terminal_here', 'Terminal ici')}
                     </button>
                   </div>
                 </div>
@@ -426,7 +428,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                 <input
                   type="text"
-                  placeholder="Rechercher par nom, chemin ou technologie..."
+                  placeholder={t('project_search_placeholder', 'Rechercher par nom, chemin ou technologie...')}
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -453,7 +455,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
                 }`}
               >
                 <FolderPlus className="w-4 h-4" />
-                {isAdding ? 'Fermer ajout' : '+ Ajouter un projet'}
+                {isAdding ? t('close_add', 'Fermer ajout') : t('add_project_btn', '+ Ajouter un projet')}
               </button>
             </div>
 
@@ -461,12 +463,12 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
             <div className="flex flex-wrap items-center gap-2 text-xs">
               {(
                 [
-                  { id: 'all', label: 'Tous' },
+                  { id: 'all', label: t('all', 'Tous') },
                   { id: 'node', label: 'Node.js' },
                   { id: 'python', label: 'Python' },
                   { id: 'php', label: 'PHP' },
-                  { id: 'git', label: 'Dépôts Git' },
-                  { id: 'warnings', label: 'Alertes Santé' }
+                  { id: 'git', label: t('git_repositories', 'Dépôts Git') },
+                  { id: 'warnings', label: t('health_alerts', 'Alertes Santé') }
                 ] as const
               ).map((f) => (
                 <button
@@ -573,13 +575,13 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
             {loading ? (
               <div className="py-12 flex flex-col items-center justify-center text-text-muted gap-3">
                 <RefreshCw className="w-8 h-8 animate-spin text-accent" />
-                <span className="text-xs">Chargement et analyse des projets...</span>
+                <span className="text-xs">{t('project_loading', 'Chargement et analyse des projets...')}</span>
               </div>
             ) : filteredProjects.length === 0 ? (
               <div className="py-12 text-center text-text-muted border border-dashed border-border rounded-xl">
                 <Folder className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm font-medium">Aucun projet trouvé</p>
-                <p className="text-xs mt-1">Modifiez vos filtres ou ajoutez un nouveau dossier.</p>
+                <p className="text-sm font-medium">{t('project_not_found', 'Aucun projet trouvé')}</p>
+                <p className="text-xs mt-1">{t('project_not_found_desc', 'Modifiez vos filtres ou ajoutez un nouveau dossier.')}</p>
               </div>
             ) : (
               filteredProjects.map((project, index) => {
@@ -727,21 +729,21 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-[10px] font-mono border border-border">↑/↓</kbd>
-              Naviguer
+              {t('navigate', 'Naviguer')}
             </span>
             <span className="flex items-center gap-1.5">
-              <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-[10px] font-mono border border-border">Entrée</kbd>
-              Basculer
+              <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-[10px] font-mono border border-border">{t('key_enter', 'Entrée')}</kbd>
+              {t('switch', 'Basculer')}
             </span>
             <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-[10px] font-mono border border-border">Ctrl+Alt+W</kbd>
-              Bascule rapide
+              {t('quick_switch', 'Bascule rapide')}
             </span>
           </div>
 
           <div className="flex items-center gap-1 text-[11px] text-text-muted">
             <Sparkles className="w-3.5 h-3.5 text-accent" />
-            <span>Changement de workspace sans perte de conversation</span>
+            <span>{t('project_switch_no_loss', 'Changement de workspace sans perte de conversation')}</span>
           </div>
         </div>
       </div>

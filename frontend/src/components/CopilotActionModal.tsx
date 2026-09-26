@@ -1,3 +1,4 @@
+import { useI18n } from '../services/i18n';
 import React, { useState } from 'react';
 import {
   X,
@@ -28,27 +29,30 @@ export interface CopilotActionModalProps {
 
 type CopilotActionType = 'refactor' | 'types' | 'docstring' | 'tests';
 
-const ACTION_DESCRIPTIONS: Record<CopilotActionType, { label: string; icon: any; desc: string }> = {
-  refactor: {
-    label: 'Refactoriser',
-    icon: Wand2,
-    desc: 'Simplifie, nettoie et modernise le code sans en altérer le comportement fonctionnel.'
-  },
-  types: {
-    label: 'Générer Types',
-    icon: Layers,
-    desc: 'Infère automatiquement les interfaces TypeScript, types d\'union ou schémas de typage.'
-  },
-  docstring: {
-    label: 'Documenter',
-    icon: BookOpen,
-    desc: 'Génère une documentation structurée (JSDoc, docstrings Google/NumPy) pour les fonctions et classes.'
-  },
-  tests: {
-    label: 'Générer Tests',
-    icon: TestTube2,
-    desc: 'Crée une suite complète de tests unitaires prête à l\'emploi (Vitest / Jest / Pytest).'
-  }
+const getActionDetails = (action: CopilotActionType, t: (key: string, def?: string) => string) => {
+  const map: Record<CopilotActionType, { label: string; icon: any; desc: string }> = {
+    refactor: {
+      label: t('copilot_action_refactor', 'Refactoriser'),
+      icon: Wand2,
+      desc: t('copilot_action_refactor_desc', 'Simplifie, nettoie et modernise le code sans en altérer le comportement fonctionnel.')
+    },
+    types: {
+      label: t('copilot_action_types', 'Générer Types'),
+      icon: Layers,
+      desc: t('copilot_action_types_desc', "Infère automatiquement les interfaces TypeScript, types d'union ou schémas de typage.")
+    },
+    docstring: {
+      label: t('copilot_action_docstring', 'Documenter'),
+      icon: BookOpen,
+      desc: t('copilot_action_docstring_desc', 'Génère une documentation structurée (JSDoc, docstrings Google/NumPy) pour les fonctions et classes.')
+    },
+    tests: {
+      label: t('copilot_action_tests', 'Générer Tests'),
+      icon: TestTube2,
+      desc: t('copilot_action_tests_desc', "Crée une suite complète de tests unitaires prête à l'emploi (Vitest / Jest / Pytest).")
+    }
+  };
+  return map[action];
 };
 
 export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
@@ -60,6 +64,7 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
   onClose,
   onApply
 }) => {
+  const { t } = useI18n();
   const [selectedAction, setSelectedAction] = useState<CopilotActionType>('refactor');
   const [userInstruction, setUserInstruction] = useState<string>('');
   const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -71,7 +76,7 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
 
   const handleExecute = async () => {
     if (!code || !code.trim()) {
-      showToast('Aucun code sélectionné à transformer', 'error');
+      showToast(t('copilot_no_code', 'Aucun code sélectionné à transformer'), 'error');
       return;
     }
 
@@ -87,7 +92,7 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
 
       setResultCode(res.result_code);
       setExplanation(res.explanation || '');
-      showToast(`Action "${ACTION_DESCRIPTIONS[selectedAction].label}" exécutée avec succès`, 'success');
+      showToast(`${t('action', 'Action')} "${getActionDetails(selectedAction, t).label}" ${t('executed_success', 'exécutée avec succès')}`, 'success');
     } catch (err: any) {
       showToast(err.message || "Erreur lors de l'exécution de l'action Copilot", 'error');
     } finally {
@@ -126,7 +131,7 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
                 )}
               </div>
               <p className="text-xs text-zinc-400">
-                Transformations de code intelligentes et prévisualisation sémantique
+                {t('copilot_modal_sub', 'Transformations de code intelligentes et prévisualisation sémantique')}
               </p>
             </div>
           </div>
@@ -145,8 +150,8 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
         {/* Action Selection Tabs & Instruction Bar */}
         <div className="p-4 border-b border-zinc-800 bg-zinc-950/40 space-y-3 shrink-0">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {(Object.keys(ACTION_DESCRIPTIONS) as CopilotActionType[]).map((actionKey) => {
-              const item = ACTION_DESCRIPTIONS[actionKey];
+            {(['refactor', 'types', 'docstring', 'tests'] as CopilotActionType[]).map((actionKey) => {
+              const item = getActionDetails(actionKey, t);
               const Icon = item.icon;
               const isSelected = selectedAction === actionKey;
 
@@ -179,7 +184,7 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
               type="text"
               value={userInstruction}
               onChange={(e) => setUserInstruction(e.target.value)}
-              placeholder="Consigne spécifique (optionnel, ex: 'utiliser async/await', 'ajouter types stricts')..."
+              placeholder={t('copilot_instruction_placeholder', "Consigne spécifique (optionnel, ex: 'utiliser async/await', 'ajouter types stricts')...")}
               className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-zinc-700 bg-zinc-900/80 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-sky-500"
             />
             <button
@@ -189,7 +194,7 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-all cursor-pointer shadow-sm disabled:opacity-50"
             >
               {isRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              <span>{isRunning ? 'Génération...' : 'Générer la transformation'}</span>
+              <span>{isRunning ? t('generating', 'Génération...') : t('generate_transformation', 'Générer la transformation')}</span>
             </button>
           </div>
         </div>
@@ -201,8 +206,8 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
               {/* Diff Controls Header */}
               <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800/80 bg-zinc-950/60 text-xs text-zinc-400 shrink-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-emerald-400">Prévisualisation des changements :</span>
-                  <span className="text-[11px] text-zinc-500">Original (gauche) vs Code Généré (droite)</span>
+                  <span className="font-semibold text-emerald-400">{t('diff_preview_title', 'Prévisualisation des changements :')}</span>
+                  <span className="text-[11px] text-zinc-500">{t('diff_preview_sub', 'Original (gauche) vs Code Généré (droite)')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -210,7 +215,7 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
                     onClick={() => setIsSplitView(!isSplitView)}
                     className="px-2 py-0.5 rounded text-[11px] border border-zinc-700 hover:bg-zinc-800 text-zinc-300 cursor-pointer"
                   >
-                    {isSplitView ? 'Vue Côte-à-côte' : 'Vue Unifiée'}
+                    {isSplitView ? t('split_view', 'Vue Côte-à-côte') : t('unified_view', 'Vue Unifiée')}
                   </button>
                   <button
                     type="button"
@@ -218,7 +223,7 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
                     className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-zinc-400 hover:text-zinc-200 cursor-pointer"
                   >
                     <RotateCcw className="w-3 h-3" />
-                    <span>Réinitialiser</span>
+                    <span>{t('reset', 'Réinitialiser')}</span>
                   </button>
                 </div>
               </div>
@@ -255,10 +260,10 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-500 space-y-2">
               <FileCode className="w-10 h-10 text-zinc-600 mb-1" />
               <p className="text-sm font-medium text-zinc-300">
-                Prêt pour la transformation avec Gemini Flash
+                {t('copilot_ready_title', 'Prêt pour la transformation avec Gemini Flash')}
               </p>
               <p className="text-xs text-zinc-500 max-w-md">
-                Choisissez une action ci-dessus (Refactoriser, Générer Types, Documenter ou Tests) puis cliquez sur « Générer la transformation ».
+                {t('copilot_ready_desc', 'Choisissez une action ci-dessus (Refactoriser, Générer Types, Documenter ou Tests) puis cliquez sur « Générer la transformation ».')}
               </p>
             </div>
           )}
@@ -267,7 +272,7 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
         {/* Footer Actions */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-zinc-800 bg-zinc-950 select-none shrink-0">
           <div className="text-[11px] text-zinc-500">
-            {resultCode !== null ? 'Inspectez les lignes vertes/rouges avant de valider' : 'Code prêt pour analyse'}
+            {resultCode !== null ? t('copilot_inspect_hint', 'Inspectez les lignes vertes/rouges avant de valider') : t('copilot_ready_hint', 'Code prêt pour analyse')}
           </div>
 
           <div className="flex items-center gap-2">
@@ -276,7 +281,7 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
               onClick={onClose}
               className="px-3.5 py-1.5 rounded-xl border border-zinc-700 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors cursor-pointer"
             >
-              Annuler
+              {t('cancel', 'Annuler')}
             </button>
             <button
               type="button"
@@ -285,7 +290,7 @@ export const CopilotActionModal: React.FC<CopilotActionModalProps> = ({
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all cursor-pointer shadow-sm disabled:opacity-40"
             >
               <Check className="w-3.5 h-3.5" />
-              <span>Appliquer dans l'éditeur</span>
+              <span>{t('apply_in_editor', "Appliquer dans l'éditeur")}</span>
             </button>
           </div>
         </div>

@@ -191,8 +191,12 @@ export const QuickThemePopover: React.FC<QuickThemePopoverProps> = ({ isOpen, on
             <div className="flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <div className="text-left">
-                <span className="text-[11px] font-semibold block leading-tight">OLED Noir Pur</span>
-                <span className="text-[9px] opacity-70 block">Fond #000000 absolu</span>
+                <span className="text-[11px] font-semibold block leading-tight">
+                  {t('theme_oled_pure_black', 'OLED Noir Pur')}
+                </span>
+                <span className="text-[9px] opacity-70 block">
+                  {t('theme_oled_pure_black_desc', 'Fond #000000 absolu')}
+                </span>
               </div>
             </div>
             <div 
@@ -219,7 +223,7 @@ export const QuickThemePopover: React.FC<QuickThemePopoverProps> = ({ isOpen, on
                 title={t('reset_accent', 'Réinitialiser la couleur')}
               >
                 <RotateCcw className="w-2.5 h-2.5" />
-                <span>Reset</span>
+                <span>{t('reset', 'Reset')}</span>
               </button>
             )}
           </div>
@@ -247,7 +251,7 @@ export const QuickThemePopover: React.FC<QuickThemePopoverProps> = ({ isOpen, on
             {/* Custom Hex Color Picker */}
             <label 
               className="w-6 h-6 rounded-full border border-dashed border-slate-400 hover:border-white transition-colors cursor-pointer flex items-center justify-center relative overflow-hidden"
-              title="Choisir une couleur personnalisée (Hex)"
+              title={t('theme_custom_hex_title', 'Choisir une couleur personnalisée (Hex)')}
               style={{
                 backgroundColor: currentAccent && !ACCENT_PRESETS.some(p => p.hex.toLowerCase() === currentAccent.toLowerCase()) 
                   ? currentAccent 

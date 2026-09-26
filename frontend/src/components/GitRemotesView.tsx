@@ -29,6 +29,7 @@ import {
 import type { GitRemoteDetail } from '../types';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
+import { useI18n } from '../services/i18n';
 
 export interface GitRemotesViewProps {
   workspace: string;
@@ -47,6 +48,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
   currentBranch = 'main',
   onNotify
 }) => {
+  const { t } = useI18n();
   const [remotes, setRemotes] = useState<GitRemoteDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,7 +99,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          const message = err instanceof Error ? err.message : 'Erreur chargement des remotes';
+          const message = err instanceof Error ? err.message : t('git_error_loading_remotes', 'Erreur chargement des remotes');
           notify(message, 'error');
           setLoading(false);
         }
@@ -113,7 +115,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
       const data = await fetchGitRemotes(workspace);
       setRemotes(data);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erreur chargement des remotes';
+      const message = err instanceof Error ? err.message : t('git_error_loading_remotes', 'Erreur chargement des remotes');
       notify(message, 'error');
     } finally {
       setLoading(false);
@@ -125,9 +127,9 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
       await navigator.clipboard.writeText(text);
       setCopiedUrl(text);
       setTimeout(() => setCopiedUrl(null), 2000);
-      notify('URL copiée dans le presse-papiers', 'success');
+      notify(t('url_copied_clipboard', 'URL copiée dans le presse-papiers'), 'success');
     } catch {
-      notify("Échec de la copie de l'URL", 'error');
+      notify(t('url_copy_failed', "Échec de la copie de l'URL"), 'error');
     }
   };
 
@@ -149,7 +151,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
         notify(`Connexion ${remoteName} échouée : ${res.error || 'Erreur'}`, 'error');
       }
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Erreur réseau';
+      const errMsg = err instanceof Error ? err.message : t('git_network_error', 'Erreur réseau');
       setPings((prev) => ({
         ...prev,
         [remoteName]: { loading: false, error: errMsg }
@@ -164,7 +166,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
       const res = await fetchGitRemote({ remote: remoteName, workspace });
       notify(`Fetch ${remoteName} terminé : ${res.output.slice(0, 100)}`, 'success');
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Erreur lors du fetch';
+      const errMsg = err instanceof Error ? err.message : t('git_error_fetching_remote', 'Erreur lors du fetch');
       notify(`Échec du fetch ${remoteName} : ${errMsg}`, 'error');
     } finally {
       setActionLoading((prev) => ({ ...prev, [`fetch-${remoteName}`]: false }));
@@ -192,7 +194,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
       notify(`Push vers ${pushingRemote.name} réussi : ${res.output.slice(0, 100)}`, 'success');
       setPushingRemote(null);
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Erreur lors du push';
+      const errMsg = err instanceof Error ? err.message : t('git_error_pushing_remote', 'Erreur lors du push');
       notify(`Échec du push vers ${pushingRemote.name} : ${errMsg}`, 'error');
     } finally {
       setSubmittingPush(false);
@@ -213,7 +215,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
     const pushUrl = addPushUrl.trim();
 
     if (!name || !url) {
-      notify('Le nom et l’URL de fetch sont obligatoires', 'warning');
+      notify(t('git_remote_name_url_required', 'Le nom et l’URL de fetch sont obligatoires'), 'warning');
       return;
     }
 
@@ -229,7 +231,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
       setIsAddOpen(false);
       await loadRemotes();
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Erreur lors de la création';
+      const errMsg = err instanceof Error ? err.message : t('git_error_creating_remote', 'Erreur lors de la création');
       notify(`Impossible d'ajouter le remote : ${errMsg}`, 'error');
     } finally {
       setSubmittingAdd(false);
@@ -262,7 +264,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
       setEditingRemote(null);
       await loadRemotes();
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Erreur lors de la mise à jour';
+      const errMsg = err instanceof Error ? err.message : t('git_error_updating_remote', 'Erreur lors de la mise à jour');
       notify(`Impossible de modifier le remote : ${errMsg}`, 'error');
     } finally {
       setSubmittingEdit(false);
@@ -273,9 +275,9 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
     const confirmed = await showConfirm(
       `Êtes-vous certain de vouloir supprimer le remote "${remoteName}" ? Cette action est irréversible localement.`,
       {
-        title: 'Supprimer le dépôt distant',
+        title: t('git_delete_remote', 'Supprimer le dépôt distant'),
         destructive: true,
-        confirmLabel: 'Supprimer'
+        confirmLabel: t('delete', 'Supprimer')
       }
     );
     if (!confirmed) return;
@@ -285,7 +287,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
       notify(`Remote "${remoteName}" supprimé avec succès`, 'success');
       await loadRemotes();
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Erreur lors de la suppression';
+      const errMsg = err instanceof Error ? err.message : t('git_error_deleting_remote', 'Erreur lors de la suppression');
       notify(`Impossible de supprimer le remote : ${errMsg}`, 'error');
     }
   };
@@ -312,14 +314,14 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-semibold text-white tracking-wide">
-                Dépôts Distants (Remotes)
+                {t('git_remotes_title', 'Dépôts Distants (Remotes)')}
               </h2>
               <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                 {remotes.length}
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Gérez les liaisons avec GitHub, GitLab ou vos serveurs distants
+              {t('git_remotes_subtitle', 'Gérez les liaisons avec GitHub, GitLab ou vos serveurs distants')}
             </p>
           </div>
         </div>
@@ -332,7 +334,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filtrer les remotes..."
+              placeholder={t('git_filter_remotes', 'Filtrer les remotes...')}
               className="pl-9 pr-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-48 transition-all"
             />
           </div>
@@ -341,7 +343,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
           <button
             onClick={loadRemotes}
             disabled={loading}
-            title="Rafraîchir les remotes"
+            title={t('git_refresh_remotes', 'Rafraîchir les remotes')}
             className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
@@ -353,7 +355,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Nouveau Remote</span>
+            <span>{t('git_new_remote', 'Nouveau Remote')}</span>
           </button>
         </div>
       </div>
@@ -363,7 +365,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
         {loading && remotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
             <RefreshCw className="w-8 h-8 animate-spin text-indigo-400" />
-            <span className="text-sm">Chargement des dépôts distants...</span>
+            <span className="text-sm">{t('git_loading_remotes', 'Chargement des dépôts distants...')}</span>
           </div>
         ) : filteredRemotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-slate-800 rounded-xl bg-slate-900/30">
@@ -371,12 +373,12 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
               <Server className="w-8 h-8" />
             </div>
             <h3 className="text-sm font-semibold text-slate-200">
-              {searchQuery ? 'Aucun remote ne correspond à votre recherche' : 'Aucun dépôt distant configuré'}
+              {searchQuery ? t('git_no_remotes_matched', 'Aucun remote ne correspond à votre recherche') : t('git_no_remotes_configured', 'Aucun dépôt distant configuré')}
             </h3>
             <p className="text-xs text-slate-400 max-w-sm mt-1 mb-4">
               {searchQuery
-                ? 'Essayez de modifier votre requête de recherche.'
-                : 'Ajoutez un remote pour synchroniser votre code avec GitHub, GitLab ou un dépôt Git distant.'}
+                ? t('try_modifying_search', 'Essayez de modifier votre requête de recherche.')
+                : t('git_add_remote_desc', 'Ajoutez un remote pour synchroniser votre code avec GitHub, GitLab ou un dépôt Git distant.')}
             </p>
             {!searchQuery && (
               <button
@@ -384,7 +386,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                 className="flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                <span>Ajouter un remote</span>
+                <span>{t('git_add_remote', 'Ajouter un remote')}</span>
               </button>
             )}
           </div>
@@ -457,35 +459,35 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                           className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/30"
                         >
                           <AlertTriangle className="w-3 h-3 text-rose-400" />
-                          <span>Erreur ping</span>
+                          <span>{t('git_ping_error', 'Erreur ping')}</span>
                         </div>
                       ) : null}
 
                       <button
                         onClick={() => handlePing(remote.name)}
                         disabled={ping?.loading}
-                        title="Tester la connectivité (git ls-remote)"
+                        title={t('git_test_connectivity_tooltip', 'Tester la connectivité (git ls-remote)')}
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors disabled:opacity-50"
                       >
                         <Zap className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Tester connexion</span>
+                        <span>{t('git_test_connection', 'Tester connexion')}</span>
                       </button>
 
                       <button
                         onClick={() => handleFetch(remote.name)}
                         disabled={isFetching}
-                        title="Récupérer les branches distantes (Fetch)"
+                        title={t('git_fetch_tooltip', 'Récupérer les branches distantes (Fetch)')}
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors disabled:opacity-50"
                       >
                         <DownloadCloud
                           className={`w-3.5 h-3.5 text-sky-400 ${isFetching ? 'animate-bounce' : ''}`}
                         />
-                        <span>Fetch</span>
+                        <span>{t('git_fetch', 'Fetch')}</span>
                       </button>
 
                       <button
                         onClick={() => handleOpenPush(remote)}
-                        title="Pousser des branches vers ce remote (Push)"
+                        title={t('git_push_tooltip', 'Pousser des branches vers ce remote (Push)')}
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white transition-colors"
                       >
                         <UploadCloud className="w-3.5 h-3.5" />
@@ -494,7 +496,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
 
                       <button
                         onClick={() => handleOpenEdit(remote)}
-                        title="Modifier le nom ou les URLs"
+                        title={t('git_edit_remote_tooltip', 'Modifier le nom ou les URLs')}
                         className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -502,7 +504,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
 
                       <button
                         onClick={() => handleDeleteRemote(remote.name)}
-                        title="Supprimer ce remote"
+                        title={t('git_delete_remote_tooltip', 'Supprimer ce remote')}
                         className="p-1 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -523,7 +525,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                         </span>
                         <button
                           onClick={() => copyToClipboard(remote.fetch_url)}
-                          title="Copier l'URL"
+                          title={t('copy_link', "Copier l'URL")}
                           className="text-slate-400 hover:text-white p-0.5 transition-colors"
                         >
                           {copiedUrl === remote.fetch_url ? (
@@ -538,7 +540,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-slate-400 hover:text-white p-0.5 transition-colors"
-                            title="Ouvrir dans le navigateur"
+                            title={t('open_in_browser', 'Ouvrir dans le navigateur')}
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
@@ -557,7 +559,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                         </span>
                         <button
                           onClick={() => copyToClipboard(remote.push_url)}
-                          title="Copier l'URL"
+                          title={t('copy_link', "Copier l'URL")}
                           className="text-slate-400 hover:text-white p-0.5 transition-colors"
                         >
                           {copiedUrl === remote.push_url ? (
@@ -583,7 +585,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
             <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-800/40">
               <div className="flex items-center gap-2">
                 <Globe className="w-4 h-4 text-indigo-400" />
-                <h3 className="text-sm font-semibold text-white">Nouveau Dépôt Distant (Remote)</h3>
+                <h3 className="text-sm font-semibold text-white">{t('git_add_remote_modal_title', 'Nouveau Dépôt Distant (Remote)')}</h3>
               </div>
               <button
                 onClick={() => setIsAddOpen(false)}
@@ -596,7 +598,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
             <form onSubmit={handleCreateRemote} className="p-4 space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Nom du Remote <span className="text-rose-400">*</span>
+                  {t('git_remote_name_label', 'Nom du Remote')} <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -610,7 +612,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
 
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  URL de Fetch <span className="text-rose-400">*</span>
+                  {t('git_fetch_url_label', 'URL de Fetch')} <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -624,11 +626,11 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
 
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  URL de Push (Optionnelle, par défaut identique à l’URL de Fetch)
+                  {t('git_push_url_label', 'URL de Push (Optionnelle, par défaut identique à l’URL de Fetch)')}
                 </label>
                 <input
                   type="text"
-                  placeholder="Laisser vide pour utiliser la même URL"
+                  placeholder={t('git_same_url_placeholder', 'Laisser vide pour utiliser la même URL')}
                   value={addPushUrl}
                   onChange={(e) => setAddPushUrl(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 font-mono"
@@ -641,7 +643,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                   onClick={() => setIsAddOpen(false)}
                   className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
                 >
-                  Annuler
+                  {t('cancel', 'Annuler')}
                 </button>
                 <button
                   type="submit"
@@ -649,7 +651,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all disabled:opacity-50"
                 >
                   {submittingAdd && <RefreshCw className="w-3 h-3 animate-spin" />}
-                  <span>Ajouter le remote</span>
+                  <span>{t('git_add_remote_btn', 'Ajouter le remote')}</span>
                 </button>
               </div>
             </form>
@@ -665,7 +667,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
               <div className="flex items-center gap-2">
                 <Edit2 className="w-4 h-4 text-indigo-400" />
                 <h3 className="text-sm font-semibold text-white">
-                  Modifier le remote {editingRemote.name}
+                  {t('git_edit_remote_modal_title', 'Modifier le remote')} {editingRemote.name}
                 </h3>
               </div>
               <button
@@ -678,9 +680,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
 
             <form onSubmit={handleUpdateRemote} className="p-4 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Nom du Remote
-                </label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">{t('git_remote_name_label', 'Nom du Remote')}</label>
                 <input
                   type="text"
                   required
@@ -691,9 +691,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  URL de Fetch
-                </label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">{t('git_fetch_url_label', 'URL de Fetch')}</label>
                 <input
                   type="text"
                   required
@@ -704,9 +702,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  URL de Push
-                </label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">{t('git_push_url_label', 'URL de Push')}</label>
                 <input
                   type="text"
                   value={editPushUrl}
@@ -721,7 +717,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                   onClick={() => setEditingRemote(null)}
                   className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
                 >
-                  Annuler
+                  {t('cancel', 'Annuler')}
                 </button>
                 <button
                   type="submit"
@@ -729,7 +725,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all disabled:opacity-50"
                 >
                   {submittingEdit && <RefreshCw className="w-3 h-3 animate-spin" />}
-                  <span>Enregistrer les modifications</span>
+                  <span>{t('save_changes', 'Enregistrer les modifications')}</span>
                 </button>
               </div>
             </form>
@@ -745,7 +741,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
               <div className="flex items-center gap-2">
                 <UploadCloud className="w-4 h-4 text-indigo-400" />
                 <h3 className="text-sm font-semibold text-white">
-                  Push vers {pushingRemote.name}
+                  {t('git_push_to_remote_title', 'Push vers')} {pushingRemote.name}
                 </h3>
               </div>
               <button
@@ -758,9 +754,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
 
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Branche à pousser
-                </label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">{t('branch_to_push', 'Branche à pousser')}</label>
                 <input
                   type="text"
                   value={pushBranch}
@@ -780,10 +774,10 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                   />
                   <div className="text-xs">
                     <span className="font-medium text-slate-200">
-                      Définir comme branche amont (-u / --set-upstream)
+                      {t('set_upstream_label', 'Définir comme branche amont (-u / --set-upstream)')}
                     </span>
                     <p className="text-slate-400 text-[11px]">
-                      Lie votre branche locale à la branche distante correspondante.
+                      {t('set_upstream_desc', 'Lie votre branche locale à la branche distante correspondante.')}
                     </p>
                   </div>
                 </label>
@@ -797,10 +791,10 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                   />
                   <div className="text-xs">
                     <span className="font-medium text-rose-300">
-                      Forcer la mise à jour protégée (--force-with-lease)
+                      {t('force_push_label', 'Forcer la mise à jour protégée (--force-with-lease)')}
                     </span>
                     <p className="text-slate-400 text-[11px]">
-                      Écrase l’historique distant uniquement si aucun tiers n’a poussé de nouveaux commits.
+                      {t('force_push_desc', 'Écrase l’historique distant uniquement si aucun tiers n’a poussé de nouveaux commits.')}
                     </p>
                   </div>
                 </label>
@@ -812,7 +806,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                   onClick={() => setPushingRemote(null)}
                   className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
                 >
-                  Annuler
+                  {t('cancel', 'Annuler')}
                 </button>
                 <button
                   type="button"
@@ -821,7 +815,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all disabled:opacity-50"
                 >
                   {submittingPush && <RefreshCw className="w-3 h-3 animate-spin" />}
-                  <span>Confirmer le push</span>
+                  <span>{t('git_confirm_push', 'Confirmer le push')}</span>
                 </button>
               </div>
             </div>

@@ -62,6 +62,7 @@ import {
 import { chatSocket } from './services/ws';
 import { syncClient } from './services/sync';
 import { getStoredTheme, getStoredSkin, applyAppearance } from './services/theme';
+import { useI18n } from './services/i18n';
 import { ToastContainer } from './components/Toast';
 import { showToast } from './services/toast';
 import { ConfirmDialogContainer } from './components/AppDialog';
@@ -138,6 +139,7 @@ const normalizeUsage = (raw: any): TokenUsageData | undefined => {
 };
 
 export function App() {
+  const { t } = useI18n();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -530,11 +532,11 @@ export function App() {
 
     // Network resilience: online/offline detection
     const handleOnline = () => {
-      showToast('Connexion rétablie — Antigravity en ligne', 'success');
+      showToast(t('online_restored', 'Connexion rétablie — Antigravity en ligne'), 'success');
       loadInitialData();
     };
     const handleOffline = () => {
-      showToast('Mode hors-ligne — Connexion réseau indisponible', 'error');
+      showToast(t('offline_mode', 'Mode hors-ligne — Connexion réseau indisponible'), 'error');
     };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -1265,11 +1267,11 @@ export function App() {
       fetchSettings().then((currentSettings) => {
         saveSettings({ ...currentSettings, model: found.name, effort: nextEffort }).catch((err) => {
           console.error("Failed to save model settings:", err);
-          showToast('Erreur lors de la sauvegarde du modèle', 'error');
+          showToast(t('error_saving_model', 'Erreur lors de la sauvegarde du modèle'), 'error');
         });
       }).catch((err) => {
         console.error("Failed to fetch settings for model change:", err);
-        showToast('Erreur lors de la récupération des paramètres', 'error');
+        showToast(t('error_fetching_settings', 'Erreur lors de la récupération des paramètres'), 'error');
       });
     }
   };
@@ -1283,11 +1285,11 @@ export function App() {
       fetchSettings().then((currentSettings) => {
         saveSettings({ ...currentSettings, model: currentModelObj.name, effort: newEffort }).catch((err) => {
           console.error("Failed to save effort settings:", err);
-          showToast("Erreur lors de la sauvegarde de l'effort de réflexion", 'error');
+          showToast(t('error_saving_effort', "Erreur lors de la sauvegarde de l'effort de réflexion"), 'error');
         });
       }).catch((err) => {
         console.error("Failed to fetch settings for effort change:", err);
-        showToast('Erreur lors de la récupération des paramètres', 'error');
+        showToast(t('error_fetching_settings', 'Erreur lors de la récupération des paramètres'), 'error');
       });
     }
   };
@@ -1448,7 +1450,7 @@ export function App() {
     try {
       const res = await addConversationBookmark(activeConversationId, stepIndex, label, preview);
       setSessionBookmarks(res.bookmarks);
-      showToast('Signet enregistré avec succès', 'success');
+      showToast(t('bookmark_saved_success', 'Signet enregistré avec succès'), 'success');
     } catch (err: any) {
       showToast(err.message || 'Erreur lors de l’enregistrement du signet', 'error');
     }
@@ -1459,7 +1461,7 @@ export function App() {
     try {
       const res = await removeConversationBookmark(activeConversationId, bookmarkId);
       setSessionBookmarks(res.bookmarks);
-      showToast('Signet supprimé', 'info');
+      showToast(t('bookmark_deleted', 'Signet supprimé'), 'info');
     } catch (err: any) {
       showToast(err.message || 'Erreur lors de la suppression du signet', 'error');
     }
@@ -1493,7 +1495,7 @@ export function App() {
 
   const handleCompactConversation = React.useCallback(async () => {
     if (!activeConversationId) {
-      showToast('Aucune conversation active à compacter.', 'warning');
+      showToast(t('no_active_conversation_to_compact', 'Aucune conversation active à compacter.'), 'warning');
       return;
     }
     try {
@@ -1506,7 +1508,7 @@ export function App() {
       if (res.action_taken && res.tokens_saved > 0) {
         showToast(`Budget de contexte appliqué : -${res.tokens_saved.toLocaleString()} tokens (-${res.reduction_pct}%) !`, 'success');
       } else {
-        showToast("Le contexte respecte déjà le budget configuré. Historique optimal.", 'info');
+        showToast(t('context_already_optimal', "Le contexte respecte déjà le budget configuré. Historique optimal."), 'info');
       }
       const freshData = await fetchConversationTranscript(activeConversationId);
       const parsed = parseStepsToMessages(freshData?.steps || []);

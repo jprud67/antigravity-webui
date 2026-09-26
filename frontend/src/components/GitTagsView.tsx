@@ -23,6 +23,7 @@ import {
 } from '../services/api';
 import type { GitTagDetail } from '../types';
 import { showToast } from '../services/toast';
+import { useI18n } from '../services/i18n';
 
 export interface GitTagsViewProps {
   workspace: string;
@@ -35,6 +36,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
   onOpenReleaseModal,
   onNotify
 }) => {
+  const { t } = useI18n();
   const [tags, setTags] = useState<GitTagDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,7 +79,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          const message = err instanceof Error ? err.message : 'Erreur chargement des tags';
+          const message = err instanceof Error ? err.message : t('git_error_loading_tags', 'Erreur chargement des tags');
           notify(message, 'error');
           setLoading(false);
         }
@@ -93,7 +95,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
       const data = await fetchGitTags(workspace);
       setTags(data);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erreur chargement des tags';
+      const message = err instanceof Error ? err.message : t('git_error_loading_tags', 'Erreur chargement des tags');
       notify(message, 'error');
     } finally {
       setLoading(false);
@@ -146,7 +148,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
       const res = await pushGitTag(tag.name, 'origin', workspace);
       notify(`Tag "${tag.name}" poussé : ${res.output.slice(0, 100)}`, 'success');
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Erreur lors du push';
+      const errMsg = err instanceof Error ? err.message : t('git_error_pushing_tag', 'Erreur lors du push');
       notify(`Échec du push du tag ${tag.name} : ${errMsg}`, 'error');
     } finally {
       setActionLoading((prev) => ({ ...prev, [`push-${tag.name}`]: false }));
@@ -159,7 +161,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
       const res = await pushAllGitTags('origin', workspace);
       notify(`Tous les tags ont été poussés : ${res.output.slice(0, 100)}`, 'success');
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Erreur lors du push --tags';
+      const errMsg = err instanceof Error ? err.message : t('git_error_pushing_all_tags', 'Erreur lors du push --tags');
       notify(`Échec du push de tous les tags : ${errMsg}`, 'error');
     } finally {
       setActionLoading((prev) => ({ ...prev, 'push-all': false }));
@@ -179,7 +181,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
     e.preventDefault();
     const name = tagName.trim();
     if (!name) {
-      notify('Le nom du tag est obligatoire', 'warning');
+      notify(t('git_tag_name_required', 'Le nom du tag est obligatoire'), 'warning');
       return;
     }
 
@@ -197,7 +199,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
       setIsCreateOpen(false);
       await loadTags();
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Erreur de création';
+      const errMsg = err instanceof Error ? err.message : t('git_error_creating_tag', 'Erreur de création');
       notify(`Impossible de créer le tag : ${errMsg}`, 'error');
     } finally {
       setSubmittingCreate(false);
@@ -225,7 +227,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
       setDeletingTag(null);
       await loadTags();
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Erreur de suppression';
+      const errMsg = err instanceof Error ? err.message : t('git_error_deleting_tag', 'Erreur de suppression');
       notify(`Impossible de supprimer le tag : ${errMsg}`, 'error');
     } finally {
       setSubmittingDelete(false);
@@ -259,7 +261,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-semibold text-white tracking-wide">
-                Tags & Releases Git
+                {t('git_tags_title', 'Tags & Releases Git')}
               </h2>
               <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 {tags.length}
@@ -313,7 +315,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filtrer les tags..."
+              placeholder={t('git_filter_tags', 'Filtrer les tags...')}
               className="pl-9 pr-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-44 transition-all"
             />
           </div>
@@ -322,7 +324,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
           <button
             onClick={loadTags}
             disabled={loading}
-            title="Rafraîchir les tags"
+            title={t('git_refresh_tags', 'Rafraîchir les tags')}
             className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
@@ -332,7 +334,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
           <button
             onClick={handlePushAllTags}
             disabled={actionLoading['push-all'] || tags.length === 0}
-            title="Pousser tous les tags locaux vers origin (--tags)"
+            title={t('git_push_all_tags_tooltip', 'Pousser tous les tags locaux vers origin (--tags)')}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors disabled:opacity-50"
           >
             <UploadCloud
@@ -340,7 +342,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                 actionLoading['push-all'] ? 'animate-bounce' : ''
               }`}
             />
-            <span>Pousser tout</span>
+            <span>{t('git_push_all', 'Pousser tout')}</span>
           </button>
 
           {/* New Tag Button */}
@@ -349,7 +351,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition-all"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Nouveau Tag</span>
+            <span>{t('git_new_tag', 'Nouveau Tag')}</span>
           </button>
         </div>
       </div>
@@ -359,7 +361,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
         {loading && tags.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
             <RefreshCw className="w-8 h-8 animate-spin text-emerald-400" />
-            <span className="text-sm">Chargement des tags Git...</span>
+            <span className="text-sm">{t('git_loading_tags', 'Chargement des tags Git...')}</span>
           </div>
         ) : filteredTags.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-slate-800 rounded-xl bg-slate-900/30">
@@ -367,7 +369,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
               <Tag className="w-8 h-8" />
             </div>
             <h3 className="text-sm font-semibold text-slate-200">
-              {searchQuery ? 'Aucun tag ne correspond à votre filtre' : 'Aucun tag Git créé'}
+              {searchQuery ? t('git_no_tags_matched', 'Aucun tag ne correspond à votre filtre') : t('git_no_tags_created', 'Aucun tag Git créé')}
             </h3>
             <p className="text-xs text-slate-400 max-w-sm mt-1 mb-4">
               {searchQuery
@@ -380,7 +382,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                 className="flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                <span>Créer le tag v0.1.0</span>
+                <span>{t('create_tag_v010', 'Créer le tag v0.1.0')}</span>
               </button>
             )}
           </div>
@@ -422,11 +424,11 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                       {onOpenReleaseModal && (
                         <button
                           onClick={() => onOpenReleaseModal(tag)}
-                          title="Générer les notes et publier la release"
+                          title={t('git_publish_release_tooltip', 'Générer les notes et publier la release')}
                           className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-colors"
                         >
                           <Rocket className="w-3.5 h-3.5" />
-                          <span>Publier Release</span>
+                          <span>{t('git_publish_release', 'Publier Release')}</span>
                         </button>
                       )}
 
@@ -434,7 +436,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                       <button
                         onClick={() => handlePushTag(tag)}
                         disabled={isPushing}
-                        title="Pousser ce tag vers origin"
+                        title={t('git_push_tag_tooltip', 'Pousser ce tag vers origin')}
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors disabled:opacity-50"
                       >
                         <UploadCloud
@@ -446,7 +448,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                       {/* Delete */}
                       <button
                         onClick={() => handleOpenDelete(tag)}
-                        title="Supprimer ce tag"
+                        title={t('git_delete_tag_tooltip', 'Supprimer ce tag')}
                         className="p-1 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -505,7 +507,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
             <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-800/40">
               <div className="flex items-center gap-2">
                 <Tag className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-sm font-semibold text-white">Nouveau Tag Git</h3>
+                <h3 className="text-sm font-semibold text-white">{t('git_new_tag_modal', 'Nouveau Tag Git')}</h3>
               </div>
               <button
                 onClick={() => setIsCreateOpen(false)}
@@ -520,7 +522,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Suggestions SemVer</span>
+                  <span>{t('git_semver_suggestions', 'Suggestions SemVer')}</span>
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
@@ -528,7 +530,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                     onClick={() => setTagName(semverSuggestions.patch)}
                     className="p-1.5 text-xs rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-200 flex flex-col items-center justify-center transition-all hover:border-emerald-500/50"
                   >
-                    <span className="text-[10px] text-slate-400">Patch</span>
+                    <span className="text-[10px] text-slate-400">{t('git_patch', 'Patch')}</span>
                     <span className="font-mono font-medium text-emerald-400">
                       {semverSuggestions.patch}
                     </span>
@@ -538,7 +540,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                     onClick={() => setTagName(semverSuggestions.minor)}
                     className="p-1.5 text-xs rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-200 flex flex-col items-center justify-center transition-all hover:border-indigo-500/50"
                   >
-                    <span className="text-[10px] text-slate-400">Mineure</span>
+                    <span className="text-[10px] text-slate-400">{t('git_minor', 'Mineure')}</span>
                     <span className="font-mono font-medium text-indigo-400">
                       {semverSuggestions.minor}
                     </span>
@@ -548,7 +550,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                     onClick={() => setTagName(semverSuggestions.major)}
                     className="p-1.5 text-xs rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-200 flex flex-col items-center justify-center transition-all hover:border-purple-500/50"
                   >
-                    <span className="text-[10px] text-slate-400">Majeure</span>
+                    <span className="text-[10px] text-slate-400">{t('git_major', 'Majeure')}</span>
                     <span className="font-mono font-medium text-purple-400">
                       {semverSuggestions.major}
                     </span>
@@ -558,7 +560,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
 
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Nom du Tag <span className="text-rose-400">*</span>
+                  {t('git_tag_name_label', 'Nom du Tag')} <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -576,7 +578,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="HEAD, hash SHA ou nom de branche"
+                  placeholder={t('git_tag_target_placeholder', 'HEAD, hash SHA ou nom de branche')}
                   value={targetCommit}
                   onChange={(e) => setTargetCommit(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
@@ -589,7 +591,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Description ou notes de version..."
+                  placeholder={t('git_tag_notes_placeholder', 'Description ou notes de version...')}
                   value={tagMessage}
                   onChange={(e) => setTagMessage(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
@@ -606,7 +608,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                   />
                   <div className="text-xs">
                     <span className="font-medium text-slate-200">
-                      Pousser immédiatement vers le remote
+                      {t('git_push_immediately', 'Pousser immédiatement vers le remote')}
                     </span>
                     <p className="text-slate-400 text-[11px]">
                       Exécute `git push origin {tagName || '<tag>'}` à la création.
@@ -618,7 +620,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                   <div className="pl-6">
                     <input
                       type="text"
-                      placeholder="Nom du remote (ex: origin)"
+                      placeholder={t('git_remote_name_placeholder', 'Nom du remote (ex: origin)')}
                       value={remoteName}
                       onChange={(e) => setRemoteName(e.target.value)}
                       className="w-full px-2.5 py-1 text-xs rounded bg-slate-950 border border-slate-700 text-slate-200 font-mono"
@@ -633,7 +635,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                   onClick={() => setIsCreateOpen(false)}
                   className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
                 >
-                  Annuler
+                  {t('cancel', 'Annuler')}
                 </button>
                 <button
                   type="submit"
@@ -641,7 +643,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition-all disabled:opacity-50"
                 >
                   {submittingCreate && <RefreshCw className="w-3 h-3 animate-spin" />}
-                  <span>Créer le tag</span>
+                  <span>{t('git_create_tag_btn', 'Créer le tag')}</span>
                 </button>
               </div>
             </form>
@@ -656,7 +658,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
             <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-800/40">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-rose-400" />
-                <h3 className="text-sm font-semibold text-white">Supprimer le Tag</h3>
+                <h3 className="text-sm font-semibold text-white">{t('git_delete_tag_title', 'Supprimer le Tag')}</h3>
               </div>
               <button
                 onClick={() => setDeletingTag(null)}
@@ -695,7 +697,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                   onClick={() => setDeletingTag(null)}
                   className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
                 >
-                  Annuler
+                  {t('cancel', 'Annuler')}
                 </button>
                 <button
                   type="button"
@@ -704,7 +706,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-rose-600 hover:bg-rose-500 text-white shadow-sm transition-all disabled:opacity-50"
                 >
                   {submittingDelete && <RefreshCw className="w-3 h-3 animate-spin" />}
-                  <span>Supprimer définitivement</span>
+                  <span>{t('delete_permanently', 'Supprimer définitivement')}</span>
                 </button>
               </div>
             </div>

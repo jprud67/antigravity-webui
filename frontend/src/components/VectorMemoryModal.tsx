@@ -147,7 +147,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
     if (!confirmed) return;
     try {
       await vectorMemoryApi.deleteMemory(id);
-      showToast('Souvenir supprimé', 'info');
+      showToast(t('memory_deleted', 'Souvenir supprimé'), 'info');
       await loadData();
       if (searchQuery.trim()) {
         setSearchResults((prev) => prev.filter((r) => r.entry.id !== id));
@@ -594,10 +594,10 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                         color: 'var(--text)'
                       }}
                     >
-                      <option value="local">Local Déterministe (Zéro dépendance, 384d)</option>
-                      <option value="openai">OpenAI (text-embedding-3-small)</option>
-                      <option value="ollama">Ollama Local (nomic-embed-text)</option>
-                      <option value="gemini">Google Gemini Embeddings</option>
+                      <option value="local">{t('vector_provider_local', 'Local Déterministe (Zéro dépendance, 384d)')}</option>
+                      <option value="openai">{t('vector_provider_openai', 'OpenAI (text-embedding-3-small)')}</option>
+                      <option value="ollama">{t('vector_provider_ollama', 'Ollama Local (nomic-embed-text)')}</option>
+                      <option value="gemini">{t('vector_provider_gemini', 'Google Gemini Embeddings')}</option>
                     </select>
                   </div>
 
@@ -737,13 +737,17 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                 {simResult && (
                   <div className="flex-1 flex flex-col space-y-3 pt-2">
                     <div className="flex items-center gap-2 text-xs">
-                      <span className="font-semibold" style={{ color: 'var(--muted)' }}>Statut :</span>
+                      <span className="font-semibold" style={{ color: 'var(--muted)' }}>
+                        {t('vector_status_label', 'Statut :')}
+                      </span>
                       <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium border ${
                         simResult.shouldInject 
                           ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
                           : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
                       }`}>
-                        {simResult.shouldInject ? `Injection active (${simResult.recalledCount} souvenirs)` : 'Prompt ignoré ou aucune correspondance'}
+                        {simResult.shouldInject 
+                          ? t('vector_injection_active_count', 'Injection active ({0} souvenirs)', simResult.recalledCount)
+                          : t('vector_injection_ignored', 'Prompt ignoré ou aucune correspondance')}
                       </span>
                     </div>
 
@@ -786,9 +790,9 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
         >
           <div className="flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-            <span className="text-[11px]">Antigravity Vector Memory Engine</span>
+            <span className="text-[11px]">{t('vector_footer_engine', 'Moteur de Mémoire Vectorielle Antigravity')}</span>
           </div>
-          <span className="text-[10px] font-mono">Auto-Recall Active</span>
+          <span className="text-[10px] font-mono">{t('vector_footer_active', 'Auto-Recall Actif')}</span>
         </div>
       </div>
     </div>

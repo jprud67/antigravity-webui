@@ -183,7 +183,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                   {/* RAM */}
                   <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
                     <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>Mémoire RAM</span>
+                      <span>{t('doctor_ram_label', 'Mémoire RAM')}</span>
                       <span className="font-bold text-slate-800 dark:text-slate-200">{report.system.ram.percent}%</span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
@@ -202,7 +202,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                   {/* Disk */}
                   <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
                     <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>Espace Disque</span>
+                      <span>{t('doctor_disk_label', 'Espace Disque')}</span>
                       <span className="font-bold text-slate-800 dark:text-slate-200">{report.system.disk.used_percent}%</span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
@@ -221,7 +221,7 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                   {/* CPU */}
                   <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
                     <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>Processeur</span>
+                      <span>{t('doctor_cpu_label', 'Processeur')}</span>
                       <span className="font-bold text-slate-800 dark:text-slate-200">{report.system.cpu_percent}%</span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">

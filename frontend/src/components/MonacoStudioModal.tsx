@@ -292,7 +292,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
   const handleFormat = useCallback(() => {
     if (editorRef.current) {
       editorRef.current.getAction('editor.action.formatDocument')?.run();
-      showToast('Document formaté', 'info');
+      showToast(t('document_formatted', 'Document formaté'), 'info');
     }
   }, []);
 
@@ -431,7 +431,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            aria-label="Sélectionner le langage"
+            aria-label={t('select_language', 'Sélectionner le langage')}
             className="bg-zinc-950 text-xs text-zinc-200 rounded-lg px-2 py-1 border border-zinc-800 focus:outline-none focus:border-emerald-500 cursor-pointer"
           >
             {SUPPORTED_LANGUAGES.map((lang) => (
@@ -462,7 +462,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              title="Enregistrer sur le disque (Ctrl+S)"
+              title={t('save_to_disk_tooltip', 'Enregistrer sur le disque (Ctrl+S)')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-300 bg-emerald-600/20 hover:bg-emerald-600/30 active:scale-95 rounded-lg border border-emerald-500/40 transition-all disabled:opacity-50"
             >
               {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
@@ -482,7 +482,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
           <button
             type="button"
             onClick={onClose}
-            title="Fermer (Échap)"
+            title={t('close_esc_tooltip', 'Fermer (Échap)')}
             className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
           >
             <X className="w-4 h-4" />
@@ -499,7 +499,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
               type="button"
               onClick={handleExecute}
               className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition-colors"
-              title="Exécuter ce code dans le shell interactif"
+              title={t('run_in_shell_tooltip', 'Exécuter ce code dans le shell interactif')}
             >
               <Play className="w-3 h-3 fill-amber-400" />
               <span>{t('editor_lens_run', 'Exécuter')}</span>
@@ -511,7 +511,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             type="button"
             onClick={handleExplain}
             className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-lg transition-colors"
-            title="Demander à Antigravity d'analyser, expliquer ou débugger ce code"
+            title={t('ask_antigravity_tooltip', "Demander à Antigravity d'analyser, expliquer ou débugger ce code")}
           >
             <BrainCircuit className="w-3.5 h-3.5" />
             <span>{t('editor_lens_explain', 'Expliquer avec Antigravity')}</span>
@@ -523,7 +523,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
               type="button"
               onClick={handleFormat}
               className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/60 rounded-lg transition-colors"
-              title="Formater le document (Shift+Alt+F)"
+              title={t('format_doc_tooltip', 'Formater le document (Shift+Alt+F)')}
             >
               <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
               <span>{t('format', 'Formater')}</span>
@@ -535,7 +535,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             type="button"
             onClick={handleFind}
             className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/60 rounded-lg transition-colors"
-            title="Rechercher dans le fichier (Ctrl+F)"
+            title={t('find_in_file_tooltip', 'Rechercher dans le fichier (Ctrl+F)')}
           >
             <Search className="w-3.5 h-3.5 text-sky-400" />
             <span>{t('find', 'Rechercher')}</span>
@@ -546,7 +546,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             type="button"
             onClick={handleCopy}
             className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/60 rounded-lg transition-colors"
-            title="Copier le code dans le presse-papiers"
+            title={t('copy_code_tooltip', 'Copier le code dans le presse-papiers')}
           >
             {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
             <span>{copied ? t('copied', 'Copié !') : t('copy', 'Copier')}</span>
@@ -558,10 +558,10 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
               type="button"
               onClick={() => setIsActionModalOpen(true)}
               className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-lg transition-colors cursor-pointer"
-              title="Ouvrir le Studio de Code Actions IA (Refactor, Types, Docs, Tests)"
+              title={t('ai_code_actions_tooltip', 'Ouvrir le Studio de Code Actions IA (Refactor, Types, Docs, Tests)')}
             >
               <Wand2 className="w-3.5 h-3.5 text-sky-400" />
-              <span>Actions IA</span>
+              <span>{t('ai_actions', 'Actions IA')}</span>
             </button>
           )}
 
@@ -580,7 +580,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
                   ? 'bg-purple-500/15 text-purple-300 border-purple-500/30 hover:bg-purple-500/25'
                   : 'bg-zinc-800/60 text-zinc-500 border-zinc-700/60 hover:text-zinc-300'
               }`}
-              title="Activer ou mettre en pause AI Copilot Ghost Text (Alt+C)"
+              title={t('copilot_ghost_tooltip', 'Activer ou mettre en pause AI Copilot Ghost Text (Alt+C)')}
             >
               <Zap className={`w-3.5 h-3.5 ${copilotStatus === 'generating' ? 'animate-pulse text-amber-400' : copilotActive ? 'text-purple-400' : ''}`} />
               <span>Copilot {copilotActive ? 'Actif' : 'En pause'}</span>
@@ -602,7 +602,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
                   ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
                   : 'text-zinc-400 hover:text-zinc-200 border-transparent'
               }`}
-              title="Basculer entre vue côte-à-côte (split) et unifiée (inline)"
+              title={t('toggle_split_view_tooltip', 'Basculer entre vue côte-à-côte (split) et unifiée (inline)')}
             >
               {isSplitView ? <Columns className="w-3 h-3" /> : <Split className="w-3 h-3" />}
               <span>{isSplitView ? t('monaco_split_view', 'Côte-à-côte') : t('monaco_inline_view', 'Unifié')}</span>
@@ -617,7 +617,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
                 ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
                 : 'text-zinc-500 hover:text-zinc-300 border-transparent'
             }`}
-            title="Activer ou désactiver le retour à la ligne automatique"
+            title={t('word_wrap_toggle', 'Activer ou désactiver le retour à la ligne automatique')}
           >
             <WrapText className="w-3 h-3" />
             <span>{t('monaco_word_wrap', 'Retour à la ligne')}</span>
@@ -631,7 +631,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
                 ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
                 : 'text-zinc-500 hover:text-zinc-300 border-transparent'
             }`}
-            title="Afficher ou masquer la minicarte de navigation"
+            title={t('toggle_minimap_tooltip', 'Afficher ou masquer la minicarte de navigation')}
           >
             <MapPin className="w-3 h-3" />
             <span>{t('monaco_minimap', 'Minimap')}</span>
@@ -745,7 +745,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             loading={
               <div className="flex items-center justify-center h-full gap-2 text-zinc-500">
                 <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
-                <span className="text-xs">Chargement du moteur Monaco...</span>
+                <span className="text-xs">{t('monaco_loading_engine', 'Chargement du moteur Monaco...')}</span>
               </div>
             }
           />
@@ -766,7 +766,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
                 type="button"
                 onClick={() => multiCursorControllerRef.current?.resetToSingleCursor()}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[10px] hover:bg-amber-500/25 transition-colors cursor-pointer"
-                title="Curseurs multiples actifs. Cliquez pour réinitialiser à un seul curseur (ou Échap)."
+                title={t('multiple_cursors_tooltip', 'Curseurs multiples actifs. Cliquez pour réinitialiser à un seul curseur (ou Échap).')}
               >
                 <Layers className="w-3 h-3" />
                 <span>{cursorCount} curseurs</span>
@@ -786,7 +786,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
               <span
                 onClick={() => navigateGitDiff(editorRef.current, diffRangesRef.current, 'next')}
                 className="cursor-pointer hover:underline flex items-center gap-1 font-semibold"
-                title="Modifications Git. Cliquez pour aller à la modification suivante (F7)."
+                title={t('git_next_change_hint', 'Modifications Git. Cliquez pour aller à la modification suivante (F7).')}
               >
                 <span className="text-emerald-400">+{diffSummary.added_lines}</span>
                 <span className="text-sky-400">~{diffSummary.modified_lines}</span>
@@ -797,7 +797,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
                   type="button"
                   onClick={() => navigateGitDiff(editorRef.current, diffRangesRef.current, 'prev')}
                   className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
-                  title="Modification précédente (Shift+F7)"
+                  title={t('git_prev_change_hint', 'Modification précédente (Shift+F7)')}
                 >
                   <ChevronUp className="w-3 h-3" />
                 </button>
@@ -805,7 +805,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
                   type="button"
                   onClick={() => navigateGitDiff(editorRef.current, diffRangesRef.current, 'next')}
                   className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
-                  title="Modification suivante (F7)"
+                  title={t('git_next_change_f7', 'Modification suivante (F7)')}
                 >
                   <ChevronDown className="w-3 h-3" />
                 </button>
@@ -816,7 +816,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[10px] border border-zinc-700">Ctrl+S</kbd> {t('save', 'Enregistrer')}
           </span>
           <span>
-            <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[10px] border border-zinc-700">Échap</kbd> {t('close', 'Fermer')}
+            <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[10px] border border-zinc-700">{t('key_escape', 'Échap')}</kbd> {t('close', 'Fermer')}
           </span>
         </div>
       </div>

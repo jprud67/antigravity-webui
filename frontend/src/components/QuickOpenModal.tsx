@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Search, X, Loader2, CornerDownLeft, Sparkles, Folder } from 'lucide-react';
 import { searchFiles } from '../services/api';
 import { FileIcon } from './FileIcon';
+import { useI18n } from '../services/i18n';
 
 export interface QuickOpenModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export const QuickOpenModal: React.FC<QuickOpenModalProps> = React.memo(({
   currentWorkspace,
   onSelectFile,
 }) => {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -125,7 +127,7 @@ export const QuickOpenModal: React.FC<QuickOpenModalProps> = React.memo(({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Rechercher un fichier par nom ou contenu... (ex: .ts, modal, config)"
+            placeholder={t('quick_open_placeholder', 'Rechercher un fichier par nom ou contenu... (ex: .ts, modal, config)')}
             className="flex-1 bg-transparent text-sm outline-none font-mono placeholder:text-slate-500"
             autoComplete="off"
             spellCheck="false"
@@ -222,7 +224,7 @@ export const QuickOpenModal: React.FC<QuickOpenModalProps> = React.memo(({
 
                   <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <CornerDownLeft className="w-3.5 h-3.5 text-sky-400" />
-                    <span className="text-[10px] text-sky-400 font-mono">Ouvrir</span>
+                    <span className="text-[10px] text-sky-400 font-mono">{t('open', 'Ouvrir')}</span>
                   </div>
                 </div>
               );
@@ -243,11 +245,11 @@ export const QuickOpenModal: React.FC<QuickOpenModalProps> = React.memo(({
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.2 rounded border bg-black/10 dark:bg-white/10">↑</kbd>
               <kbd className="px-1 py-0.2 rounded border bg-black/10 dark:bg-white/10">↓</kbd>
-              <span>Naviguer</span>
+              <span>{t('navigate', 'Naviguer')}</span>
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.2 rounded border bg-black/10 dark:bg-white/10">Entrée</kbd>
-              <span>Ouvrir</span>
+              <kbd className="px-1.5 py-0.2 rounded border bg-black/10 dark:bg-white/10">{t('key_enter', 'Entrée')}</kbd>
+              <span>{t('open', 'Ouvrir')}</span>
             </span>
           </div>
           <div className="text-slate-400">

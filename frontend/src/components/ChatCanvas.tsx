@@ -1112,7 +1112,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
               }}
             >
               <GitBranch className="w-3 h-3" />
-              <span>Branche</span>
+              <span>{t('branch', 'Branche')}</span>
             </div>
           )}
 
@@ -1173,7 +1173,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
               title={t("analytics_dashboard", "Dashboard Quotas & Analytique (/analytics)")}
             >
               <BarChart3 className="w-3.5 h-3.5 text-sky-400" />
-              <span className="text-[11px] font-medium hidden sm:inline">Quotas</span>
+              <span className="text-[11px] font-medium hidden sm:inline">{t('quotas', 'Quotas')}</span>
             </button>
           )}
 
@@ -1440,7 +1440,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                     <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-white/10 text-xs opacity-75 select-none">
                       <div className="flex items-center gap-1.5 font-semibold text-[11px] uppercase tracking-wider">
                         <User className="w-3.5 h-3.5" />
-                        <span>Vous</span>
+                        <span>{t('you', 'Vous')}</span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px] font-mono">
                         {msg.timestamp && (
@@ -1558,7 +1558,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                         }}
                       >
                         <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ backgroundColor: 'var(--accent)' }} />
-                        <span>En direct</span>
+                        <span>{t('live', 'En direct')}</span>
                       </span>
                     )}
                   </div>
