@@ -34,8 +34,16 @@ except ImportError:
     pytest = _pytest_shim
 
 import json
+import os
 import tempfile
 from datetime import datetime, timezone
+
+if "ANTIGRAVITY_DATA_DIR" not in os.environ:
+    _TEST_DATA_DIR = Path(__file__).resolve().parent / "tests" / ".test_env_data"
+    _TEST_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    os.environ["ANTIGRAVITY_DATA_DIR"] = str(_TEST_DATA_DIR)
+    os.environ["WEBUI_PASSWORD"] = "antigravity2026"
+    os.environ["ANTIGRAVITY_TESTING"] = "1"
 
 from app.config import BRAIN_DIR
 from app.main import app

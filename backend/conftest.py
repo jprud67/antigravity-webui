@@ -1,14 +1,20 @@
 """
-Pytest configuration and isolation fixture for Antigravity WebUI test suite.
+Root Pytest configuration and isolation fixture for Antigravity WebUI test suite.
 Ensures all tests execute in a hermetic environment without touching or polluting
-the host's ~/.gemini/antigravity-cli configuration or live user data.
+the host's ~/.gemini/antigravity-cli configuration or live user data, regardless of
+whether pytest runs from root, backend, or specific subdirectories.
 """
 import os
 import shutil
+import sys
 from pathlib import Path
 
+_BACKEND_DIR = Path(__file__).resolve().parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
+
 # Setup isolated ANTIGRAVITY_DATA_DIR before any app module import
-_TEST_DATA_DIR = Path(__file__).resolve().parent / ".test_env_data"
+_TEST_DATA_DIR = _BACKEND_DIR / "tests" / ".test_env_data"
 _TEST_DATA_DIR.mkdir(parents=True, exist_ok=True)
 os.environ["ANTIGRAVITY_DATA_DIR"] = str(_TEST_DATA_DIR)
 os.environ["WEBUI_PASSWORD"] = "antigravity2026"

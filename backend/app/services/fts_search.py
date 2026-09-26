@@ -63,6 +63,17 @@ def ensure_fts_schema(conn: sqlite3.Connection | None = None) -> None:
                 """
             )
 
+            # 1b. Table d'index B-Tree pour dédoublonnage instantané O(1) des messages
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS session_fts_indexed_messages (
+                    session_id TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    PRIMARY KEY (session_id, message_id)
+                );
+                """
+            )
+
             # 2. Table virtuelle FTS5
             # Test d'abord avec le tokenizer trigram (recherche par sous-chaînes partielles et code)
             try:
@@ -142,7 +153,7 @@ class TranscriptFtsService:
         timestamp: str | None = None,
         conn: sqlite3.Connection | None = None,
     ) -> bool:
-        """Indexe un message unique dans FTS5."""
+        """Indexe un message unique dans FTS5 avec dédoublonnage O(1)."""
         if not text or not text.strip():
             return False
 
@@ -154,20 +165,28 @@ class TranscriptFtsService:
 
         try:
             with _fts_lock:
-                # Évite d'indexer deux fois le même message_id pour la session
+                # Évite d'indexer deux fois le même message_id via la table B-Tree indexée (O(1))
                 existing = conn.execute(
-                    "SELECT rowid FROM session_transcript_fts WHERE session_id = ? AND message_id = ?",
+                    "SELECT 1 FROM session_fts_indexed_messages WHERE session_id = ? AND message_id = ?",
                     (session_id, message_id)
                 ).fetchone()
                 if existing:
                     return False
 
+                clean_text = text.strip()
                 conn.execute(
                     """
                     INSERT INTO session_transcript_fts(session_id, message_id, role, project, timestamp, text)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (session_id, message_id, role, project, ts, text.strip())
+                    (session_id, message_id, role, project, ts, clean_text)
+                )
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO session_fts_indexed_messages(session_id, message_id)
+                    VALUES (?, ?)
+                    """,
+                    (session_id, message_id)
                 )
                 if close_after:
                     conn.commit()
@@ -180,7 +199,7 @@ class TranscriptFtsService:
                 conn.close()
 
     def index_session_transcript(self, session_id: str, conn: sqlite3.Connection | None = None) -> int:
-        """Lit transcript.jsonl pour une session et indexe les nouveaux messages."""
+        """Lit transcript.jsonl pour une session et indexe par lots haute performance (executemany)."""
         transcript_file = BRAIN_DIR / session_id / ".system_generated" / "logs" / "transcript.jsonl"
         if not transcript_file.is_file():
             # Alternative: direct logs/transcript.jsonl
@@ -208,8 +227,9 @@ class TranscriptFtsService:
             ).fetchone()
             last_indexed_step = state_row["last_step_index"] if state_row else -1
 
-            indexed_count = 0
             max_step = last_indexed_step
+            batch_fts: list[tuple[str, str, str, str, str, str]] = []
+            batch_meta: list[tuple[str, str]] = []
 
             with open(transcript_file, "r", encoding="utf-8", errors="replace") as f:
                 for line in f:
@@ -254,36 +274,57 @@ class TranscriptFtsService:
 
                     msg_id = f"step_{step_idx}"
                     ts = step.get("timestamp") or datetime.now(timezone.utc).isoformat()
+                    cleaned_text = content.strip()
 
-                    if content:
-                        self.index_message(
-                            session_id=session_id,
-                            message_id=msg_id,
-                            role=assigned_role,
-                            text=content,
-                            project=project,
-                            timestamp=ts,
-                            conn=conn,
-                        )
-                        indexed_count += 1
+                    if cleaned_text:
+                        batch_fts.append((session_id, msg_id, assigned_role, project, ts, cleaned_text))
+                        batch_meta.append((session_id, msg_id))
 
                     max_step = max(max_step, step_idx)
 
-            with _fts_lock:
-                conn.execute(
-                    """
-                    INSERT INTO session_fts_index_state(session_id, last_step_index, indexed_row_count, updated_at)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                    ON CONFLICT(session_id) DO UPDATE SET
-                        last_step_index = excluded.last_step_index,
-                        indexed_row_count = indexed_row_count + excluded.indexed_row_count,
-                        updated_at = CURRENT_TIMESTAMP
-                    """,
-                    (session_id, max_step, indexed_count)
-                )
-                conn.commit()
+            if batch_fts:
+                with _fts_lock:
+                    conn.executemany(
+                        """
+                        INSERT INTO session_transcript_fts(session_id, message_id, role, project, timestamp, text)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        batch_fts
+                    )
+                    conn.executemany(
+                        """
+                        INSERT OR IGNORE INTO session_fts_indexed_messages(session_id, message_id)
+                        VALUES (?, ?)
+                        """,
+                        batch_meta
+                    )
+                    conn.execute(
+                        """
+                        INSERT INTO session_fts_index_state(session_id, last_step_index, indexed_row_count, updated_at)
+                        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                        ON CONFLICT(session_id) DO UPDATE SET
+                            last_step_index = excluded.last_step_index,
+                            indexed_row_count = indexed_row_count + excluded.indexed_row_count,
+                            updated_at = CURRENT_TIMESTAMP
+                        """,
+                        (session_id, max_step, len(batch_fts))
+                    )
+                    conn.commit()
+            elif max_step > last_indexed_step:
+                with _fts_lock:
+                    conn.execute(
+                        """
+                        INSERT INTO session_fts_index_state(session_id, last_step_index, indexed_row_count, updated_at)
+                        VALUES (?, ?, 0, CURRENT_TIMESTAMP)
+                        ON CONFLICT(session_id) DO UPDATE SET
+                            last_step_index = excluded.last_step_index,
+                            updated_at = CURRENT_TIMESTAMP
+                        """,
+                        (session_id, max_step)
+                    )
+                    conn.commit()
 
-            return indexed_count
+            return len(batch_fts)
         except Exception as e:
             logger.debug(f"Erreur indexation session {session_id}: {e}")
             return 0
@@ -392,9 +433,35 @@ class TranscriptFtsService:
         try:
             with _fts_lock:
                 conn.execute("DELETE FROM session_transcript_fts")
+                conn.execute("DELETE FROM session_fts_indexed_messages")
                 conn.execute("DELETE FROM session_fts_index_state")
                 conn.commit()
 
+            cursor = conn.execute("SELECT conversation_id FROM conversation_summaries")
+            sessions = [r["conversation_id"] for r in cursor.fetchall()]
+
+            total_messages_indexed = 0
+            for sid in sessions:
+                count = self.index_session_transcript(sid, conn=conn)
+                total_messages_indexed += count
+
+            self.optimize()
+
+            took_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            return {
+                "success": True,
+                "total_sessions": len(sessions),
+                "total_messages_indexed": total_messages_indexed,
+                "took_ms": took_ms,
+            }
+        finally:
+            conn.close()
+
+    def sync_all_sessions(self) -> dict[str, Any]:
+        """Indexe incrémentalement toutes les sessions qui ont de nouveaux messages sans reconstruire l'index."""
+        start_time = time.perf_counter()
+        conn = _get_connection()
+        try:
             cursor = conn.execute("SELECT conversation_id FROM conversation_summaries")
             sessions = [r["conversation_id"] for r in cursor.fetchall()]
 
@@ -410,6 +477,18 @@ class TranscriptFtsService:
                 "total_messages_indexed": total_messages_indexed,
                 "took_ms": took_ms,
             }
+        finally:
+            conn.close()
+
+    def optimize(self) -> None:
+        """Optimise les structures d'arbre B et les segments d'index FTS5."""
+        conn = _get_connection()
+        try:
+            with _fts_lock:
+                conn.execute("INSERT INTO session_transcript_fts(session_transcript_fts) VALUES('optimize');")
+                conn.commit()
+        except Exception as e:
+            logger.debug(f"FTS optimize notice: {e}")
         finally:
             conn.close()
 
@@ -440,4 +519,8 @@ def get_fts_stats() -> dict[str, Any]:
 
 def reindex_all_conversations() -> dict[str, Any]:
     return fts_service.rebuild_all_sessions()
+
+
+def sync_fts_conversations() -> dict[str, Any]:
+    return fts_service.sync_all_sessions()
 

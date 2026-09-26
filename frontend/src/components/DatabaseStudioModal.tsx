@@ -180,11 +180,16 @@ export const DatabaseStudioModal: React.FC<DatabaseStudioModalProps> = ({
     }
   }, [selectedDbPath, sqlQuery, queryLimit, saveRecentQuery, t]);
 
+  const handleExecuteQueryRef = useRef(handleExecuteQuery);
+  useEffect(() => {
+    handleExecuteQueryRef.current = handleExecuteQuery;
+  }, [handleExecuteQuery]);
+
   // Keydown listener for Ctrl+Enter
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-      handleExecuteQuery();
+      handleExecuteQueryRef.current();
     });
   };
 

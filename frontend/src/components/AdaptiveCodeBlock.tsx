@@ -487,6 +487,7 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
 
   const LangIcon = langMeta.icon;
   const isBash = language === 'bash';
+  const isSql = ['sql', 'sqlite', 'sqlite3', 'pgsql', 'postgres', 'mysql'].includes(language);
   const hasCollapseFeature = linesCount > 28;
 
   return (
@@ -584,6 +585,26 @@ export const AdaptiveCodeBlock: React.FC<AdaptiveCodeBlockProps> = ({
               >
                 <Terminal className="w-3 h-3 text-emerald-400" />
                 <span className="hidden md:inline">{t('terminal', 'Terminal')}</span>
+              </button>
+            )}
+
+            {/* SQL Studio button for SQL snippets */}
+            {isSql && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('open-database-studio', { detail: { query: cleanedCode } }));
+                }}
+                title={t('open_in_database_studio', 'Ouvrir dans Database Studio')}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer border hover:text-emerald-400"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--muted)',
+                }}
+              >
+                <Database className="w-3 h-3 text-emerald-400" />
+                <span className="hidden sm:inline">{t('sql_studio', 'SQL Studio')}</span>
               </button>
             )}
 
