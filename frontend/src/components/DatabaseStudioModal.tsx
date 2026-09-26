@@ -56,7 +56,14 @@ export const DatabaseStudioModal: React.FC<DatabaseStudioModalProps> = ({
   const [queryLimit, setQueryLimit] = useState<number>(500);
   const [executing, setExecuting] = useState<boolean>(false);
   const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
-  const [recentQueries, setRecentQueries] = useState<string[]>([]);
+  const [recentQueries, setRecentQueries] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(RECENT_QUERIES_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [pageSize] = useState<number>(50);
@@ -65,23 +72,16 @@ export const DatabaseStudioModal: React.FC<DatabaseStudioModalProps> = ({
 
   const editorRef = useRef<any>(null);
 
-  // Load recent queries from localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(RECENT_QUERIES_KEY);
-      if (stored) {
-        setRecentQueries(JSON.parse(stored));
-      }
-    } catch {}
-  }, []);
-
   // Sync initialQuery prop if it changes
   useEffect(() => {
     if (initialQuery) {
-      setSqlQuery(initialQuery);
-      if (editorRef.current) {
-        editorRef.current.setValue(initialQuery);
-      }
+      const timer = setTimeout(() => {
+        setSqlQuery(initialQuery);
+        if (editorRef.current) {
+          editorRef.current.setValue(initialQuery);
+        }
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [initialQuery]);
 
@@ -132,13 +132,19 @@ export const DatabaseStudioModal: React.FC<DatabaseStudioModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadDatabases();
+      const timer = setTimeout(() => {
+        void loadDatabases();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, loadDatabases]);
 
   useEffect(() => {
     if (isOpen && selectedDbPath) {
-      loadSchema(selectedDbPath);
+      const timer = setTimeout(() => {
+        void loadSchema(selectedDbPath);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, selectedDbPath, loadSchema]);
 

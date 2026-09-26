@@ -10,6 +10,8 @@ def test_clean_search_query():
     assert clean_search_query("hello") == '"hello"*'
     assert clean_search_query('"exact phrase"') == '"exact phrase"'
     assert "antigravity" in clean_search_query("antigravity python")
+    assert clean_search_query('"""') == ""
+    assert clean_search_query("   ") == ""
 
 
 def test_fts_service_crud_and_search():

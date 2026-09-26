@@ -246,6 +246,8 @@ export function App() {
   const [isQuickOpenOpen, setIsQuickOpenOpen] = useState(false);
   const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState('');
   const [workspaceSearchMode, setWorkspaceSearchMode] = useState<'find' | 'replace'>('find');
+  const [isDatabaseStudioOpen, setIsDatabaseStudioOpen] = useState(false);
+  const [databaseStudioInitialQuery, setDatabaseStudioInitialQuery] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const handleOpenFile = (e: any) => {
@@ -315,8 +317,6 @@ export function App() {
   const [isCanvasStudioOpen, setIsCanvasStudioOpen] = useState(false);
   const [isVectorMemoryOpen, setIsVectorMemoryOpen] = useState(false);
   const [isDockerStudioOpen, setIsDockerStudioOpen] = useState(false);
-  const [isDatabaseStudioOpen, setIsDatabaseStudioOpen] = useState(false);
-  const [databaseStudioInitialQuery, setDatabaseStudioInitialQuery] = useState<string | undefined>(undefined);
   const [activeProgressCard, setActiveProgressCard] = useState<ProgressCardData | null>(null);
 
   // Global FTS search shortcut (Ctrl+Shift+K or Cmd+Shift+K)

@@ -18,7 +18,7 @@ function sanitizeFtsSnippet(raw: string): string {
   const markStart = '___FTS_MARK_START___';
   const markEnd = '___FTS_MARK_END___';
   const preserved = raw
-    .replace(/<mark>/gi, markStart)
+    .replace(/<mark(\s+[^>]*)?>/gi, markStart)
     .replace(/<\/mark>/gi, markEnd);
 
   const escaped = preserved

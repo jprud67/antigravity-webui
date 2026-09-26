@@ -191,12 +191,13 @@ async def compute_embedding(text: str, cfg: AutoRecallConfig | None = None) -> l
     if config.provider == "openai" and config.api_key:
         api_key = config.api_key.strip()
         api_base = (config.api_base.strip() if config.api_base else "https://api.openai.com/v1").rstrip("/")
+        model = (config.model or "").strip() or "text-embedding-3-small"
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.post(
                     f"{api_base}/embeddings",
                     headers={"Authorization": f"Bearer {api_key}"},
-                    json={"model": config.model, "input": text},
+                    json={"model": model, "input": text},
                 )
                 if res.status_code == 200:
                     data = res.json()

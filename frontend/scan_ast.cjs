@@ -33,11 +33,11 @@ function isTechnicalToken(str) {
   // ignore URLs or paths
   if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('/api/') || s.startsWith('./') || s.startsWith('../')) return true;
   // ignore uppercase constants like HEAD, GET, POST, JSON, UTF-8
-  if (/^[A-Z0-9_\-]+$/.test(s) && (s === 'HEAD' || s === 'GET' || s === 'POST' || s === 'JSON' || s === 'SHA' || s === 'CLI' || s === 'ID' || s === 'FTS5' || s === 'URL' || s === 'API' || s === 'RAM' || s === 'MB' || s === 'GB' || s === 'KB' || s === 'UUID')) return true;
+  if (/^[A-Z0-9_-]+$/.test(s) && (s === 'HEAD' || s === 'GET' || s === 'POST' || s === 'JSON' || s === 'SHA' || s === 'CLI' || s === 'ID' || s === 'FTS5' || s === 'URL' || s === 'API' || s === 'RAM' || s === 'MB' || s === 'GB' || s === 'KB' || s === 'UUID')) return true;
   // ignore keyboard shortcuts like Ctrl+S, Esc, Enter if alone
   if (/^(ctrl\+[a-z0-9]|esc|enter|shift\+enter|tab|alt\+[a-z0-9])$/i.test(s)) return true;
   // ignore svg path data
-  if (/^[MmLlHhVvCcSsQqTtAaZz0-9\s,\.\-]+$/.test(s) && (s.startsWith('M') || s.startsWith('m'))) return true;
+  if (/^[MmLlHhVvCcSsQqTtAaZz0-9\s,.-]+$/.test(s) && (s.startsWith('M') || s.startsWith('m'))) return true;
 
   return false;
 }

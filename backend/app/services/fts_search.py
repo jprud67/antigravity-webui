@@ -123,7 +123,7 @@ def clean_search_query(raw_query: str) -> str:
             cleaned = re.sub(r'[^\w\-]', '', w)
             if cleaned:
                 formatted_words.append(f'"{cleaned}"*')
-    return " AND ".join(formatted_words) if formatted_words else f'"{q}"'
+    return " AND ".join(formatted_words) if formatted_words else ""
 
 
 class TranscriptFtsService:
