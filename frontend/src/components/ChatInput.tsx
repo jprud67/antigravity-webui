@@ -769,7 +769,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         } else if (onCompact) {
           onCompact();
         } else {
-          showToast('Assistant d\'élagage non disponible.', 'info');
+          showToast(t('prune_assistant_unavailable', "Assistant d'élagage non disponible."), 'info');
         }
         return true;
 
@@ -779,7 +779,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         } else if (onCompact) {
           onCompact();
         } else {
-          showToast('Gestionnaire de budget non disponible.', 'info');
+          showToast(t('budget_manager_unavailable', 'Gestionnaire de budget non disponible.'), 'info');
         }
         return true;
 
@@ -809,7 +809,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         if (onOpenMonacoStudio) {
           onOpenMonacoStudio({ mode: 'editor', filePath: args || undefined });
         } else {
-          showToast('Studio Monaco non disponible.', 'info');
+          showToast(t('monaco_studio_unavailable', 'Studio Monaco non disponible.'), 'info');
         }
         return true;
 
@@ -817,7 +817,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
         if (onOpenMonacoStudio) {
           onOpenMonacoStudio({ mode: 'diff', filePath: args || undefined });
         } else {
-          showToast('Studio Diff Monaco non disponible.', 'info');
+          showToast(t('monaco_diff_unavailable', 'Studio Diff Monaco non disponible.'), 'info');
         }
         return true;
 

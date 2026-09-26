@@ -77,7 +77,7 @@ export const FtsSearchModal: React.FC<FtsSearchModalProps> = ({
     try {
       setReindexing(true);
       const res = await reindexFts();
-      showToast(`Index FTS reconstruit : ${res.total_messages_indexed} messages indexés (${res.took_ms} ms)`, 'success');
+      showToast(t('fts_rebuilt_success', 'Index FTS reconstruit : {0} messages indexés ({1} ms)', res.total_messages_indexed, res.took_ms), 'success');
       const newStats = await getFtsStats();
       setStats(newStats);
       if (query) executeSearch(query, roleFilter);

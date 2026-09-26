@@ -116,13 +116,13 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
     setActionInProgress(`${containerId}-${action}`);
     try {
       await dockerApi.executeAction(containerId, action);
-      showToast(`Action ${action} executed successfully`, 'success');
+      showToast(t('docker_action_success', 'Action {0} exécutée avec succès', action), 'success');
       await loadData();
       if (selectedContainerId === containerId && activeTab === 'logs') {
         loadContainerLogs(containerId, logsTail);
       }
     } catch (err: any) {
-      showToast(err.message || `Failed to execute ${action}`, 'error');
+      showToast(err.message || t('docker_action_failed', "Échec de l'exécution de {0}", action), 'error');
     } finally {
       setActionInProgress(null);
     }
@@ -133,10 +133,10 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
     setActionInProgress(`compose-${action}`);
     try {
       const res = await dockerApi.executeComposeAction(composePath, action);
-      showToast(`Compose ${action}: ${res.output || 'success'}`, 'success');
+      showToast(`${t('docker_compose', 'Compose')} ${action}: ${res.output || t('success', 'succès')}`, 'success');
       await loadData();
     } catch (err: any) {
-      showToast(err.message || `Failed compose ${action}`, 'error');
+      showToast(err.message || t('docker_compose_failed', 'Échec compose {0}', action), 'error');
     } finally {
       setActionInProgress(null);
     }
@@ -153,10 +153,10 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
       const res = await dockerApi.execCommand(selectedContainerId, execCommand.trim());
       setExecResult(res);
       if (!res.success) {
-        showToast(`Exit code ${res.exit_code}`, 'error');
+        showToast(t('docker_exit_code_error', 'Code de sortie {0}', res.exit_code), 'error');
       }
     } catch (err: any) {
-      showToast(err.message || 'Execution failed', 'error');
+      showToast(err.message || t('docker_exec_failed', "Échec de l'exécution"), 'error');
     } finally {
       setExecRunning(false);
     }
@@ -265,8 +265,8 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
             </div>
             {status?.isAvailable && (
               <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
-                <span>Total: <strong className="text-slate-200">{status.containersCount}</strong></span>
-                <span>Active: <strong className="text-emerald-400">{status.runningCount}</strong></span>
+                <span>{t('total_colon', 'Total :')} <strong className="text-slate-200">{status.containersCount}</strong></span>
+                <span>{t('active_colon', 'Actifs :')} <strong className="text-emerald-400">{status.runningCount}</strong></span>
               </div>
             )}
           </div>
@@ -633,7 +633,7 @@ export const DockerStudioModal: React.FC<DockerStudioModalProps> = ({
                 {execResult && (
                   <div className="p-3 rounded-xl border bg-black/70 border-slate-800 font-mono text-xs space-y-1">
                     <div className="flex items-center justify-between text-[10px] text-slate-400">
-                      <span>Exit code: <strong className={execResult.success ? 'text-emerald-400' : 'text-rose-400'}>{execResult.exit_code}</strong></span>
+                      <span>{t('exit_code_colon', 'Code de sortie :')} <strong className={execResult.success ? 'text-emerald-400' : 'text-rose-400'}>{execResult.exit_code}</strong></span>
                     </div>
                     {execResult.stdout && <pre className="text-emerald-300 whitespace-pre-wrap">{execResult.stdout}</pre>}
                     {execResult.stderr && <pre className="text-rose-400 whitespace-pre-wrap">{execResult.stderr}</pre>}

@@ -91,7 +91,7 @@ export const GitConflictModal: React.FC<GitConflictModalProps> = ({
         resolution,
         custom_content: resolution === 'custom' ? editedContent : undefined
       });
-      showToast(`Conflit résolu pour ${filePath}`, 'success');
+      showToast(t('conflict_resolved_for_file', 'Conflit résolu pour {0}', filePath), 'success');
       onResolved(filePath);
       onClose();
     } catch (err: any) {

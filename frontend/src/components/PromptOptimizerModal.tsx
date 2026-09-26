@@ -248,10 +248,10 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
             }}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Score de Clarté : {currentScore}%</span>
+            <span>{t('clarity_score_label', 'Score de Clarté : {0}%', currentScore)}</span>
           </div>
           <span className="text-[11px] hidden md:inline" style={{ color: 'var(--muted, #71717a)' }}>
-            {currentScore >= 75 ? 'Optimal pour Antigravity' : currentScore >= 45 ? 'Compréhensible mais perfectible' : 'Trop vague ou incomplet'}
+            {currentScore >= 75 ? t('clarity_optimal', 'Optimal pour Antigravity') : currentScore >= 45 ? t('clarity_fair', 'Compréhensible mais perfectible') : t('clarity_vague', 'Trop vague ou incomplet')}
           </span>
         </div>
 
@@ -348,7 +348,14 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
                   ? 'bg-sky-500/20 border-sky-500/40 text-sky-300 shadow-sm'
                   : 'border-transparent hover:bg-white/5 text-zinc-400 hover:text-zinc-200'
               }`}
-              title={opt.desc}
+              title={
+                opt.id === 'general' ? t('preset_desc_general', 'Structuration claire en Contexte, Objectif et Instructions') :
+                opt.id === 'debug' ? t('preset_desc_debug', 'Diagnostic chirurgical, reproduction et correctif minimal') :
+                opt.id === 'plan' ? t('preset_desc_plan', 'Architecture ciblée, phasage TDD et critères de validation') :
+                opt.id === 'refactor' ? t('preset_desc_refactor', 'Nettoyage de code, zéro régression et préservation des APIs') :
+                opt.id === 'review' ? t('preset_desc_review', 'Audit critique : sécurité, performance et typage') :
+                opt.desc
+              }
             >
               <span>{opt.icon}</span>
               <span>{opt.id === 'general' ? t('general', 'Général') : opt.id === 'debug' ? t('debugging', 'Débogage') : opt.id === 'plan' ? t('plan_and_tasks', 'Plan & Tâches') : opt.id === 'refactor' ? t('refactoring', 'Refactoring') : opt.id === 'review' ? t('code_review', 'Revue de Code') : opt.label}</span>

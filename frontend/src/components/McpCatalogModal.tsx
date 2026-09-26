@@ -108,9 +108,9 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
       const res = await testMcpServer(slug);
       setTestResults((prev) => ({ ...prev, [slug]: res }));
       if (res.success) {
-        showToast(`${slug} en ligne (${res.latency_ms} ms)`, 'success');
+        showToast(t('mcp_online_ms', '{0} en ligne ({1} ms)', slug, res.latency_ms), 'success');
       } else {
-        showToast(`Échec test ${slug} : ${res.error || 'Inaccessible'}`, 'error');
+        showToast(t('mcp_test_failed', 'Échec test {0} : {1}', slug, res.error || t('inaccessible', 'Inaccessible')), 'error');
       }
     } catch (e: any) {
       showToast(e.message || 'Erreur test connexion', 'error');
@@ -131,7 +131,7 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
       await installMcpServer(installTarget.slug, {
         api_key: apiKeyInput.trim() || undefined
       });
-      showToast(`Serveur MCP '${installTarget.name}' installé avec succès !`, 'success');
+      showToast(t('mcp_server_installed_success', "Serveur MCP '{0}' installé avec succès !", installTarget.name), 'success');
       setItems((prev) =>
         prev.map((i) => (i.slug === installTarget.slug ? { ...i, is_installed: true } : i))
       );
@@ -147,7 +147,7 @@ export const McpCatalogModal: React.FC<McpCatalogModalProps> = ({
     e.stopPropagation();
     try {
       await uninstallMcpServer(slug);
-      showToast(`Serveur MCP '${slug}' désinstallé.`, 'success');
+      showToast(t('mcp_server_uninstalled', "Serveur MCP '{0}' désinstallé.", slug), 'success');
       setItems((prev) =>
         prev.map((i) => (i.slug === slug ? { ...i, is_installed: false } : i))
       );

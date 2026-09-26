@@ -59,10 +59,10 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
 
   const handleSwitch = useCallback((path: string) => {
     onSelectWorkspace(path);
-    showToast(`Workspace actif basculé vers ${path.split(/[\\/]/).pop() || path}`, 'success');
+    showToast(t('workspace_switched_to', 'Workspace actif basculé vers {0}', path.split(/[\\/]/).pop() || path), 'success');
     window.dispatchEvent(new CustomEvent('workspace-changed', { detail: { path } }));
     onClose();
-  }, [onSelectWorkspace, onClose]);
+  }, [onSelectWorkspace, onClose, t]);
 
   const loadProjects = useCallback(() => {
     setLoading(true);
@@ -178,7 +178,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
       showToast(t('cannot_remove_default_workspace', 'Impossible de retirer le workspace par défaut'), 'warning');
       return;
     }
-    const confirmed = await showConfirm(`Retirer le projet "${path.split(/[\\/]/).pop()}" de la liste des workspaces ?`, { destructive: true });
+    const confirmed = await showConfirm(t('remove_project_confirm', 'Retirer le projet "{0}" de la liste des workspaces ?', path.split(/[\\/]/).pop() || path), { destructive: true });
     if (!confirmed) {
       return;
     }
@@ -202,7 +202,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
     }
     if (onRunTerminalCommand) {
       onRunTerminalCommand(command);
-      showToast(`Commande injectée dans le terminal : ${command}`, 'success');
+      showToast(t('command_injected_terminal', 'Commande injectée dans le terminal : {0}', command), 'success');
       onClose();
     }
   };

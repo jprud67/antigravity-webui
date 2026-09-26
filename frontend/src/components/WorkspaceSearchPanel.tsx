@@ -235,7 +235,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
         file_paths: [fileResult.file_path],
         dry_run: false
       });
-      showToast(`${res.total_replacements} remplacement(s) effectué(s)`, 'success');
+      showToast(t('replacements_count_success', '{0} remplacement(s) effectué(s)', res.total_replacements), 'success');
       onFileModified?.(fileResult.file_path);
       await handleExecuteSearch();
     } catch (err: any) {
@@ -243,15 +243,15 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
     } finally {
       setIsReplacing(false);
     }
-  }, [query, replaceText, currentWorkspace, isCaseSensitive, isWholeWord, isRegex, handleExecuteSearch, onFileModified]);
+  }, [query, replaceText, currentWorkspace, isCaseSensitive, isWholeWord, isRegex, handleExecuteSearch, onFileModified, t]);
 
   // Replace All Across Workspace
   const handleReplaceAll = useCallback(async () => {
     if (!resultsData || resultsData.total_matches === 0) return;
 
     const confirmed = await showConfirm(
-      `Confirmez-vous le remplacement de ${resultsData.total_matches} occurrence(s) réparties sur ${resultsData.total_files} fichier(s) par "${replaceText}" ?`,
-      { title: 'Remplacer tout dans le workspace', confirmLabel: 'Tout remplacer', destructive: true }
+      t('confirm_replace_all_workspace', 'Confirmez-vous le remplacement de {0} occurrence(s) réparties sur {1} fichier(s) par "{2}" ?', resultsData.total_matches, resultsData.total_files, replaceText),
+      { title: t('replace_all_in_workspace', 'Remplacer tout dans le workspace'), confirmLabel: t('replace_all', 'Tout remplacer'), destructive: true }
     );
     if (!confirmed) return;
 
@@ -268,7 +268,7 @@ export const WorkspaceSearchPanel: React.FC<WorkspaceSearchPanelProps> = ({
         exclude_pattern: excludePattern.trim() || undefined,
         dry_run: false
       });
-      showToast(`${res.total_replacements} remplacement(s) effectué(s) dans ${res.files_modified} fichier(s)`, 'success');
+      showToast(t('replacements_in_files_success', '{0} remplacement(s) effectué(s) dans {1} fichier(s)', res.total_replacements, res.files_modified), 'success');
       if (res.previews) {
         for (const p of res.previews) {
           onFileModified?.(p.file_path);

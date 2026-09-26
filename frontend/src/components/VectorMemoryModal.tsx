@@ -162,7 +162,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
     if (!confirmed) return;
     try {
       const res = await vectorMemoryApi.clearMemories('default');
-      showToast(`Mémoire réinitialisée (${res.deletedCount} éléments)`, 'info');
+      showToast(t('memory_reset_elements', 'Mémoire réinitialisée ({0} éléments)', res.deletedCount), 'info');
       await loadData();
       setSearchResults([]);
     } catch (err: any) {

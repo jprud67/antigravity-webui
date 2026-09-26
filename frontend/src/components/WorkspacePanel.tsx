@@ -445,9 +445,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
           detail: { command: cmd }
         })
       );
-      showToast(`Exécution : ${cmd}`, 'info');
+      showToast(t('execution_cmd_toast', 'Exécution : {0}', cmd), 'info');
     }, 150);
-  }, [selectedFilePath, isTerminalSplitOpen]);
+  }, [selectedFilePath, isTerminalSplitOpen, t]);
 
   const handleCdToActiveFolder = useCallback(() => {
     if (!activeFileFolder) return;
@@ -461,9 +461,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
           detail: { command: `cd "${activeFileFolder}"` }
         })
       );
-      showToast(`cd "${activeFileFolder}"`, 'info');
+      showToast(t('terminal_cd_folder', 'cd "{0}"', activeFileFolder), 'info');
     }, 150);
-  }, [activeFileFolder, isTerminalSplitOpen]);
+  }, [activeFileFolder, isTerminalSplitOpen, t]);
 
   const BINARY_EXTENSIONS = useMemo(() => new Set([
     'docx', 'doc', 'pdf', 'zip', 'tar', 'gz', 'tgz', '7z', 'rar',
@@ -676,18 +676,18 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
           lastUploadedPath = res.path;
         }
       } catch (err: any) {
-        showToast(`Erreur d'import pour ${file.name} : ${err.message}`, 'error');
+        showToast(t('import_error_for_file', "Erreur d'import pour {0} : {1}", file.name, err.message), 'error');
       }
     }
 
     if (successCount > 0) {
-      showToast(`${successCount} fichier${successCount > 1 ? 's' : ''} importé${successCount > 1 ? 's' : ''} avec succès.`, 'success');
+      showToast(t('files_imported_count_success', '{0} fichier(s) importé(s) avec succès.', successCount), 'success');
       await loadTree();
       if (lastUploadedPath) {
         handleSelectFile(lastUploadedPath);
       }
     }
-  }, [creatingParent, currentWorkspace, loadTree, handleSelectFile]);
+  }, [creatingParent, currentWorkspace, loadTree, handleSelectFile, t]);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -699,13 +699,13 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const handleDuplicateFile = useCallback(async (path: string) => {
     try {
       const res = await duplicateWorkspaceFile(path, currentWorkspace);
-      showToast(`Fichier dupliqué : ${res.new_name}`, 'success');
+      showToast(t('file_duplicated_named', 'Fichier dupliqué : {0}', res.new_name), 'success');
       await loadTree();
       handleSelectFile(res.new_path);
     } catch (err: any) {
       showToast(err.message || 'Erreur lors de la duplication', 'error');
     }
-  }, [currentWorkspace, loadTree, handleSelectFile]);
+  }, [currentWorkspace, loadTree, handleSelectFile, t]);
 
   const handleSelectSearchMatch = useCallback(async (
     filePath: string,
@@ -1032,14 +1032,14 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     try {
       if (creatingType === 'file') {
         await createFile(targetPath, '', currentWorkspace);
-        showToast(`Fichier « ${name} » créé avec succès`, 'success');
+        showToast(t('file_created_success_named', 'Fichier « {0} » créé avec succès', name), 'success');
         setCreatingType(null);
         setNewItemName('');
         await loadTree();
         handleSelectFile(targetPath);
       } else {
         await createDirectory(targetPath, currentWorkspace);
-        showToast(`Dossier « ${name} » créé avec succès`, 'success');
+        showToast(t('folder_created_success_named', 'Dossier « {0} » créé avec succès', name), 'success');
         setCreatingType(null);
         setNewItemName('');
         await loadTree();
@@ -1047,7 +1047,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } catch (err: any) {
       showToast(err.message || 'Erreur lors de la création', 'error');
     }
-  }, [newItemName, creatingType, creatingParent, currentWorkspace, loadTree, handleSelectFile]);
+  }, [newItemName, creatingType, creatingParent, currentWorkspace, loadTree, handleSelectFile, t]);
 
   const handleRenameItem = useCallback(async () => {
     if (!renamingPath || !renamedName.trim()) return;
@@ -1059,7 +1059,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
     try {
       await renameFile(renamingPath, newPath, currentWorkspace);
-      showToast(`Renommé en « ${newName} »`, 'success');
+      showToast(t('renamed_to_named', 'Renommé en « {0} »', newName), 'success');
       setRenamingPath(null);
       setRenamedName('');
       // Update any open tab with old path
@@ -1068,15 +1068,15 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } catch (err: any) {
       showToast(err.message || 'Erreur lors du renommage', 'error');
     }
-  }, [renamingPath, renamedName, currentWorkspace, loadTree]);
+  }, [renamingPath, renamedName, currentWorkspace, loadTree, t]);
 
   const handleDeleteItem = useCallback(async (path: string, isDir: boolean, name: string) => {
     const confirmed = await showConfirm(
-      `Êtes-vous sûr de vouloir supprimer ${isDir ? 'le dossier' : 'le fichier'} « ${name} » ? Cette action est irréversible.`,
+      t('delete_item_confirm', 'Êtes-vous sûr de vouloir supprimer {0} « {1} » ? Cette action est irréversible.', isDir ? t('the_folder', 'le dossier') : t('the_file', 'le fichier'), name),
       {
-        title: 'Confirmation de suppression',
-        confirmLabel: 'Supprimer définitivement',
-        cancelLabel: 'Annuler',
+        title: t('delete_confirmation_title', 'Confirmation de suppression'),
+        confirmLabel: t('delete_permanently', 'Supprimer définitivement'),
+        cancelLabel: t('cancel', 'Annuler'),
         destructive: true
       }
     );
@@ -1084,14 +1084,14 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
     try {
       await deleteFile(path, currentWorkspace);
-      showToast(`« ${name} » supprimé`, 'info');
+      showToast(t('item_deleted_named', '« {0} » supprimé', name), 'info');
       // If open in tabs, close it
       setOpenTabs(prev => prev.filter(t => !t.path.startsWith(path)));
       await loadTree();
     } catch (err: any) {
       showToast(err.message || 'Erreur lors de la suppression', 'error');
     }
-  }, [currentWorkspace, loadTree]);
+  }, [currentWorkspace, loadTree, t]);
 
   const toggleFolder = (folderPath: string) => {
     setExpandedFolders((prev) => ({ ...prev, [folderPath]: !prev[folderPath] }));
@@ -1436,7 +1436,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
               type="button"
               onClick={() => onOpenMonacoStudio({ mode: 'editor', initialValue: '', readOnly: false })}
               className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/50"
-              title="Monaco Code Studio (/editor)"
+              title={t('monaco_code_studio_tooltip', 'Monaco Code Studio (/editor)')}
             >
               <Code2 className="w-3.5 h-3.5 text-sky-400" />
               <span>{t('editor', 'Éditeur')}</span>
@@ -2097,7 +2097,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                                 isMinimap ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'hover:bg-black/5 dark:hover:bg-white/5'
                               }`}
                               style={{ borderColor: isMinimap ? undefined : 'var(--border)' }}
-                              title="Minimap Monaco"
+                              title={t('minimap_monaco', 'Minimap Monaco')}
                             >
                               <Columns className="w-2.5 h-2.5" />
                             </button>
@@ -2572,7 +2572,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
                           }}
                           className="p-1 rounded hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors cursor-pointer"
-                          title="Masquer le terminal (Ctrl+`)"
+                          title={t('hide_terminal_shortcut', 'Masquer le terminal (Ctrl+`)')}
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>

@@ -440,7 +440,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                       {ping?.loading ? (
                         <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg bg-slate-800 text-slate-400 border border-slate-700">
                           <RefreshCw className="w-3 h-3 animate-spin text-indigo-400" />
-                          <span>Test en cours...</span>
+                          <span>{t('testing_in_progress', 'Test en cours...')}</span>
                         </div>
                       ) : ping?.latency_ms !== undefined ? (
                         <div
@@ -491,7 +491,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white transition-colors"
                       >
                         <UploadCloud className="w-3.5 h-3.5" />
-                        <span>Push...</span>
+                        <span>{t('push_ellipsis', 'Push...')}</span>
                       </button>
 
                       <button
@@ -617,7 +617,7 @@ export const GitRemotesView: React.FC<GitRemotesViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="git@github.com:owner/repo.git ou https://github.com/..."
+                  placeholder="git@github.com:owner/repo.git / https://github.com/..."
                   value={addUrl}
                   onChange={(e) => setAddUrl(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 font-mono"

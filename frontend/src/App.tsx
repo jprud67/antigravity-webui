@@ -1476,7 +1476,7 @@ export function App() {
       setConversations(convs);
       await handleSelectConversation(res.conversation_id);
     } catch (e: any) {
-      showToast(`Erreur lors de la bifurcation : ${e.message}`, 'error');
+      showToast(t('fork_error_toast', 'Erreur lors de la bifurcation : {0}', e.message), 'error');
     } finally {
       setIsStreaming(false);
     }
@@ -1506,7 +1506,7 @@ export function App() {
         appSettings.preserveLastNTurns
       );
       if (res.action_taken && res.tokens_saved > 0) {
-        showToast(`Budget de contexte appliqué : -${res.tokens_saved.toLocaleString()} tokens (-${res.reduction_pct}%) !`, 'success');
+        showToast(t('context_budget_applied', 'Budget de contexte appliqué : -{0} tokens (-{1}%) !', res.tokens_saved.toLocaleString(), res.reduction_pct), 'success');
       } else {
         showToast(t('context_already_optimal', "Le contexte respecte déjà le budget configuré. Historique optimal."), 'info');
       }
@@ -1528,7 +1528,7 @@ export function App() {
 
   const handlePruneSuccess = useCallback(async (result: PruneResult) => {
     if (!activeConversationId) return;
-    showToast(`Contexte élagué : -${result.tokens_saved.toLocaleString()} tokens (-${result.reduction_pct}%) !`, 'success');
+    showToast(t('context_pruned_success', 'Contexte élagué : -{0} tokens (-{1}%) !', result.tokens_saved.toLocaleString(), result.reduction_pct), 'success');
     try {
       const freshData = await fetchConversationTranscript(activeConversationId);
       const parsed = parseStepsToMessages(freshData?.steps || []);

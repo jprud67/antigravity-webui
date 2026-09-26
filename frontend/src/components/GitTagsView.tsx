@@ -442,7 +442,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
                         <UploadCloud
                           className={`w-3.5 h-3.5 text-sky-400 ${isPushing ? 'animate-bounce' : ''}`}
                         />
-                        <span>Push</span>
+                        <span>{t('push', 'Push')}</span>
                       </button>
 
                       {/* Delete */}

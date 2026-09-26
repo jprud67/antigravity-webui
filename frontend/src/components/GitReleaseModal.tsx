@@ -237,7 +237,7 @@ export const GitReleaseModal: React.FC<GitReleaseModalProps> = ({
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="ex: Release v0.2.23 - Git Remotes & Tags Studio"
+                placeholder={t('release_title_placeholder', 'ex: Release v0.2.23 - Git Remotes & Tags Studio')}
                 className="w-full px-3 py-2 text-xs rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 font-medium"
               />
             </div>

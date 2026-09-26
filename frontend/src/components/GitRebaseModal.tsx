@@ -509,7 +509,7 @@ export const GitRebaseModal: React.FC<GitRebaseModalProps> = ({
               {executing ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Rebase en cours...</span>
+                  <span>{t('rebase_in_progress', 'Rebase en cours...')}</span>
                 </>
               ) : (
                 <>

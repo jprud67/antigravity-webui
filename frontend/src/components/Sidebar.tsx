@@ -1067,7 +1067,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                     color: sortOrder === 'alpha_asc' ? 'var(--accent)' : 'var(--text)',
                   }}
                 >
-                  <span>Titre (A → Z)</span>
+                  <span>{t('sort_alpha_asc', 'Titre (A → Z)')}</span>
                   {sortOrder === 'alpha_asc' && <Check className="w-3 h-3" />}
                 </button>
                 <button
@@ -1080,7 +1080,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                     color: sortOrder === 'alpha_desc' ? 'var(--accent)' : 'var(--text)',
                   }}
                 >
-                  <span>Titre (Z → A)</span>
+                  <span>{t('sort_alpha_desc', 'Titre (Z → A)')}</span>
                   {sortOrder === 'alpha_desc' && <Check className="w-3 h-3" />}
                 </button>
               </div>

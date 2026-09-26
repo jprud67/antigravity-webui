@@ -231,7 +231,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
               <div className="mt-2 truncate font-semibold text-xs" style={{ color: 'var(--strong)' }}>
                 {activeModel || 'Auto (Antigravity)'}
               </div>
-              <span className="text-[10px] text-sky-400 mt-0.5">Standard CLI</span>
+              <span className="text-[10px] text-sky-400 mt-0.5">{t('standard_cli', 'Standard CLI')}</span>
             </div>
 
             {/* Total Sessions */}

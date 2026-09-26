@@ -31,11 +31,11 @@ export interface PromptTemplate {
 
 const STORAGE_KEY = 'antigravity_custom_prompt_templates';
 
-const BUILTIN_TEMPLATES: PromptTemplate[] = [
+const getBuiltinTemplates = (t: (key: string, fallback: string) => string): PromptTemplate[] => [
   {
     id: 'code-review',
-    title: 'Revue de code approfondie',
-    description: 'Analyse critique de la qualité, robustesse, sécurité et maintenabilité du code.',
+    title: t('tmpl_code_review_title', 'Revue de code approfondie'),
+    description: t('tmpl_code_review_desc', 'Analyse critique de la qualité, robustesse, sécurité et maintenabilité du code.'),
     category: 'code',
     content: `Effectue une revue de code rigoureuse et constructive du code suivant :
 
@@ -50,8 +50,8 @@ Points clés à analyser :
   },
   {
     id: 'code-refactor',
-    title: 'Refactoring Clean Code & SOLID',
-    description: 'Modernise et restructure le code pour réduire la complexité et éliminer la duplication.',
+    title: t('tmpl_code_refactor_title', 'Refactoring Clean Code & SOLID'),
+    description: t('tmpl_code_refactor_desc', 'Modernise et restructure le code pour réduire la complexité et éliminer la duplication.'),
     category: 'code',
     content: `Refactorise le code suivant en appliquant les principes Clean Code et SOLID :
 
@@ -69,8 +69,8 @@ Consignes :
   },
   {
     id: 'code-tests',
-    title: 'Génération de tests unitaires',
-    description: 'Génère une suite complète de tests (cas nominaux, limites, erreurs et mocks).',
+    title: t('tmpl_code_tests_title', 'Génération de tests unitaires'),
+    description: t('tmpl_code_tests_desc', 'Génère une suite complète de tests (cas nominaux, limites, erreurs et mocks).'),
     category: 'code',
     content: `Génère une suite exhaustive de tests unitaires avec le framework {framework} pour le code suivant :
 
@@ -86,8 +86,8 @@ Couvre impérativement :
   },
   {
     id: 'archi-plan',
-    title: 'Plan d\'architecture par étapes',
-    description: 'Établit une stratégie technique détaillée avant toute implémentation.',
+    title: t('tmpl_archi_plan_title', 'Plan d\'architecture par étapes'),
+    description: t('tmpl_archi_plan_desc', 'Établit une stratégie technique détaillée avant toute implémentation.'),
     category: 'architecture',
     content: `Établis un plan d'architecture technique exhaustif par étapes pour accomplir l'objectif suivant :
 
@@ -103,8 +103,8 @@ Structure attendue :
   },
   {
     id: 'archi-impact',
-    title: 'Analyse d\'impact & régression',
-    description: 'Évalue les effets de bord et risques d\'un changement prévu.',
+    title: t('tmpl_archi_impact_title', 'Analyse d\'impact & régression'),
+    description: t('tmpl_archi_impact_desc', 'Évalue les effets de bord et risques d\'un changement prévu.'),
     category: 'architecture',
     content: `Réalise une analyse d'impact préalable pour la modification suivante :
 
@@ -118,8 +118,8 @@ Analyse :
   },
   {
     id: 'archi-api',
-    title: 'Conception d\'API RESTful',
-    description: 'Définit les routes, payloads JSON, statuts HTTP et gestion d\'erreurs.',
+    title: t('tmpl_archi_api_title', 'Conception d\'API RESTful'),
+    description: t('tmpl_archi_api_desc', 'Définit les routes, payloads JSON, statuts HTTP et gestion d\'erreurs.'),
     category: 'architecture',
     content: `Conçois une spécification d'API RESTful pour la ressource suivante :
 
@@ -135,8 +135,8 @@ Détaille pour chaque endpoint :
   },
   {
     id: 'debug-bug',
-    title: 'Diagnostic & résolution de bug',
-    description: 'Méthode d\'investigation systématique avec reproduction et correctif.',
+    title: t('tmpl_debug_bug_title', 'Diagnostic & résolution de bug'),
+    description: t('tmpl_debug_bug_desc', 'Méthode d\'investigation systématique avec reproduction et correctif.'),
     category: 'debug',
     content: `Je rencontre le bug suivant. Aide-moi à le diagnostiquer et à le résoudre :
 
@@ -153,8 +153,8 @@ Procède ainsi :
   },
   {
     id: 'debug-secu',
-    title: 'Audit de sécurité & vulnérabilités',
-    description: 'Vérifie les injections, autorisations, fuites de données et tokens.',
+    title: t('tmpl_debug_secu_title', 'Audit de sécurité & vulnérabilités'),
+    description: t('tmpl_debug_secu_desc', 'Vérifie les injections, autorisations, fuites de données et tokens.'),
     category: 'debug',
     content: `Effectue un audit de sécurité approfondi sur le code suivant :
 
@@ -171,8 +171,8 @@ Vérifie spécifiquement :
   },
   {
     id: 'debug-logs',
-    title: 'Analyse de logs & stacktrace',
-    description: 'Interprète une trace d\'erreur ou des logs serveur complexes.',
+    title: t('tmpl_debug_logs_title', 'Analyse de logs & stacktrace'),
+    description: t('tmpl_debug_logs_desc', 'Interprète une trace d\'erreur ou des logs serveur complexes.'),
     category: 'debug',
     content: `Analyse les logs d'erreur suivants et identifie précisément le problème :
 
@@ -187,8 +187,8 @@ Indique :
   },
   {
     id: 'docs-readme',
-    title: 'Rédaction de README technique',
-    description: 'Génère un README professionnel avec badges, installation et exemples.',
+    title: t('tmpl_docs_readme_title', 'Rédaction de README technique'),
+    description: t('tmpl_docs_readme_desc', 'Génère un README professionnel avec badges, installation et exemples.'),
     category: 'docs',
     content: `Rédige un fichier README.md de qualité professionnelle pour le projet suivant :
 
@@ -204,8 +204,8 @@ Inclus :
   },
   {
     id: 'docs-changelog',
-    title: 'Changelog & Notes de version',
-    description: 'Structure une release note claire regroupée par type de changements.',
+    title: t('tmpl_docs_changelog_title', 'Changelog & Notes de version'),
+    description: t('tmpl_docs_changelog_desc', 'Structure une release note claire regroupée par type de changements.'),
     category: 'docs',
     content: `Rédige les notes de version (Release Notes) pour la version {version} à partir des commits suivants :
 
@@ -283,9 +283,10 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
   }, [isOpen, onClose]);
 
   // Combine built-in & custom
+  const builtinTemplates = useMemo(() => getBuiltinTemplates(t), [t]);
   const allTemplates = useMemo(() => {
-    return [...customTemplates, ...BUILTIN_TEMPLATES];
-  }, [customTemplates]);
+    return [...customTemplates, ...builtinTemplates];
+  }, [customTemplates, builtinTemplates]);
 
   // Filter templates
   const filteredTemplates = useMemo(() => {
@@ -360,7 +361,7 @@ export const PromptTemplatesModal: React.FC<PromptTemplatesModalProps> = ({
   // Custom template save
   const handleSaveCustom = () => {
     if (!editTitle.trim() || !editContent.trim()) {
-      showToast('Le titre et le contenu sont obligatoires', 'error');
+      showToast(t('title_and_content_required', 'Le titre et le contenu sont obligatoires'), 'error');
       return;
     }
 

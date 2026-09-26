@@ -1812,7 +1812,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           onClick={() => {
                             setSettings((prev) => ({ ...prev, contextBudgetTokens: opt.val }));
                             saveSettings({ ...settings, contextBudgetTokens: opt.val }).catch(console.error);
-                            showToast(`Plafond de contexte défini à ${opt.label} tokens`, 'info');
+                            showToast(t('context_ceiling_defined', 'Plafond de contexte défini à {0} tokens', opt.label), 'info');
                           }}
                           className={`p-2 rounded-xl text-center border transition-all cursor-pointer ${
                             isSel ? 'border-sky-500/80 bg-sky-500/15 text-sky-400 font-semibold' : 'hover:border-sky-500/30 text-xs'

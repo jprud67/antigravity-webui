@@ -1695,7 +1695,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                           if (matchingBookmark && onRemoveBookmark) {
                             onRemoveBookmark(matchingBookmark.id);
                           } else {
-                            const label = window.prompt("Libellé du signet mémoire :", `Étape #${msgStep}`);
+                            const label = window.prompt(t('memory_bookmark_prompt', 'Libellé du signet mémoire :'), `${t('step_hash_prefix', 'Étape #')}${msgStep}`);
                             if (label && label.trim()) {
                               onAddBookmark(msgStep, label.trim(), (msg.content || '').slice(0, 150));
                             }
@@ -1705,10 +1705,10 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                           matchingBookmark ? 'text-amber-400 border-amber-500/30 bg-amber-500/10' : ''
                         }`}
                         style={{ borderColor: matchingBookmark ? undefined : 'var(--border)' }}
-                        title={matchingBookmark ? `Signet : ${matchingBookmark.label} (cliquer pour supprimer)` : "Ajouter un signet mémoire"}
+                        title={matchingBookmark ? `${t('bookmark_prefix', 'Signet :')} ${matchingBookmark.label} (${t('click_to_delete', 'cliquer pour supprimer')})` : t('add_memory_bookmark', 'Ajouter un signet mémoire')}
                       >
                         <Bookmark className={`w-3 h-3 ${matchingBookmark ? 'text-amber-400 fill-amber-400' : 'text-amber-500'}`} />
-                        <span className="hidden sm:inline">{matchingBookmark ? "Marqué" : "Signet"}</span>
+                        <span className="hidden sm:inline">{matchingBookmark ? t('marked', 'Marqué') : t('bookmark', 'Signet')}</span>
                       </button>
                     )}
 

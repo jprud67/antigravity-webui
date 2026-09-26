@@ -302,7 +302,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
     try {
       const res = await popGitStash({ workspace: currentWorkspace, index });
       if (res.status === 'conflict') {
-        showToast(`Stash dépilé avec des conflits: ${res.message}`, 'error');
+        showToast(t('stash_pop_conflicts', 'Stash dépilé avec des conflits: {0}', res.message), 'error');
       } else {
         showToast(t('stash_popped_success', 'Stash dépilé et appliqué !'), 'success');
       }
@@ -318,7 +318,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
     try {
       const res = await applyGitStash({ workspace: currentWorkspace, index });
       if (res.status === 'conflict') {
-        showToast(`Stash appliqué avec des conflits: ${res.message}`, 'error');
+        showToast(t('stash_apply_conflicts', 'Stash appliqué avec des conflits: {0}', res.message), 'error');
       } else {
         showToast(t('stash_applied_success', 'Stash appliqué avec succès !'), 'success');
       }
@@ -330,10 +330,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
   }, [currentWorkspace, loadStatus]);
 
   const handleDropStash = useCallback(async (index: number) => {
-    const confirmed = await showConfirm(`Voulez-vous vraiment supprimer le stash@{${index}} ?`, {
+    const confirmed = await showConfirm(t('confirm_delete_stash_idx', 'Voulez-vous vraiment supprimer le stash@{0} ?', index), {
       title: t('delete_stash', 'Supprimer le stash'),
       confirmLabel: t('delete', 'Supprimer'),
-      cancelLabel: 'Annuler',
+      cancelLabel: t('cancel', 'Annuler'),
       destructive: true
     });
     if (!confirmed) return;
@@ -347,10 +347,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
   }, [currentWorkspace, loadStashes]);
 
   const handleClearAllStashes = useCallback(async () => {
-    const confirmed = await showConfirm('Voulez-vous supprimer TOUS les stashes ? Cette action est irréversible.', {
+    const confirmed = await showConfirm(t('confirm_clear_all_stashes', 'Voulez-vous supprimer TOUS les stashes ? Cette action est irréversible.'), {
       title: t('clear_all_stashes', 'Vider tous les stashes'),
       confirmLabel: t('delete_all', 'Tout supprimer'),
-      cancelLabel: 'Annuler',
+      cancelLabel: t('cancel', 'Annuler'),
       destructive: true
     });
     if (!confirmed) return;
@@ -398,7 +398,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         await loadStatus();
         await loadHistory(true);
       } else if (res.status === 'conflict') {
-        showToast(`Conflit lors du cherry-pick: ${res.message}`, 'error');
+        showToast(t('cherry_pick_conflict_msg', 'Conflit lors du cherry-pick: {0}', res.message), 'error');
         await loadStatus();
         setViewMode('changes');
       }
@@ -413,7 +413,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         workspace: currentWorkspace,
         branch: branchName
       });
-      showToast(`Bascule réussie sur '${res.branch || branchName}'`, 'success');
+      showToast(t('switched_branch_success', "Bascule réussie sur '{0}'", res.branch || branchName), 'success');
       await loadStatus();
       await loadBranches();
       if (commits.length > 0) {
@@ -434,7 +434,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         start_point: newBranchStartPoint.trim() || undefined,
         checkout: newBranchCheckout
       });
-      showToast(`Branche '${res.name}' créée avec succès !`, 'success');
+      showToast(t('branch_created_success_named', "Branche '{0}' créée avec succès !", res.name || newBranchName.trim()), 'success');
       setIsCreateBranchOpen(false);
       setNewBranchName('');
       setNewBranchStartPoint('');
@@ -454,13 +454,13 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
   const handleDeleteBranch = useCallback(async (branch: GitBranchDetail) => {
     const isRemote = branch.is_remote;
     const confirmMessage = isRemote
-      ? `Voulez-vous vraiment supprimer la branche distante '${branch.name}' sur le remote ?`
-      : `Voulez-vous vraiment supprimer la branche locale '${branch.name}' ?`;
+      ? t('confirm_delete_remote_branch', "Voulez-vous vraiment supprimer la branche distante '{0}' sur le remote ?", branch.name)
+      : t('confirm_delete_local_branch', "Voulez-vous vraiment supprimer la branche locale '{0}' ?", branch.name);
 
     const confirmed = await showConfirm(confirmMessage, {
       title: t('delete_branch', 'Supprimer la branche'),
-      confirmLabel: 'Supprimer',
-      cancelLabel: 'Annuler',
+      confirmLabel: t('delete', 'Supprimer'),
+      cancelLabel: t('cancel', 'Annuler'),
       destructive: true
     });
     if (!confirmed) return;
@@ -472,17 +472,17 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         force: false,
         remote: isRemote
       });
-      showToast(`Branche '${branch.name}' supprimée avec succès.`, 'info');
+      showToast(t('branch_deleted_success_named', "Branche '{0}' supprimée avec succès.", branch.name), 'info');
       await loadBranches();
     } catch (err: any) {
       const msg = err.message || '';
       if (msg.includes('non complètement fusionnée') || msg.includes('not fully merged')) {
         const forceConfirm = await showConfirm(
-          `La branche '${branch.name}' n'est pas complètement fusionnée. Souhaitez-vous forcer la suppression (-D) ?`,
+          t('branch_not_merged_force_confirm', "La branche '{0}' n'est pas complètement fusionnée. Souhaitez-vous forcer la suppression (-D) ?", branch.name),
           {
-            title: 'Forcer la suppression',
-            confirmLabel: 'Supprimer de force (-D)',
-            cancelLabel: 'Annuler',
+            title: t('force_delete_title', 'Forcer la suppression'),
+            confirmLabel: t('force_delete_btn', 'Supprimer de force (-D)'),
+            cancelLabel: t('cancel', 'Annuler'),
             destructive: true
           }
         );
@@ -494,10 +494,10 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
               force: true,
               remote: isRemote
             });
-            showToast(`Branche '${branch.name}' supprimée de force.`, 'info');
+            showToast(t('branch_force_deleted_named', "Branche '{0}' supprimée de force.", branch.name), 'info');
             await loadBranches();
           } catch (forceErr: any) {
-            showToast(forceErr.message || 'Échec de la suppression forcée', 'error');
+            showToast(forceErr.message || t('force_delete_failed', 'Échec de la suppression forcée'), 'error');
           }
         }
       } else {
@@ -517,14 +517,14 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         message: mergeMessage.trim() || undefined
       });
       if (res.has_conflicts) {
-        showToast(`Conflits survenus lors de la fusion de '${mergingBranch.name}'`, 'error');
+        showToast(t('merge_conflicts_occurred', "Conflits survenus lors de la fusion de '{0}'", mergingBranch.name), 'error');
         setMergingBranch(null);
         await loadStatus();
         if (res.conflicts && res.conflicts.length > 0) {
           setActiveConflictFile(res.conflicts[0]);
         }
       } else {
-        showToast(`Branche '${mergingBranch.name}' fusionnée avec succès !`, 'success');
+        showToast(t('branch_merged_success_named', "Branche '{0}' fusionnée avec succès !", mergingBranch.name), 'success');
         setMergingBranch(null);
         setMergeMessage('');
         setMergeNoFF(false);
@@ -550,7 +550,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
         old_name: renamingBranch.name,
         new_name: newRenameName.trim()
       });
-      showToast(`Branche renommée en '${res.new_name}' avec succès !`, 'success');
+      showToast(t('branch_renamed_success_named', "Branche renommée en '{0}' avec succès !", res.new_name || newRenameName.trim()), 'success');
       setRenamingBranch(null);
       setNewRenameName('');
       await loadBranches();
@@ -1272,7 +1272,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                         title={t('open_in_monaco_diff_tooltip', 'Ouvrir dans le studio de diff sémantique Monaco')}
                       >
                         <Code2 className="w-3 h-3" />
-                        <span>Monaco Studio</span>
+                        <span>{t('monaco_studio', 'Monaco Studio')}</span>
                       </button>
                     )}
                     <button
@@ -1636,7 +1636,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                         title={t('start_rebase_tooltip', 'Démarrer un rebase interactif depuis ce commit (git rebase -i)')}
                       >
                         <RotateCcw className="w-3 h-3 text-sky-400" />
-                        <span>Rebase</span>
+                        <span>{t('rebase', 'Rebase')}</span>
                       </button>
                       {onOpenMonacoStudio && commitDiff && (
                         <button
@@ -1652,7 +1652,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                           title={t('inspect_patch_tooltip', 'Inspecter le patch dans Monaco Studio')}
                         >
                           <Code2 className="w-3 h-3" />
-                          <span>Monaco Studio</span>
+                          <span>{t('monaco_studio', 'Monaco Studio')}</span>
                         </button>
                       )}
                     </div>
@@ -1708,7 +1708,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
           <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-black/10 dark:bg-white/5 border" style={{ borderColor: 'var(--border)' }}>
             <div className="flex items-center gap-2 text-xs">
               <Archive className="w-4 h-4 text-purple-400" />
-              <span className="font-semibold text-slate-200">Stash Stack</span>
+              <span className="font-semibold text-slate-200">{t('stash_stack', 'Stash Stack')}</span>
               <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-purple-500/20 text-purple-300 font-mono">
                 {stashes.length}
               </span>
@@ -1751,7 +1751,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                 type="text"
                 value={newStashMessage}
                 onChange={(e) => setNewStashMessage(e.target.value)}
-                placeholder="Message du stash (optionnel)..."
+                placeholder={t('stash_message_placeholder', 'Message du stash (optionnel)...')}
                 className="w-full px-3 py-1.5 border rounded-lg text-xs outline-none bg-black/20 focus:border-sky-500 text-slate-100"
                 style={{ borderColor: 'var(--border)' }}
               />
@@ -1824,7 +1824,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                         title={t('git_view_stash_diff_tooltip', 'Voir le diff complet du stash')}
                       >
                         <FileDiff className="w-3 h-3" />
-                        <span>Diff</span>
+                        <span>{t('diff', 'Diff')}</span>
                       </button>
                       <button
                         type="button"
@@ -2163,7 +2163,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                             title={t('git_rebase_branch_tooltip', 'Rebase interactif sur la base de cette branche')}
                           >
                             <RotateCcw className="w-3 h-3" />
-                            <span>Rebase</span>
+                            <span>{t('rebase', 'Rebase')}</span>
                           </button>
                         )}
 
@@ -2238,13 +2238,13 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
 
                 <div className="space-y-2 text-xs">
                   <label className="block text-[11px] font-medium" style={{ color: 'var(--muted)' }}>
-                    Message de commit de fusion
+                    {t('merge_commit_message_label', 'Message de commit de fusion')}
                   </label>
                   <input
                     type="text"
                     value={mergeMessage}
                     onChange={(e) => setMergeMessage(e.target.value)}
-                    placeholder="Message de merge..."
+                    placeholder={t('merge_message_placeholder', 'Message de merge...')}
                     className="w-full px-3 py-1.5 border rounded-lg text-xs outline-none bg-black/20 focus:border-emerald-500 text-slate-100 font-mono"
                     style={{ borderColor: 'var(--border)' }}
                   />
@@ -2256,7 +2256,7 @@ export const GitTab: React.FC<GitTabProps> = ({ currentWorkspace, onOpenMonacoSt
                       onChange={(e) => setMergeNoFF(e.target.checked)}
                       className="rounded text-emerald-500"
                     />
-                    <span>Forcer un commit de fusion (--no-ff)</span>
+                    <span>{t('force_merge_commit_noff', 'Forcer un commit de fusion (--no-ff)')}</span>
                   </label>
                 </div>
 

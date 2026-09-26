@@ -228,7 +228,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
         setLanguage(detectLanguage(config.filePath));
       })
       .catch((err) => {
-        showToast(`Erreur chargement: ${err.message}`, 'error');
+        showToast(t('load_error_with_msg', 'Erreur chargement: {0}', err.message), 'error');
       })
       .finally(() => {
         if (!isCancelled) setIsLoadingFile(false);
@@ -685,7 +685,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             loading={
               <div className="flex items-center justify-center h-full gap-2 text-zinc-500">
                 <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
-                <span className="text-xs">Initialisation du studio de diff Monaco...</span>
+                <span className="text-xs">{t('monaco_diff_studio_init', 'Initialisation du studio de diff Monaco...')}</span>
               </div>
             }
           />

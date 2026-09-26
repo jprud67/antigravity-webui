@@ -404,7 +404,7 @@ export const MessagingGatewayModal: React.FC<MessagingGatewayModalProps> = ({ is
                   </label>
                   <input
                     type="text"
-                    placeholder="Ex: -100123456789 ou votre User ID"
+                    placeholder={t('telegram_chat_id_placeholder', 'Ex: -100123456789 ou votre User ID')}
                     value={tgChatId}
                     onChange={(e) => setTgChatId(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl text-xs font-mono focus:outline-none"
