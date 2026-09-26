@@ -42,7 +42,7 @@
       code: Optional[str] = None
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # backend/tests/test_editor_diagnostics.py
@@ -96,12 +96,12 @@ def test_json_syntax_error():
     assert data["diagnostics"][0]["source"] == "json"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `backend\venv\Scripts\pytest.exe backend\tests\test_editor_diagnostics.py -v`
 Expected: FAIL with 404 Not Found (endpoint not registered)
 
-- [ ] **Step 3: Implement `backend/app/api/editor_diagnostics.py` and register router in `main.py`**
+- [x] **Step 3: Implement `backend/app/api/editor_diagnostics.py` and register router in `main.py`**
 
 - Handle Python AST syntax checking.
 - Call `backend\venv\Scripts\ruff.exe check --output-format=json --stdin-filename <filename>` via stdin.
@@ -109,12 +109,12 @@ Expected: FAIL with 404 Not Found (endpoint not registered)
 - Handle JSON parsing with `json.loads`.
 - Register router with `/api/editor` prefix in `backend/app/main.py`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `backend\venv\Scripts\pytest.exe backend\tests\test_editor_diagnostics.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit backend endpoint**
+- [x] **Step 5: Commit backend endpoint**
 
 ```bash
 git add backend/app/api/editor_diagnostics.py backend/app/main.py backend/tests/test_editor_diagnostics.py
@@ -135,7 +135,7 @@ git commit -m "feat(diagnostics): implement real-time AST, ruff, oxlint and JSON
 - `fetchEditorDiagnostics(content, filePath, language, workspace)` function in `api.ts`.
 - `applyMonacoDiagnostics(monaco, model, diagnostics)` and `clearMonacoDiagnostics(monaco, model)` helpers in `monacoDiagnostics.ts`.
 
-- [ ] **Step 1: Update `frontend/src/types.ts` with diagnostic models**
+- [x] **Step 1: Update `frontend/src/types.ts` with diagnostic models**
 
 ```typescript
 export interface DiagnosticItem {
@@ -158,20 +158,20 @@ export interface EditorDiagnosticsResponse {
 }
 ```
 
-- [ ] **Step 2: Add `fetchEditorDiagnostics` to `frontend/src/services/api.ts`**
+- [x] **Step 2: Add `fetchEditorDiagnostics` to `frontend/src/services/api.ts`**
 
-- [ ] **Step 3: Create `frontend/src/services/monacoDiagnostics.ts`**
+- [x] **Step 3: Create `frontend/src/services/monacoDiagnostics.ts`**
 
 - Implements `applyMonacoDiagnostics(monaco, model, diagnostics, owner = 'antigravity-lint')`.
 - Maps severity to `monaco.MarkerSeverity.Error | Warning | Info`.
 - Implements `clearMonacoDiagnostics(monaco, model, owner)`.
 
-- [ ] **Step 4: Verify TypeScript compilation**
+- [x] **Step 4: Verify TypeScript compilation**
 
 Run: `npx --prefix frontend tsc -b`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 5: Commit frontend types & service**
+- [x] **Step 5: Commit frontend types & service**
 
 ```bash
 git add frontend/src/types.ts frontend/src/services/api.ts frontend/src/services/monacoDiagnostics.ts
@@ -196,9 +196,9 @@ git commit -m "feat(diagnostics): add frontend diagnostics types, API client, an
 - `editor_diagnostics_auto_lint`: "Lint automatique" / "Auto-lint"
 - `editor_diagnostics_refresh`: "Actualiser les diagnostics" / "Refresh diagnostics"
 
-- [ ] **Step 1: Write python injection script and run it**
-- [ ] **Step 2: Verify 15-language key count parity**
-- [ ] **Step 3: Commit i18n updates**
+- [x] **Step 1: Write python injection script and run it**
+- [x] **Step 2: Verify 15-language key count parity**
+- [x] **Step 3: Commit i18n updates**
 
 ```bash
 git add frontend/public/locales.json
@@ -219,11 +219,11 @@ git commit -m "feat(i18n): add 15-language parity for Monaco diagnostics and pro
 - Click problem -> calls `editor.revealPositionInCenter({ lineNumber, column })` and `editor.setPosition({ lineNumber, column })`.
 - Auto-lint toggle & refresh button in status bar / drawer header.
 
-- [ ] **Step 1: Integrate diagnostic state and debounced hook in `MonacoStudioModal.tsx`**
-- [ ] **Step 2: Render status bar problem counter and toggleable Problems Drawer**
-- [ ] **Step 3: Test click-to-line navigation and Monaco marker updates**
-- [ ] **Step 4: Verify with `tsc -b` and `npm run build`**
-- [ ] **Step 5: Commit MonacoStudioModal changes**
+- [x] **Step 1: Integrate diagnostic state and debounced hook in `MonacoStudioModal.tsx`**
+- [x] **Step 2: Render status bar problem counter and toggleable Problems Drawer**
+- [x] **Step 3: Test click-to-line navigation and Monaco marker updates**
+- [x] **Step 4: Verify with `tsc -b` and `npm run build`**
+- [x] **Step 5: Commit MonacoStudioModal changes**
 
 ```bash
 git add frontend/src/components/MonacoStudioModal.tsx
@@ -243,9 +243,9 @@ git commit -m "feat(studio): integrate live diagnostics, markers, and Problems D
 - Jump to problem line when problem badge or drawer item is selected.
 - Synchronized Monaco markers for active open tab.
 
-- [ ] **Step 1: Integrate diagnostics in `WorkspacePanel.tsx`**
-- [ ] **Step 2: Verify `tsc -b` and production bundle**
-- [ ] **Step 3: Commit WorkspacePanel changes**
+- [x] **Step 1: Integrate diagnostics in `WorkspacePanel.tsx`**
+- [x] **Step 2: Verify `tsc -b` and production bundle**
+- [x] **Step 3: Commit WorkspacePanel changes**
 
 ```bash
 git add frontend/src/components/WorkspacePanel.tsx
@@ -260,8 +260,8 @@ git commit -m "feat(workspace): integrate live diagnostics and problem counter i
 - Modify: `docs/ROADMAP.md`
 - Modify: `frontend/package.json`, `backend/app/main.py`, `backend/app/services/updater.py`, `frontend/public/sw.js` (bump version to `0.3.4`)
 
-- [ ] **Step 1: Run full pytest backend test suite**
-- [ ] **Step 2: Run frontend production build**
-- [ ] **Step 3: Update `docs/ROADMAP.md` to document Jalon v0.3.4 as completed**
-- [ ] **Step 4: Commit changes and create annotated tag `v0.3.4`**
-- [ ] **Step 5: Push commit and tag `v0.3.4` to `origin/main`**
+- [x] **Step 1: Run full pytest backend test suite**
+- [x] **Step 2: Run frontend production build**
+- [x] **Step 3: Update `docs/ROADMAP.md` to document Jalon v0.3.4 as completed**
+- [x] **Step 4: Commit changes and create annotated tag `v0.3.4`**
+- [x] **Step 5: Push commit and tag `v0.3.4` to `origin/main`**

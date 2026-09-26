@@ -230,10 +230,17 @@ This roadmap outlines the strategic direction for **Antigravity‑webui**, the f
 | **Dual Pane Session Routing & Focus Tracking** | Gestion conjointe de volet actif (`primary` vs `secondary`), badges d'état visuels (`Volet 1`, `Volet 2`), ciblage contextuel des actions de la barre d'outils (Clear, Restart session, changement d'interpréteur Shell) et routage automatique des commandes (`terminal-run-command`). | Frontend / IDE | 2027‑03‑29 | ✅ **Completed** |
 | **Internationalisation Complète (15 Langues)** | Couverture complète et stricte des clés i18n (`terminal_split_single`, `terminal_split_horizontal`, `terminal_split_vertical`, `terminal_drag_split`, `terminal_pane_1`, `terminal_pane_2`) sur l'ensemble des 15 langues dans `locales.json`. | Release Manager | 2027‑03‑29 | ✅ **Completed** |
 
+### 📌 Jalon v0.3.4 : Monaco Extended Diagnostics & Live Linting (Real-Time AST, Ruff, Oxlint & Problems Drawer)
+| Milestone | Description | Owner | Target | Status |
+|---|---|---|---|---|
+| **Backend Real-Time Diagnostics Engine (`/api/editor/diagnostics`)** | Service haute performance d'analyse syntaxique et de linting sans latence : analyse AST Python + `ruff check --output-format=json`, exécution `oxlint --format json` (JS/TS/JSX/TSX), et validation JSON stricte avec mapping unifié des erreurs, avertissements et infos. | Backend / IDE | 2027‑03‑29 | ✅ **Completed** |
+| **Monaco Model Markers Integration** | Synchronisation automatique et débouncée (400ms) avec l'API `monaco.editor.setModelMarkers` générant les lignes ondulées (squigglies) natives, repères gutter et annotations minimap. | Frontend / IDE | 2027‑03‑29 | ✅ **Completed** |
+| **Collapsible Problems Drawer & 1-Click Line Jump** | Tiroir rétractable interactif "Problèmes" (`MonacoStudioModal.tsx` et `WorkspacePanel.tsx`) avec compteurs d'erreurs/avertissements, navigation 1-clic avec centrage et surbrillance du curseur (`revealPositionInCenter`), bascule auto-lint et rafraîchissement manuel. | Frontend / UX | 2027‑03‑29 | ✅ **Completed** |
+| **Release v0.3.4 & Full 15-Language i18n Parity** | Bump de version v0.3.4, parité stricte des 4 347 clés sur les 15 langues dans `locales.json`, 189 tests pytest validés à 100%, build de production Vite sans erreur. | Release Manager | 2027‑03‑29 | ✅ **Completed** |
+
 ### 📌 Prochaines étapes v0.4 (Cockpit Web IDE & Agentic Workspace)
 | Milestone | Description |
 |---|---|
-| **Monaco Extended Diagnostics & Live Linting** – Analyse syntaxique et diagnostics en temps réel (Python ruff/flake8, JS/TS eslint). |
 | **Collaborative Session Sharing & Live Preview** – Partage de session par lien direct, synchronisation WebSocket et inspection conjointe. |
 | **Multi-Agent Visual Orchestration Studio** – Visualisation des sous-agents en temps réel, graphe d'exécution et pilotage hiérarchique. |
 | **Release v0.4 – Premium Web IDE & Autonomous Agent Cockpit** |
