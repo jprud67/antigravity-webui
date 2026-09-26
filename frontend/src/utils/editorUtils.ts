@@ -108,8 +108,11 @@ export function detectLanguage(filePath?: string, fallback = 'plaintext'): strin
 export function getInitialMonacoTheme(): 'vs-dark' | 'light' {
   if (typeof document === 'undefined') return 'vs-dark';
   const isLight =
+    document.documentElement.getAttribute('color-scheme') === 'light' ||
+    document.documentElement.getAttribute('data-theme') === 'light' ||
     document.documentElement.classList.contains('theme-light') ||
     document.body.classList.contains('theme-light') ||
-    document.documentElement.getAttribute('data-theme') === 'light';
+    (!document.documentElement.classList.contains('dark') && !document.body.classList.contains('dark'));
   return isLight ? 'light' : 'vs-dark';
 }
+

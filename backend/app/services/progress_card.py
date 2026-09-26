@@ -39,6 +39,7 @@ class ProgressCardPayload(BaseModel):
 
 @contextmanager
 def _get_db():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH), timeout=15.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")

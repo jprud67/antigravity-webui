@@ -8,7 +8,6 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -23,9 +22,9 @@ router = APIRouter(prefix="/api/editor", tags=["Editor Diagnostics"], dependenci
 
 class EditorDiagnosticsRequest(BaseModel):
     content: str = ""
-    filePath: Optional[str] = None
+    filePath: str | None = None
     language: str = "text"
-    workspace: Optional[str] = None
+    workspace: str | None = None
 
 
 class DiagnosticItem(BaseModel):
@@ -36,18 +35,18 @@ class DiagnosticItem(BaseModel):
     message: str
     severity: str  # 'error' | 'warning' | 'info'
     source: str    # 'ruff' | 'oxlint' | 'syntax' | 'json'
-    code: Optional[str] = None
+    code: str | None = None
 
 
 class EditorDiagnosticsResponse(BaseModel):
-    diagnostics: List[DiagnosticItem]
+    diagnostics: list[DiagnosticItem]
     duration_ms: float
     total_errors: int
     total_warnings: int
     total_infos: int
 
 
-def _get_ruff_executable() -> Optional[str]:
+def _get_ruff_executable() -> str | None:
     # Check venv Scripts
     scripts_dir = Path(sys.executable).parent
     candidate = scripts_dir / ("ruff.exe" if os.name == "nt" else "ruff")
@@ -59,7 +58,7 @@ def _get_ruff_executable() -> Optional[str]:
     return shutil.which("ruff")
 
 
-def _get_oxlint_executable() -> Optional[str]:
+def _get_oxlint_executable() -> str | None:
     # Check frontend/node_modules/.bin
     candidate = Path(REPO_ROOT) / "frontend" / "node_modules" / ".bin" / ("oxlint.cmd" if os.name == "nt" else "oxlint")
     if candidate.exists():
@@ -67,8 +66,8 @@ def _get_oxlint_executable() -> Optional[str]:
     return shutil.which("oxlint")
 
 
-def _lint_python(content: str, file_path: Optional[str]) -> List[DiagnosticItem]:
-    diagnostics: List[DiagnosticItem] = []
+def _lint_python(content: str, file_path: str | None) -> list[DiagnosticItem]:
+    diagnostics: list[DiagnosticItem] = []
     has_syntax_error = False
 
     # 1. AST syntax check
@@ -153,8 +152,8 @@ def _lint_python(content: str, file_path: Optional[str]) -> List[DiagnosticItem]
     return diagnostics
 
 
-def _lint_javascript(content: str, file_path: Optional[str], language: str) -> List[DiagnosticItem]:
-    diagnostics: List[DiagnosticItem] = []
+def _lint_javascript(content: str, file_path: str | None, language: str) -> list[DiagnosticItem]:
+    diagnostics: list[DiagnosticItem] = []
     oxlint_bin = _get_oxlint_executable()
     if not oxlint_bin:
         return diagnostics
@@ -239,8 +238,8 @@ def _lint_javascript(content: str, file_path: Optional[str], language: str) -> L
     return diagnostics
 
 
-def _lint_json(content: str) -> List[DiagnosticItem]:
-    diagnostics: List[DiagnosticItem] = []
+def _lint_json(content: str) -> list[DiagnosticItem]:
+    diagnostics: list[DiagnosticItem] = []
     try:
         json.loads(content)
     except json.JSONDecodeError as e:
@@ -259,10 +258,10 @@ def _lint_json(content: str) -> List[DiagnosticItem]:
     return diagnostics
 
 
-def _lint_yaml(content: str) -> List[DiagnosticItem]:
-    diagnostics: List[DiagnosticItem] = []
+def _lint_yaml(content: str) -> list[DiagnosticItem]:
+    diagnostics: list[DiagnosticItem] = []
     try:
-        import yaml
+        import yaml  # type: ignore[import-untyped]
         list(yaml.safe_load_all(content))
     except Exception as e:
         mark = getattr(e, "problem_mark", None)
@@ -336,7 +335,7 @@ def get_editor_diagnostics(
         elif lower_fp.endswith((".yaml", ".yml")):
             language = "yaml"
 
-    diagnostics: List[DiagnosticItem] = []
+    diagnostics: list[DiagnosticItem] = []
 
     if content.strip():
         if language in ("python", "py"):

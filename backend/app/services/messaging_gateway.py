@@ -32,6 +32,7 @@ RATE_LIMIT_SECONDS = 600            # 10 minutes
 
 @contextmanager
 def _get_db():
+    SESSIONS_DB.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=15.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")

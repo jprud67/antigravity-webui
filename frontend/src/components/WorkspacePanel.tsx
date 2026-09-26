@@ -862,14 +862,19 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const [isLinting, setIsLinting] = useState<boolean>(false);
   const [isProblemsOpen, setIsProblemsOpen] = useState<boolean>(false);
 
+  const lastLintedPathRef = useRef<string | null>(null);
+
   const loadDiagnostics = useCallback(
-    async (codeToLint: string, langToLint: string, path?: string) => {
+    async (codeToLint: string, langToLint: string, path?: string, clearPrevious: boolean = false) => {
       if (!codeToLint.trim()) {
         setDiagnostics([]);
         if (monacoEditorRef.current && monacoInstanceRef.current) {
           clearMonacoDiagnostics(monacoInstanceRef.current, monacoEditorRef.current.getModel());
         }
         return;
+      }
+      if (clearPrevious) {
+        setDiagnostics([]);
       }
       setIsLinting(true);
       try {
@@ -896,30 +901,38 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     [currentWorkspace]
   );
 
-  // Tab switch effect: immediately clear and start linting new file
+  // Unified diagnostics effect: immediate on tab switch, debounced on keystrokes
   useEffect(() => {
-    if (!activeTabItem || isBinaryTab) {
-      setDiagnostics([]);
-      if (monacoEditorRef.current && monacoInstanceRef.current) {
-        clearMonacoDiagnostics(monacoInstanceRef.current, monacoEditorRef.current.getModel());
+    if (!activeTabItem || isBinaryTab || !activeTabItem.path) {
+      if (lastLintedPathRef.current !== null) {
+        lastLintedPathRef.current = null;
+        setDiagnostics([]);
+        if (monacoEditorRef.current && monacoInstanceRef.current) {
+          clearMonacoDiagnostics(monacoInstanceRef.current, monacoEditorRef.current.getModel());
+        }
       }
       return;
     }
-    setDiagnostics([]);
-    if (monacoEditorRef.current && monacoInstanceRef.current) {
-      clearMonacoDiagnostics(monacoInstanceRef.current, monacoEditorRef.current.getModel());
-    }
-    loadDiagnostics(activeTabItem.content, activeTabItem.language, activeTabItem.path);
-  }, [activeTabItem?.path, isBinaryTab, loadDiagnostics]);
 
-  // Content change debounce effect: re-lint on keystroke without flickering or clearing markers prematurely
-  useEffect(() => {
-    if (!activeTabItem || isBinaryTab || !activeTabItem.path) return;
+    const currentPath = activeTabItem.path;
+    const isTabSwitch = lastLintedPathRef.current !== currentPath;
+
+    if (isTabSwitch) {
+      lastLintedPathRef.current = currentPath;
+      if (monacoEditorRef.current && monacoInstanceRef.current) {
+        clearMonacoDiagnostics(monacoInstanceRef.current, monacoEditorRef.current.getModel());
+      }
+      loadDiagnostics(activeTabItem.content, activeTabItem.language, currentPath, true);
+      return;
+    }
+
+    // Debounced re-lint on keystroke without flickering markers
     const timer = setTimeout(() => {
-      loadDiagnostics(activeTabItem.content, activeTabItem.language, activeTabItem.path);
+      loadDiagnostics(activeTabItem.content, activeTabItem.language, currentPath, false);
     }, 450);
+
     return () => clearTimeout(timer);
-  }, [activeTabItem?.content, activeTabItem?.language, isBinaryTab, loadDiagnostics]);
+  }, [activeTabItem, isBinaryTab, loadDiagnostics]);
 
   const handleJumpToProblem = useCallback((item: DiagnosticItem) => {
     if (!monacoEditorRef.current) return;

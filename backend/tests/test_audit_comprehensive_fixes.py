@@ -168,3 +168,41 @@ def test_vector_memory_schema_indices():
         assert "idx_vm_created" in indices
         assert "idx_vm_agent_cat" in indices
 
+
+def test_database_studio_as_uri_schema(tmp_path):
+    import sqlite3
+    from app.services.database_studio import count_sqlite_tables, inspect_database_schema
+
+    test_db = tmp_path / "test_studio.db"
+    conn = sqlite3.connect(str(test_db))
+    conn.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
+    conn.execute("INSERT INTO users (id, name) VALUES (1, 'Alice'), (2, 'Bob')")
+    conn.commit()
+    conn.close()
+
+    count = count_sqlite_tables(str(test_db))
+    assert count == 1
+
+    schema = inspect_database_schema(str(test_db))
+    assert schema.database_name == "test_studio.db"
+    assert len(schema.tables) == 1
+    assert schema.tables[0].name == "users"
+    assert schema.tables[0].row_count_estimate == 2
+
+
+@pytest.mark.asyncio
+async def test_vector_memory_ollama_provider_integration():
+    from unittest.mock import MagicMock, patch
+    from app.services.vector_memory import AutoRecallConfig, compute_embedding
+
+    cfg = AutoRecallConfig(provider="ollama", api_base="http://localhost:11434", model="nomic-embed-text")
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"embedding": [0.1, 0.2, 0.3]}
+
+    with patch("httpx.AsyncClient.post", return_value=mock_resp):
+        vec = await compute_embedding("test prompt for ollama", cfg=cfg)
+        assert vec == [0.1, 0.2, 0.3]
+
+

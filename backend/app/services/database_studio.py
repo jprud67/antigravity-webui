@@ -110,7 +110,8 @@ def count_sqlite_tables(db_path: str) -> int:
     """Quickly returns the number of tables in an SQLite database."""
     conn = None
     try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0)
+        resolved_uri = Path(db_path).resolve().as_uri() + "?mode=ro"
+        conn = sqlite3.connect(resolved_uri, uri=True, timeout=2.0)
         cursor = conn.cursor()
         cursor.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
         row = cursor.fetchone()
@@ -188,7 +189,8 @@ def inspect_database_schema(db_path: str) -> DatabaseSchema:
 
     conn = None
     try:
-        conn = sqlite3.connect(f"file:{clean_path}?mode=ro", uri=True, timeout=5.0)
+        resolved_uri = p.as_uri() + "?mode=ro"
+        conn = sqlite3.connect(resolved_uri, uri=True, timeout=5.0)
         cursor = conn.cursor()
 
         # Query all user tables and views

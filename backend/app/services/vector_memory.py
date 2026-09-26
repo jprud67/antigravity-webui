@@ -233,6 +233,22 @@ async def compute_embedding(text: str, cfg: AutoRecallConfig | None = None) -> l
         except Exception as e:
             logger.warning(f"Gemini embedding call failed, falling back to local: {e}")
 
+    elif config.provider == "ollama":
+        api_base = (config.api_base.strip() if config.api_base else "http://localhost:11434").rstrip("/")
+        model = (config.model or "").strip() or "nomic-embed-text"
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(
+                    f"{api_base}/api/embeddings",
+                    json={"model": model, "prompt": text},
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    if "embedding" in data and isinstance(data["embedding"], list):
+                        return data["embedding"]
+        except Exception as e:
+            logger.warning(f"Ollama embedding call failed, falling back to local: {e}")
+
     # Default zero-dependency local embedding
     return generate_local_embedding(text)
 
