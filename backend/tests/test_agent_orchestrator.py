@@ -168,3 +168,65 @@ def test_get_agent_inspection_details(tmp_path, monkeypatch):
     details = get_agent_inspection_details("inspect_agent_1", "parent_conv")
     assert details["agent_id"] == "inspect_agent_1"
     assert "Analyzing repository structure" in details["thought_preview"] or len(details["tools"]) >= 1
+
+
+from fastapi.testclient import TestClient
+from app.main import app
+
+api_client = TestClient(app)
+
+
+def get_auth_headers():
+    login_res = api_client.post("/api/auth/login", json={"password": "antigravity2026"})
+    token = login_res.json().get("token")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+def test_api_orchestrator_auth_guard():
+    # Unauthenticated calls should be rejected with 401 or 403
+    res = api_client.get("/api/orchestrator/graph/test_conv")
+    assert res.status_code in (401, 403)
+
+    res_steer = api_client.post("/api/orchestrator/steer", json={
+        "conversation_id": "test_conv",
+        "target_agent_id": "target",
+        "instruction": "do something"
+    })
+    assert res_steer.status_code in (401, 403)
+
+
+def test_api_orchestrator_endpoints(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.services.agent_orchestrator.BRAIN_DIR", tmp_path)
+    headers = get_auth_headers()
+
+    # 1. GET /api/orchestrator/graph/{conversation_id}
+    res_graph = api_client.get("/api/orchestrator/graph/api_conv_1", headers=headers)
+    assert res_graph.status_code == 200
+    graph_data = res_graph.json()
+    assert graph_data["conversation_id"] == "api_conv_1"
+    assert len(graph_data["nodes"]) >= 1
+
+    # 2. POST /api/orchestrator/steer
+    res_steer = api_client.post("/api/orchestrator/steer", json={
+        "conversation_id": "api_conv_1",
+        "target_agent_id": "worker_node_1",
+        "instruction": "Prioritize unit tests"
+    }, headers=headers)
+    assert res_steer.status_code == 200
+    assert res_steer.json()["success"] is True
+
+    # 3. POST /api/orchestrator/terminate
+    res_term = api_client.post("/api/orchestrator/terminate", json={
+        "conversation_id": "api_conv_1",
+        "target_agent_id": "worker_node_1",
+        "recursive": True
+    }, headers=headers)
+    assert res_term.status_code == 200
+    assert res_term.json()["success"] is True
+    assert res_term.json()["recursive"] is True
+
+    # 4. GET /api/orchestrator/inspect/{agent_id}
+    res_inspect = api_client.get("/api/orchestrator/inspect/worker_node_1?conversation_id=api_conv_1", headers=headers)
+    assert res_inspect.status_code == 200
+    assert res_inspect.json()["agent_id"] == "worker_node_1"
+

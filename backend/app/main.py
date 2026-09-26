@@ -31,6 +31,7 @@ from app.api.mcp_catalog import router as mcp_catalog_router
 from app.api.memory import router as memory_router
 from app.api.messaging_gateway import router as messaging_gateway_router
 from app.api.openai_compat import router as openai_router
+from app.api.orchestrator import router as orchestrator_router
 from app.api.progress_card import router as progress_card_router
 from app.api.prompt import router as prompt_router
 from app.api.rules import router as rules_router
@@ -179,6 +180,7 @@ app.include_router(docker_studio_router)  # Docker & Container Management Studio
 app.include_router(database_studio_router)  # Database Explorer & Visual SQL Query Studio
 app.include_router(editor_diagnostics_router)  # Live Syntax & Linter Diagnostics Studio
 app.include_router(share_router)  # Collaborative Session Sharing & Live Preview
+app.include_router(orchestrator_router)  # Multi-Agent Visual Orchestration Studio & Hierarchical Steering
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
