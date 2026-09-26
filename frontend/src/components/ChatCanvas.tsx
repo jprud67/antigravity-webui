@@ -38,9 +38,12 @@ import {
   Plus,
   RotateCcw,
   X,
-  Bookmark
+  Bookmark,
+  Share2,
+  Eye,
+  Users
 } from 'lucide-react';
-import type { ChatMessage, ToolCallItem, BookmarkItem, MonacoStudioConfig, ProgressCardData } from '../types';
+import type { ChatMessage, ToolCallItem, BookmarkItem, MonacoStudioConfig, ProgressCardData, PresenceParticipant } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
 import { DiffViewer } from './DiffViewer';
 import { ApprovalCard } from './ApprovalCard';
@@ -93,6 +96,13 @@ interface ChatCanvasProps {
   onOpenMonacoStudio?: (config: MonacoStudioConfig) => void;
   progressCard?: ProgressCardData | null;
   onDismissProgressCard?: () => void;
+  isSharedSession?: boolean;
+  sharePermission?: 'read' | 'write' | null;
+  presenceCount?: number;
+  presenceParticipants?: PresenceParticipant[];
+  onOpenShare?: () => void;
+  onToggleLivePreview?: () => void;
+  isLivePreviewOpen?: boolean;
 }
 
 const copyTextToClipboard = async (text: string): Promise<boolean> => {
@@ -812,6 +822,13 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   onOpenMonacoStudio,
   progressCard,
   onDismissProgressCard,
+  isSharedSession = false,
+  sharePermission = null,
+  presenceCount = 1,
+  presenceParticipants = [],
+  onOpenShare,
+  onToggleLivePreview,
+  isLivePreviewOpen = false,
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -1030,6 +1047,37 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
       className="flex-1 flex flex-col min-h-0 overflow-hidden relative"
       style={{ backgroundColor: 'var(--main-bg, var(--bg))' }}
     >
+      {/* Collaborative & Spectator Top Status Banner */}
+      {isSharedSession && (
+        <div
+          className={`w-full px-4 py-2 flex items-center justify-between text-xs font-medium border-b backdrop-blur-md transition-all shrink-0 z-30 ${
+            sharePermission === 'write'
+              ? 'bg-purple-950/70 text-purple-200 border-purple-800/60 shadow-sm'
+              : 'bg-cyan-950/70 text-cyan-200 border-cyan-800/60 shadow-sm'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {sharePermission === 'write' ? (
+              <>
+                <Users className="w-4 h-4 text-purple-400" />
+                <span>{t('share_copilot_banner') || 'Session Collaborative en direct · Co-Pilote'}</span>
+              </>
+            ) : (
+              <>
+                <Eye className="w-4 h-4 text-cyan-400" />
+                <span>{t('share_spectator_banner') || 'Mode Spectateur en direct · Lecture seule'}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] opacity-80 flex items-center gap-1.5 font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              {presenceCount} {t('share_presence_connected') || 'connecté(s)'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Top Bar - Responsive Workbench & Mobile First Header */}
       <div
         className="h-14 px-3 sm:px-6 flex items-center justify-between shrink-0 z-20 border-b safe-pt gap-2"
@@ -1157,8 +1205,61 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
           )}
         </div>
 
-        {/* Right Side: Quotas, Search & Volet Latéral Toggle */}
+        {/* Right Side: Presence, Preview, Share, Quotas, Search & Volet Latéral Toggle */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Presence Indicator Hub */}
+          {(presenceCount > 1 || isSharedSession) && (
+            <div
+              className="py-1 px-2.5 rounded-xl text-xs flex items-center gap-1.5 border border-purple-500/30 bg-purple-500/10 text-purple-300"
+              title={`${presenceCount} ${t('share_presence_connected') || 'connecté(s)'}`}
+            >
+              <Users className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-[11px] font-semibold">{presenceCount}</span>
+              {presenceParticipants.length > 0 && (
+                <div className="flex -space-x-1.5 ml-0.5">
+                  {presenceParticipants.slice(0, 3).map((p) => (
+                    <div
+                      key={p.client_id}
+                      className="w-4 h-4 rounded-full border border-zinc-900 text-[9px] flex items-center justify-center font-bold text-white uppercase shadow"
+                      style={{ backgroundColor: p.avatar_color || '#8b5cf6' }}
+                      title={`${p.nickname} (${p.role})`}
+                    >
+                      {p.nickname.slice(0, 1)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Live Preview Toggle Button */}
+          {onToggleLivePreview && (
+            <button
+              type="button"
+              onClick={onToggleLivePreview}
+              className={`p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border ${
+                isLivePreviewOpen
+                  ? 'border-cyan-500 bg-cyan-500/20 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.3)]'
+                  : 'border-zinc-800 bg-zinc-800/60 text-zinc-400 hover:text-white hover:border-zinc-700'
+              }`}
+              title={t('share_live_preview', 'Aperçu Live & Inspection (/preview)')}
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Share / Collaborate Button */}
+          {onOpenShare && (
+            <button
+              type="button"
+              onClick={onOpenShare}
+              className="py-1.5 px-2.5 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20"
+              title={t('share_session', 'Partager la session (/share)')}
+            >
+              <Share2 className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-[11px] font-medium hidden sm:inline">{t('share_session', 'Partager')}</span>
+            </button>
+          )}
           {/* Quotas Button */}
           {onOpenAnalytics && (
             <button

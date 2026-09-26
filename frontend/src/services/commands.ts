@@ -50,7 +50,9 @@ import {
   Code2,
   Wand2,
   Gauge,
-  Database
+  Database,
+  Share2,
+  Eye
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -703,6 +705,33 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'panel',
     icon: Database,
     color: 'text-blue-400',
+    isAction: true
+  },
+  {
+    cmd: '/share',
+    descKey: 'share_session',
+    desc: 'Partager la session avec un lien direct (Spectateur / Co-Pilote)',
+    category: 'action',
+    icon: Share2,
+    color: 'text-purple-400',
+    isAction: true
+  },
+  {
+    cmd: '/collaborate',
+    descKey: 'share_modal_title',
+    desc: 'Ouvrir la modale de partage et collaboration en direct',
+    category: 'action',
+    icon: Users,
+    color: 'text-indigo-400',
+    isAction: true
+  },
+  {
+    cmd: '/preview',
+    descKey: 'share_live_preview',
+    desc: 'Ouvrir le tiroir d\'aperçu live et inspection conjointe',
+    category: 'panel',
+    icon: Eye,
+    color: 'text-cyan-400',
     isAction: true
   },
   {

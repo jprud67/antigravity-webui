@@ -9,6 +9,7 @@ export class ChatWebSocketClient {
   private heartbeatTimer: any = null;
   private heartbeatTimeout: any = null;
   private _status: 'connected' | 'disconnected' | 'reconnecting' = 'disconnected';
+  private shareToken: string | null = null;
   private currentConversationId: string | null = null;
   private pendingPayloads: any[] = [];
   private reconnectAttempts: number = 0;
@@ -27,6 +28,17 @@ export class ChatWebSocketClient {
 
   public get connectionStatus() {
     return this._status;
+  }
+
+  public setShareToken(token: string | null) {
+    if (this.shareToken !== token) {
+      this.shareToken = token;
+      if (this.ws) {
+        this.reconnect();
+      } else if (token) {
+        this.connect();
+      }
+    }
   }
 
   public setCurrentConversation(convId: string | null) {
@@ -68,12 +80,15 @@ export class ChatWebSocketClient {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const token = localStorage.getItem('antigravity_token');
-    // NOTE: token is passed as a WebSocket sub-protocol to avoid exposure in
-    // server/proxy access logs (query-string tokens are frequently logged).
-    // RFC 6455 / RFC 2616 strictly forbids separators (including colons ':') in subprotocol strings.
-    // We encode the token using standard URL-safe base64 without padding to guarantee token compliance.
+    const shareToken = this.shareToken;
+
     let protocols: string[] | undefined;
-    if (token) {
+    const baseUrl = `${protocol}//${host}/ws/chat`;
+    let wsUrl = baseUrl;
+
+    if (shareToken) {
+      wsUrl = `${baseUrl}?share_token=${encodeURIComponent(shareToken)}`;
+    } else if (token) {
       try {
         // Safe UTF-8 to base64 encoding avoiding Latin1 DOMException
         const utf8Bytes = encodeURIComponent(token).replace(/%([0-9A-F]{2})/g, (_, p1) =>
@@ -84,17 +99,16 @@ export class ChatWebSocketClient {
       } catch {
         protocols = undefined;
       }
+      wsUrl = `${baseUrl}?token=${encodeURIComponent(token)}`;
     }
-    const baseUrl = `${protocol}//${host}/ws/chat`;
-    const fallbackUrl = `${baseUrl}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 
     try {
       try {
-        this.ws = protocols ? new WebSocket(baseUrl, protocols) : new WebSocket(fallbackUrl);
+        this.ws = protocols ? new WebSocket(baseUrl, protocols) : new WebSocket(wsUrl);
       } catch (subErr) {
         // Fallback to query param auth if subprotocol constructor rejects it
         console.warn('[WS] Subprotocol connection failed, falling back to query param auth:', subErr);
-        this.ws = new WebSocket(fallbackUrl);
+        this.ws = new WebSocket(wsUrl);
       }
 
       this.ws.onopen = () => {
@@ -158,9 +172,12 @@ export class ChatWebSocketClient {
         console.log(`[WS] Disconnected (${event.code}).`);
         this.stopHeartbeat();
         this.setStatus('disconnected');
-        if (event.code === 1008) {
-          // Unauthorized - do not reconnect automatically
+        if (event.code === 1008 || event.code === 4403) {
+          // Unauthorized or revoked token - do not reconnect automatically
           this.pendingPayloads = [];
+          if (event.code === 4403) {
+            this.listeners.forEach((cb) => cb({ event: 'share_revoked' }));
+          }
           return;
         }
         this.scheduleReconnect();

@@ -31,9 +31,12 @@ const CanvasStudioModal = lazy(() => import('./components/CanvasStudioModal').th
 const VectorMemoryModal = lazy(() => import('./components/VectorMemoryModal').then(m => ({ default: m.VectorMemoryModal })));
 const DockerStudioModal = lazy(() => import('./components/DockerStudioModal').then(m => ({ default: m.DockerStudioModal })));
 const DatabaseStudioModal = lazy(() => import('./components/DatabaseStudioModal').then(m => ({ default: m.DatabaseStudioModal })));
+const ShareSessionModal = lazy(() => import('./components/ShareSessionModal').then(m => ({ default: m.ShareSessionModal })));
+const SharePinModal = lazy(() => import('./components/SharePinModal').then(m => ({ default: m.SharePinModal })));
+const LivePreviewDrawer = lazy(() => import('./components/LivePreviewDrawer').then(m => ({ default: m.LivePreviewDrawer })));
 
 import type { TokenUsageData } from './components/ContextRing';
-import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig, AppSettings, ProgressCardData } from './types';
+import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig, AppSettings, ProgressCardData, PresenceParticipant } from './types';
 import { parseStepsToMessages, cleanUserPrompt } from './utils/transcriptParser';
 import { 
   fetchConversations, 
@@ -56,6 +59,7 @@ import {
   checkSystemUpdate,
   addConversationBookmark,
   removeConversationBookmark,
+  verifyShareToken,
   type GoogleAccountInfo,
   type UpdateCheckResult,
   type PruneResult
@@ -67,7 +71,7 @@ import { useI18n } from './services/i18n';
 import { ToastContainer } from './components/Toast';
 import { showToast } from './services/toast';
 import { ConfirmDialogContainer } from './components/AppDialog';
-import { getConvIdFromPath, navigateToConversation } from './utils/navigation';
+import { getConvIdFromPath, navigateToConversation, getShareTokenFromUrl } from './utils/navigation';
 
 const safeStringifyLen = (val: any): number => {
   if (val === null || val === undefined) return 0;
@@ -278,12 +282,20 @@ export function App() {
       setDatabaseStudioInitialQuery(e?.detail?.query || undefined);
       setIsDatabaseStudioOpen(true);
     };
+    const handleOpenShareModal = () => {
+      setIsShareModalOpen(true);
+    };
+    const handleToggleLivePreview = () => {
+      setIsLivePreviewOpen((prev) => !prev);
+    };
     window.addEventListener('open-workspace-file', handleOpenFile);
     window.addEventListener('terminal-run-command', handleRunTerminal);
     window.addEventListener('open-quick-open', handleQuickOpen);
     window.addEventListener('open-workspace-search', handleWorkspaceSearch);
     window.addEventListener('open-database-studio', handleOpenDatabaseStudio);
     window.addEventListener('antigravity:open-database-studio', handleOpenDatabaseStudio);
+    window.addEventListener('open-share-modal', handleOpenShareModal);
+    window.addEventListener('toggle-live-preview', handleToggleLivePreview);
     return () => {
       window.removeEventListener('open-workspace-file', handleOpenFile);
       window.removeEventListener('terminal-run-command', handleRunTerminal);
@@ -291,6 +303,8 @@ export function App() {
       window.removeEventListener('open-workspace-search', handleWorkspaceSearch);
       window.removeEventListener('open-database-studio', handleOpenDatabaseStudio);
       window.removeEventListener('antigravity:open-database-studio', handleOpenDatabaseStudio);
+      window.removeEventListener('open-share-modal', handleOpenShareModal);
+      window.removeEventListener('toggle-live-preview', handleToggleLivePreview);
     };
   }, []);
 
@@ -319,6 +333,14 @@ export function App() {
   const [isCanvasStudioOpen, setIsCanvasStudioOpen] = useState(false);
   const [isVectorMemoryOpen, setIsVectorMemoryOpen] = useState(false);
   const [isDockerStudioOpen, setIsDockerStudioOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [activeShareToken, setActiveShareToken] = useState<string | null>(null);
+  const [isSharedSession, setIsSharedSession] = useState(false);
+  const [sharePermission, setSharePermission] = useState<'read' | 'write' | null>(null);
+  const [presenceCount, setPresenceCount] = useState<number>(1);
+  const [presenceParticipants, setPresenceParticipants] = useState<PresenceParticipant[]>([]);
+  const [isLivePreviewOpen, setIsLivePreviewOpen] = useState(false);
   const [activeProgressCard, setActiveProgressCard] = useState<ProgressCardData | null>(null);
 
   // Global FTS search shortcut (Ctrl+Shift+K or Cmd+Shift+K)
@@ -512,10 +534,33 @@ export function App() {
         setCurrentWorkspace(savedWorkspace);
       }
 
-      // Check if URL matches a conversation route (/c/:id or /chat/:id)
-      const routeConvId = getConvIdFromPath(window.location.pathname);
-      if (routeConvId) {
-        await handleSelectConversation(routeConvId, false);
+      // Check for share token in URL (/share/:token or ?share=:token)
+      const urlShareToken = getShareTokenFromUrl();
+      if (urlShareToken) {
+        setActiveShareToken(urlShareToken);
+        try {
+          const verifyRes = await verifyShareToken(urlShareToken);
+          if (verifyRes.requires_pin) {
+            setIsPinModalOpen(true);
+          } else if (verifyRes.valid) {
+            setIsSharedSession(true);
+            setSharePermission(verifyRes.permission || 'read');
+            chatSocket.setShareToken(urlShareToken);
+            if (verifyRes.conversation_id) {
+              await handleSelectConversation(verifyRes.conversation_id, false);
+            }
+          } else {
+            showToast(verifyRes.reason || 'Lien de partage invalide ou expiré', 'error');
+          }
+        } catch (err: any) {
+          showToast(err.message || 'Lien de partage invalide', 'error');
+        }
+      } else {
+        // Check if URL matches a conversation route (/c/:id or /chat/:id)
+        const routeConvId = getConvIdFromPath(window.location.pathname);
+        if (routeConvId) {
+          await handleSelectConversation(routeConvId, false);
+        }
       }
     } catch (e) {
       console.error('Error loading initial data:', e);
@@ -1214,6 +1259,19 @@ export function App() {
             setIsStreaming(false);
           }
         }
+      } else if (event.event === 'presence_update') {
+        if (typeof event.count === 'number') {
+          setPresenceCount(event.count);
+        }
+        if (Array.isArray(event.participants)) {
+          setPresenceParticipants(event.participants);
+        }
+      } else if (event.event === 'share_revoked') {
+        showToast(t('share_access_revoked') || 'Accès à la session révoqué', 'error');
+        setIsSharedSession(false);
+        setSharePermission(null);
+      } else if (event.event === 'forbidden') {
+        showToast(event.message || t('share_prompt_disabled_spectator') || 'Action interdite en mode spectateur', 'warning');
       }
     });
 
@@ -1435,6 +1493,13 @@ export function App() {
         return;
       }
 
+      // Ctrl+Shift+P — Live Preview & Inspection
+      if (mod && shift && (e.key === 'P' || e.key === 'p')) {
+        e.preventDefault();
+        setIsLivePreviewOpen((prev) => !prev);
+        return;
+      }
+
       // Escape — Close active modal
       if (e.key === 'Escape') {
         if (isQuickOpenOpen) { setIsQuickOpenOpen(false); return; }
@@ -1456,6 +1521,9 @@ export function App() {
         if (isWorktreeOpen) { setIsWorktreeOpen(false); return; }
         if (isDockerStudioOpen) { setIsDockerStudioOpen(false); return; }
         if (isDatabaseStudioOpen) { setIsDatabaseStudioOpen(false); return; }
+        if (isShareModalOpen) { setIsShareModalOpen(false); return; }
+        if (isPinModalOpen) { setIsPinModalOpen(false); return; }
+        if (isLivePreviewOpen) { setIsLivePreviewOpen(false); return; }
         if (isRightPanelOpen) { setIsRightPanelOpen(false); return; }
         if (isMobileSidebarOpen) { setIsMobileSidebarOpen(false); return; }
         return;
@@ -1478,6 +1546,7 @@ export function App() {
     isQuickOpenOpen, isMcpCatalogOpen, isDoctorOpen,
     isRemoteAccessOpen, isGatewayOpen, isWorktreeOpen,
     isDockerStudioOpen, isDatabaseStudioOpen,
+    isShareModalOpen, isPinModalOpen, isLivePreviewOpen,
   ]);
 
   // Phase 3 Session Handlers (Fork, Pin, Tags, Project, Search)
@@ -2050,6 +2119,13 @@ export function App() {
           onOpenMonacoStudio={handleOpenMonacoStudio}
           progressCard={activeProgressCard}
           onDismissProgressCard={() => setActiveProgressCard(null)}
+          isSharedSession={isSharedSession}
+          sharePermission={sharePermission}
+          presenceCount={presenceCount}
+          presenceParticipants={presenceParticipants}
+          onOpenShare={() => setIsShareModalOpen(true)}
+          onToggleLivePreview={() => setIsLivePreviewOpen((prev) => !prev)}
+          isLivePreviewOpen={isLivePreviewOpen}
         />
 
         <ChatInput
@@ -2117,6 +2193,9 @@ export function App() {
             setDatabaseStudioInitialQuery(query);
             setIsDatabaseStudioOpen(true);
           }}
+          isReadOnly={isSharedSession && sharePermission === 'read'}
+          onOpenShare={() => setIsShareModalOpen(true)}
+          onOpenLivePreview={() => setIsLivePreviewOpen((prev) => !prev)}
         />
       </main>
 
@@ -2360,6 +2439,41 @@ export function App() {
           onClose={() => setIsDatabaseStudioOpen(false)}
           currentWorkspace={currentWorkspace}
           initialQuery={databaseStudioInitialQuery}
+        />
+      )}
+
+      {isShareModalOpen && (
+        <ShareSessionModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          conversationId={activeConversationId}
+        />
+      )}
+
+      {isPinModalOpen && activeShareToken && (
+        <SharePinModal
+          isOpen={isPinModalOpen}
+          token={activeShareToken}
+          onUnlocked={async (res) => {
+            setIsPinModalOpen(false);
+            setIsSharedSession(true);
+            setSharePermission(res.permission || 'read');
+            chatSocket.setShareToken(activeShareToken);
+            if (res.conversation_id) {
+              await handleSelectConversation(res.conversation_id, false);
+            }
+            showToast(t('share_session') || 'Session partagée déverrouillée', 'success');
+          }}
+          onCancel={() => setIsPinModalOpen(false)}
+        />
+      )}
+
+      {isLivePreviewOpen && (
+        <LivePreviewDrawer
+          isOpen={isLivePreviewOpen}
+          onClose={() => setIsLivePreviewOpen(false)}
+          activeConversationId={activeConversationId}
+          currentWorkspace={currentWorkspace}
         />
       )}
       </Suspense>

@@ -85,6 +85,9 @@ interface ChatInputProps {
   onAddBookmark?: (label?: string) => void;
   onOpenMonacoStudio?: (config: MonacoStudioConfig) => void;
   onOpenDatabaseStudio?: (query?: string) => void;
+  onOpenShare?: () => void;
+  onOpenLivePreview?: () => void;
+  isReadOnly?: boolean;
   contextBudgetTokens?: number;
 }
 
@@ -146,6 +149,9 @@ export const ChatInput = React.memo<ChatInputProps>(({
   onAddBookmark,
   onOpenMonacoStudio,
   onOpenDatabaseStudio,
+  onOpenShare,
+  onOpenLivePreview,
+  isReadOnly = false,
   contextBudgetTokens
 }) => {
   const { lang, t } = useI18n();
@@ -830,6 +836,24 @@ export const ChatInput = React.memo<ChatInputProps>(({
           onOpenDatabaseStudio(args || undefined);
         } else {
           window.dispatchEvent(new CustomEvent('open-database-studio', { detail: { query: args || undefined } }));
+        }
+        return true;
+
+      case '/share':
+      case '/collaborate':
+        if (onOpenShare) {
+          onOpenShare();
+        } else {
+          window.dispatchEvent(new CustomEvent('open-share-modal'));
+        }
+        return true;
+
+      case '/preview':
+      case '/live':
+        if (onOpenLivePreview) {
+          onOpenLivePreview();
+        } else {
+          window.dispatchEvent(new CustomEvent('toggle-live-preview'));
         }
         return true;
 
@@ -1620,12 +1644,19 @@ export const ChatInput = React.memo<ChatInputProps>(({
 
           <textarea
             ref={textareaRef}
+            disabled={isReadOnly}
             value={prompt}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={t('composer_placeholder', 'Posez une question ou tapez / pour les commandes...')}
+            placeholder={
+              isReadOnly
+                ? (t('share_prompt_disabled_spectator') || 'Mode lecture seule (Spectateur)')
+                : t('composer_placeholder', 'Posez une question ou tapez / pour les commandes...')
+            }
             rows={1}
-            className="w-full bg-transparent text-[15px] sm:text-xs resize-none outline-none leading-relaxed min-h-[44px] max-h-[160px] sm:max-h-[200px]"
+            className={`w-full bg-transparent text-[15px] sm:text-xs resize-none outline-none leading-relaxed min-h-[44px] max-h-[160px] sm:max-h-[200px] ${
+              isReadOnly ? 'opacity-50 cursor-not-allowed italic' : ''
+            }`}
             style={{ color: 'var(--text)' }}
           />
 
@@ -1921,7 +1952,7 @@ export const ChatInput = React.memo<ChatInputProps>(({
               <button
                 type="button"
                 onClick={() => handleSubmit('normal')}
-                disabled={!prompt.trim() && attachments.length === 0}
+                disabled={isReadOnly || (!prompt.trim() && attachments.length === 0)}
                 className="py-1.5 px-4 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer font-sans"
                 style={{
                   backgroundColor: 'var(--accent)',
