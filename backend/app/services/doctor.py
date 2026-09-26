@@ -29,6 +29,12 @@ from app.services.fts_search import (
     sync_fts_conversations,
 )
 
+__all__ = [
+    "reindex_all_conversations",
+    "run_auto_repair",
+    "run_system_diagnostics",
+]
+
 logger = logging.getLogger(__name__)
 
 DB_PATH = SESSIONS_DB

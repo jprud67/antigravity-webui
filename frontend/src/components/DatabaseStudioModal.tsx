@@ -120,7 +120,16 @@ export const DatabaseStudioModal: React.FC<DatabaseStudioModalProps> = ({
       setSchema(res);
       if (res.tables.length > 0) {
         setExpandedTables({ [res.tables[0].name]: true });
-        setSqlQuery(`SELECT * FROM "${res.tables[0].name}" LIMIT 50;`);
+        setSqlQuery(prev => {
+          if (!prev || prev === 'SELECT 1;' || prev.trim() === '') {
+            const defaultQ = `SELECT * FROM "${res.tables[0].name}" LIMIT 50;`;
+            if (editorRef.current) {
+              editorRef.current.setValue(defaultQ);
+            }
+            return defaultQ;
+          }
+          return prev;
+        });
       }
     } catch (err: any) {
       showToast(err.message || t('db_schema_error', 'Échec du chargement du schéma'), 'error');
@@ -188,6 +197,9 @@ export const DatabaseStudioModal: React.FC<DatabaseStudioModalProps> = ({
   // Keydown listener for Ctrl+Enter
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
+    if (sqlQuery && editor.getValue() !== sqlQuery) {
+      editor.setValue(sqlQuery);
+    }
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       handleExecuteQueryRef.current();
     });

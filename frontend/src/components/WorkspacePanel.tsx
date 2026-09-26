@@ -1611,7 +1611,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       {/* Panel Tab Body */}
       <div className="flex-1 min-h-0 overflow-hidden relative select-text">
         <div className={`h-full ${activeTab === 'terminal' ? 'block' : 'hidden'}`}>
-          <TerminalTab currentWorkspace={currentWorkspace} />
+          <TerminalTab key={currentWorkspace} currentWorkspace={currentWorkspace} />
         </div>
 
         {activeTab === 'git' && (
@@ -2582,6 +2582,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     {/* Terminal Body */}
                     <div className="flex-1 min-h-0 relative overflow-hidden">
                       <TerminalTab
+                        key={`split-${currentWorkspace}`}
                         currentWorkspace={currentWorkspace}
                         compact={true}
                         onClose={() => {

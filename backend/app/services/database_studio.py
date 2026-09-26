@@ -349,5 +349,5 @@ def export_query_results(db_path: str, query: str, format: str = "csv") -> str:
     writer = csv.writer(output)
     writer.writerow(result.columns)
     for row in result.rows:
-        writer.writerow(row)
+        writer.writerow([cell if cell is not None else "" for cell in row])
     return output.getvalue()

@@ -283,12 +283,14 @@ export function App() {
     window.addEventListener('open-quick-open', handleQuickOpen);
     window.addEventListener('open-workspace-search', handleWorkspaceSearch);
     window.addEventListener('open-database-studio', handleOpenDatabaseStudio);
+    window.addEventListener('antigravity:open-database-studio', handleOpenDatabaseStudio);
     return () => {
       window.removeEventListener('open-workspace-file', handleOpenFile);
       window.removeEventListener('terminal-run-command', handleRunTerminal);
       window.removeEventListener('open-quick-open', handleQuickOpen);
       window.removeEventListener('open-workspace-search', handleWorkspaceSearch);
       window.removeEventListener('open-database-studio', handleOpenDatabaseStudio);
+      window.removeEventListener('antigravity:open-database-studio', handleOpenDatabaseStudio);
     };
   }, []);
 

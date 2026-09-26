@@ -19,24 +19,34 @@ logger = logging.getLogger("antigravity.kanban")
 router = APIRouter(prefix="/api/kanban", tags=["kanban"])
 
 KANBAN_DB_PATH = Path(os.environ.get("ANTIGRAVITY_KANBAN_DB", str(GEMINI_DIR / "webui_kanban.db")))
+
+
+def get_kanban_db_path() -> Path:
+    env_path = os.environ.get("ANTIGRAVITY_KANBAN_DB")
+    if env_path:
+        return Path(env_path)
+    return KANBAN_DB_PATH
+
+
 _schema_lock = threading.RLock()
-_schema_initialized = False
+_initialized_kanban_paths: set[str] = set()
 
 
 def get_db_connection() -> sqlite3.Connection:
-    global _schema_initialized
-    KANBAN_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(KANBAN_DB_PATH), timeout=15.0)
+    target_path = get_kanban_db_path()
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(target_path), timeout=15.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=5000")
-    if not _schema_initialized:
+    path_key = str(target_path.resolve()) if target_path.exists() else str(target_path)
+    if path_key not in _initialized_kanban_paths:
         with _schema_lock:
-            if not _schema_initialized:
+            if path_key not in _initialized_kanban_paths:
                 _ensure_schema(conn)
-                restrict_file_permissions(KANBAN_DB_PATH)
-                _schema_initialized = True
+                restrict_file_permissions(target_path)
+                _initialized_kanban_paths.add(path_key)
     return conn
 
 
@@ -196,7 +206,7 @@ def list_tasks(
             "tasks": tasks,
             "columns": columns,
             "count": len(tasks),
-            "db_path": str(KANBAN_DB_PATH)
+            "db_path": str(get_kanban_db_path())
         }
     except Exception as e:
         logger.error(f"Error listing tasks: {e}", exc_info=True)
