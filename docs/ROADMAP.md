@@ -238,12 +238,21 @@ This roadmap outlines the strategic direction for **Antigravity‑webui**, the f
 | **Collapsible Problems Drawer & 1-Click Line Jump** | Tiroir rétractable interactif "Problèmes" (`MonacoStudioModal.tsx` et `WorkspacePanel.tsx`) avec compteurs d'erreurs/avertissements, navigation 1-clic avec centrage et surbrillance du curseur (`revealPositionInCenter`), bascule auto-lint et rafraîchissement manuel. | Frontend / UX | 2027‑03‑29 | ✅ **Completed** |
 | **Release v0.3.4 & Full 15-Language i18n Parity** | Bump de version v0.3.4, parité stricte des 4 347 clés sur les 15 langues dans `locales.json`, 189 tests pytest validés à 100%, build de production Vite sans erreur. | Release Manager | 2027‑03‑29 | ✅ **Completed** |
 
-### 📌 Prochaines étapes v0.4 (Cockpit Web IDE & Agentic Workspace)
+### 📌 Jalon v0.4.0 : Collaborative Session Sharing & Live Preview (Direct Link, WebSocket Sync & Multi-View Inspection)
+| Milestone | Description | Owner | Target | Status |
+|---|---|---|---|---|
+| **Backend SQLite Share Engine & REST Endpoints (`/api/share/*`)** | Persistance sécurisée des sessions partagées (`shared_sessions`), tokens cryptographiques haute entropie, hachage sécurisé des codes PIN (PBKDF2-SHA256, 100k itérations, salt aléatoire, vérification en temps constant), expiration UTC configurable (1h, 24h, 7j, illimité), révocation instantanée 1-clic et gardes d'authentification. | Backend / Security | 2027‑03‑29 | ✅ **Completed** |
+| **WebSocket Real-Time Presence Hub & Spectator Guard** | Synchronisation en temps réel via WebSocket avec prise en charge du token partagé (`?share=...`), gestionnaire de présence dynamique (`attendee_count`, notifications d'arrivée/départ), attribution de rôles (`spectator` vs `copilot`), et garde stricte empêchant l'exécution d'actions/outils pour les spectateurs avec déconnexion immédiate (code 4403) en cas de révocation du lien. | Backend / Core | 2027‑03‑29 | ✅ **Completed** |
+| **Share Session & PIN Verification Modals** | Modale de partage interactive (`ShareSessionModal.tsx`) avec sélection de rôle, durée de validité, protection optionnelle par code PIN, génération de lien avec copie 1-clic, tableau des liens actifs avec révocation directe. Modale de saisie de code PIN (`SharePinModal.tsx`) avec retour visuel et gestion d'erreurs. | Frontend / UX | 2027‑03‑29 | ✅ **Completed** |
+| **Multi-View Live Preview Drawer** | Tiroir latéral rétractable (`LivePreviewDrawer.tsx`) offrant 3 modes d'inspection : iframe responsive sandboxée pour applications Web et Canvas (avec présélections Desktop, Tablette, Mobile et rechargement), visionneuse Monaco Editor en lecture seule pour les fichiers modifiés de la session avec sélecteur de fichiers, et visionneuse Markdown pour les artéfacts et plans de session. Raccourci global `Ctrl+Shift+P`. | Frontend / IDE | 2027‑03‑29 | ✅ **Completed** |
+| **Full 15-Language i18n Parity & Release v0.4.0** | Ajout de 38 nouvelles clés `share_*` avec parité stricte à 100% sur l'ensemble des 15 langues dans `locales.json` (4 384 clés par langue), commandes slash (`/share`, `/collaborate`, `/preview`), 100% tests pytest validés, zéro erreur TypeScript (`tsc -b`), build de production Vite optimisé. | Release Manager | 2027‑03‑29 | ✅ **Completed** |
+
+### 📌 Prochaines étapes v0.4.x (Cockpit Web IDE & Agentic Workspace)
 | Milestone | Description |
 |---|---|
-| **Collaborative Session Sharing & Live Preview** – Partage de session par lien direct, synchronisation WebSocket et inspection conjointe. |
 | **Multi-Agent Visual Orchestration Studio** – Visualisation des sous-agents en temps réel, graphe d'exécution et pilotage hiérarchique. |
-| **Release v0.4 – Premium Web IDE & Autonomous Agent Cockpit** |
+| **Autonomous Multi-Workspace Coordinator** – Orchestration parallèle de plusieurs workspaces et pipelines CI/CD autonomes. |
+
 
 
 
