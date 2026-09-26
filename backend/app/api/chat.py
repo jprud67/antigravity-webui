@@ -1,8 +1,11 @@
 import base64
 import logging
+import secrets
+import time
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.services import share_service
 from app.services.auth import get_auth_config, verify_token_or_api_key
 from app.services.execution_manager import execution_manager
 from app.services.storage import is_safe_conversation_id
@@ -57,15 +60,45 @@ async def chat_websocket(
             elif sp_clean == "antigravity":
                 selected_subprotocol = "antigravity"
 
-    config = get_auth_config()
-    if config.get("enabled", True) and not verify_token_or_api_key(effective_token):
-        await websocket.close(code=1008, reason="Unauthorized")
-        logger.warning("Rejected unauthenticated WebSocket connection to /ws/chat")
-        return
+    share_token = websocket.query_params.get("share_token")
+    client_role = "host"
+    client_nickname = "Hôte"
+    client_color = "#3b82f6"
+    bound_conv_id = None
+
+    if share_token:
+        pin_code = websocket.query_params.get("pin_code")
+        v_res = share_service.verify_share_token(share_token, pin_code=pin_code)
+        if not v_res.get("valid"):
+            await websocket.close(code=1008, reason="Unauthorized")
+            logger.warning("Rejected invalid share_token WebSocket connection to /ws/chat")
+            return
+        share_permission = v_res.get("permission", "read")
+        bound_conv_id = v_res.get("conversation_id")
+        client_role = "spectator" if share_permission == "read" else "copilot"
+        cid_tag = bound_conv_id[:4] if bound_conv_id else "Guest"
+        client_nickname = f"Spectateur {cid_tag}" if client_role == "spectator" else f"Co-pilote {cid_tag}"
+        client_color = "#06b6d4" if client_role == "spectator" else "#8b5cf6"
+    else:
+        config = get_auth_config()
+        if config.get("enabled", True) and not verify_token_or_api_key(effective_token):
+            await websocket.close(code=1008, reason="Unauthorized")
+            logger.warning("Rejected unauthenticated WebSocket connection to /ws/chat")
+            return
+
+    client_info = {
+        "client_id": secrets.token_hex(4),
+        "role": client_role,
+        "nickname": client_nickname,
+        "avatar_color": client_color,
+        "share_token": share_token,
+        "bound_conversation_id": bound_conv_id,
+        "joined_at": time.time(),
+    }
 
     await websocket.accept(subprotocol=selected_subprotocol)
-    execution_manager.register_socket(websocket)
-    logger.info("WebSocket client connected to /ws/chat")
+    execution_manager.register_socket(websocket, client_info)
+    logger.info(f"WebSocket client connected to /ws/chat (role={client_role}, bound={bound_conv_id})")
 
     # Send connection handshake with server status
     try:
@@ -79,10 +112,19 @@ async def chat_websocket(
         await websocket.send_json({
             "event": "connected",
             "active_conversations": active_cids,
-            "active_turn": active_turn
+            "active_turn": active_turn,
+            "role": client_role,
+            "nickname": client_nickname,
+            "bound_conversation_id": bound_conv_id
         })
     except Exception as e:
         logger.warning(f"Failed to send initial handshake to websocket: {e}")
+
+    # If bound to a shared conversation, auto-attach to session subscribers and broadcast presence
+    if bound_conv_id:
+        session = execution_manager.get_or_create_session(bound_conv_id)
+        session.add_subscriber(websocket)
+        await execution_manager.broadcast_presence(bound_conv_id)
 
     try:
         while True:
@@ -93,10 +135,27 @@ async def chat_websocket(
                 conv_id = conv_id.strip()
                 if conv_id in ("", "null", "undefined", "None"):
                     conv_id = None
+
+            # Guest isolation: cannot manipulate conversations other than the bound one
+            if bound_conv_id and conv_id and conv_id != bound_conv_id:
+                await websocket.send_json({"event": "error", "message": "Accès limité à la session partagée."})
+                continue
+            if bound_conv_id and not conv_id:
+                conv_id = bound_conv_id
+
             if conv_id and not is_safe_conversation_id(conv_id):
                 await websocket.send_json({"event": "error", "message": "Identifiant de conversation invalide."})
                 continue
             data["conversation_id"] = conv_id
+
+            # Role enforcement: spectator cannot send prompts, steering, or approvals
+            if client_role == "spectator" and action in ("prompt", "steer", "interrupt", "cancel", "clear_queue", "approval", "input", "answer", "stdin"):
+                await websocket.send_json({
+                    "event": "forbidden",
+                    "action": action,
+                    "message": "Action refusée : session partagée en lecture seule (Mode Spectateur)"
+                })
+                continue
 
             if action == "prompt":
                 await execution_manager.submit_prompt(websocket, data)
@@ -104,6 +163,7 @@ async def chat_websocket(
             elif action == "attach":
                 state = await execution_manager.attach(conv_id, websocket)
                 await websocket.send_json({"event": "attached", **state})
+                await execution_manager.broadcast_presence(conv_id)
 
             elif action in ["interrupt", "cancel"]:
                 await execution_manager.interrupt(conv_id)
@@ -143,3 +203,4 @@ async def chat_websocket(
         # Crucial: Unregister socket only, DO NOT kill processes or cancel tasks!
         execution_manager.unregister_socket(websocket)
         logger.info("WebSocket connection cleaned up; background tasks continue running.")
+

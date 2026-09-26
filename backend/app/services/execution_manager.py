@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+import uuid
 from collections import deque
 from typing import Any
 
@@ -776,6 +777,7 @@ class ExecutionManager:
         self.sessions: dict[str, ExecutionSession] = {}
         self.active_session: ExecutionSession | None = None
         self.connected_sockets: set[WebSocket] = set()
+        self.socket_info: dict[WebSocket, dict[str, Any]] = {}
         self._background_tasks: set[asyncio.Task[Any]] = set()
         self._lock: asyncio.Lock = asyncio.Lock()
 
@@ -829,16 +831,38 @@ class ExecutionManager:
             target_session.pending_approval = None
             logger.info(f"Removed execution session for conversation {conversation_id} from memory.")
 
-    def register_socket(self, ws: WebSocket):
+    def register_socket(self, ws: WebSocket, info: dict[str, Any] | None = None):
         self.connected_sockets.add(ws)
+        if info is not None:
+            self.socket_info[ws] = info
+        else:
+            self.socket_info[ws] = {
+                "client_id": uuid.uuid4().hex[:8],
+                "role": "host",
+                "nickname": "Hôte",
+                "avatar_color": "#3b82f6",
+                "joined_at": time.time(),
+            }
 
     def unregister_socket(self, ws: WebSocket, prune: bool = True):
         self.connected_sockets.discard(ws)
+        info = self.socket_info.pop(ws, None)
+        bound_cid = info.get("bound_conversation_id") if info else None
+
         # Detach from all sessions WITHOUT stopping or cancelling anything!
         for s in list(self.sessions.values()):
             s.remove_subscriber(ws)
         if self.active_session:
             self.active_session.remove_subscriber(ws)
+
+        if bound_cid:
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    loop.create_task(self.broadcast_presence(bound_cid))
+            except Exception as e:
+                logger.debug(f"Could not broadcast presence on socket unregister: {e}")
+
         if prune:
             try:
                 self.prune_inactive_sessions()
@@ -847,6 +871,62 @@ class ExecutionManager:
         logger.info(
             f"WebSocket client disconnected; {len(self.get_running_conversations())} background task(s) continue running uninterrupted."
         )
+
+    async def broadcast_presence(self, conversation_id: str | None) -> None:
+        """Broadcasts live attendee presence list and count to all subscribers of a conversation."""
+        if not conversation_id:
+            return
+        session = self.get_session(conversation_id)
+        if not session:
+            return
+
+        participants: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+
+        for ws in list(session.subscribers):
+            info = self.socket_info.get(ws)
+            if info:
+                cid = info.get("client_id")
+                if cid and cid not in seen_ids:
+                    seen_ids.add(cid)
+                    participants.append({
+                        "client_id": cid,
+                        "role": info.get("role", "host"),
+                        "nickname": info.get("nickname", "Participant"),
+                        "avatar_color": info.get("avatar_color", "#6366f1"),
+                    })
+            else:
+                dummy_id = f"host_{id(ws) % 10000}"
+                if dummy_id not in seen_ids:
+                    seen_ids.add(dummy_id)
+                    participants.append({
+                        "client_id": dummy_id,
+                        "role": "host",
+                        "nickname": "Hôte",
+                        "avatar_color": "#3b82f6",
+                    })
+
+        event = {
+            "event": "presence_update",
+            "conversation_id": conversation_id,
+            "count": len(participants),
+            "participants": participants,
+        }
+        await session.broadcast(event)
+
+    def disconnect_token(self, share_token: str) -> int:
+        """Closes all WebSockets attached to a specific share token."""
+        to_disconnect = [
+            ws for ws, info in self.socket_info.items()
+            if info.get("share_token") == share_token
+        ]
+        for ws in to_disconnect:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(ws.close(code=4403, reason="Session Share Revoked"))
+            except Exception as e:
+                logger.debug("Failed closing revoked websocket: %s", e)
+        return len(to_disconnect)
 
     def register_session_cid(self, session: ExecutionSession, cid: str | None) -> None:
         clean = _clean_cid(cid)

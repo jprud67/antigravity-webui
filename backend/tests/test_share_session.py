@@ -146,3 +146,46 @@ def test_api_create_and_verify_flow():
     assert res_after.json()["valid"] is False
     assert res_after.json()["reason"] == "revoked"
 
+
+def test_ws_share_spectator_read_only():
+    cid = "conv_ws_spectator"
+    link = share_service.create_share_link(cid, permission="read")
+    token = link["token"]
+
+    # Connect via WebSocket with share_token
+    with client.websocket_connect(f"/ws/chat?share_token={token}") as ws:
+        ev1 = ws.receive_json()
+        assert ev1["event"] == "connected"
+        assert ev1["role"] == "spectator"
+
+        ev2 = ws.receive_json()
+        assert ev2["event"] == "presence_update"
+        assert ev2["count"] >= 1
+
+        # Try to submit a prompt as spectator -> must be rejected with forbidden
+        ws.send_json({"action": "prompt", "conversation_id": cid, "prompt": "rm -rf /"})
+        resp = ws.receive_json()
+        assert resp["event"] == "forbidden"
+        assert "lecture seule" in resp["message"] or "spectateur" in resp["message"].lower()
+
+
+def test_ws_share_copilot_allowed():
+    cid = "conv_ws_copilot"
+    link = share_service.create_share_link(cid, permission="write")
+    token = link["token"]
+
+    # Connect via WebSocket with share_token (write)
+    with client.websocket_connect(f"/ws/chat?share_token={token}") as ws:
+        ev1 = ws.receive_json()
+        assert ev1["event"] == "connected"
+        assert ev1["role"] == "copilot"
+
+        ev2 = ws.receive_json()
+        assert ev2["event"] == "presence_update"
+
+        # Ping should succeed
+        ws.send_json({"action": "ping", "conversation_id": cid})
+        resp = ws.receive_json()
+        assert resp["event"] == "pong"
+
+
