@@ -28,13 +28,14 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger("antigravity.memory")
 
 # Verrouillage cross-processus : fcntl sur Unix, msvcrt sur Windows
-fcntl = None
-msvcrt = None
 try:
     import fcntl
 except ImportError:
-    with suppress(ImportError):
-        import msvcrt
+    fcntl = None  # type: ignore[assignment]
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None  # type: ignore[assignment]
 
 ENTRY_DELIMITER = "\n§\n"
 
@@ -155,7 +156,7 @@ class MemoryStore:
                     fcntl.flock(fd, fcntl.LOCK_EX)
                 elif msvcrt:
                     fd.seek(0)
-                    msvcrt.locking(fd.fileno(), msvcrt.LK_LOCK, 1)
+                    msvcrt.locking(fd.fileno(), msvcrt.LK_LOCK, 1)  # type: ignore[attr-defined]
                 yield
             finally:
                 with suppress(Exception):
@@ -163,7 +164,7 @@ class MemoryStore:
                         fcntl.flock(fd, fcntl.LOCK_UN)
                     elif msvcrt:
                         fd.seek(0)
-                        msvcrt.locking(fd.fileno(), msvcrt.LK_UNLCK, 1)
+                        msvcrt.locking(fd.fileno(), msvcrt.LK_UNLCK, 1)  # type: ignore[attr-defined]
 
     def _parse_entries(self, text: str) -> List[str]:
         """Découpe le texte markdown en entrées distinctes."""

@@ -11,13 +11,14 @@ import json
 import logging
 import sqlite3
 import time
-from pathlib import Path
 from typing import Any, List, Optional
 from pydantic import BaseModel, Field
 
+from app.config import SESSIONS_DB
+
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(__file__).resolve().parent.parent.parent / "sessions.db"
+DB_PATH = SESSIONS_DB
 
 PROGRESS_CARD_MAX_STEPS = 25
 PROGRESS_CARD_MAX_BYTES = 16384

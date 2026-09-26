@@ -10,16 +10,17 @@ from __future__ import annotations
 import base64
 import json
 import logging
-import os
 import secrets
 import sqlite3
 import time
 import urllib.parse
 from typing import Any, Dict, List, Optional
 
+from app.config import SESSIONS_DB
+
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "sessions.db")
+DB_PATH = str(SESSIONS_DB)
 
 
 def is_safe_push_endpoint(endpoint: str) -> bool:
@@ -28,9 +29,7 @@ def is_safe_push_endpoint(endpoint: str) -> bool:
         parsed = urllib.parse.urlparse(endpoint)
         if parsed.scheme == "https":
             return bool(parsed.hostname)
-        if parsed.scheme == "http" and parsed.hostname in ("127.0.0.1", "localhost", "::1"):
-            return True
-        return False
+        return bool(parsed.scheme == "http" and parsed.hostname in ("127.0.0.1", "localhost", "::1"))
     except Exception:
         return False
 
@@ -156,7 +155,7 @@ def send_web_push_notification(
         try:
             # If pywebpush is installed, use native VAPID encryption
             try:
-                from pywebpush import webpush
+                from pywebpush import webpush  # type: ignore[import-not-found,import-untyped]
                 keys = get_or_create_vapid_keys()
                 webpush(
                     subscription_info={

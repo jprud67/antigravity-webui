@@ -19,6 +19,7 @@ if not Path(AGY_BIN).exists():
         AGY_BIN = resolved
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+SESSIONS_DB = REPO_ROOT / "backend" / "sessions.db"
 
 def _detect_default_workspace() -> Path:
     env_ws = os.environ.get("ANTIGRAVITY_DEFAULT_WORKSPACE")

@@ -1,5 +1,4 @@
 import uuid
-import pytest
 from app.services.messaging_gateway import (
     ALPHABET,
     generate_pairing_code,
@@ -32,7 +31,7 @@ def test_pairing_lifecycle(tmp_path):
     assert not is_user_approved("telegram", user_id)
 
     # 2. Request pairing code
-    ok, msg, code = request_pairing("telegram", user_id, "Alice Test")
+    ok, _msg, code = request_pairing("telegram", user_id, "Alice Test")
     assert ok is True
     assert code is not None
 
@@ -41,7 +40,7 @@ def test_pairing_lifecycle(tmp_path):
     assert any(p["code"] == code for p in pending)
 
     # 4. Approve code
-    approved_ok, approve_msg, dev = approve_pairing_code(code)
+    approved_ok, _approve_msg, dev = approve_pairing_code(code)
     assert approved_ok is True
     assert dev is not None
     assert dev["user_id"] == user_id

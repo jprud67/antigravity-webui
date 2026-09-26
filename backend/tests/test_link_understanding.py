@@ -6,7 +6,6 @@ from app.services.link_understanding import (
     is_safe_public_url,
     extract_bare_urls,
     _clean_html_to_text,
-    fetch_and_extract_url,
     enrich_user_prompt_with_links
 )
 

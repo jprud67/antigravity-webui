@@ -10,15 +10,16 @@ Provides:
 from __future__ import annotations
 
 import logging
-import os
 import secrets
 import sqlite3
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.config import SESSIONS_DB
+
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "sessions.db")
+DB_PATH = str(SESSIONS_DB)
 
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 CODE_LENGTH = 8

@@ -4,8 +4,6 @@ from app.main import app
 from app.services.mcp_catalog import (
     list_mcp_catalog,
     get_mcp_catalog_item,
-    install_mcp_catalog_item,
-    uninstall_mcp_catalog_item,
     test_mcp_connection as ping_mcp_server
 )
 

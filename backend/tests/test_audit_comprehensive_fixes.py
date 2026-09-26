@@ -1,6 +1,5 @@
 import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import urllib.error
 
 from app.services.fts_search import fts_service, reindex_all_conversations
@@ -86,12 +85,14 @@ def test_tailscale_port_validation():
 
 def test_web_push_http_error_prunes_subscription():
     sub = {"endpoint": "https://push.example.com/expired", "keys": {"p256dh": "k", "auth": "a"}}
-    with patch("app.services.web_push.list_subscriptions", return_value=[sub]):
-        with patch("app.services.web_push.remove_subscription") as mock_remove:
-            with patch("urllib.request.urlopen", side_effect=urllib.error.HTTPError("https://push.example.com/expired", 410, "Gone", {}, None)):
-                res = send_web_push_notification("title", "body")
-                assert res["failed"] == 1
-                mock_remove.assert_called_with("https://push.example.com/expired")
+    with (
+        patch("app.services.web_push.list_subscriptions", return_value=[sub]),
+        patch("app.services.web_push.remove_subscription") as mock_remove,
+        patch("urllib.request.urlopen", side_effect=urllib.error.HTTPError("https://push.example.com/expired", 410, "Gone", {}, None)),
+    ):
+        res = send_web_push_notification("title", "body")
+        assert res["failed"] == 1
+        mock_remove.assert_called_with("https://push.example.com/expired")
 
 
 @pytest.mark.asyncio

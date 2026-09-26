@@ -1,11 +1,8 @@
 """Unit tests for Tailscale and Web Push services."""
 
-import sqlite3
-import pytest
 from unittest.mock import patch, MagicMock
 from app.services.tailscale import (
     get_tailscale_status,
-    toggle_tailscale_serve,
 )
 from app.services.web_push import (
     get_or_create_vapid_keys,

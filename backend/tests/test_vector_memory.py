@@ -9,7 +9,6 @@ from app.services.vector_memory import (
     MemorySearchInput,
     MemoryStoreInput,
     clear_memories,
-    compute_embedding,
     cosine_similarity,
     delete_memory,
     execute_auto_recall_hook,

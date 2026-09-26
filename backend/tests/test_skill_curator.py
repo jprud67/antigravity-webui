@@ -1,7 +1,6 @@
 import tempfile
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -55,6 +54,7 @@ def test_skill_curator_lifecycle():
         old_data["test-skill-1"]["last_used_at"] = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat()
         curator._save_usage(old_data)
         sweep_archive = curator.sweep_lifecycle(stale_days=14, archive_days=30)
+        assert sweep_archive["transitions_count"] == 1
         assert curator.get_skill_telemetry("test-skill-1")["status"] == STATE_ARCHIVED
 
         # Re-use should reactivate to active

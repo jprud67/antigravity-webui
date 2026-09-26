@@ -1,6 +1,5 @@
 """Unit tests for Persistent Python Kernel and Tool RPC service."""
 
-import os
 from pathlib import Path
 import pytest
 from app.services.code_kernel import (

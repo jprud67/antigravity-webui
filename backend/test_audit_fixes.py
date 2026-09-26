@@ -8984,24 +8984,27 @@ def test_git_run_git_non_interactive_editor():
 
 def test_git_resolve_conflict_checkout_failure():
     """Vérifie que resolve_conflict lève une HTTPException 400 si checkout --ours ou --theirs échoue."""
-    from unittest.mock import patch
     import subprocess
+    from unittest.mock import patch
     from fastapi import HTTPException
-    import app.api.git as git_mod
-    from app.api.git import resolve_conflict, ResolveConflictRequest
+    from app.api.git import ResolveConflictRequest, resolve_conflict
 
-    with patch("app.api.git._validate_workspace", return_value=Path("/fake/workspace")):
-        with patch("app.api.git._resolve_relative_git_path", return_value="conflict_file.txt"):
-            def fake_run_git(args, cwd, **kwargs):
-                if args[:2] == ["checkout", "--ours"]:
-                    return subprocess.CompletedProcess(args, 1, stdout="", stderr="error: pathspec did not match")
-                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+    with (
+        patch("app.api.git._validate_workspace", return_value=Path("/fake/workspace")),
+        patch("app.api.git._resolve_relative_git_path", return_value="conflict_file.txt"),
+    ):
+        def fake_run_git(args, cwd, **kwargs):
+            if args[:2] == ["checkout", "--ours"]:
+                return subprocess.CompletedProcess(args, 1, stdout="", stderr="error: pathspec did not match")
+            return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
 
-            with patch("app.api.git.run_git", side_effect=fake_run_git):
-                with pytest.raises(HTTPException) as exc_info:
-                    resolve_conflict(ResolveConflictRequest(workspace="/fake/workspace", path="conflict_file.txt", resolution="ours"))
-                assert exc_info.value.status_code == 400
-                assert "Erreur lors de la résolution (ours)" in exc_info.value.detail
+        with (
+            patch("app.api.git.run_git", side_effect=fake_run_git),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            resolve_conflict(ResolveConflictRequest(workspace="/fake/workspace", path="conflict_file.txt", resolution="ours"))
+        assert exc_info.value.status_code == 400
+        assert "Erreur lors de la résolution (ours)" in exc_info.value.detail
 
 
 def test_session_metadata_get_trimmed_conversation_id():

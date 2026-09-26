@@ -15,18 +15,17 @@ import shutil
 import sqlite3
 import sys
 import time
-from pathlib import Path
 from typing import Any
 import httpx
 import psutil
 
-from app.config import CONVERSATION_DB
+from app.config import CONVERSATION_DB, REPO_ROOT, SESSIONS_DB
 from app.services.fts_search import get_fts_stats, reindex_all_conversations
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(__file__).resolve().parent.parent.parent / "sessions.db"
-WORKSPACE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+DB_PATH = SESSIONS_DB
+WORKSPACE_DIR = REPO_ROOT
 
 
 LLM_PROBES = [

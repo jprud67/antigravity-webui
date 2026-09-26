@@ -7,7 +7,6 @@ from app.main import app
 from app.services.docker_studio import (
     get_docker_status,
     scan_workspace_docker_files,
-    list_containers,
 )
 
 client = TestClient(app)

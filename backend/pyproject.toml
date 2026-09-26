@@ -1,7 +1,18 @@
 [tool.ruff]
-lint.ignore = ["B008", "BLE001", "S110", "G201", "PLW1510", "S112", "SIM102", "DTZ006"]
+lint.ignore = ["B008", "BLE001", "S110", "G201", "PLW1510", "S112", "SIM102", "DTZ006", "S102"]
 
 [tool.pytest.ini_options]
 pythonpath = ["app", "."]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+follow_imports = "silent"
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = false
 

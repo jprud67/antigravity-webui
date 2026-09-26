@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -58,7 +57,7 @@ Voici ce que nous allons faire ensuite."""
   }
 }
 ```"""
-    clean2, calls2, rep2 = engine.repair_and_extract(text2, allowed_tools=["run_command"])
+    _clean2, calls2, rep2 = engine.repair_and_extract(text2, allowed_tools=["run_command"])
     assert rep2 is True
     assert len(calls2) == 1
     assert calls2[0]["name"] == "run_command"
@@ -69,7 +68,7 @@ Voici ce que nous allons faire ensuite."""
 ```bash
 npm run build
 ```"""
-    clean3, calls3, rep3 = engine.repair_and_extract(text3, allowed_tools=["run_command"], promote_shell=True)
+    _clean3, calls3, rep3 = engine.repair_and_extract(text3, allowed_tools=["run_command"], promote_shell=True)
     assert rep3 is True
     assert len(calls3) == 1
     assert calls3[0]["name"] == "run_command"

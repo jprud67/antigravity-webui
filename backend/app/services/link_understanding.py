@@ -15,14 +15,15 @@ import re
 import socket
 import sqlite3
 import time
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 import httpx
 
+from app.config import SESSIONS_DB
+
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(__file__).resolve().parent.parent.parent / "sessions.db"
+DB_PATH = SESSIONS_DB
 CACHE_TTL_SECONDS = 86400  # 24 hours
 MAX_CONTENT_CHARS = 1800
 

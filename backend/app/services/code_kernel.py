@@ -62,10 +62,16 @@ class KernelToolProxy:
             raise FileNotFoundError(f"Fichier introuvable : {full_path}")
         with open(full_path, "r", encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
-        
-        start = max(1, start_line) - 1 if start_line else 0
-        end = min(len(lines), end_line) if end_line else len(lines)
-        return "".join(lines[start:end])
+
+        try:
+            start_idx = max(1, int(start_line)) - 1 if start_line is not None else 0
+        except (ValueError, TypeError):
+            start_idx = 0
+        try:
+            end_idx = min(len(lines), int(end_line)) if end_line is not None else len(lines)
+        except (ValueError, TypeError):
+            end_idx = len(lines)
+        return "".join(lines[start_idx:end_idx])
 
     def list_dir(self, path: str = ".") -> List[Dict[str, Any]]:
         full_path = os.path.normpath(os.path.join(self.cwd, path)) if not os.path.isabs(path) else path
@@ -180,7 +186,7 @@ class PersistentPythonKernel:
                 try:
                     with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
                         compiled = compile(code, f"<cell-{current_exec_count}>", "exec")
-                        exec(compiled, self.globals)  # nosec B102
+                        exec(compiled, self.globals)  # nosec B102 # noqa: S102
                 except SystemExit as se:
                     status = "exit"
                     tb = f"SystemExit: {se.code}"

@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,7 +44,7 @@ from app.api.messaging_gateway import router as messaging_gateway_router
 from app.api.canvas_documents import router as canvas_documents_router
 from app.api.vector_memory import router as vector_memory_router
 from app.api.docker_studio import router as docker_studio_router
-from app.config import BRAIN_DIR, CONVERSATION_DB
+from app.config import BRAIN_DIR, CONVERSATION_DB, REPO_ROOT
 from app.services.cron_ticker import cron_ticker_loop
 from app.services.execution_manager import execution_manager
 from app.services.fs_watcher import set_main_loop, watch_filesystem
@@ -188,7 +187,7 @@ class CacheStaticFiles(StaticFiles):
 
 
 # Frontend SPA serving
-FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
 if (FRONTEND_DIST / "assets").is_dir():
     app.mount("/assets", CacheStaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 

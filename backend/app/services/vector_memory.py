@@ -87,11 +87,11 @@ class AutoRecallConfig(BaseModel):
     enabled: bool = True
     provider: EmbeddingProvider = "local"
     model: str = "text-embedding-3-small"
-    api_key: Optional[str] = Field(None, alias="apiKey")
-    api_base: Optional[str] = Field(None, alias="apiBase")
-    max_results: int = Field(3, ge=1, le=10, alias="maxResults")
-    min_similarity: float = Field(0.60, ge=0.0, le=1.0, alias="minSimilarity")
-    max_chars: int = Field(2000, ge=200, le=10000, alias="maxChars")
+    api_key: Optional[str] = Field(default=None, alias="apiKey")
+    api_base: Optional[str] = Field(default=None, alias="apiBase")
+    max_results: int = Field(default=3, ge=1, le=10, alias="maxResults")
+    min_similarity: float = Field(default=0.60, ge=0.0, le=1.0, alias="minSimilarity")
+    max_chars: int = Field(default=2000, ge=200, le=10000, alias="maxChars")
 
 
 class RecallHookResult(BaseModel):
@@ -187,12 +187,13 @@ async def compute_embedding(text: str, cfg: Optional[AutoRecallConfig] = None) -
     config = cfg or get_auto_recall_config()
 
     if config.provider == "openai" and config.api_key:
-        api_base = (config.api_base or "https://api.openai.com/v1").rstrip("/")
+        api_key = config.api_key.strip()
+        api_base = (config.api_base.strip() if config.api_base else "https://api.openai.com/v1").rstrip("/")
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.post(
                     f"{api_base}/embeddings",
-                    headers={"Authorization": f"Bearer {config.api_key}"},
+                    headers={"Authorization": f"Bearer {api_key}"},
                     json={"model": config.model, "input": text},
                 )
                 if res.status_code == 200:
@@ -202,13 +203,14 @@ async def compute_embedding(text: str, cfg: Optional[AutoRecallConfig] = None) -
             logger.warning(f"OpenAI embedding call failed, falling back to local: {e}")
 
     elif config.provider == "gemini" and config.api_key:
-        api_base = (config.api_base or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
+        api_key = config.api_key.strip()
+        api_base = (config.api_base.strip() if config.api_base else "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
         model = config.model if config.model and "embedding" in config.model else "text-embedding-004"
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.post(
                     f"{api_base}/models/{model}:embedContent",
-                    headers={"x-goog-api-key": config.api_key, "Content-Type": "application/json"},
+                    headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
                     json={"content": {"parts": [{"text": text}]}},
                 )
                 if res.status_code == 200:

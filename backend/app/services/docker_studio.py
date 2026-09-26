@@ -17,7 +17,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.platform_utils import is_blocked_sensitive_path
@@ -312,7 +312,7 @@ def list_containers(all_containers: bool = True) -> List[ContainerSummary]:
                         image=row.get("Image", ""),
                         state=state_mapped,
                         status=row.get("Status", ""),
-                        createdAt=row.get("CreatedAt", ""),
+                        created_at=row.get("CreatedAt", ""),
                         ports=ports,
                         command=row.get("Command"),
                     )

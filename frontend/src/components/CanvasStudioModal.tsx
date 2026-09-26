@@ -66,7 +66,7 @@ const TEMPLATES: Record<string, { title: string; html: string }> = {
   data_table: {
     title: 'Interactive Filterable Table',
     html: `<div style="padding: 20px; font-family: var(--font-body, system-ui, sans-serif);">
-  <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: gap: 8px;">
+  <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
     <h3 style="margin: 0; font-size: 16px; color: var(--text-strong, var(--strong, #ffffff));">Recent Deployments</h3>
     <input type="text" id="search" placeholder="Filter rows..." style="padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border, rgba(255,255,255,0.1)); background: var(--surface-subtle, rgba(255,255,255,0.04)); color: var(--text, #f8fafc); font-size: 12px;" />
   </div>
