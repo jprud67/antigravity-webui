@@ -428,5 +428,118 @@ def test_mcp_catalog_user_agent_version():
     assert "Antigravity-MCP-Probe/0.3.4" in source
 
 
+def test_editor_diagnostics_react_language_mapping():
+    import inspect
+
+    from app.api.editor_diagnostics import _lint_javascript
+    source = inspect.getsource(_lint_javascript)
+    assert "javascriptreact" in source
+    assert "typescriptreact" in source
+
+
+def test_editor_diagnostics_python_stdin_filename():
+    import inspect
+
+    from app.api.editor_diagnostics import _lint_python
+    source = inspect.getsource(_lint_python)
+    assert 'not base_name.endswith(".py")' in source or "stdin_filename = f\"{base_name}.py\"" in source
+
+
+def test_canvas_documents_workspace_input():
+    from app.services.canvas_documents import (
+        CanvasDocumentCreateInput,
+        CanvasDocumentEntrypoint,
+    )
+
+    inp = CanvasDocumentCreateInput(
+        entrypoint=CanvasDocumentEntrypoint(type="html", value="<h1>Hello</h1>"),
+        workspace="/custom/workspace/path"
+    )
+    assert inp.workspace == "/custom/workspace/path"
+
+
+def test_database_studio_is_sqlite_file_and_thumbs_db(tmp_path):
+    import sqlite3
+
+    from app.services.database_studio import discover_databases, is_sqlite_file
+
+    # Thumbs.db must return False
+    thumbs = tmp_path / "Thumbs.db"
+    thumbs.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 30)
+    assert is_sqlite_file(thumbs) is False
+
+    # Fake db without header must return False
+    fake_db = tmp_path / "fake.db"
+    fake_db.write_bytes(b"NOT_SQLITE_DATA_1234567890")
+    assert is_sqlite_file(fake_db) is False
+
+    # Genuine sqlite db must return True
+    real_db = tmp_path / "real.sqlite"
+    conn = sqlite3.connect(str(real_db))
+    conn.execute("CREATE TABLE foo (id INT)")
+    conn.commit()
+    conn.close()
+    assert is_sqlite_file(real_db) is True
+
+    # discover_databases should only discover real.sqlite, ignoring Thumbs.db and fake.db
+    discovered = discover_databases(str(tmp_path))
+    assert len(discovered) == 1
+    assert discovered[0].name == "real.sqlite"
+
+
+def test_code_kernel_global_execution_lock():
+    import threading
+
+    from app.services.code_kernel import _GLOBAL_EXECUTION_LOCK
+
+    assert isinstance(_GLOBAL_EXECUTION_LOCK, type(threading.RLock()))
+
+
+def test_fts_sync_missing_summaries_table(tmp_path, monkeypatch):
+    from app.services.fts_search import fts_service
+
+    test_db = tmp_path / "empty_fts_sync.db"
+    monkeypatch.setattr("app.services.fts_search.CONVERSATION_DB", test_db)
+    monkeypatch.setattr("app.services.fts_search._fts_initialized", False)
+
+    # sync_all_sessions must not crash even if conversation_summaries table is missing
+    res = fts_service.sync_all_sessions()
+    assert res["success"] is True
+    assert res["total_sessions"] == 0
+
+
+def test_docker_compose_action_requires_regular_file(tmp_path):
+    import pytest
+
+    from app.services.docker_studio import execute_compose_action
+
+    dir_compose = tmp_path / "docker-compose.yml"
+    dir_compose.mkdir()
+
+    with pytest.raises(FileNotFoundError, match="introuvable"):
+        execute_compose_action(str(dir_compose), "up")
+
+
+def test_workspaces_add_canonical_deduplication(tmp_path, monkeypatch):
+    from app.api.workspaces import add_workspace
+
+    ws_dir = tmp_path / "my_project"
+    ws_dir.mkdir()
+
+    fake_settings = {"trustedWorkspaces": [str(ws_dir.resolve())]}
+    monkeypatch.setattr("app.api.workspaces.get_settings", lambda: dict(fake_settings))
+    def fake_save(s):
+        fake_settings.clear()
+        fake_settings.update(s)
+        return s
+    monkeypatch.setattr("app.api.workspaces.save_settings", fake_save)
+
+    # Adding with trailing slash or relative notation should be deduplicated
+    res = add_workspace(path=f"{ws_dir}/")
+    assert res["status"] == "ok"
+    assert len(fake_settings["trustedWorkspaces"]) == 1
+
+
+
 
 

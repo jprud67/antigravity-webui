@@ -103,8 +103,11 @@ export const DatabaseStudioModal: React.FC<DatabaseStudioModalProps> = ({
     try {
       const res = await databaseApi.discover(currentWorkspace);
       setDatabases(res);
-      if (res.length > 0 && !selectedDbPath) {
+      if (res.length > 0 && (!selectedDbPath || !res.some(d => d.path === selectedDbPath))) {
         setSelectedDbPath(res[0].path);
+      } else if (res.length === 0) {
+        setSelectedDbPath('');
+        setSchema(null);
       }
     } catch (err: any) {
       showToast(err.message || t('db_discover_error', 'Erreur lors de la détection des bases de données'), 'error');

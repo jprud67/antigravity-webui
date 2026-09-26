@@ -42,7 +42,8 @@ class PreviewRequest(BaseModel):
 def create_document(payload: CanvasDocumentCreateInput):
     """Creates a new Canvas document."""
     try:
-        manifest = create_canvas_document(payload, workspace_dir=DEFAULT_WORKSPACE)
+        ws = payload.workspace or DEFAULT_WORKSPACE
+        manifest = create_canvas_document(payload, workspace_dir=ws)
         return manifest
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -112,7 +112,12 @@ def _lint_python(content: str, file_path: str | None) -> list[DiagnosticItem]:
         try:
             raw_target = (file_path or "").rstrip("/\\")
             base_name = os.path.basename(raw_target) if raw_target else ""
-            stdin_filename = base_name if base_name else "temp_check.py"
+            if not base_name:
+                stdin_filename = "temp_check.py"
+            elif not base_name.endswith(".py"):
+                stdin_filename = f"{base_name}.py"
+            else:
+                stdin_filename = base_name
             proc = subprocess.run(
                 [ruff_bin, "check", "--output-format=json", "--stdin-filename", stdin_filename, "-"],
                 input=content.encode("utf-8", errors="replace"),
@@ -173,11 +178,12 @@ def _lint_javascript(content: str, file_path: str | None, language: str) -> list
         return diagnostics
 
     ext = ".ts"
-    if "jsx" in language or (file_path and file_path.endswith(".jsx")):
+    lower_lang = (language or "").lower()
+    if lower_lang in ("javascriptreact", "jsx") or "jsx" in lower_lang or (file_path and file_path.endswith(".jsx")):
         ext = ".jsx"
-    elif "tsx" in language or (file_path and file_path.endswith(".tsx")):
+    elif lower_lang in ("typescriptreact", "tsx") or "tsx" in lower_lang or (file_path and file_path.endswith(".tsx")):
         ext = ".tsx"
-    elif "js" in language or (file_path and file_path.endswith(".js")):
+    elif lower_lang in ("javascript", "js") or (file_path and file_path.endswith(".js")):
         ext = ".js"
 
     temp_file = None

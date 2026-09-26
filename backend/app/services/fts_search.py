@@ -477,8 +477,24 @@ class TranscriptFtsService:
         start_time = time.perf_counter()
         conn = _get_connection()
         try:
-            cursor = conn.execute("SELECT conversation_id FROM conversation_summaries")
-            sessions = [r["conversation_id"] for r in cursor.fetchall()]
+            ensure_fts_schema(conn)
+            sessions: list[str] = []
+            try:
+                cursor = conn.execute("SELECT conversation_id FROM conversation_summaries")
+                sessions = [r["conversation_id"] for r in cursor.fetchall()]
+            except (sqlite3.OperationalError, sqlite3.DatabaseError):
+                sessions = []
+
+            # Discover any sessions in BRAIN_DIR that may not yet be in conversation_summaries
+            if BRAIN_DIR.exists():
+                try:
+                    for d in BRAIN_DIR.iterdir():
+                        if d.is_dir() and not d.name.startswith("."):
+                            if (d / ".system_generated" / "logs" / "transcript.jsonl").exists() or (d / "logs" / "transcript.jsonl").exists():
+                                if d.name not in sessions:
+                                    sessions.append(d.name)
+                except Exception:
+                    pass
 
             total_messages_indexed = 0
             for sid in sessions:

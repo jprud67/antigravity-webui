@@ -58,6 +58,7 @@ class CanvasDocumentCreateInput(BaseModel):
     retention_scope: str | None = Field(default=None, validation_alias=AliasChoices("retentionScope", "retention_scope"), serialization_alias="retentionScope")
     csp_sandbox: Literal["scripts"] | None = Field(default="scripts", validation_alias=AliasChoices("cspSandbox", "csp_sandbox"), serialization_alias="cspSandbox")
     wrap_with_theme: bool = Field(default=True, validation_alias=AliasChoices("wrapWithTheme", "wrap_with_theme"), serialization_alias="wrapWithTheme")
+    workspace: str | None = Field(default=None, validation_alias=AliasChoices("workspace", "workspacePath", "workspace_path"), serialization_alias="workspace")
 
 
 class CanvasDocumentManifest(BaseModel):

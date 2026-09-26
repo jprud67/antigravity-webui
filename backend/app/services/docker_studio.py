@@ -473,7 +473,7 @@ def execute_compose_action(compose_file_path: str, action: str) -> dict[str, Any
     if comp_path.suffix.lower() not in (".yml", ".yaml"):
         raise ValueError("Le fichier compose doit être un fichier .yml ou .yaml")
 
-    if not comp_path.exists():
+    if not comp_path.is_file():
         raise FileNotFoundError(f"Fichier compose introuvable : {compose_file_path}")
 
     bin_info = resolve_container_binary()

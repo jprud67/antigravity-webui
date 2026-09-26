@@ -120,7 +120,14 @@ def add_workspace(path: str = Query(...), _ = Depends(require_auth)):
     raw = settings.get("trustedWorkspaces", [])
     workspaces = list(raw) if isinstance(raw, list) else []
     str_p = str(p)
-    if str_p not in workspaces:
+
+    def _safe_resolve(w_path: str) -> str:
+        try:
+            return str(Path(w_path).resolve())
+        except Exception:
+            return str(w_path)
+
+    if not any(_safe_resolve(w) == str_p for w in workspaces):
         workspaces.append(str_p)
         settings["trustedWorkspaces"] = workspaces
         save_settings(settings)

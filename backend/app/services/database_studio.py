@@ -97,8 +97,13 @@ def is_sqlite_file(file_path: Path) -> bool:
     try:
         if not file_path.is_file():
             return False
-        if file_path.suffix.lower() in SQLITE_EXTENSIONS:
+        if file_path.name.lower() == "thumbs.db":
+            return False
+        size = file_path.stat().st_size
+        if size == 0 and file_path.suffix.lower() in SQLITE_EXTENSIONS:
             return True
+        if size < 16:
+            return False
         with open(file_path, "rb") as f:
             header = f.read(16)
             return header == SQLITE_HEADER
@@ -145,9 +150,11 @@ def discover_databases(workspace_path: str, max_depth: int = 4) -> list[Database
 
             for file in files:
                 ext = Path(file).suffix.lower()
-                if ext in SQLITE_EXTENSIONS:
+                if ext in SQLITE_EXTENSIONS and file.lower() != "thumbs.db":
                     full_path = Path(current_root) / file
                     if is_blocked_sensitive_path(str(full_path)):
+                        continue
+                    if not is_sqlite_file(full_path):
                         continue
                     try:
                         size = full_path.stat().st_size

@@ -25,6 +25,7 @@ from app.platform_utils import is_blocked_sensitive_path
 logger = logging.getLogger(__name__)
 
 _MAX_OUTPUT_CHARS = 500_000
+_GLOBAL_EXECUTION_LOCK = threading.RLock()
 
 
 class KernelToolProxy:
@@ -173,13 +174,14 @@ class PersistentPythonKernel:
 
     def execute(self, code: str, timeout: int = 30) -> dict[str, Any]:
         """Execute a Python code cell inside the persistent namespace."""
-        orig_stdout = sys.stdout
-        orig_stderr = sys.stderr
-        with self.lock:
-            self.execution_count += 1
-            self.last_active_at = time.time()
-            start_time = time.perf_counter()
-            current_exec_count = self.execution_count
+        with _GLOBAL_EXECUTION_LOCK:
+            orig_stdout = sys.stdout
+            orig_stderr = sys.stderr
+            with self.lock:
+                self.execution_count += 1
+                self.last_active_at = time.time()
+                start_time = time.perf_counter()
+                current_exec_count = self.execution_count
 
             out_buf = io.StringIO()
             err_buf = io.StringIO()
