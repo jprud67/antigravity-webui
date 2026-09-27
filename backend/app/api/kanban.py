@@ -146,6 +146,13 @@ class UpdateTaskRequest(BaseModel):
     project_id: str | None = None
     result: str | None = None
 
+class BulkTaskActionRequest(BaseModel):
+    task_ids: list[str]
+    action: str  # "update_status", "update_priority", "update_assignee", "delete"
+    status: str | None = None
+    priority: int | None = None
+    assignee: str | None = None
+
 def _normalize_status(st: str) -> str:
     return st.lower().strip().replace("-", "_")
 
@@ -364,3 +371,92 @@ def delete_task(task_id: str, _ = Depends(require_auth)):
     except Exception as e:
         logger.error(f"Error deleting task {task_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/tasks/bulk")
+def bulk_task_action(req: BulkTaskActionRequest, _ = Depends(require_auth)):
+    if not req.task_ids:
+        return {"success": True, "affected_count": 0, "action": req.action}
+
+    try:
+        with get_db() as conn:
+            cur = conn.cursor()
+            placeholders = ",".join("?" for _ in req.task_ids)
+
+            if req.action == "delete":
+                cur.execute(f"DELETE FROM tasks WHERE id IN ({placeholders})", req.task_ids)
+                conn.commit()
+                return {"success": True, "affected_count": cur.rowcount, "action": "delete"}
+
+            elif req.action == "update_status":
+                if not req.status:
+                    raise HTTPException(status_code=400, detail="Statut manquant pour l'action update_status")
+                new_st = _normalize_status(req.status)
+                now = int(time.time())
+                
+                # Fetch affected tasks to handle started_at / completed_at
+                cur.execute(f"SELECT id, status, started_at, completed_at FROM tasks WHERE id IN ({placeholders})", req.task_ids)
+                rows = cur.fetchall()
+                
+                for row in rows:
+                    t_id = row["id"]
+                    t_started = row["started_at"]
+                    t_completed = row["completed_at"]
+                    
+                    st_updates = ["status = ?"]
+                    st_params = [new_st]
+                    
+                    if new_st in ["running", "in_progress"]:
+                        if not t_started:
+                            st_updates.append("started_at = ?")
+                            st_params.append(now)
+                        if t_completed:
+                            st_updates.append("completed_at = ?")
+                            st_params.append(None)
+                    elif new_st in ["done", "completed"]:
+                        if not t_completed:
+                            st_updates.append("completed_at = ?")
+                            st_params.append(now)
+                        if not t_started:
+                            st_updates.append("started_at = ?")
+                            st_params.append(now)
+                    else:
+                        if t_completed:
+                            st_updates.append("completed_at = ?")
+                            st_params.append(None)
+                    
+                    st_params.append(t_id)
+                    cur.execute(f"UPDATE tasks SET {', '.join(st_updates)} WHERE id = ?", st_params)
+                
+                conn.commit()
+                return {"success": True, "affected_count": len(rows), "action": "update_status", "status": new_st}
+
+            elif req.action == "update_priority":
+                if req.priority is None:
+                    raise HTTPException(status_code=400, detail="Priorité manquante pour l'action update_priority")
+                cur.execute(
+                    f"UPDATE tasks SET priority = ? WHERE id IN ({placeholders})",
+                    [req.priority] + req.task_ids
+                )
+                conn.commit()
+                return {"success": True, "affected_count": cur.rowcount, "action": "update_priority", "priority": req.priority}
+
+            elif req.action == "update_assignee":
+                if req.assignee is None:
+                    raise HTTPException(status_code=400, detail="Assigné manquant pour l'action update_assignee")
+                cur.execute(
+                    f"UPDATE tasks SET assignee = ? WHERE id IN ({placeholders})",
+                    [req.assignee] + req.task_ids
+                )
+                conn.commit()
+                return {"success": True, "affected_count": cur.rowcount, "action": "update_assignee", "assignee": req.assignee}
+
+            else:
+                raise HTTPException(status_code=400, detail=f"Action bulk non supportée: {req.action}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error executing bulk action {req.action}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+

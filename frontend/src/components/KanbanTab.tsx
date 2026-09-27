@@ -4,7 +4,8 @@ import {
   fetchKanbanTasks, 
   createKanbanTask, 
   updateKanbanTask, 
-  deleteKanbanTask 
+  deleteKanbanTask,
+  bulkKanbanTaskAction
 } from '../services/api';
 import { showToast } from '../services/toast';
 import { showConfirm } from '../services/dialog';
@@ -22,7 +23,9 @@ import {
   CheckCircle2, 
   AlertTriangle,
   X,
-  User
+  User,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 
 interface KanbanTabProps {
@@ -52,6 +55,10 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
   const [taskAssignee, setTaskAssignee] = useState('antigravity');
   const [taskStatus, setTaskStatus] = useState('todo');
   const [submitting, setSubmitting] = useState(false);
+
+  // Bulk actions selection state
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const loadTasks = React.useCallback(async () => {
     setLoading(true);
@@ -168,6 +175,84 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
     }
   };
 
+  const toggleSelectTask = (taskId: string) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTaskIds.size === tasks.length) {
+      setSelectedTaskIds(new Set());
+    } else {
+      setSelectedTaskIds(new Set(tasks.map(t => t.id)));
+    }
+  };
+
+  const handleBulkStatus = async (newStatus: string) => {
+    if (selectedTaskIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      const res = await bulkKanbanTaskAction({
+        task_ids: Array.from(selectedTaskIds),
+        action: 'update_status',
+        status: newStatus
+      });
+      showToast(t('kanban_bulk_status_success', '{0} task(s) updated').replace('{0}', String(res.affected_count)), 'success');
+      setSelectedTaskIds(new Set());
+      await loadTasks();
+    } catch (e: any) {
+      showToast(e.message || t('kanban_bulk_error', 'Failed to update tasks'), 'error');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkPriority = async (newPriority: number) => {
+    if (selectedTaskIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      const res = await bulkKanbanTaskAction({
+        task_ids: Array.from(selectedTaskIds),
+        action: 'update_priority',
+        priority: newPriority
+      });
+      showToast(t('kanban_bulk_priority_success', '{0} task(s) priority updated').replace('{0}', String(res.affected_count)), 'success');
+      setSelectedTaskIds(new Set());
+      await loadTasks();
+    } catch (e: any) {
+      showToast(e.message || t('kanban_bulk_error', 'Failed to update priority'), 'error');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTaskIds.size === 0) return;
+    const count = selectedTaskIds.size;
+    if (!(await showConfirm(t('kanban_bulk_delete_confirm', 'Permanently delete {0} task(s)?').replace('{0}', String(count)), { destructive: true }))) return;
+    setBulkLoading(true);
+    try {
+      const res = await bulkKanbanTaskAction({
+        task_ids: Array.from(selectedTaskIds),
+        action: 'delete'
+      });
+      showToast(t('kanban_bulk_delete_success', '{0} task(s) deleted').replace('{0}', String(res.affected_count)), 'success');
+      setSelectedTaskIds(new Set());
+      await loadTasks();
+    } catch (e: any) {
+      showToast(e.message || t('kanban_bulk_error', 'Failed to delete tasks'), 'error');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   const getPriorityBadge = (p: number) => {
     if (p >= 2) {
       return (
@@ -266,6 +351,110 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
         </div>
       </div>
 
+      {/* Bulk Actions Floating Bar */}
+      {selectedTaskIds.size > 0 && (
+        <div
+          className="px-4 py-2 border-b flex flex-wrap items-center justify-between gap-2 text-xs shrink-0 animate-in fade-in slide-in-from-top-1"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            borderColor: 'var(--border)'
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleSelectAll}
+              className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-sky-500"
+              title={selectedTaskIds.size === tasks.length ? t('kanban_deselect_all', 'Deselect all') : t('kanban_select_all', 'Select all')}
+            >
+              {selectedTaskIds.size === tasks.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+            </button>
+            <span className="font-semibold text-sky-600 dark:text-sky-400">
+              {t('kanban_selected_count', '{0} selected').replace('{0}', String(selectedTaskIds.size))}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] opacity-70 mr-1 hidden sm:inline">{t('kanban_bulk_move', 'Move to')}:</span>
+            <button
+              onClick={() => handleBulkStatus('todo')}
+              disabled={bulkLoading}
+              className="px-2 py-1 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/30 text-[11px] font-medium transition cursor-pointer disabled:opacity-50"
+            >
+              {t('kanban_col_todo', 'To do')}
+            </button>
+            <button
+              onClick={() => handleBulkStatus('running')}
+              disabled={bulkLoading}
+              className="px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30 text-[11px] font-medium transition cursor-pointer disabled:opacity-50"
+            >
+              {t('kanban_col_running', 'In progress')}
+            </button>
+            <button
+              onClick={() => handleBulkStatus('blocked')}
+              disabled={bulkLoading}
+              className="px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30 text-[11px] font-medium transition cursor-pointer disabled:opacity-50"
+            >
+              {t('kanban_col_blocked', 'Blocked')}
+            </button>
+            <button
+              onClick={() => handleBulkStatus('done')}
+              disabled={bulkLoading}
+              className="px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 text-[11px] font-medium transition cursor-pointer disabled:opacity-50"
+            >
+              {t('kanban_col_done', 'Done')}
+            </button>
+
+            <span className="h-4 w-px bg-zinc-700/30 mx-1 hidden sm:inline" />
+
+            {/* Bulk Priority */}
+            <span className="text-[11px] opacity-70 mr-1 hidden sm:inline">{t('kanban_priority_label', 'Priority')}:</span>
+            <button
+              onClick={() => handleBulkPriority(0)}
+              disabled={bulkLoading}
+              className="px-2 py-1 rounded border text-[11px] transition cursor-pointer disabled:opacity-50"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              {t('kanban_priority_normal', 'Normal')}
+            </button>
+            <button
+              onClick={() => handleBulkPriority(1)}
+              disabled={bulkLoading}
+              className="px-2 py-1 rounded bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 text-[11px] font-semibold transition cursor-pointer disabled:opacity-50"
+            >
+              {t('kanban_priority_high', 'High')}
+            </button>
+            <button
+              onClick={() => handleBulkPriority(2)}
+              disabled={bulkLoading}
+              className="px-2 py-1 rounded bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-500/30 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+            >
+              {t('kanban_priority_urgent', 'Critical')}
+            </button>
+
+            <span className="h-4 w-px bg-zinc-700/30 mx-1" />
+
+            {/* Bulk Delete */}
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkLoading}
+              className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>{t('kanban_delete', 'Delete')}</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedTaskIds(new Set())}
+              disabled={bulkLoading}
+              className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-zinc-400"
+              title={t('kanban_cancel_selection', 'Cancel selection')}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="m-3 p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-300 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
@@ -310,9 +499,25 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                 }}
               >
                 <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <span className="text-xs font-semibold leading-snug break-words" style={{ color: 'var(--strong)' }}>
-                    {task.title}
-                  </span>
+                  <div className="flex items-start gap-1.5 min-w-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelectTask(task.id);
+                      }}
+                      className="mt-0.5 text-zinc-400 hover:text-sky-500 transition-colors cursor-pointer shrink-0"
+                    >
+                      {selectedTaskIds.has(task.id) ? (
+                        <CheckSquare className="w-3.5 h-3.5 text-sky-500" />
+                      ) : (
+                        <Square className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    <span className="text-xs font-semibold leading-snug break-words" style={{ color: 'var(--strong)' }}>
+                      {task.title}
+                    </span>
+                  </div>
                   {getPriorityBadge(task.priority)}
                 </div>
 
@@ -393,9 +598,25 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                 className="group p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 hover:border-amber-500/50 transition-all shadow-xs hover:shadow-sm"
               >
                 <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 leading-snug break-words">
-                    {task.title}
-                  </span>
+                  <div className="flex items-start gap-1.5 min-w-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelectTask(task.id);
+                      }}
+                      className="mt-0.5 text-zinc-400 hover:text-amber-500 transition-colors cursor-pointer shrink-0"
+                    >
+                      {selectedTaskIds.has(task.id) ? (
+                        <CheckSquare className="w-3.5 h-3.5 text-amber-500" />
+                      ) : (
+                        <Square className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 leading-snug break-words">
+                      {task.title}
+                    </span>
+                  </div>
                   {getPriorityBadge(task.priority)}
                 </div>
 
@@ -478,9 +699,25 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                 className="group p-3 rounded-lg border border-rose-500/30 bg-rose-500/5 dark:bg-rose-500/10 hover:border-rose-500/50 transition-all shadow-xs hover:shadow-sm"
               >
                 <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <span className="text-xs font-semibold text-rose-700 dark:text-rose-300 leading-snug break-words">
-                    {task.title}
-                  </span>
+                  <div className="flex items-start gap-1.5 min-w-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelectTask(task.id);
+                      }}
+                      className="mt-0.5 text-zinc-400 hover:text-rose-500 transition-colors cursor-pointer shrink-0"
+                    >
+                      {selectedTaskIds.has(task.id) ? (
+                        <CheckSquare className="w-3.5 h-3.5 text-rose-500" />
+                      ) : (
+                        <Square className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    <span className="text-xs font-semibold text-rose-700 dark:text-rose-300 leading-snug break-words">
+                      {task.title}
+                    </span>
+                  </div>
                   {getPriorityBadge(task.priority)}
                 </div>
 
@@ -556,9 +793,25 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
                 className="group p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10 transition-all shadow-xs opacity-85 hover:opacity-100"
               >
                 <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 line-through decoration-emerald-500/60 leading-snug break-words">
-                    {task.title}
-                  </span>
+                  <div className="flex items-start gap-1.5 min-w-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelectTask(task.id);
+                      }}
+                      className="mt-0.5 text-zinc-400 hover:text-emerald-500 transition-colors cursor-pointer shrink-0"
+                    >
+                      {selectedTaskIds.has(task.id) ? (
+                        <CheckSquare className="w-3.5 h-3.5 text-emerald-500" />
+                      ) : (
+                        <Square className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 line-through decoration-emerald-500/60 leading-snug break-words">
+                      {task.title}
+                    </span>
+                  </div>
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                 </div>
 

@@ -1437,6 +1437,25 @@ export async function deleteKanbanTask(taskId: string): Promise<{ success: boole
   return res.json();
 }
 
+export async function bulkKanbanTaskAction(payload: {
+  task_ids: string[];
+  action: 'update_status' | 'update_priority' | 'update_assignee' | 'delete';
+  status?: string;
+  priority?: number;
+  assignee?: string;
+}): Promise<{ success: boolean; affected_count: number; action: string; [key: string]: any }> {
+  const res = await fetch(`${API_BASE}/kanban/tasks/bulk`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec action groupée' }));
+    throw new Error(err.detail || 'Erreur action groupée');
+  }
+  return res.json();
+}
+
 // Cron Jobs API
 export interface CronJobItem {
   id: string;

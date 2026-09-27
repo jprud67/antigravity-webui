@@ -4519,7 +4519,17 @@
     "plugin_catalog_title": "Plugin Catalog",
     "sdk_portal_title": "SDK Developer Portal",
     "watchdog_sentinel": "Watchdog Sentinel",
-    "maintenance_sweeps": "Maintenance Sweeps"
+    "maintenance_sweeps": "Maintenance Sweeps",
+    "kanban_deselect_all": "Deselect all",
+    "kanban_select_all": "Select all",
+    "kanban_selected_count": "{0} selected",
+    "kanban_bulk_move": "Move to",
+    "kanban_bulk_status_success": "{0} task(s) updated",
+    "kanban_bulk_priority_success": "{0} task(s) priority updated",
+    "kanban_bulk_delete_confirm": "Permanently delete {0} task(s)?",
+    "kanban_bulk_delete_success": "{0} task(s) deleted",
+    "kanban_bulk_error": "Bulk action failed",
+    "kanban_cancel_selection": "Cancel selection"
   },
   "it": {
     "offline_title": "Connessione persa",
@@ -9041,7 +9051,17 @@
     "plugin_catalog_title": "Catalogo Plugin",
     "sdk_portal_title": "SDK Developer Portal",
     "watchdog_sentinel": "Sentinel Watchdog",
-    "maintenance_sweeps": "Scansioni di Manutenzione"
+    "maintenance_sweeps": "Scansioni di Manutenzione",
+    "kanban_deselect_all": "Deseleziona tutto",
+    "kanban_select_all": "Seleziona tutto",
+    "kanban_selected_count": "{0} selezionati",
+    "kanban_bulk_move": "Sposta in",
+    "kanban_bulk_status_success": "{0} attività aggiornate",
+    "kanban_bulk_priority_success": "Priorità di {0} attività aggiornata",
+    "kanban_bulk_delete_confirm": "Eliminare definitivamente {0} attività?",
+    "kanban_bulk_delete_success": "{0} attività eliminate",
+    "kanban_bulk_error": "Azione di gruppo non riuscita",
+    "kanban_cancel_selection": "Annulla selezione"
   },
   "ja": {
     "offline_title": "接続が切断されました",
@@ -13563,7 +13583,17 @@
     "plugin_catalog_title": "プラグインカタログ",
     "sdk_portal_title": "SDK開発者ポータル",
     "watchdog_sentinel": "ウォッチドッグセンチネル",
-    "maintenance_sweeps": "メンテナンススキャン"
+    "maintenance_sweeps": "メンテナンススキャン",
+    "kanban_deselect_all": "すべての選択を解除",
+    "kanban_select_all": "すべて選択",
+    "kanban_selected_count": "{0} 件選択中",
+    "kanban_bulk_move": "移動先",
+    "kanban_bulk_status_success": "{0} 件のタスクを更新しました",
+    "kanban_bulk_priority_success": "{0} 件のタスクの優先度を更新しました",
+    "kanban_bulk_delete_confirm": "{0} 件のタスクを完全に削除しますか？",
+    "kanban_bulk_delete_success": "{0} 件のタスクを削除しました",
+    "kanban_bulk_error": "一括処理に失敗しました",
+    "kanban_cancel_selection": "選択を解除"
   },
   "ru": {
     "offline_title": "Соединение потеряно",
@@ -18085,7 +18115,17 @@
     "plugin_catalog_title": "Каталог плагинов",
     "sdk_portal_title": "Портал разработчика SDK",
     "watchdog_sentinel": "Дозорный страж",
-    "maintenance_sweeps": "Обслуживание системы"
+    "maintenance_sweeps": "Обслуживание системы",
+    "kanban_deselect_all": "Снять выбор со всех",
+    "kanban_select_all": "Выбрать все",
+    "kanban_selected_count": "Выбрано: {0}",
+    "kanban_bulk_move": "Переместить в",
+    "kanban_bulk_status_success": "Обновлено задач: {0}",
+    "kanban_bulk_priority_success": "Приоритет обновлен для {0} задач",
+    "kanban_bulk_delete_confirm": "Окончательно удалить {0} задач(и)?",
+    "kanban_bulk_delete_success": "Удалено задач: {0}",
+    "kanban_bulk_error": "Ошибка массового действия",
+    "kanban_cancel_selection": "Отменить выбор"
   },
   "es": {
     "offline_title": "Conexión perdida",
@@ -22607,7 +22647,17 @@
     "plugin_catalog_title": "Catálogo de Plugins",
     "sdk_portal_title": "Portal SDK para Desarrolladores",
     "watchdog_sentinel": "Centinela Watchdog",
-    "maintenance_sweeps": "Barridos de Mantenimiento"
+    "maintenance_sweeps": "Barridos de Mantenimiento",
+    "kanban_deselect_all": "Deseleccionar todo",
+    "kanban_select_all": "Seleccionar todo",
+    "kanban_selected_count": "{0} seleccionada(s)",
+    "kanban_bulk_move": "Mover a",
+    "kanban_bulk_status_success": "{0} tarea(s) actualizada(s)",
+    "kanban_bulk_priority_success": "Prioridad de {0} tarea(s) actualizada",
+    "kanban_bulk_delete_confirm": "¿Eliminar definitivamente {0} tarea(s)?",
+    "kanban_bulk_delete_success": "{0} tarea(s) eliminada(s)",
+    "kanban_bulk_error": "Error en la acción masiva",
+    "kanban_cancel_selection": "Cancelar selección"
   },
   "de": {
     "offline_title": "Verbindung verloren",
@@ -27129,7 +27179,17 @@
     "plugin_catalog_title": "Plugin-Katalog",
     "sdk_portal_title": "SDK-Entwicklerportal",
     "watchdog_sentinel": "Watchdog-Sentinel",
-    "maintenance_sweeps": "Wartungs-Scans"
+    "maintenance_sweeps": "Wartungs-Scans",
+    "kanban_deselect_all": "Alle abwählen",
+    "kanban_select_all": "Alle auswählen",
+    "kanban_selected_count": "{0} ausgewählt",
+    "kanban_bulk_move": "Verschieben nach",
+    "kanban_bulk_status_success": "{0} Aufgabe(n) aktualisiert",
+    "kanban_bulk_priority_success": "Priorität für {0} Aufgabe(n) aktualisiert",
+    "kanban_bulk_delete_confirm": "{0} Aufgabe(n) dauerhaft löschen?",
+    "kanban_bulk_delete_success": "{0} Aufgabe(n) gelöscht",
+    "kanban_bulk_error": "Massenaktion fehlgeschlagen",
+    "kanban_cancel_selection": "Auswahl aufheben"
   },
   "zh": {
     "offline_title": "连接已断开",
@@ -31651,7 +31711,17 @@
     "plugin_catalog_title": "插件目录",
     "sdk_portal_title": "SDK开发者门户",
     "watchdog_sentinel": "看门狗哨兵",
-    "maintenance_sweeps": "维护扫描"
+    "maintenance_sweeps": "维护扫描",
+    "kanban_deselect_all": "取消全选",
+    "kanban_select_all": "全选",
+    "kanban_selected_count": "已选择 {0} 项",
+    "kanban_bulk_move": "移动到",
+    "kanban_bulk_status_success": "{0} 个任务已更新",
+    "kanban_bulk_priority_success": "{0} 个任务的优先级已更新",
+    "kanban_bulk_delete_confirm": "确定要永久删除这 {0} 个任务吗？",
+    "kanban_bulk_delete_success": "{0} 个任务已删除",
+    "kanban_bulk_error": "批量操作失败",
+    "kanban_cancel_selection": "取消选择"
   },
   "zh-Hant": {
     "offline_title": "連線中斷",
@@ -36173,7 +36243,17 @@
     "plugin_catalog_title": "Plugin Catalog",
     "sdk_portal_title": "SDK Developer Portal",
     "watchdog_sentinel": "Watchdog Sentinel",
-    "maintenance_sweeps": "Maintenance Sweeps"
+    "maintenance_sweeps": "Maintenance Sweeps",
+    "kanban_deselect_all": "Deselect all",
+    "kanban_select_all": "Select all",
+    "kanban_selected_count": "{0} selected",
+    "kanban_bulk_move": "Move to",
+    "kanban_bulk_status_success": "{0} task(s) updated",
+    "kanban_bulk_priority_success": "{0} task(s) priority updated",
+    "kanban_bulk_delete_confirm": "Permanently delete {0} task(s)?",
+    "kanban_bulk_delete_success": "{0} task(s) deleted",
+    "kanban_bulk_error": "Bulk action failed",
+    "kanban_cancel_selection": "Cancel selection"
   },
   "pt": {
     "offline_title": "Conexão perdida",
@@ -40695,7 +40775,17 @@
     "plugin_catalog_title": "Catálogo de Plugins",
     "sdk_portal_title": "Portal SDK para Desenvolvedores",
     "watchdog_sentinel": "Sentinela Watchdog",
-    "maintenance_sweeps": "Varreduras de Manutenção"
+    "maintenance_sweeps": "Varreduras de Manutenção",
+    "kanban_deselect_all": "Desmarcar tudo",
+    "kanban_select_all": "Selecionar tudo",
+    "kanban_selected_count": "{0} selecionada(s)",
+    "kanban_bulk_move": "Mover para",
+    "kanban_bulk_status_success": "{0} tarefa(s) atualizada(s)",
+    "kanban_bulk_priority_success": "Prioridade de {0} tarefa(s) atualizada",
+    "kanban_bulk_delete_confirm": "Excluir permanentemente {0} tarefa(s)?",
+    "kanban_bulk_delete_success": "{0} tarefa(s) excluída(s)",
+    "kanban_bulk_error": "Falha na ação em massa",
+    "kanban_cancel_selection": "Cancelar seleção"
   },
   "ko": {
     "offline_title": "연결이 끊겼습니다",
@@ -45217,7 +45307,17 @@
     "plugin_catalog_title": "플러그인 카탈로그",
     "sdk_portal_title": "SDK 개발자 포털",
     "watchdog_sentinel": "워치독 센티넬",
-    "maintenance_sweeps": "유지보수 스캔"
+    "maintenance_sweeps": "유지보수 스캔",
+    "kanban_deselect_all": "모두 선택 해제",
+    "kanban_select_all": "모두 선택",
+    "kanban_selected_count": "{0}개 선택됨",
+    "kanban_bulk_move": "이동 위치",
+    "kanban_bulk_status_success": "{0}개 작업 업데이트됨",
+    "kanban_bulk_priority_success": "{0}개 작업 우선순위 업데이트됨",
+    "kanban_bulk_delete_confirm": "{0}개 작업을 영구 삭제하시겠습니까?",
+    "kanban_bulk_delete_success": "{0}개 작업 삭제됨",
+    "kanban_bulk_error": "일괄 작업 실패",
+    "kanban_cancel_selection": "선택 취소"
   },
   "fr": {
     "offline_title": "Connexion perdue",
@@ -49739,7 +49839,17 @@
     "plugin_catalog_title": "Catalogue de Plugins",
     "sdk_portal_title": "SDK Developer Portal",
     "watchdog_sentinel": "Sentinel Watchdog",
-    "maintenance_sweeps": "Balayages de Maintenance"
+    "maintenance_sweeps": "Balayages de Maintenance",
+    "kanban_deselect_all": "Tout désélectionner",
+    "kanban_select_all": "Tout sélectionner",
+    "kanban_selected_count": "{0} sélectionnée(s)",
+    "kanban_bulk_move": "Déplacer vers",
+    "kanban_bulk_status_success": "{0} tâche(s) mise(s) à jour",
+    "kanban_bulk_priority_success": "Priorité de {0} tâche(s) mise à jour",
+    "kanban_bulk_delete_confirm": "Supprimer définitivement {0} tâche(s) ?",
+    "kanban_bulk_delete_success": "{0} tâche(s) supprimée(s)",
+    "kanban_bulk_error": "Erreur lors de l'action groupée",
+    "kanban_cancel_selection": "Annuler la sélection"
   },
   "cs": {
     "_label": "Čeština",
@@ -54261,7 +54371,17 @@
     "plugin_catalog_title": "Plugin Catalog",
     "sdk_portal_title": "SDK Developer Portal",
     "watchdog_sentinel": "Watchdog Sentinel",
-    "maintenance_sweeps": "Maintenance Sweeps"
+    "maintenance_sweeps": "Maintenance Sweeps",
+    "kanban_deselect_all": "Deselect all",
+    "kanban_select_all": "Select all",
+    "kanban_selected_count": "{0} selected",
+    "kanban_bulk_move": "Move to",
+    "kanban_bulk_status_success": "{0} task(s) updated",
+    "kanban_bulk_priority_success": "{0} task(s) priority updated",
+    "kanban_bulk_delete_confirm": "Permanently delete {0} task(s)?",
+    "kanban_bulk_delete_success": "{0} task(s) deleted",
+    "kanban_bulk_error": "Bulk action failed",
+    "kanban_cancel_selection": "Cancel selection"
   },
   "tr": {
     "offline_title": "Bağlantı kesildi",
@@ -58783,7 +58903,17 @@
     "plugin_catalog_title": "Eklenti Kataloğu",
     "sdk_portal_title": "SDK Geliştirici Portalı",
     "watchdog_sentinel": "Watchdog Nöbetçisi",
-    "maintenance_sweeps": "Bakım Taramaları"
+    "maintenance_sweeps": "Bakım Taramaları",
+    "kanban_deselect_all": "Tümünün seçimini kaldır",
+    "kanban_select_all": "Tümünü seç",
+    "kanban_selected_count": "{0} seçildi",
+    "kanban_bulk_move": "Şuraya taşı",
+    "kanban_bulk_status_success": "{0} görev güncellendi",
+    "kanban_bulk_priority_success": "{0} görevin önceliği güncellendi",
+    "kanban_bulk_delete_confirm": "{0} görev kalıcı olarak silinsin mi?",
+    "kanban_bulk_delete_success": "{0} görev silindi",
+    "kanban_bulk_error": "Toplu işlem başarısız oldu",
+    "kanban_cancel_selection": "Seçimi iptal et"
   },
   "pl": {
     "offline_title": "Połączenie utracone",
@@ -63305,7 +63435,17 @@
     "plugin_catalog_title": "Katalog Wtyczek",
     "sdk_portal_title": "Portal Deweloperski SDK",
     "watchdog_sentinel": "Strażnik Watchdog",
-    "maintenance_sweeps": "Skany Konserwacyjne"
+    "maintenance_sweeps": "Skany Konserwacyjne",
+    "kanban_deselect_all": "Odznacz wszystko",
+    "kanban_select_all": "Zaznacz wszystko",
+    "kanban_selected_count": "Wybrano: {0}",
+    "kanban_bulk_move": "Przenieś do",
+    "kanban_bulk_status_success": "Zaktualizowano {0} zadań",
+    "kanban_bulk_priority_success": "Zaktualizowano priorytet {0} zadań",
+    "kanban_bulk_delete_confirm": "Trwale usunąć {0} zadań?",
+    "kanban_bulk_delete_success": "Usunięto {0} zadań",
+    "kanban_bulk_error": "Akcja zbiorcza nie powiodła się",
+    "kanban_cancel_selection": "Anuluj zaznaczenie"
   },
   "vi": {
     "offline_title": "Mất kết nối",
@@ -67827,6 +67967,16 @@
     "plugin_catalog_title": "Plugin Catalog",
     "sdk_portal_title": "SDK Developer Portal",
     "watchdog_sentinel": "Watchdog Sentinel",
-    "maintenance_sweeps": "Maintenance Sweeps"
+    "maintenance_sweeps": "Maintenance Sweeps",
+    "kanban_deselect_all": "Deselect all",
+    "kanban_select_all": "Select all",
+    "kanban_selected_count": "{0} selected",
+    "kanban_bulk_move": "Move to",
+    "kanban_bulk_status_success": "{0} task(s) updated",
+    "kanban_bulk_priority_success": "{0} task(s) priority updated",
+    "kanban_bulk_delete_confirm": "Permanently delete {0} task(s)?",
+    "kanban_bulk_delete_success": "{0} task(s) deleted",
+    "kanban_bulk_error": "Bulk action failed",
+    "kanban_cancel_selection": "Cancel selection"
   }
 }
