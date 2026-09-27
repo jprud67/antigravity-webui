@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -7,7 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.config import BRAIN_DIR
+from app.config import BRAIN_DIR, REPO_ROOT
+from app.services.git_worktree import create_subagent_worktree
 from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.orchestrator")
@@ -55,13 +57,16 @@ class AgentNode(BaseModel):
     pid: int | None = None
     worktree_path: str | None = None
     worktree_branch: str | None = None
+    is_fork: bool = False
+    fork_parent_id: str | None = None
+    fork_branch: str | None = None
     metrics: AgentNodeMetrics = Field(default_factory=AgentNodeMetrics)
 
 
 class AgentEdge(BaseModel):
     source: str
     target: str
-    edge_type: str = "spawns"  # "spawns" | "delegates" | "monitors"
+    edge_type: str = "spawns"  # "spawns" | "delegates" | "monitors" | "forks"
 
 
 class OrchestratorGraphResponse(BaseModel):
@@ -83,6 +88,48 @@ class TerminateRequest(BaseModel):
     conversation_id: str
     target_agent_id: str
     recursive: bool = False
+
+
+class ForkAgentRequest(BaseModel):
+    conversation_id: str
+    parent_agent_id: str
+    branch_name: str | None = None
+    model: str | None = None
+    directives: str | None = None
+    create_worktree: bool = True
+    workspace_path: str | None = None
+
+
+class ForkAgentResponse(BaseModel):
+    success: bool
+    forked_agent_id: str
+    parent_agent_id: str
+    branch_name: str | None = None
+    worktree_path: str | None = None
+    model: str | None = None
+    created_at: str
+
+
+class AgentComparisonItem(BaseModel):
+    agent_id: str
+    name: str
+    role: AgentNodeRole
+    status: AgentNodeStatus
+    model: str | None = None
+    duration_ms: int = 0
+    tool_call_count: int = 0
+    token_count: int | None = None
+    modified_files_count: int = 0
+    modified_files: list[dict[str, Any]] = Field(default_factory=list)
+    thought_preview: str | None = None
+    worktree_branch: str | None = None
+    is_fork: bool = False
+    fork_parent_id: str | None = None
+
+
+class AgentComparisonResponse(BaseModel):
+    conversation_id: str
+    agents: list[AgentComparisonItem]
 
 
 def _validate_safe_id(identifier: str, field_name: str = "id") -> str:
@@ -235,6 +282,80 @@ def build_orchestrator_graph(conversation_id: str) -> OrchestratorGraphResponse:
 
             # Enqueue to check for nested subagents
             queue.append((sub_id, sub_id, depth + 1))
+
+    # 3. Discover forked execution branches
+    forks_file = session_dir / ".system_generated" / "forks.jsonl"
+    if forks_file.exists():
+        try:
+            with open(forks_file, "r", encoding="utf-8", errors="ignore") as ff:
+                for f_line in ff:
+                    if not f_line.strip():
+                        continue
+                    try:
+                        f_entry = json.loads(f_line)
+                    except Exception:
+                        continue
+                    forked_id = f_entry.get("forked_agent_id")
+                    if not forked_id or forked_id in visited:
+                        continue
+                    visited.add(forked_id)
+
+                    parent_aid = f_entry.get("parent_agent_id") or root_id
+                    f_directives = f_entry.get("directives") or ""
+                    f_model = f_entry.get("model")
+                    f_branch = f_entry.get("branch_name")
+                    f_wt_path = f_entry.get("worktree_path")
+                    f_role = _infer_role_from_name_or_task("Forked Branch", f_directives)
+
+                    # Check forked agent transcript for activity
+                    fork_dir = BRAIN_DIR / forked_id
+                    fork_status = AgentNodeStatus.RUNNING
+                    fork_thought = None
+                    fork_tools = 0
+                    if fork_dir.exists():
+                        f_tpath = fork_dir / ".system_generated" / "logs" / "transcript.jsonl"
+                        if f_tpath.exists():
+                            try:
+                                with open(f_tpath, "r", encoding="utf-8", errors="ignore") as fst:
+                                    flines = fst.readlines()
+                                    for line in flines[-15:]:
+                                        try:
+                                            en = json.loads(line)
+                                            if en.get("type") == "PLANNER_RESPONSE" and en.get("content"):
+                                                fork_thought = str(en["content"])[:180]
+                                            fork_tools += len(en.get("tool_calls") or [])
+                                        except Exception:
+                                            continue
+                                    if flines and ("finished with result" in flines[-1] or "Ready for execution" in flines[-1]):
+                                        fork_status = AgentNodeStatus.COMPLETED
+                            except Exception:
+                                pass
+
+                    parent_node = nodes_map.get(parent_aid)
+                    p_depth = (parent_node.depth + 1) if parent_node else 1
+
+                    fork_node = AgentNode(
+                        id=forked_id,
+                        name=f"Fork ({f_branch or forked_id[:12]})",
+                        parent_id=parent_aid,
+                        depth=p_depth,
+                        role=f_role,
+                        status=fork_status,
+                        model=f_model,
+                        task_summary=f_directives[:120] if f_directives else "Bifurcation d'exécution",
+                        current_activity=f"Branch: {f_branch}" if f_branch else None,
+                        thought_preview=fork_thought,
+                        worktree_path=f_wt_path,
+                        worktree_branch=f_branch,
+                        is_fork=True,
+                        fork_parent_id=parent_aid,
+                        fork_branch=f_branch,
+                        metrics=AgentNodeMetrics(tool_call_count=fork_tools)
+                    )
+                    nodes_map[forked_id] = fork_node
+                    edges.append(AgentEdge(source=parent_aid, target=forked_id, edge_type="forks"))
+        except Exception as e:
+            logger.debug(f"Error reading forks file {forks_file}: {e}")
 
     nodes_list = list(nodes_map.values())
     active = sum(1 for n in nodes_list if n.status == AgentNodeStatus.RUNNING)
@@ -391,3 +512,145 @@ def get_agent_inspection_details(agent_id: str, conversation_id: str) -> dict[st
         "tools": tools[-20:],
         "modified_files": modified_files[-30:]
     }
+
+
+def fork_agent_node(req: ForkAgentRequest) -> ForkAgentResponse:
+    """Forks an agent node to instantiate an isolated sub-branch with dedicated directives/model and worktree."""
+    clean_cid = _validate_safe_id(req.conversation_id, "conversation_id")
+    clean_pid = _validate_safe_id(req.parent_agent_id, "parent_agent_id")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    forked_id = f"fork_{uuid.uuid4().hex[:8]}"
+
+    worktree_path = None
+    branch = None
+
+    if req.create_worktree:
+        cwd = req.workspace_path or str(REPO_ROOT)
+        try:
+            wt = create_subagent_worktree(cwd, subagent_id=forked_id, branch_name=req.branch_name)
+            if wt:
+                worktree_path = wt.get("path")
+                branch = wt.get("branch")
+        except Exception as exc:
+            logger.warning(f"Error provisioning worktree for fork {forked_id}: {exc}")
+
+    # Create subagent storage in BRAIN_DIR
+    fork_dir = BRAIN_DIR / forked_id
+    logs_dir = fork_dir / ".system_generated" / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+
+    fork_metadata = {
+        "forked_agent_id": forked_id,
+        "parent_agent_id": clean_pid,
+        "conversation_id": clean_cid,
+        "model": req.model or "Gemini 3.8 Flash (Low)",
+        "directives": req.directives or "",
+        "branch_name": branch,
+        "worktree_path": worktree_path,
+        "created_at": now_iso
+    }
+
+    try:
+        meta_file = fork_dir / ".system_generated" / "fork_meta.json"
+        meta_file.write_text(json.dumps(fork_metadata, indent=2), encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"Failed to write fork_meta.json: {e}")
+
+    # Register in parent conversation forks.jsonl
+    conv_dir = BRAIN_DIR / clean_cid
+    conv_sys = conv_dir / ".system_generated"
+    conv_sys.mkdir(parents=True, exist_ok=True)
+    forks_ledger = conv_sys / "forks.jsonl"
+    try:
+        with open(forks_ledger, "a", encoding="utf-8") as f:
+            f.write(json.dumps(fork_metadata) + "\n")
+    except Exception as e:
+        logger.warning(f"Failed to register fork in {forks_ledger}: {e}")
+
+    # Seed initial transcript for forked subagent
+    t_file = logs_dir / "transcript.jsonl"
+    try:
+        with open(t_file, "w", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "step_index": 1,
+                "type": "USER_INPUT",
+                "source": "USER_EXPLICIT",
+                "created_at": now_iso,
+                "content": req.directives or f"Branche de bifurcation issue de l'agent {clean_pid}"
+            }) + "\n")
+            f.write(json.dumps({
+                "step_index": 2,
+                "type": "PLANNER_RESPONSE",
+                "created_at": now_iso,
+                "content": f"Branche d'exécution isolée initialisée ({branch or 'espace partagé'}). Modèle: {req.model or 'Défaut'}."
+            }) + "\n")
+    except Exception as e:
+        logger.warning(f"Failed to seed fork transcript: {e}")
+
+    logger.info(f"Forked agent node {clean_pid} -> {forked_id} (branch: {branch}, model: {req.model})")
+
+    return ForkAgentResponse(
+        success=True,
+        forked_agent_id=forked_id,
+        parent_agent_id=clean_pid,
+        branch_name=branch,
+        worktree_path=worktree_path,
+        model=req.model,
+        created_at=now_iso
+    )
+
+
+def compare_execution_branches(
+    conversation_id: str,
+    agent_ids: list[str] | None = None
+) -> AgentComparisonResponse:
+    """Compares execution alternatives, measuring metrics, files, and outputs side-by-side."""
+    clean_cid = _validate_safe_id(conversation_id, "conversation_id")
+    graph = build_orchestrator_graph(clean_cid)
+
+    # Determine nodes to compare
+    target_nodes: list[AgentNode] = []
+    if agent_ids:
+        clean_ids = set(agent_ids)
+        target_nodes = [n for n in graph.nodes if n.id in clean_ids]
+    else:
+        # Default: compare forked nodes and their immediate parents, or all subagents
+        forks = [n for n in graph.nodes if getattr(n, "is_fork", False)]
+        if forks:
+            parent_ids = {n.fork_parent_id for n in forks if n.fork_parent_id}
+            target_nodes = [n for n in graph.nodes if n.id in parent_ids or getattr(n, "is_fork", False)]
+        else:
+            # Fallback to all non-root nodes, or top nodes if <= 5
+            target_nodes = [n for n in graph.nodes if n.role != AgentNodeRole.ROOT] or graph.nodes
+
+    items: list[AgentComparisonItem] = []
+    for node in target_nodes:
+        insp = get_agent_inspection_details(agent_id=node.id, conversation_id=clean_cid)
+        mod_files = insp.get("modified_files", [])
+
+        duration = node.metrics.duration_ms
+        if duration == 0 and insp.get("thoughts"):
+            duration = len(insp["thoughts"]) * 1200
+
+        items.append(AgentComparisonItem(
+            agent_id=node.id,
+            name=node.name,
+            role=node.role,
+            status=node.status,
+            model=node.model,
+            duration_ms=duration,
+            tool_call_count=len(insp.get("tools", [])),
+            token_count=node.metrics.token_count,
+            modified_files_count=len(mod_files),
+            modified_files=mod_files,
+            thought_preview=insp.get("thought_preview") or node.thought_preview,
+            worktree_branch=node.worktree_branch,
+            is_fork=getattr(node, "is_fork", False),
+            fork_parent_id=getattr(node, "fork_parent_id", None)
+        ))
+
+    return AgentComparisonResponse(
+        conversation_id=clean_cid,
+        agents=items
+    )

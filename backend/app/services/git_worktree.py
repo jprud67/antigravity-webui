@@ -89,7 +89,8 @@ def ensure_worktrees_gitignore(repo_root: str) -> None:
 
 def create_subagent_worktree(
     parent_cwd: str | None,
-    subagent_id: str | None = None
+    subagent_id: str | None = None,
+    branch_name: str | None = None
 ) -> dict[str, Any] | None:
     """Create an isolated git worktree for a subagent.
     
@@ -105,7 +106,11 @@ def create_subagent_worktree(
         clean_id = uuid.uuid4().hex[:8]
     wt_id = clean_id
     wt_name = f"subagent-{wt_id}"
-    branch = f"antigravity-subagent/{wt_name}"
+    if branch_name and branch_name.strip():
+        clean_branch = re.sub(r"[^a-zA-Z0-9_\-\./]", "", branch_name.strip())
+        branch = clean_branch if clean_branch else f"antigravity-subagent/{wt_name}"
+    else:
+        branch = f"antigravity-subagent/{wt_name}"
     expected_parent = (Path(repo_root) / ".worktrees").resolve()
     wt_path = (expected_parent / wt_name).resolve()
 

@@ -15,7 +15,8 @@ import {
   Code2, 
   TestTube2, 
   Compass, 
-  Flame
+  Flame,
+  GitFork
 } from 'lucide-react';
 import type { AgentNode, AgentEdge, AgentNodeRole, AgentNodeStatus } from '../types';
 import { useI18n } from '../services/i18n';
@@ -25,6 +26,7 @@ interface AgentGraphCanvasProps {
   edges: AgentEdge[];
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
+  onForkNode?: (node: AgentNode) => void;
   orientation?: 'vertical' | 'horizontal';
 }
 
@@ -103,6 +105,7 @@ export const AgentGraphCanvas: React.FC<AgentGraphCanvasProps> = ({
   edges,
   selectedNodeId,
   onSelectNode,
+  onForkNode,
   orientation = 'vertical',
 }) => {
   const { t } = useI18n();
@@ -268,6 +271,10 @@ export const AgentGraphCanvas: React.FC<AgentGraphCanvasProps> = ({
               <stop offset="0%" stopColor="#3b82f6" />
               <stop offset="100%" stopColor="#06b6d4" />
             </linearGradient>
+            <linearGradient id="edge-gradient-fork" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#f97316" />
+            </linearGradient>
             <linearGradient id="edge-gradient-default" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#52525b" />
               <stop offset="100%" stopColor="#3f3f46" />
@@ -307,15 +314,16 @@ export const AgentGraphCanvas: React.FC<AgentGraphCanvasProps> = ({
 
             const isHighlighted = selectedNodeId === edge.source || selectedNodeId === edge.target;
             const isChildRunning = target.node.status === 'running';
+            const isForkEdge = edge.edge_type === 'forks';
 
             return (
               <g key={`${edge.source}-${edge.target}`}>
-                {/* Glow underlay if active or selected */}
-                {(isHighlighted || isChildRunning) && (
+                {/* Glow underlay if active, selected or fork */}
+                {(isHighlighted || isChildRunning || isForkEdge) && (
                   <path
                     d={pathD}
                     fill="none"
-                    stroke={isChildRunning ? '#06b6d4' : '#3b82f6'}
+                    stroke={isForkEdge ? '#f59e0b' : isChildRunning ? '#06b6d4' : '#3b82f6'}
                     strokeWidth={4}
                     strokeOpacity={0.4}
                     filter="url(#edge-glow)"
@@ -325,10 +333,16 @@ export const AgentGraphCanvas: React.FC<AgentGraphCanvasProps> = ({
                 <path
                   d={pathD}
                   fill="none"
-                  stroke={isHighlighted || isChildRunning ? 'url(#edge-gradient-active)' : 'url(#edge-gradient-default)'}
-                  strokeWidth={isHighlighted ? 2.5 : 1.75}
-                  strokeDasharray={isChildRunning ? '6,4' : undefined}
-                  className={isChildRunning ? 'animate-[dash_1s_linear_infinite]' : ''}
+                  stroke={
+                    isForkEdge
+                      ? 'url(#edge-gradient-fork)'
+                      : isHighlighted || isChildRunning
+                      ? 'url(#edge-gradient-active)'
+                      : 'url(#edge-gradient-default)'
+                  }
+                  strokeWidth={isHighlighted ? 2.5 : isForkEdge ? 2 : 1.75}
+                  strokeDasharray={isChildRunning ? '6,4' : isForkEdge ? '4,4' : undefined}
+                  className={isChildRunning || isForkEdge ? 'animate-[dash_1s_linear_infinite]' : ''}
                 />
               </g>
             );
@@ -355,6 +369,8 @@ export const AgentGraphCanvas: React.FC<AgentGraphCanvasProps> = ({
               className={`agent-node-card absolute p-3.5 rounded-xl border backdrop-blur-md cursor-pointer transition-all duration-200 select-none shadow-lg ${
                 isSelected
                   ? 'bg-zinc-900/95 border-cyan-500/80 shadow-cyan-500/20 ring-2 ring-cyan-500/30'
+                  : node.is_fork
+                  ? 'bg-zinc-900/90 border-amber-500/50 shadow-amber-500/10 hover:border-amber-500/70'
                   : isRunning
                   ? 'bg-zinc-900/90 border-emerald-500/40 shadow-emerald-500/10 hover:border-emerald-500/60'
                   : 'bg-zinc-900/80 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/90'
@@ -363,14 +379,34 @@ export const AgentGraphCanvas: React.FC<AgentGraphCanvasProps> = ({
               {/* Header: Role Icon, Name, and Status */}
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="p-1 rounded bg-zinc-800/80 border border-zinc-700/60 shrink-0">
-                    {getRoleIcon(node.role)}
+                  <div className={`p-1 rounded border shrink-0 ${node.is_fork ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-zinc-800/80 border-zinc-700/60'}`}>
+                    {node.is_fork ? <GitFork className="w-4 h-4 text-amber-400" /> : getRoleIcon(node.role)}
                   </div>
                   <span className="font-semibold text-xs text-zinc-100 truncate">
                     {node.name}
                   </span>
+                  {node.is_fork && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                      Fork
+                    </span>
+                  )}
                 </div>
-                {getStatusBadge(node.status, t)}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {getStatusBadge(node.status, t)}
+                  {onForkNode && (
+                    <button
+                      type="button"
+                      title={t('orchestrator_fork_node_btn', "Bifurquer cette branche")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onForkNode(node);
+                      }}
+                      className="p-1 rounded text-zinc-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                    >
+                      <GitFork className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Task Summary */}

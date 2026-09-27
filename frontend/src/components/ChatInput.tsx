@@ -869,6 +869,24 @@ export const ChatInput = React.memo<ChatInputProps>(({
         }
         return true;
 
+      case '/agent-fork':
+        if (onOpenOrchestrator) onOpenOrchestrator();
+        window.dispatchEvent(new CustomEvent('open-orchestrator-studio'));
+        window.dispatchEvent(new CustomEvent('open-agent-fork-modal'));
+        return true;
+
+      case '/replay':
+        if (onOpenOrchestrator) onOpenOrchestrator();
+        window.dispatchEvent(new CustomEvent('open-orchestrator-studio'));
+        window.dispatchEvent(new CustomEvent('open-replay-modal'));
+        return true;
+
+      case '/coordinator':
+      case '/pipelines':
+      case '/workspaces-coordinator':
+        window.dispatchEvent(new CustomEvent('open-coordinator-studio'));
+        return true;
+
       case '/analytics':
       case '/stats':
         if (onOpenAnalytics) {

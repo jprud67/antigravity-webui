@@ -18,7 +18,7 @@ logger = logging.getLogger("antigravity.context_budget")
 # Base tokens consumed by Antigravity's system prompt + 30+ tool definitions and schemas
 BASE_SYSTEM_TOKENS = 13_370
 CHARS_PER_TOKEN = 3.8
-DEFAULT_CONTEXT_BUDGET_TOKENS = 35_000
+DEFAULT_CONTEXT_BUDGET_TOKENS = 20_000
 DEFAULT_PRESERVE_LAST_N_TURNS = 2
 
 

@@ -53,7 +53,8 @@ import {
   Database,
   Share2,
   Eye,
-  Network
+  Network,
+  GitFork
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -760,6 +761,24 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'action',
     icon: Network,
     color: 'text-purple-400',
+    isAction: true
+  },
+  {
+    cmd: '/agent-fork',
+    descKey: 'cmd_desc_agent_fork',
+    desc: 'Bifurquer l\'arbre d\'exécution d\'un sous-agent',
+    category: 'action',
+    icon: GitFork,
+    color: 'text-amber-400',
+    isAction: true
+  },
+  {
+    cmd: '/replay',
+    descKey: 'cmd_desc_replay',
+    desc: 'Comparer les alternatives d\'exécution et le replay temporel',
+    category: 'action',
+    icon: GitCompare,
+    color: 'text-cyan-400',
     isAction: true
   },
   {

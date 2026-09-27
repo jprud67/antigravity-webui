@@ -192,3 +192,65 @@ AssertionError: assert 1 == 2
     assert "AssertionError" in ctx["error_summary"]
     assert "app/main.py" in ctx["suspected_files"]
     assert "pytest tests/" in ctx["remediation_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_execute_batch_action_run_all_tests(tmp_path, monkeypatch):
+    str_path = str(tmp_path.resolve())
+    monkeypatch.setattr(
+        "app.services.workspace_coordinator.get_settings",
+        lambda: {"trustedWorkspaces": [str_path], "defaultWorkspace": str_path}
+    )
+
+    pkg_json = tmp_path / "package.json"
+    pkg_json.write_text(json.dumps({"scripts": {"test": "echo all-tests-passed"}}), encoding="utf-8")
+
+    from app.services.workspace_coordinator import execute_batch_action
+
+    batch_res = await execute_batch_action("run_all_tests", [str_path])
+    assert batch_res["action"] == "run_all_tests"
+    assert batch_res["processed_count"] == 1
+    assert batch_res["results"][0]["status"] == "success"
+    assert batch_res["results"][0]["pipeline_id"] == "node_test"
+
+
+@pytest.mark.asyncio
+async def test_execute_batch_action_unsupported(tmp_path, monkeypatch):
+    str_path = str(tmp_path.resolve())
+    monkeypatch.setattr(
+        "app.services.workspace_coordinator.get_settings",
+        lambda: {"trustedWorkspaces": [str_path], "defaultWorkspace": str_path}
+    )
+
+    from app.services.workspace_coordinator import execute_batch_action
+
+    batch_res = await execute_batch_action("unknown_action", [str_path])
+    assert batch_res["results"][0]["status"] == "error"
+    assert "non supportée" in batch_res["results"][0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_broadcast_coordinator_event():
+    from app.services.execution_manager import ExecutionManager
+    mgr = ExecutionManager()
+
+    class MockWebSocket:
+        def __init__(self):
+            self.sent = []
+
+        async def send_json(self, data):
+            self.sent.append(data)
+
+    ws = MockWebSocket()
+    mgr.register_socket(ws)
+
+    await mgr.broadcast_coordinator_event({
+        "event": "step_started",
+        "run_id": "test_run",
+        "pipeline_id": "pipe_1"
+    })
+
+    assert len(ws.sent) == 1
+    assert ws.sent[0]["event"] == "coordinator_event"
+    assert ws.sent[0]["run_id"] == "test_run"
+

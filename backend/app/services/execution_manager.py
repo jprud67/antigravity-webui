@@ -949,6 +949,24 @@ class ExecutionManager:
         }
         await session.broadcast(event)
 
+    async def broadcast_coordinator_event(self, event_data: dict[str, Any]) -> None:
+        """Broadcasts real-time pipeline execution and coordinator telemetry to all connected WebSockets."""
+        msg = {
+            "type": "coordinator_event",
+            "data": event_data,
+            **event_data,
+            "event": "coordinator_event",
+            "coordinator_event": event_data.get("event", "update"),
+        }
+        dead_sockets: list[WebSocket] = []
+        for ws in list(self.connected_sockets):
+            try:
+                await ws.send_json(msg)
+            except Exception:
+                dead_sockets.append(ws)
+        for ws in dead_sockets:
+            self.unregister_socket(ws)
+
     def disconnect_token(self, share_token: str) -> int:
         """Closes all WebSockets attached to a specific share token."""
         to_disconnect = [

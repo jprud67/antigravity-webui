@@ -207,6 +207,41 @@ async def chat_websocket(
                     except Exception as e:
                         logger.debug(f"Error fetching orchestrator graph on ws: {e}")
 
+            elif action == "coordinator_run":
+                from app.services.workspace_coordinator import execute_pipeline_run
+                ws_path = data.get("workspace_path")
+                pipe_id = data.get("pipeline_id")
+                if ws_path and pipe_id:
+                    try:
+                        run_obj = await execute_pipeline_run(
+                            workspace_path=ws_path,
+                            pipeline_id=pipe_id,
+                            on_step_update=execution_manager.broadcast_coordinator_event,
+                            wait_complete=False
+                        )
+                        await websocket.send_json({
+                            "event": "coordinator_run_started",
+                            "run_id": run_obj.run_id,
+                            "pipeline_id": pipe_id,
+                            "workspace_path": ws_path
+                        })
+                    except Exception as exc:
+                        await websocket.send_json({
+                            "event": "error",
+                            "message": f"Échec du lancement du pipeline: {exc}"
+                        })
+
+            elif action == "coordinator_cancel":
+                from app.services.workspace_coordinator import cancel_pipeline_run
+                r_id = data.get("run_id")
+                if r_id:
+                    cancelled = cancel_pipeline_run(r_id)
+                    await websocket.send_json({
+                        "event": "coordinator_run_cancelled",
+                        "run_id": r_id,
+                        "success": cancelled
+                    })
+
 
     except WebSocketDisconnect:
         logger.info("WebSocket client disconnected")

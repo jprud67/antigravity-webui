@@ -1764,12 +1764,37 @@ def _safe_rmtree(dir_path: Path, root_boundary: Path) -> None:
     except Exception as err:
         logger.warning(f"Error removing directory {dir_path}: {err}")
 
+def _delete_conversation_sqlite_files(conversation_id: str) -> None:
+    if not is_safe_conversation_id(conversation_id):
+        return
+    conv_dir = GEMINI_DIR / "conversations"
+    presence_dir = GEMINI_DIR / "presence"
+    annot_dir = GEMINI_DIR / "annotations"
+    for ext in (".db", ".db-wal", ".db-shm"):
+        db_file = conv_dir / f"{conversation_id}{ext}"
+        try:
+            if db_file.exists():
+                db_file.unlink()
+        except Exception as e:
+            logger.debug(f"Failed to delete {db_file}: {e}")
+    try:
+        lock_file = presence_dir / f"{conversation_id}.lock"
+        if lock_file.exists():
+            lock_file.unlink()
+    except Exception as e:
+        logger.debug(f"Failed to delete {lock_file}: {e}")
+    try:
+        pbtxt_file = annot_dir / f"{conversation_id}.pbtxt"
+        if pbtxt_file.exists():
+            pbtxt_file.unlink()
+    except Exception as e:
+        logger.debug(f"Failed to delete {pbtxt_file}: {e}")
+
+
 def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
-    if not conversation_ids:
-        return True
     safe_ids = [cid for cid in conversation_ids if is_safe_conversation_id(cid)]
     if not safe_ids:
-        return True
+        return False
 
     try:
         from app.services.execution_manager import execution_manager
@@ -1806,6 +1831,7 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
 
     for cid in safe_ids:
         _safe_rmtree(BRAIN_DIR / cid, BRAIN_DIR)
+        _delete_conversation_sqlite_files(cid)
 
     bulk_delete_session_meta(safe_ids)
     _notify_conversations_changed()
@@ -1849,6 +1875,7 @@ def delete_conversation(conversation_id: str) -> bool:
 
     # Remove brain directory safely
     _safe_rmtree(BRAIN_DIR / conversation_id, BRAIN_DIR)
+    _delete_conversation_sqlite_files(conversation_id)
 
     # Delete metadata
     delete_session_meta(conversation_id)
@@ -3238,11 +3265,12 @@ def get_settings() -> dict[str, Any]:
     defaults: dict[str, Any] = {
         "agentMode": "accept-edits",
         "colorScheme": "dark",
-        "model": "Gemini 3.8 Flash (Medium)",
+        "model": "Gemini 3.8 Flash (Low)",
+        "effort": "low",
         "trustedWorkspaces": [DEFAULT_WORKSPACE],
         "defaultWorkspace": DEFAULT_WORKSPACE,
         "ecoMode": True,
-        "contextBudgetTokens": 35000,
+        "contextBudgetTokens": 20000,
         "autoCompactContext": True,
         "preserveLastNTurns": 2,
     }
@@ -3267,8 +3295,10 @@ def get_settings() -> dict[str, Any]:
                 res["defaultWorkspace"] = DEFAULT_WORKSPACE
             if "ecoMode" not in res:
                 res["ecoMode"] = True
+            if "effort" not in res:
+                res["effort"] = "low"
             if "contextBudgetTokens" not in res:
-                res["contextBudgetTokens"] = 35000
+                res["contextBudgetTokens"] = 20000
             if "autoCompactContext" not in res:
                 res["autoCompactContext"] = True
             if "preserveLastNTurns" not in res:

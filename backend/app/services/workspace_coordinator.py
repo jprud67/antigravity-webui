@@ -862,6 +862,39 @@ async def execute_batch_action(action: str, workspace_paths: list[str]) -> dict[
                         "exit_code": proc.returncode,
                         "output": stdout.decode("utf-8", errors="replace")[:1000]
                     })
+
+            elif action == "run_all_tests":
+                ws_pipelines = discover_workspace_pipelines(str(ws_path))
+                test_pipelines = [p for p in ws_pipelines if p.pipeline_type == "test"]
+                if not test_pipelines:
+                    results.append({
+                        "workspace": str(ws_path),
+                        "status": "skipped",
+                        "output": "Aucun pipeline de test détecté dans ce workspace."
+                    })
+                    continue
+                target_p = test_pipelines[0]
+                run_obj = await execute_pipeline_run(
+                    workspace_path=str(ws_path),
+                    pipeline_id=target_p.id,
+                    wait_complete=True
+                )
+                results.append({
+                    "workspace": str(ws_path),
+                    "status": run_obj.status,
+                    "pipeline_id": target_p.id,
+                    "pipeline_name": target_p.name,
+                    "duration_ms": run_obj.total_duration_ms,
+                    "steps_count": len(run_obj.steps),
+                    "output": "\n".join(s.output_preview for s in run_obj.steps if s.output_preview)[:1000]
+                })
+
+            else:
+                results.append({
+                    "workspace": str(ws_path),
+                    "status": "error",
+                    "error": f"Action non supportée : {action}"
+                })
         except Exception as e:
             results.append({
                 "workspace": ws,

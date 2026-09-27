@@ -231,3 +231,67 @@ def test_api_orchestrator_endpoints(tmp_path, monkeypatch):
     assert res_inspect.status_code == 200
     assert res_inspect.json()["agent_id"] == "worker_node_1"
 
+    # 5. POST /api/orchestrator/fork
+    res_fork = api_client.post("/api/orchestrator/fork", json={
+        "conversation_id": "api_conv_1",
+        "parent_agent_id": "worker_node_1",
+        "branch_name": "feature-fork-test",
+        "model": "Claude 3.7 Sonnet",
+        "directives": "Alternative implementation test",
+        "create_worktree": False
+    }, headers=headers)
+    assert res_fork.status_code == 200
+    fork_data = res_fork.json()
+    assert fork_data["success"] is True
+    assert fork_data["parent_agent_id"] == "worker_node_1"
+    assert "fork_" in fork_data["forked_agent_id"]
+
+    # 6. GET /api/orchestrator/compare
+    res_compare = api_client.get("/api/orchestrator/compare?conversation_id=api_conv_1", headers=headers)
+    assert res_compare.status_code == 200
+    compare_data = res_compare.json()
+    assert compare_data["conversation_id"] == "api_conv_1"
+    assert isinstance(compare_data["agents"], list)
+
+
+def test_fork_agent_node_and_graph_integration(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.services.agent_orchestrator.BRAIN_DIR", tmp_path)
+    from app.services.agent_orchestrator import (
+        ForkAgentRequest,
+        fork_agent_node,
+        build_orchestrator_graph,
+        compare_execution_branches,
+    )
+
+    req = ForkAgentRequest(
+        conversation_id="session_fork_test",
+        parent_agent_id="root_session_fork_test",
+        branch_name="feature-opt",
+        model="Gemini 3.8 Flash (Low)",
+        directives="Benchmark parallel sorting algorithm",
+        create_worktree=False
+    )
+    res = fork_agent_node(req)
+    assert res.success is True
+    assert res.parent_agent_id == "root_session_fork_test"
+    assert res.forked_agent_id.startswith("fork_")
+
+    # Verify graph includes forked node and edge
+    graph = build_orchestrator_graph("session_fork_test")
+    fork_nodes = [n for n in graph.nodes if n.is_fork]
+    assert len(fork_nodes) == 1
+    assert fork_nodes[0].id == res.forked_agent_id
+    assert fork_nodes[0].fork_parent_id == "root_session_fork_test"
+
+    # Verify edge
+    fork_edges = [e for e in graph.edges if e.edge_type == "forks"]
+    assert len(fork_edges) == 1
+    assert fork_edges[0].source == "root_session_fork_test"
+    assert fork_edges[0].target == res.forked_agent_id
+
+    # Verify comparison
+    comp = compare_execution_branches("session_fork_test")
+    assert comp.conversation_id == "session_fork_test"
+    assert len(comp.agents) >= 1
+
+

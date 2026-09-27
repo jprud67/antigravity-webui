@@ -23,6 +23,7 @@ interface AgentInspectionDrawerProps {
   onClose: () => void;
   onSteer: (instruction: string) => Promise<void>;
   onTerminate: (recursive: boolean) => Promise<void>;
+  onFork?: () => void;
 }
 
 export const AgentInspectionDrawer: React.FC<AgentInspectionDrawerProps> = ({
@@ -31,6 +32,7 @@ export const AgentInspectionDrawer: React.FC<AgentInspectionDrawerProps> = ({
   onClose,
   onSteer,
   onTerminate,
+  onFork,
 }) => {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'telemetry' | 'tools' | 'diff'>('telemetry');
@@ -120,13 +122,26 @@ export const AgentInspectionDrawer: React.FC<AgentInspectionDrawerProps> = ({
             ID: {agentNode.id}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onFork && (
+            <button
+              type="button"
+              onClick={onFork}
+              title={t('orchestrator_fork_agent_btn', "Bifurquer l'arbre depuis cet agent")}
+              className="px-2.5 py-1 rounded-lg text-xs font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 flex items-center gap-1.5 transition-colors"
+            >
+              <GitFork className="w-3.5 h-3.5" />
+              <span>{t('orchestrator_fork_btn_label', 'Bifurquer')}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Tabs Navigation */}

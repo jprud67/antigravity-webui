@@ -7,12 +7,15 @@ import {
   Columns, 
   Rows, 
   Loader2, 
-  Network
+  Network,
+  GitCompare
 } from 'lucide-react';
 import type { OrchestratorGraphResponse, AgentNode } from '../types';
 import { fetchOrchestratorGraph, steerSubagent, terminateSubagent } from '../services/api';
 import { AgentGraphCanvas } from './AgentGraphCanvas';
 import { AgentInspectionDrawer } from './AgentInspectionDrawer';
+import { ForkAgentModal } from './ForkAgentModal';
+import { ExecutionComparisonModal } from './ExecutionComparisonModal';
 import { useI18n } from '../services/i18n';
 import { showToast } from '../services/toast';
 
@@ -34,6 +37,27 @@ export const AgentOrchestrationModal: React.FC<AgentOrchestrationModalProps> = (
   const [orientation, setOrientation] = useState<'vertical' | 'horizontal'>('vertical');
   const [filterStatus, setFilterStatus] = useState<'all' | 'running' | 'completed' | 'failed'>('all');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [forkModalOpen, setForkModalOpen] = useState(false);
+  const [nodeToFork, setNodeToFork] = useState<AgentNode | null>(null);
+  const [compareModalOpen, setCompareModalOpen] = useState(false);
+
+  // Global event listeners for slash commands / external triggers
+  useEffect(() => {
+    const handleOpenFork = (e: any) => {
+      const target = e?.detail?.node || graphData?.nodes?.[0] || null;
+      setNodeToFork(target);
+      setForkModalOpen(true);
+    };
+    const handleOpenCompare = () => {
+      setCompareModalOpen(true);
+    };
+    window.addEventListener('open-agent-fork-modal', handleOpenFork);
+    window.addEventListener('open-replay-modal', handleOpenCompare);
+    return () => {
+      window.removeEventListener('open-agent-fork-modal', handleOpenFork);
+      window.removeEventListener('open-replay-modal', handleOpenCompare);
+    };
+  }, [graphData]);
 
   // Load graph data
   const loadGraph = useCallback(async (isPolling = false) => {
@@ -261,6 +285,17 @@ export const AgentOrchestrationModal: React.FC<AgentOrchestrationModalProps> = (
               </button>
             </div>
 
+            {/* Replay & Comparison Button */}
+            <button
+              type="button"
+              onClick={() => setCompareModalOpen(true)}
+              title={t('orchestrator_btn_compare', 'Replay temporel & Comparaison')}
+              className="px-2.5 py-1.5 rounded-lg bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700 flex items-center gap-1.5 text-xs transition-colors"
+            >
+              <GitCompare className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">{t('orchestrator_tab_compare', 'Replay & Comparer')}</span>
+            </button>
+
             {/* Refresh */}
             <button
               type="button"
@@ -320,6 +355,10 @@ export const AgentOrchestrationModal: React.FC<AgentOrchestrationModalProps> = (
                   edges={graphData.edges}
                   selectedNodeId={selectedNodeId}
                   onSelectNode={(id) => setSelectedNodeId(id)}
+                  onForkNode={(node) => {
+                    setNodeToFork(node);
+                    setForkModalOpen(true);
+                  }}
                   orientation={orientation}
                 />
               </div>
@@ -332,6 +371,10 @@ export const AgentOrchestrationModal: React.FC<AgentOrchestrationModalProps> = (
                   onClose={() => setSelectedNodeId(null)}
                   onSteer={handleSteer}
                   onTerminate={handleTerminate}
+                  onFork={() => {
+                    setNodeToFork(selectedNode);
+                    setForkModalOpen(true);
+                  }}
                 />
               )}
             </>
@@ -347,6 +390,32 @@ export const AgentOrchestrationModal: React.FC<AgentOrchestrationModalProps> = (
             </div>
           )}
         </div>
+
+        {/* Fork Agent Modal */}
+        <ForkAgentModal
+          isOpen={forkModalOpen}
+          onClose={() => {
+            setForkModalOpen(false);
+            setNodeToFork(null);
+          }}
+          agentNode={nodeToFork}
+          conversationId={conversationId || ''}
+          onForkCreated={(forkedId) => {
+            loadGraph(false);
+            setSelectedNodeId(forkedId);
+          }}
+        />
+
+        {/* Replay & Comparison Modal */}
+        <ExecutionComparisonModal
+          isOpen={compareModalOpen}
+          onClose={() => setCompareModalOpen(false)}
+          conversationId={conversationId || ''}
+          onSelectAgent={(aid) => {
+            setSelectedNodeId(aid);
+            setCompareModalOpen(false);
+          }}
+        />
       </div>
     </div>
   );

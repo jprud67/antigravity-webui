@@ -1175,13 +1175,16 @@ export interface AgentNode {
   pid?: number | null;
   worktree_path?: string | null;
   worktree_branch?: string | null;
+  is_fork?: boolean;
+  fork_parent_id?: string | null;
+  fork_branch?: string | null;
   metrics: AgentNodeMetrics;
 }
 
 export interface AgentEdge {
   source: string;
   target: string;
-  edge_type: 'spawns' | 'delegates' | 'monitors';
+  edge_type: 'spawns' | 'delegates' | 'monitors' | 'forks';
 }
 
 export interface OrchestratorGraphResponse {
@@ -1203,6 +1206,48 @@ export interface TerminateAgentRequest {
   conversation_id: string;
   target_agent_id: string;
   recursive?: boolean;
+}
+
+export interface ForkAgentRequest {
+  conversation_id: string;
+  parent_agent_id: string;
+  branch_name?: string;
+  model?: string;
+  directives?: string;
+  create_worktree?: boolean;
+  workspace_path?: string;
+}
+
+export interface ForkAgentResponse {
+  success: boolean;
+  forked_agent_id: string;
+  parent_agent_id: string;
+  branch_name?: string | null;
+  worktree_path?: string | null;
+  model?: string | null;
+  created_at: string;
+}
+
+export interface AgentComparisonItem {
+  agent_id: string;
+  name: string;
+  role: AgentNodeRole;
+  status: AgentNodeStatus;
+  model?: string | null;
+  duration_ms: number;
+  tool_call_count: number;
+  token_count?: number | null;
+  modified_files_count: number;
+  modified_files: Array<{ path: string; step?: number; is_write?: boolean }>;
+  thought_preview?: string | null;
+  worktree_branch?: string | null;
+  is_fork?: boolean;
+  fork_parent_id?: string | null;
+}
+
+export interface AgentComparisonResponse {
+  conversation_id: string;
+  agents: AgentComparisonItem[];
 }
 
 export interface AgentInspectionDetails {
@@ -1238,5 +1283,109 @@ export interface CheckpointDetail extends Checkpoint {
   tools_used: string[];
   artifacts: string[];
 }
+
+
+// ---------------------------------------------------------------------------
+// Autonomous Multi-Workspace Coordinator & Pipelines (v0.4.3)
+// ---------------------------------------------------------------------------
+
+export type PipelineStepStatus = 'pending' | 'running' | 'success' | 'failed' | 'skipped';
+export type WorkspacePipelineType = 'test' | 'build' | 'lint' | 'custom' | 'full';
+export type PipelineRunStatus = 'running' | 'success' | 'failed' | 'cancelled';
+export type BatchCoordinatorAction = 'git_fetch' | 'git_pull' | 'install_deps' | 'run_all_tests';
+
+export interface PipelineStep {
+  id: string;
+  name: string;
+  command: string;
+  cwd: string;
+  status: PipelineStepStatus;
+  exit_code?: number | null;
+  started_at?: number | null;
+  finished_at?: number | null;
+  duration_ms: number;
+  output_preview: string;
+}
+
+export interface WorkspacePipeline {
+  id: string;
+  workspace_path: string;
+  workspace_name: string;
+  pipeline_type: WorkspacePipelineType;
+  name: string;
+  description: string;
+  steps: PipelineStep[];
+  status: 'idle' | 'running' | 'success' | 'failed';
+  total_duration_ms: number;
+  last_run_at?: number | null;
+}
+
+export interface PipelineExecutionRun {
+  run_id: string;
+  workspace_path: string;
+  pipeline_id: string;
+  pipeline_name: string;
+  status: PipelineRunStatus;
+  current_step_index: number;
+  steps: PipelineStep[];
+  started_at: number;
+  finished_at?: number | null;
+  total_duration_ms: number;
+  triggered_by: string;
+}
+
+export interface MultiWorkspaceOverview {
+  workspaces: Array<{
+    path: string;
+    name: string;
+    is_default: boolean;
+    is_active: boolean;
+    runtime: any;
+    git?: {
+      branch?: string;
+      is_dirty?: boolean;
+      ahead?: number;
+      behind?: number;
+    };
+    health?: {
+      status: 'healthy' | 'warning' | 'error';
+      issues?: string[];
+    };
+  }>;
+  active_workspace_path: string;
+  discovered_pipelines: WorkspacePipeline[];
+  global_health: 'healthy' | 'warning' | 'error';
+  running_pipeline_count: number;
+  dirty_repos_count: number;
+  out_of_sync_count: number;
+}
+
+export interface RemediationContext {
+  workspace_path: string;
+  run_id: string;
+  failed_step_id: string;
+  error_summary: string;
+  suspected_files: string[];
+  remediation_prompt: string;
+}
+
+export interface CoordinatorBatchResult {
+  action: string;
+  processed_count: number;
+  results: Array<{
+    workspace: string;
+    status: 'success' | 'failed' | 'skipped' | 'error';
+    exit_code?: number;
+    command?: string;
+    output?: string;
+    pipeline_id?: string;
+    pipeline_name?: string;
+    duration_ms?: number;
+    steps_count?: number;
+    error?: string;
+    message?: string;
+  }>;
+}
+
 
 

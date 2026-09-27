@@ -36,6 +36,7 @@ const SharePinModal = lazy(() => import('./components/SharePinModal').then(m => 
 const LivePreviewDrawer = lazy(() => import('./components/LivePreviewDrawer').then(m => ({ default: m.LivePreviewDrawer })));
 const AgentOrchestrationModal = lazy(() => import('./components/AgentOrchestrationModal').then(m => ({ default: m.AgentOrchestrationModal })));
 const CheckpointRewindModal = lazy(() => import('./components/CheckpointRewindModal').then(m => ({ default: m.CheckpointRewindModal })));
+const MultiWorkspaceCoordinatorModal = lazy(() => import('./components/MultiWorkspaceCoordinatorModal').then(m => ({ default: m.MultiWorkspaceCoordinatorModal })));
 
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig, AppSettings, ProgressCardData, PresenceParticipant } from './types';
@@ -220,7 +221,7 @@ export function App() {
 
   const [models, setModels] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
-  const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('medium');
+  const [selectedEffort, setSelectedEffort] = useState<'low' | 'medium' | 'high'>('low');
   const [quickPrompt, setQuickPrompt] = useState('');
 
   // Memoized prompt history of active discussion for terminal-like navigation
@@ -285,6 +286,7 @@ export function App() {
   const [isDockerStudioOpen, setIsDockerStudioOpen] = useState(false);
   const [isOrchestratorOpen, setIsOrchestratorOpen] = useState(false);
   const [isCheckpointModalOpen, setIsCheckpointModalOpen] = useState(false);
+  const [isCoordinatorModalOpen, setIsCoordinatorModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [activeShareToken, setActiveShareToken] = useState<string | null>(null);
@@ -337,6 +339,9 @@ export function App() {
     const handleOpenCheckpointStudio = () => {
       setIsCheckpointModalOpen(true);
     };
+    const handleOpenCoordinator = () => {
+      setIsCoordinatorModalOpen(true);
+    };
     window.addEventListener('open-workspace-file', handleOpenFile);
     window.addEventListener('terminal-run-command', handleRunTerminal);
     window.addEventListener('open-quick-open', handleQuickOpen);
@@ -349,6 +354,8 @@ export function App() {
     window.addEventListener('antigravity:open-orchestrator-studio', handleOpenOrchestrator);
     window.addEventListener('open-checkpoint-studio', handleOpenCheckpointStudio);
     window.addEventListener('antigravity:open-checkpoint-studio', handleOpenCheckpointStudio);
+    window.addEventListener('open-coordinator-studio', handleOpenCoordinator);
+    window.addEventListener('antigravity:open-coordinator-studio', handleOpenCoordinator);
     return () => {
       window.removeEventListener('open-workspace-file', handleOpenFile);
       window.removeEventListener('terminal-run-command', handleRunTerminal);
@@ -362,6 +369,8 @@ export function App() {
       window.removeEventListener('antigravity:open-orchestrator-studio', handleOpenOrchestrator);
       window.removeEventListener('open-checkpoint-studio', handleOpenCheckpointStudio);
       window.removeEventListener('antigravity:open-checkpoint-studio', handleOpenCheckpointStudio);
+      window.removeEventListener('open-coordinator-studio', handleOpenCoordinator);
+      window.removeEventListener('antigravity:open-coordinator-studio', handleOpenCoordinator);
     };
   }, []);
 
@@ -1553,6 +1562,13 @@ export function App() {
         return;
       }
 
+      // Ctrl+Alt+M — Multi-Workspace Coordinator & Pipeline Studio
+      if (mod && e.altKey && (e.key === 'm' || e.key === 'M')) {
+        e.preventDefault();
+        setIsCoordinatorModalOpen((prev) => !prev);
+        return;
+      }
+
       // Ctrl+Shift+P — Live Preview & Inspection
       if (mod && shift && (e.key === 'P' || e.key === 'p')) {
         e.preventDefault();
@@ -1583,6 +1599,7 @@ export function App() {
         if (isDatabaseStudioOpen) { setIsDatabaseStudioOpen(false); return; }
         if (isOrchestratorOpen) { setIsOrchestratorOpen(false); return; }
         if (isCheckpointModalOpen) { setIsCheckpointModalOpen(false); return; }
+        if (isCoordinatorModalOpen) { setIsCoordinatorModalOpen(false); return; }
         if (isShareModalOpen) { setIsShareModalOpen(false); return; }
         if (isPinModalOpen) { setIsPinModalOpen(false); return; }
         if (isLivePreviewOpen) { setIsLivePreviewOpen(false); return; }
@@ -1608,7 +1625,7 @@ export function App() {
     isQuickOpenOpen, isMcpCatalogOpen, isDoctorOpen,
     isRemoteAccessOpen, isGatewayOpen, isWorktreeOpen,
     isDockerStudioOpen, isDatabaseStudioOpen, isOrchestratorOpen, isCheckpointModalOpen,
-    isShareModalOpen, isPinModalOpen, isLivePreviewOpen,
+    isCoordinatorModalOpen, isShareModalOpen, isPinModalOpen, isLivePreviewOpen,
   ]);
 
   // Phase 3 Session Handlers (Fork, Pin, Tags, Project, Search)
@@ -2109,6 +2126,7 @@ export function App() {
         onOpenDatabaseStudio={() => { setDatabaseStudioInitialQuery(undefined); setIsDatabaseStudioOpen(true); }}
         onOpenOrchestrator={() => setIsOrchestratorOpen(true)}
         onOpenCheckpointStudio={() => setIsCheckpointModalOpen(true)}
+        onOpenCoordinator={() => setIsCoordinatorModalOpen(true)}
       />
 
       {/* Main Chat Area */}
@@ -2523,6 +2541,18 @@ export function App() {
           onClose={() => setIsCheckpointModalOpen(false)}
           currentConversationId={activeConversationId || ''}
           onSelectConversation={handleSelectConversation}
+        />
+      )}
+
+      {isCoordinatorModalOpen && (
+        <MultiWorkspaceCoordinatorModal
+          isOpen={isCoordinatorModalOpen}
+          onClose={() => setIsCoordinatorModalOpen(false)}
+          activeWorkspace={currentWorkspace || ''}
+          onSwitchWorkspace={handleSelectWorkspace}
+          onInjectPrompt={(prompt) => {
+            handleSendMessage(prompt, {});
+          }}
         />
       )}
 

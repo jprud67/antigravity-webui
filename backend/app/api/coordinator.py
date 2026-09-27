@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
 from app.platform_utils import is_blocked_sensitive_path
+from app.services.execution_manager import execution_manager
 from app.services.workspace_coordinator import (
     BatchActionRequest,
     MultiWorkspaceOverview,
@@ -82,6 +83,7 @@ async def api_run_pipeline(payload: PipelineRunRequest):
         run_obj = await execute_pipeline_run(
             workspace_path=payload.workspace_path,
             pipeline_id=payload.pipeline_id,
+            on_step_update=execution_manager.broadcast_coordinator_event,
             wait_complete=False
         )
         return run_obj

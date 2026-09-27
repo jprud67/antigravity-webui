@@ -92,7 +92,10 @@ import type {
   ShareLinkCreatePayload,
   ShareVerificationResult,
   OrchestratorGraphResponse,
-  AgentInspectionDetails
+  AgentInspectionDetails,
+  ForkAgentRequest,
+  ForkAgentResponse,
+  AgentComparisonResponse
 } from '../types';
 
 const API_BASE = '/api';
@@ -3280,6 +3283,37 @@ export async function fetchAgentInspectionDetails(agentId: string, conversationI
   return res.json();
 }
 
+export async function forkAgentBranch(payload: ForkAgentRequest): Promise<ForkAgentResponse> {
+  const res = await fetch(`${API_BASE}/orchestrator/fork`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de la bifurcation de l'agent" }));
+    throw new Error(err.detail || "Échec de la bifurcation de l'agent");
+  }
+  return res.json();
+}
+
+export async function compareExecutionBranches(
+  conversationId: string,
+  agentIds?: string[]
+): Promise<AgentComparisonResponse> {
+  const query = new URLSearchParams({ conversation_id: conversationId });
+  if (agentIds && agentIds.length > 0) {
+    query.set('agent_ids', agentIds.join(','));
+  }
+  const res = await fetch(`${API_BASE}/orchestrator/compare?${query.toString()}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de la comparaison d'exécution" }));
+    throw new Error(err.detail || "Échec de la comparaison d'exécution");
+  }
+  return res.json();
+}
+
 // ---------------------------------------------------------------------------
 // Checkpoint & Rewind Studio (v0.4.2)
 // ---------------------------------------------------------------------------
@@ -3357,3 +3391,110 @@ export async function deleteCheckpointApi(conversationId: string, checkpointId: 
   }
   return res.json();
 }
+
+
+// ---------------------------------------------------------------------------
+// Autonomous Multi-Workspace Coordinator & Pipelines API (v0.4.3)
+// ---------------------------------------------------------------------------
+
+export async function fetchCoordinatorOverview(activeWorkspace?: string): Promise<import('../types').MultiWorkspaceOverview> {
+  const query = activeWorkspace ? `?active_workspace=${encodeURIComponent(activeWorkspace)}` : '';
+  const res = await fetch(`${API_BASE}/coordinator/overview${query}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du chargement du coordinateur' }));
+    throw new Error(err.detail || 'Erreur lors du chargement de la vue coordinateur');
+  }
+  return res.json();
+}
+
+export async function fetchWorkspacePipelines(workspacePath?: string): Promise<import('../types').WorkspacePipeline[]> {
+  const query = workspacePath ? `?workspace=${encodeURIComponent(workspacePath)}` : '';
+  const res = await fetch(`${API_BASE}/coordinator/pipelines${query}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la découverte des pipelines' }));
+    throw new Error(err.detail || 'Erreur lors de la détection des pipelines');
+  }
+  return res.json();
+}
+
+export async function runCoordinatorPipeline(workspacePath: string, pipelineId: string): Promise<import('../types').PipelineExecutionRun> {
+  const res = await fetch(`${API_BASE}/coordinator/run`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({
+      workspace_path: workspacePath,
+      pipeline_id: pipelineId,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du lancement du pipeline' }));
+    throw new Error(err.detail || 'Erreur lors du lancement du pipeline');
+  }
+  return res.json();
+}
+
+export async function fetchPipelineRunDetails(runId: string): Promise<import('../types').PipelineExecutionRun> {
+  const res = await fetch(`${API_BASE}/coordinator/run/${encodeURIComponent(runId)}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Exécution introuvable' }));
+    throw new Error(err.detail || 'Exécution introuvable');
+  }
+  return res.json();
+}
+
+export async function cancelCoordinatorPipeline(runId: string): Promise<{ success: boolean; run_id: string; status: string; message?: string }> {
+  const res = await fetch(`${API_BASE}/coordinator/cancel/${encodeURIComponent(runId)}`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'annulation" }));
+    throw new Error(err.detail || "Échec de l'annulation du pipeline");
+  }
+  return res.json();
+}
+
+export async function triggerCoordinatorRemediation(payload: {
+  workspace_path: string;
+  run_id: string;
+  failed_step_id: string;
+  step_command?: string;
+  step_output?: string;
+}): Promise<import('../types').RemediationContext> {
+  const res = await fetch(`${API_BASE}/coordinator/remediation`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la génération du diagnostic' }));
+    throw new Error(err.detail || 'Erreur lors de la génération de la remédiation');
+  }
+  return res.json();
+}
+
+export async function triggerCoordinatorBatch(
+  action: import('../types').BatchCoordinatorAction,
+  workspacePaths?: string[]
+): Promise<import('../types').CoordinatorBatchResult> {
+  const res = await fetch(`${API_BASE}/coordinator/batch`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({
+      action,
+      workspace_paths: workspacePaths || [],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'action par lot" }));
+    throw new Error(err.detail || "Erreur lors de l'action par lot");
+  }
+  return res.json();
+}
+

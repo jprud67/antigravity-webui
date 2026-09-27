@@ -23,7 +23,7 @@ DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
     {
         "id": "gemini-3.8-flash",
         "name": "Gemini 3.8 Flash",
-        "default_effort": "medium",
+        "default_effort": "low",
         "supported_efforts": ["high", "medium", "low"],
         "variants": {
             "high": "gemini-3.8-flash-high",
@@ -34,7 +34,7 @@ DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
     {
         "id": "gemini-3.7-flash",
         "name": "Gemini 3.7 Flash",
-        "default_effort": "medium",
+        "default_effort": "low",
         "supported_efforts": ["high", "medium", "low"],
         "variants": {
             "high": "gemini-3.7-flash-high",
@@ -45,7 +45,7 @@ DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
     {
         "id": "gemini-3.6-flash",
         "name": "Gemini 3.6 Flash",
-        "default_effort": "medium",
+        "default_effort": "low",
         "supported_efforts": ["high", "medium", "low"],
         "variants": {
             "high": "gemini-3.6-flash-high",
@@ -189,7 +189,7 @@ async def get_model_families() -> list[dict[str, Any]]:
                 families[fid] = {
                     'id': fid,
                     'name': meta['family_name'],
-                    'default_effort': meta['effort'] or ('medium' if 'medium' in meta['supported_efforts'] else ('low' if 'low' in meta['supported_efforts'] else 'high')),
+                    'default_effort': 'low' if 'low' in meta['supported_efforts'] else ('medium' if 'medium' in meta['supported_efforts'] else (meta['effort'] or 'low')),
                     'supported_efforts': meta['supported_efforts'],
                     'variants': {}
                 }
