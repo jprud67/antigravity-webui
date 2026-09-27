@@ -187,6 +187,21 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
     });
   };
 
+  const toggleSelectColumn = (columnTasks: KanbanTask[]) => {
+    if (columnTasks.length === 0) return;
+    const colTaskIds = columnTasks.map(t => t.id);
+    const allSelected = colTaskIds.every(id => selectedTaskIds.has(id));
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        colTaskIds.forEach(id => next.delete(id));
+      } else {
+        colTaskIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
   const toggleSelectAll = () => {
     if (selectedTaskIds.size === tasks.length) {
       setSelectedTaskIds(new Set());
@@ -480,6 +495,20 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
             }}
           >
             <div className="flex items-center gap-2">
+              {filterTasks(columns.todo).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => toggleSelectColumn(filterTasks(columns.todo))}
+                  className="text-zinc-400 hover:text-sky-500 transition-colors cursor-pointer shrink-0"
+                  title={filterTasks(columns.todo).every(t => selectedTaskIds.has(t.id)) ? t('kanban_deselect_col', 'Deselect column') : t('kanban_select_col', 'Select column')}
+                >
+                  {filterTasks(columns.todo).every(t => selectedTaskIds.has(t.id)) ? (
+                    <CheckSquare className="w-3.5 h-3.5 text-sky-500" />
+                  ) : (
+                    <Square className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
               <div className="w-2 h-2 rounded-full bg-sky-400" />
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>{t('kanban_col_todo', 'To do')}</span>
             </div>
@@ -583,6 +612,20 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
             }}
           >
             <div className="flex items-center gap-2">
+              {filterTasks(columns.running).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => toggleSelectColumn(filterTasks(columns.running))}
+                  className="text-zinc-400 hover:text-amber-500 transition-colors cursor-pointer shrink-0"
+                  title={filterTasks(columns.running).every(t => selectedTaskIds.has(t.id)) ? t('kanban_deselect_col', 'Deselect column') : t('kanban_select_col', 'Select column')}
+                >
+                  {filterTasks(columns.running).every(t => selectedTaskIds.has(t.id)) ? (
+                    <CheckSquare className="w-3.5 h-3.5 text-amber-500" />
+                  ) : (
+                    <Square className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
               <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>{t('kanban_col_running', 'In progress')}</span>
             </div>
@@ -684,6 +727,20 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
             }}
           >
             <div className="flex items-center gap-2">
+              {filterTasks(columns.blocked).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => toggleSelectColumn(filterTasks(columns.blocked))}
+                  className="text-zinc-400 hover:text-rose-500 transition-colors cursor-pointer shrink-0"
+                  title={filterTasks(columns.blocked).every(t => selectedTaskIds.has(t.id)) ? t('kanban_deselect_col', 'Deselect column') : t('kanban_select_col', 'Select column')}
+                >
+                  {filterTasks(columns.blocked).every(t => selectedTaskIds.has(t.id)) ? (
+                    <CheckSquare className="w-3.5 h-3.5 text-rose-500" />
+                  ) : (
+                    <Square className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
               <div className="w-2 h-2 rounded-full bg-rose-500" />
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>{t('kanban_col_blocked', 'Blocked')}</span>
             </div>
@@ -778,6 +835,20 @@ export const KanbanTab: React.FC<KanbanTabProps> = ({ currentWorkspace, onExecut
             }}
           >
             <div className="flex items-center gap-2">
+              {filterTasks(columns.done).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => toggleSelectColumn(filterTasks(columns.done))}
+                  className="text-zinc-400 hover:text-emerald-500 transition-colors cursor-pointer shrink-0"
+                  title={filterTasks(columns.done).every(t => selectedTaskIds.has(t.id)) ? t('kanban_deselect_col', 'Deselect column') : t('kanban_select_col', 'Select column')}
+                >
+                  {filterTasks(columns.done).every(t => selectedTaskIds.has(t.id)) ? (
+                    <CheckSquare className="w-3.5 h-3.5 text-emerald-500" />
+                  ) : (
+                    <Square className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--strong)' }}>{t('kanban_col_done', 'Done')}</span>
             </div>
