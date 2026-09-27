@@ -8,7 +8,9 @@ import {
   Tablet,
   Smartphone,
   FileCode2,
-  Layers
+  Layers,
+  AlertCircle,
+  ArrowRight
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import ReactMarkdown from 'react-markdown';
@@ -43,11 +45,13 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
   const [activeTab, setActiveTab] = useState<PreviewTab>('web');
 
   // Web & Canvas Live Preview State
-  const [previewUrl, setPreviewUrl] = useState<string>('http://localhost:5173/');
-  const [iframeSrc, setIframeSrc] = useState<string>('http://localhost:5173/');
+  const defaultUrl = typeof window !== 'undefined' ? `${window.location.origin}/` : 'http://localhost:5173/';
+  const [previewUrl, setPreviewUrl] = useState<string>(defaultUrl);
+  const [iframeSrc, setIframeSrc] = useState<string>(defaultUrl);
   const [viewportPreset, setViewportPreset] = useState<ViewportPreset>('desktop');
   const [iframeKey, setIframeKey] = useState<number>(0);
   const [iframeLoading, setIframeLoading] = useState<boolean>(false);
+  const [iframeError, setIframeError] = useState<boolean>(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Modified Files Inspection State
@@ -66,6 +70,8 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
     if (!isOpen) return;
 
     let isMounted = true;
+    // oxlint-disable-next-line react/set-state-in-effect
+    setLoadingFiles(true);
 
     // Fetch git status to get modified files in workspace
     fetchGitStatus(currentWorkspace)
@@ -118,6 +124,8 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
     if (!selectedFile) return;
 
     let isMounted = true;
+    // oxlint-disable-next-line react/set-state-in-effect
+    setLoadingContent(true);
     fetchFileContent(selectedFile, currentWorkspace)
       .then((res) => {
         if (isMounted) {
@@ -161,6 +169,7 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
 
   const handleReload = () => {
     setIframeLoading(true);
+    setIframeError(false);
     setIframeKey((prev) => prev + 1);
   };
 
@@ -176,6 +185,8 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
         return;
       }
+      setIframeError(false);
+      setIframeLoading(true);
       setIframeSrc(parsed.href);
       setIframeKey((prev) => prev + 1);
     } catch {
@@ -355,6 +366,13 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 font-mono focus:outline-none focus:border-cyan-500"
               />
               <button
+                type="submit"
+                className="p-1.5 text-zinc-400 hover:text-cyan-300 rounded-lg hover:bg-zinc-800 transition"
+                title="Appliquer l'URL"
+              >
+                <ArrowRight size={15} />
+              </button>
+              <button
                 type="button"
                 onClick={handleReload}
                 className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition"
@@ -380,14 +398,59 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
               className="h-full bg-white rounded-xl shadow-2xl overflow-hidden border border-zinc-800/80 transition-all duration-300 relative flex flex-col"
               style={{ width: getViewportWidth(), maxWidth: '100%' }}
             >
+              {/* Loading Indicator */}
+              {iframeLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-zinc-950/40 backdrop-blur-xs text-xs text-cyan-300 gap-2">
+                  <RefreshCw size={16} className="animate-spin text-cyan-400" />
+                  <span>Chargement de l'aperçu...</span>
+                </div>
+              )}
+
+              {/* Error fallback overlay */}
+              {iframeError && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-900 text-zinc-300 p-6 text-center gap-3">
+                  <div className="p-3 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                    <AlertCircle size={24} />
+                  </div>
+                  <h4 className="text-sm font-semibold text-white">Impossible de charger l'aperçu</h4>
+                  <p className="text-xs text-zinc-400 max-w-sm">
+                    L'adresse <span className="font-mono text-cyan-300">{iframeSrc}</span> ne répond pas ou bloque l'intégration par iframe (X-Frame-Options).
+                  </p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={handleReload}
+                      className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-white transition flex items-center gap-1.5"
+                    >
+                      <RefreshCw size={12} />
+                      Réessayer
+                    </button>
+                    <a
+                      href={iframeSrc}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-xs font-medium text-white transition flex items-center gap-1.5"
+                    >
+                      <ExternalLink size={12} />
+                      Ouvrir dans un nouvel onglet
+                    </a>
+                  </div>
+                </div>
+              )}
+
               <iframe
                 key={iframeKey}
                 ref={iframeRef}
                 src={iframeSrc}
-                sandbox="allow-scripts allow-forms allow-popups allow-modals"
+                sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin"
                 className="w-full h-full border-0"
-                onLoad={() => setIframeLoading(false)}
-                onError={() => setIframeLoading(false)}
+                onLoad={() => {
+                  setIframeLoading(false);
+                }}
+                onError={() => {
+                  setIframeLoading(false);
+                  setIframeError(true);
+                }}
                 title="Live Sandboxed Preview"
               />
             </div>
