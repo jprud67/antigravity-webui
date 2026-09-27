@@ -240,6 +240,30 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None, force: bool = False
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_deleted_conv_id ON deleted_conversations(conversation_id);"
             )
+            # Triggers SQLite natifs : bloquent silencieusement toute tentative du CLI agy
+            # de réinsérer ou mettre à jour des conversations présentes dans deleted_conversations
+            conn.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS prevent_tombstone_insert
+                BEFORE INSERT ON conversation_summaries
+                FOR EACH ROW
+                WHEN NEW.conversation_id IN (SELECT conversation_id FROM deleted_conversations)
+                BEGIN
+                    SELECT RAISE(IGNORE);
+                END;
+                """
+            )
+            conn.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS prevent_tombstone_update
+                BEFORE UPDATE ON conversation_summaries
+                FOR EACH ROW
+                WHEN NEW.conversation_id IN (SELECT conversation_id FROM deleted_conversations)
+                BEGIN
+                    SELECT RAISE(IGNORE);
+                END;
+                """
+            )
             conn.commit()
             if conn is None or db_path_str == str(CONVERSATION_DB):
                 _schema_initialized = True
