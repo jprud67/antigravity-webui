@@ -1219,4 +1219,49 @@ body {
   border-left: 4px solid #f43f5e;
 }
 
+/* Monaco Remote Multi-Cursors Presence */
+.monaco-remote-cursor {
+  position: relative;
+  border-left: 2px solid #8b5cf6 !important;
+  animation: pulse-cursor 1.2s infinite ease-in-out;
+}
+
+.monaco-remote-selection {
+  background-color: rgba(139, 92, 246, 0.25) !important;
+  border-radius: 2px;
+}
+
+@keyframes pulse-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Monaco Inline Comments Glyphs in Gutter Margin */
+.monaco-comment-glyph-open::before {
+  content: '💬';
+  font-size: 11px;
+  display: block;
+  text-align: center;
+  cursor: pointer;
+}
+
+.monaco-comment-glyph-agent::before {
+  content: '🤖';
+  font-size: 11px;
+  display: block;
+  text-align: center;
+  cursor: pointer;
+}
+
+.monaco-comment-glyph-resolved::before {
+  content: '✓';
+  font-size: 11px;
+  color: #10b981;
+  font-weight: bold;
+  display: block;
+  text-align: center;
+  cursor: pointer;
+}
+
+
 

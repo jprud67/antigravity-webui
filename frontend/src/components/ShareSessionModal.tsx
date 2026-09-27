@@ -12,10 +12,14 @@ import {
   ExternalLink,
   ShieldCheck,
   Clock,
-  Sparkles
+  Sparkles,
+  Shield,
+  Terminal,
+  Sliders,
+  Edit3
 } from 'lucide-react';
 import { useI18n } from '../services/i18n';
-import { createShareLink, fetchShareLinks, revokeShareLink } from '../services/api';
+import { createShareLink, fetchShareLinks, revokeShareLink, updateSharePermissions } from '../services/api';
 import { showToast } from '../services/toast';
 import { copyText } from '../utils/codeBlockUtils';
 import type { ShareLinkItem } from '../types';
@@ -49,6 +53,37 @@ export const ShareSessionModal: React.FC<ShareSessionModalProps> = ({
   const [loadingLinks, setLoadingLinks] = useState<boolean>(false);
   const [revokingToken, setRevokingToken] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [expandedPermissionsToken, setExpandedPermissionsToken] = useState<string | null>(null);
+  const [updatingPermsToken, setUpdatingPermsToken] = useState<string | null>(null);
+
+  const handleTogglePermission = async (
+    token: string,
+    key: 'can_write' | 'can_run_terminal' | 'requires_approval',
+    currentVal: boolean
+  ) => {
+    try {
+      setUpdatingPermsToken(token);
+      const patch = { [key]: !currentVal };
+      const updated = await updateSharePermissions(token, patch);
+      setActiveLinks((prev) =>
+        prev.map((l) =>
+          l.token === token
+            ? {
+                ...l,
+                can_write: updated.can_write,
+                can_run_terminal: updated.can_run_terminal,
+                requires_approval: updated.requires_approval,
+              }
+            : l
+        )
+      );
+      showToast(t('share_permissions_updated') || 'Permissions mises à jour', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Erreur lors de la mise à jour des permissions', 'error');
+    } finally {
+      setUpdatingPermsToken(null);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -410,9 +445,10 @@ export const ShareSessionModal: React.FC<ShareSessionModalProps> = ({
                 {activeLinks.map((link) => (
                   <div
                     key={link.token}
-                    className="flex items-center justify-between p-3 rounded-xl bg-zinc-800/30 border border-zinc-800 hover:border-zinc-700 transition"
+                    className="flex flex-col p-3 rounded-xl bg-zinc-800/30 border border-zinc-800 hover:border-zinc-700 transition"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
                       {/* Permission Badge */}
                       <span
                         className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${
@@ -445,6 +481,22 @@ export const ShareSessionModal: React.FC<ShareSessionModalProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
+                        onClick={() =>
+                          setExpandedPermissionsToken(
+                            expandedPermissionsToken === link.token ? null : link.token
+                          )
+                        }
+                        className={`p-1.5 rounded-lg transition ${
+                          expandedPermissionsToken === link.token
+                            ? 'bg-purple-600/30 text-purple-300'
+                            : 'text-zinc-400 hover:text-white hover:bg-zinc-700/50'
+                        }`}
+                        title="Permissions granulaires (Écriture, Terminal, Approbation)"
+                      >
+                        <Sliders size={14} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => copyExistingLink(link.token)}
                         className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-700/50 transition"
                         title={t('common_copy') || 'Copy Link'}
@@ -461,6 +513,89 @@ export const ShareSessionModal: React.FC<ShareSessionModalProps> = ({
                         <Trash2 size={14} />
                       </button>
                     </div>
+                  </div>
+
+                  {expandedPermissionsToken === link.token && (
+                    <div className="mt-2.5 pt-2.5 border-t border-zinc-700/60 grid grid-cols-3 gap-2 text-[11px]">
+                      <button
+                        type="button"
+                        disabled={updatingPermsToken === link.token}
+                        onClick={() =>
+                          handleTogglePermission(
+                            link.token,
+                            'can_write',
+                            link.can_write !== undefined ? link.can_write : link.permission === 'write'
+                          )
+                        }
+                        className={`flex items-center justify-between p-2 rounded-lg border transition ${
+                          (link.can_write ?? (link.permission === 'write'))
+                            ? 'bg-purple-950/40 border-purple-700/60 text-purple-200'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-500'
+                        }`}
+                        title="Activer/désactiver les droits d'écriture et de prompt"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Edit3 size={12} />
+                          Écriture
+                        </span>
+                        <span className="font-semibold text-[10px]">
+                          {(link.can_write ?? (link.permission === 'write')) ? 'OUI' : 'NON'}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={updatingPermsToken === link.token}
+                        onClick={() =>
+                          handleTogglePermission(
+                            link.token,
+                            'can_run_terminal',
+                            Boolean(link.can_run_terminal)
+                          )
+                        }
+                        className={`flex items-center justify-between p-2 rounded-lg border transition ${
+                          link.can_run_terminal
+                            ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-200'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-500'
+                        }`}
+                        title="Activer/bloquer l'exécution de commandes dans le terminal"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Terminal size={12} />
+                          Terminal
+                        </span>
+                        <span className="font-semibold text-[10px]">
+                          {link.can_run_terminal ? 'ACTIF' : 'BLOQUÉ'}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={updatingPermsToken === link.token}
+                        onClick={() =>
+                          handleTogglePermission(
+                            link.token,
+                            'requires_approval',
+                            link.requires_approval !== undefined ? link.requires_approval : true
+                          )
+                        }
+                        className={`flex items-center justify-between p-2 rounded-lg border transition ${
+                          (link.requires_approval ?? true)
+                            ? 'bg-amber-950/40 border-amber-700/60 text-amber-200'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-500'
+                        }`}
+                        title="Exiger l'approbation de l'hôte pour les opérations critiques"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Shield size={12} />
+                          Approbation
+                        </span>
+                        <span className="font-semibold text-[10px]">
+                          {(link.requires_approval ?? true) ? 'REQUISE' : 'LIBRE'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
                   </div>
                 ))}
               </div>

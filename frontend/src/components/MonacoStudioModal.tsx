@@ -27,11 +27,12 @@ import {
   ChevronDown,
   AlertTriangle,
   RotateCw,
-  Info
+  Info,
+  MessageSquare
 } from 'lucide-react';
 import Editor, { DiffEditor } from '@monaco-editor/react';
-import { saveFileContent, fetchFileContent, fetchGitFileVersions, fetchGitDiffRanges, fetchEditorDiagnostics } from '../services/api';
-import type { MonacoStudioConfig, GitDiffRange, GitDiffSummary, DiagnosticItem } from '../types';
+import { saveFileContent, fetchFileContent, fetchGitFileVersions, fetchGitDiffRanges, fetchEditorDiagnostics, fetchInlineComments } from '../services/api';
+import type { MonacoStudioConfig, GitDiffRange, GitDiffSummary, DiagnosticItem, InlineComment, RemoteCursorPresence } from '../types';
 import { showToast } from '../services/toast';
 import { useI18n } from '../services/i18n';
 import { SUPPORTED_LANGUAGES, detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
@@ -40,10 +41,13 @@ import {
   getMonacoMultiCursorOptions,
   setupMultiCursor,
   applyGitDecorations,
-  navigateGitDiff
+  navigateGitDiff,
+  applyInlineCommentDecorations,
+  applyRemoteCursorDecorations
 } from '../services/monacoAnnotations';
 import { applyMonacoDiagnostics, clearMonacoDiagnostics } from '../services/monacoDiagnostics';
 import { CopilotActionModal } from './CopilotActionModal';
+import { InlineCommentsPopover } from './InlineCommentsPopover';
 
 interface MonacoStudioModalProps {
   isOpen: boolean;
@@ -109,6 +113,8 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
   const multiCursorControllerRef = useRef<any>(null);
   const monacoInstanceRef = useRef<any>(null);
   const diffRangesRef = useRef<GitDiffRange[]>([]);
+  const editorRef = useRef<any>(null);
+  const diagRequestIdRef = useRef<number>(0);
 
   // Live Diagnostics & Linting state
   const [diagnostics, setDiagnostics] = useState<DiagnosticItem[]>([]);
@@ -123,8 +129,62 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
     diffRangesRef.current = diffRanges;
   }, [diffRanges]);
 
-  const editorRef = useRef<any>(null);
-  const diagRequestIdRef = useRef<number>(0);
+  // Inline Comments & Remote Multi-Cursors Presence
+  const [comments, setComments] = useState<InlineComment[]>([]);
+  const [activeCommentLine, setActiveCommentLine] = useState<number | null>(null);
+  const [isCommentPopoverOpen, setIsCommentPopoverOpen] = useState<boolean>(false);
+  const [remoteCursors, _setRemoteCursors] = useState<RemoteCursorPresence[]>([]);
+  const commentDecorationsRef = useRef<string[]>([]);
+  const remoteCursorDecorationsRef = useRef<string[]>([]);
+
+  const configConversationId = (config as any).conversationId || 'default';
+  const configFilePath = config.filePath;
+
+  const loadComments = useCallback(async () => {
+    if (!configFilePath) return;
+    try {
+      const items = await fetchInlineComments(configConversationId, configFilePath);
+      setComments(items);
+    } catch (err) {
+      console.debug('Failed to load inline comments', err);
+    }
+  }, [configConversationId, configFilePath]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    if (configFilePath) {
+      fetchInlineComments(configConversationId, configFilePath)
+        .then((items) => {
+          if (isCurrent) setComments(items);
+        })
+        .catch((err) => console.debug('Failed to load inline comments', err));
+    }
+    return () => {
+      isCurrent = false;
+    };
+  }, [configConversationId, configFilePath]);
+
+  useEffect(() => {
+    if (editorRef.current && monacoInstanceRef.current) {
+      commentDecorationsRef.current = applyInlineCommentDecorations(
+        editorRef.current,
+        monacoInstanceRef.current,
+        comments,
+        commentDecorationsRef.current
+      );
+    }
+  }, [comments]);
+
+  useEffect(() => {
+    if (editorRef.current && monacoInstanceRef.current) {
+      remoteCursorDecorationsRef.current = applyRemoteCursorDecorations(
+        editorRef.current,
+        monacoInstanceRef.current,
+        remoteCursors,
+        remoteCursorDecorationsRef.current
+      );
+    }
+  }, [remoteCursors]);
 
   useEffect(() => {
     return () => {
@@ -133,8 +193,6 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
       }
     };
   }, []);
-
-  const configFilePath = config.filePath;
 
   const runDiagnostics = useCallback(
     async (codeToLint: string, langToLint: string, path?: string) => {
@@ -701,6 +759,32 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
               )}
             </button>
           )}
+
+          {/* Inline Code Review / Comments Button */}
+          {mode === 'editor' && config.filePath && (
+            <button
+              type="button"
+              onClick={() => {
+                const curLine = editorRef.current?.getPosition()?.lineNumber || 1;
+                setActiveCommentLine(curLine);
+                setIsCommentPopoverOpen(!isCommentPopoverOpen);
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors border cursor-pointer ${
+                isCommentPopoverOpen || comments.length > 0
+                  ? 'bg-purple-500/15 text-purple-300 border-purple-500/30 hover:bg-purple-500/25'
+                  : 'bg-zinc-800/60 text-zinc-400 border-zinc-700/60 hover:text-zinc-200'
+              }`}
+              title="Revue de code & Commentaires en ligne (Cliquez sur la marge pour annoter)"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
+              <span>Commentaires</span>
+              {comments.length > 0 && (
+                <span className="px-1.5 py-0.2 bg-purple-500/30 text-purple-200 rounded-full text-[10px] font-mono">
+                  {comments.length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* View Toggles */}
@@ -810,6 +894,7 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
             onChange={(value) => setContent(value || '')}
             options={{
               ...getMonacoMultiCursorOptions(),
+              glyphMargin: true,
               wordWrap: isWordWrap ? 'on' : 'off',
               minimap: { enabled: isMinimap },
               fontSize: 13,
@@ -842,6 +927,16 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
                 setCursorCount(count);
               });
               multiCursorControllerRef.current = multiCtrl;
+
+              editor.onMouseDown((e: any) => {
+                if (e.target && (e.target.type === 2 || e.target.type === 3)) {
+                  const line = e.target.position?.lineNumber;
+                  if (line) {
+                    setActiveCommentLine(line);
+                    setIsCommentPopoverOpen(true);
+                  }
+                }
+              });
 
               editor.addCommand(monaco.KeyCode.F7, () => {
                 navigateGitDiff(editor, diffRangesRef.current, 'next');
@@ -1096,6 +1191,19 @@ const MonacoStudioInner: React.FC<MonacoStudioInnerProps> = ({
           }
         }}
       />
+
+      {/* Inline Comments & Review Popover */}
+      {config.filePath && activeCommentLine !== null && (
+        <InlineCommentsPopover
+          isOpen={isCommentPopoverOpen}
+          onClose={() => setIsCommentPopoverOpen(false)}
+          conversationId={(config as any).conversationId || 'default'}
+          filePath={config.filePath}
+          lineNumber={activeCommentLine}
+          comments={comments}
+          onCommentsUpdated={loadComments}
+        />
+      )}
     </div>
   );
 };

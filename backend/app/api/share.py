@@ -212,3 +212,42 @@ def get_shared_transcript(share_token: str, pin_code: str | None = Query(default
         "usage": usage,
         "is_running": is_running,
     }
+
+
+class SharePermissionsUpdateRequest(BaseModel):
+    can_write: bool | None = None
+    can_run_terminal: bool | None = None
+    requires_approval: bool | None = None
+
+
+@router.get("/permissions/{token_or_conv_id}")
+def get_share_permissions_endpoint(token_or_conv_id: str):
+    """Retrieves granular permissions for a shared token or conversation."""
+    return share_service.get_share_permissions(token_or_conv_id)
+
+
+@router.patch("/permissions/{token_or_conv_id}", dependencies=[Depends(require_auth)])
+async def update_share_permissions_endpoint(token_or_conv_id: str, req: SharePermissionsUpdateRequest):
+    """Modulates guest permissions (can_write, can_run_terminal, requires_approval) for a shared session."""
+    try:
+        updated = share_service.update_share_permissions(
+            token_or_conv_id,
+            can_write=req.can_write,
+            can_run_terminal=req.can_run_terminal,
+            requires_approval=req.requires_approval,
+        )
+        conv_id = updated.get("conversation_id")
+        if conv_id:
+            session = execution_manager.get_session(conv_id)
+            if session:
+                await session.broadcast({
+                    "event": "permissions_updated",
+                    "conversation_id": conv_id,
+                    "permissions": updated,
+                })
+        return updated
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error("Error updating permissions: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update permissions")

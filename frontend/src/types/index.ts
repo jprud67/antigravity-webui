@@ -1114,6 +1114,9 @@ export interface ShareLinkItem {
   is_revoked: boolean;
   is_expired: boolean;
   is_active: boolean;
+  can_write?: boolean;
+  can_run_terminal?: boolean;
+  requires_approval?: boolean;
 }
 
 export interface ShareLinkCreatePayload {
@@ -1385,6 +1388,59 @@ export interface CoordinatorBatchResult {
     error?: string;
     message?: string;
   }>;
+}
+
+export interface InlineComment {
+  id: string;
+  conversation_id: string;
+  file_path: string;
+  line_number: number;
+  author: string;
+  content: string;
+  parent_id?: string | null;
+  resolved: boolean;
+  created_at: string;
+  has_agent_mention?: boolean;
+}
+
+export interface CommentCreatePayload {
+  conversation_id: string;
+  file_path: string;
+  line_number: number;
+  author?: string;
+  content: string;
+  parent_id?: string | null;
+}
+
+export interface CommentUpdatePayload {
+  content?: string;
+  resolved?: boolean;
+}
+
+export interface SharePermissions {
+  token?: string;
+  conversation_id: string;
+  permission: 'read' | 'write';
+  can_write: boolean;
+  can_run_terminal: boolean;
+  requires_approval: boolean;
+  is_revoked?: boolean;
+}
+
+export interface RemoteCursorPresence {
+  client_id: string;
+  nickname: string;
+  avatar_color: string;
+  role: string;
+  file_path?: string;
+  line: number;
+  column: number;
+  selection?: {
+    startLineNumber: number;
+    startColumn: number;
+    endLineNumber: number;
+    endColumn: number;
+  };
 }
 
 

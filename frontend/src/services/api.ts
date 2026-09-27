@@ -3498,3 +3498,110 @@ export async function triggerCoordinatorBatch(
   return res.json();
 }
 
+// ---------------- Collaboration & Inline Comments API ----------------
+
+export async function fetchInlineComments(
+  conversationId: string,
+  filePath?: string
+): Promise<import('../types').InlineComment[]> {
+  const params = new URLSearchParams({ conversation_id: conversationId });
+  if (filePath) params.set('file_path', filePath);
+  const res = await fetch(`${API_BASE}/comments?${params.toString()}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    return [];
+  }
+  const data = await res.json();
+  return data.comments || [];
+}
+
+export async function createInlineComment(
+  payload: import('../types').CommentCreatePayload
+): Promise<import('../types').InlineComment> {
+  const res = await fetch(`${API_BASE}/comments`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la création du commentaire' }));
+    throw new Error(err.detail || 'Erreur lors de la création du commentaire');
+  }
+  return res.json();
+}
+
+export async function updateInlineComment(
+  commentId: string,
+  payload: import('../types').CommentUpdatePayload
+): Promise<import('../types').InlineComment> {
+  const res = await fetch(`${API_BASE}/comments/${encodeURIComponent(commentId)}`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la mise à jour du commentaire' }));
+    throw new Error(err.detail || 'Erreur lors de la mise à jour du commentaire');
+  }
+  return res.json();
+}
+
+export async function deleteInlineComment(commentId: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/comments/${encodeURIComponent(commentId)}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+  return res.ok;
+}
+
+export async function triggerInlineReview(
+  conversationId: string,
+  filePath: string,
+  focusDirective?: string
+): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/comments/trigger-review`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({
+      conversation_id: conversationId,
+      file_path: filePath,
+      focus_directive: focusDirective,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du déclenchement de la révision' }));
+    throw new Error(err.detail || 'Erreur lors du déclenchement de la révision');
+  }
+  return res.json();
+}
+
+export async function fetchSharePermissions(
+  tokenOrConvId: string
+): Promise<import('../types').SharePermissions> {
+  const res = await fetch(`${API_BASE}/share/permissions/${encodeURIComponent(tokenOrConvId)}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error('Impossible de charger les permissions');
+  }
+  return res.json();
+}
+
+export async function updateSharePermissions(
+  tokenOrConvId: string,
+  perms: { can_write?: boolean; can_run_terminal?: boolean; requires_approval?: boolean }
+): Promise<import('../types').SharePermissions> {
+  const res = await fetch(`${API_BASE}/share/permissions/${encodeURIComponent(tokenOrConvId)}`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify(perms),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la modification des permissions' }));
+    throw new Error(err.detail || 'Erreur lors de la modification des permissions');
+  }
+  return res.json();
+}
+
+

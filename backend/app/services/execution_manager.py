@@ -967,6 +967,39 @@ class ExecutionManager:
         for ws in dead_sockets:
             self.unregister_socket(ws)
 
+    async def broadcast_cursor_move(
+        self,
+        conversation_id: str | None,
+        sender_socket: WebSocket,
+        cursor_data: dict[str, Any]
+    ) -> None:
+        """Broadcasts a client's cursor position and selection to other peers in a shared conversation."""
+        if not conversation_id:
+            return
+        session = self.get_session(conversation_id)
+        if not session:
+            return
+
+        client_info = self.socket_info.get(sender_socket, {})
+        event = {
+            "event": "remote_cursor",
+            "conversation_id": conversation_id,
+            "client_id": client_info.get("client_id") or f"peer_{id(sender_socket) % 10000}",
+            "nickname": client_info.get("nickname", "Collaborator"),
+            "avatar_color": client_info.get("avatar_color", "#06b6d4"),
+            "file_path": cursor_data.get("file_path", ""),
+            "cursor": cursor_data.get("cursor"),
+            "selection": cursor_data.get("selection"),
+            "timestamp": time.time(),
+        }
+
+        for ws in list(session.subscribers):
+            if ws != sender_socket:
+                try:
+                    await ws.send_json(event)
+                except Exception:
+                    pass
+
     def disconnect_token(self, share_token: str) -> int:
         """Closes all WebSockets attached to a specific share token."""
         to_disconnect = [

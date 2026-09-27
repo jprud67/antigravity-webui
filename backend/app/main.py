@@ -27,6 +27,7 @@ from app.api.files import router as files_router
 from app.api.git import router as git_router
 from app.api.git_worktree import router as git_worktree_router
 from app.api.google_accounts import router as google_router
+from app.api.inline_comments import router as inline_comments_router
 from app.api.kanban import router as kanban_router
 from app.api.link_understanding import router as link_understanding_router
 from app.api.mcp_catalog import router as mcp_catalog_router
@@ -56,6 +57,7 @@ from app.services.execution_manager import execution_manager
 from app.services.fs_watcher import set_main_loop, watch_filesystem
 from app.services.fts_search import ensure_fts_schema
 from app.services.google_auth import restore_stashed_token_if_needed
+from app.services.inline_comments import ensure_comments_schema
 from app.services.link_understanding import ensure_link_cache_schema
 from app.services.messaging_gateway import ensure_messaging_gateway_schema
 from app.services.progress_card import ensure_progress_card_schema
@@ -93,6 +95,7 @@ async def lifespan(app: FastAPI):
     ensure_messaging_gateway_schema()
     ensure_vector_memory_schema()
     ensure_share_schema()
+    ensure_comments_schema()
     restore_stashed_token_if_needed()
     prefetch_update_check()
     _warn_if_default_password()
@@ -130,7 +133,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Antigravity WebUI",
     description="Web Interface to orchestrate Antigravity CLI without touching the terminal",
-    version="0.4.4",
+    version="0.4.5",
     lifespan=lifespan
 )
 
@@ -182,6 +185,7 @@ app.include_router(docker_studio_router)  # Docker & Container Management Studio
 app.include_router(database_studio_router)  # Database Explorer & Visual SQL Query Studio
 app.include_router(editor_diagnostics_router)  # Live Syntax & Linter Diagnostics Studio
 app.include_router(share_router)  # Collaborative Session Sharing & Live Preview
+app.include_router(inline_comments_router)  # Inline Code Reviews & Annotated Comments
 app.include_router(orchestrator_router)  # Multi-Agent Visual Orchestration Studio & Hierarchical Steering
 app.include_router(checkpoints_router)   # Agent Dynamic Checkpoint & Rewind Studio
 app.include_router(coordinator_router)   # Autonomous Multi-Workspace Coordinator & Pipelines Engine

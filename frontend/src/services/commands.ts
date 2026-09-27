@@ -142,6 +142,23 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     icon: CalendarClock,
     color: 'text-orange-400'
   },
+  {
+    cmd: '/review',
+    descKey: 'cmd_desc_review',
+    desc: 'Lancer une revue de code collaborative autonome avec les commentaires en ligne',
+    arg: '<fichier ou directive>',
+    category: 'workflow',
+    icon: GitPullRequest,
+    color: 'text-purple-400'
+  },
+  {
+    cmd: '/collaborate',
+    descKey: 'cmd_desc_collaborate',
+    desc: 'Gérer les liens de partage collaboratif et permissions multi-curseurs',
+    category: 'workflow',
+    icon: Users,
+    color: 'text-cyan-400'
+  },
 
   // Execution & Steering (Hermes Parity)
   {

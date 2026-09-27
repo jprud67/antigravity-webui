@@ -1,4 +1,4 @@
-import type { GitDiffRange } from '../types';
+import type { GitDiffRange, RemoteCursorPresence, InlineComment } from '../types';
 
 /**
  * Options par défaut pour activer l'expérience multi-curseurs native dans Monaco Editor.
@@ -207,3 +207,114 @@ export function navigateGitDiff(
     editor.focus();
   }
 }
+
+/**
+ * Applique les décorations de curseurs distants en temps réel (multi-curseurs collaboratifs).
+ */
+export function applyRemoteCursorDecorations(
+  editor: any,
+  monaco: any,
+  cursors: RemoteCursorPresence[],
+  oldDecorations: string[] = []
+): string[] {
+  if (!editor || !monaco || !monaco.Range) {
+    return oldDecorations;
+  }
+  const model = editor.getModel();
+  if (!model) return oldDecorations;
+
+  const lineCount = model.getLineCount() || 1;
+  const newDecorations: any[] = [];
+
+  for (const c of cursors) {
+    const line = Math.min(Math.max(1, c.line), lineCount);
+    const col = Math.max(1, c.column);
+
+    // Decorate cursor position
+    newDecorations.push({
+      range: new monaco.Range(line, col, line, col + 1),
+      options: {
+        className: 'monaco-remote-cursor',
+        hoverMessage: {
+          value: `**${c.nickname}** (${c.role})\n*Ligne ${line}, Col ${col}*`,
+        },
+      },
+    });
+
+    // Decorate selection if present
+    if (
+      c.selection &&
+      (c.selection.startLineNumber !== c.selection.endLineNumber ||
+        c.selection.startColumn !== c.selection.endColumn)
+    ) {
+      const sLine = Math.min(Math.max(1, c.selection.startLineNumber), lineCount);
+      const eLine = Math.min(Math.max(1, c.selection.endLineNumber), lineCount);
+      newDecorations.push({
+        range: new monaco.Range(sLine, c.selection.startColumn, eLine, c.selection.endColumn),
+        options: {
+          className: 'monaco-remote-selection',
+          hoverMessage: {
+            value: `Sélection de **${c.nickname}**`,
+          },
+        },
+      });
+    }
+  }
+
+  try {
+    return editor.deltaDecorations(oldDecorations, newDecorations);
+  } catch (err) {
+    console.debug('Failed to update Monaco remote cursor decorations:', err);
+    return [];
+  }
+}
+
+/**
+ * Applique les marqueurs visuels de commentaires de code et d'annotations dans la marge (glyphMargin).
+ */
+export function applyInlineCommentDecorations(
+  editor: any,
+  monaco: any,
+  comments: InlineComment[],
+  oldDecorations: string[] = []
+): string[] {
+  if (!editor || !monaco || !monaco.Range) {
+    return oldDecorations;
+  }
+  const model = editor.getModel();
+  if (!model) return oldDecorations;
+
+  const lineCount = model.getLineCount() || 1;
+  const newDecorations = comments.map((comment) => {
+    const line = Math.min(Math.max(1, comment.line_number), lineCount);
+    const isResolved = comment.resolved;
+    const hasAgent = comment.has_agent_mention;
+
+    return {
+      range: new monaco.Range(line, 1, line, 1),
+      options: {
+        isWholeLine: true,
+        glyphMarginClassName: isResolved
+          ? 'monaco-comment-glyph-resolved'
+          : hasAgent
+          ? 'monaco-comment-glyph-agent'
+          : 'monaco-comment-glyph-open',
+        glyphMarginHoverMessage: {
+          value: `💬 **${comment.author}** (${isResolved ? 'Résolu' : 'Ouvert'})\n${comment.content}`,
+        },
+        overviewRuler: {
+          color: isResolved ? '#6b7280aa' : hasAgent ? '#8b5cf6dd' : '#0ea5e9dd',
+          position: 2,
+        },
+      },
+    };
+  });
+
+  try {
+    return editor.deltaDecorations(oldDecorations, newDecorations);
+  } catch (err) {
+    console.debug('Failed to update Monaco inline comment decorations:', err);
+    return [];
+  }
+}
+

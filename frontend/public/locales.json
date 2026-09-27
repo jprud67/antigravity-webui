@@ -4507,7 +4507,13 @@
     "replay_loading": "Extracting metrics and alternatives...",
     "replay_no_alternatives_title": "No concurrent execution branches detected",
     "replay_no_alternatives_desc": "Use the 'Fork Tree' action on an agent node to generate concurrent alternatives with different models (Gemini, Claude, GPT).",
-    "replay_inspect_action": "Inspect"
+    "replay_inspect_action": "Inspect",
+    "cmd_desc_review": "Launch autonomous collaborative code review with inline comments",
+    "cmd_desc_collaborate": "Manage collaborative share links and multi-cursor permissions",
+    "share_permissions_updated": "Workspace permissions updated successfully",
+    "collab_inline_comments": "Inline Comments & Reviews",
+    "collab_agent_review": "Autonomous @agent review triggered",
+    "collab_remote_cursors": "Live Multi-Cursor Presence"
   },
   "it": {
     "offline_title": "Connessione persa",
@@ -9017,7 +9023,13 @@
     "replay_loading": "Estrazione delle metriche e alternative...",
     "replay_no_alternatives_title": "Nessun ramo di esecuzione concorrente rilevato",
     "replay_no_alternatives_desc": "Usa l'azione 'Biforca albero' su un nodo agente per generare alternative concorrenti con modelli diversi (Gemini, Claude, GPT).",
-    "replay_inspect_action": "Ispeziona"
+    "replay_inspect_action": "Ispeziona",
+    "cmd_desc_review": "Avvia revisione del codice collaborativa autonoma con commenti inline",
+    "cmd_desc_collaborate": "Gestisci i link di condivisione collaborativi e i permessi multi-cursore",
+    "share_permissions_updated": "Permessi dell'area di lavoro aggiornati con successo",
+    "collab_inline_comments": "Commenti e revisioni inline",
+    "collab_agent_review": "Revisione autonoma dell'@agent avviata",
+    "collab_remote_cursors": "Presenza live multi-cursore"
   },
   "ja": {
     "offline_title": "接続が切断されました",
@@ -13527,7 +13539,13 @@
     "replay_loading": "メトリクスと代替案を抽出中...",
     "replay_no_alternatives_title": "並行実行ブランチは検出されませんでした",
     "replay_no_alternatives_desc": "エージェントノードで「ツリーを分岐」アクションを使用して、異なるモデル（Gemini、Claude、GPT）で並行代替案を生成します。",
-    "replay_inspect_action": "詳細検査"
+    "replay_inspect_action": "詳細検査",
+    "cmd_desc_review": "インラインコメント付きの自律的協調コードレビューを開始",
+    "cmd_desc_collaborate": "共同作業用の共有リンクとマルチカーソル権限を管理",
+    "share_permissions_updated": "ワークスペースの権限が正常に更新されました",
+    "collab_inline_comments": "インラインコメントとレビュー",
+    "collab_agent_review": "自律型@agentレビューがトリガーされました",
+    "collab_remote_cursors": "ライブマルチカーソルプレゼンス"
   },
   "ru": {
     "offline_title": "Соединение потеряно",
@@ -18037,7 +18055,13 @@
     "replay_loading": "Извлечение метрик и альтернатив...",
     "replay_no_alternatives_title": "Конкурирующие ветви выполнения не обнаружены",
     "replay_no_alternatives_desc": "Используйте действие «Разветвить дерево» на узле агента, чтобы генерировать параллельные альтернативы с разными моделями (Gemini, Claude, GPT).",
-    "replay_inspect_action": "Инспектировать"
+    "replay_inspect_action": "Инспектировать",
+    "cmd_desc_review": "Запустить автономное совместное ревью кода с инлайн-комментариями",
+    "cmd_desc_collaborate": "Управление ссылками совместного доступа и разрешениями мультикурсоров",
+    "share_permissions_updated": "Разрешения рабочей области успешно обновлены",
+    "collab_inline_comments": "Инлайн-комментарии и ревью",
+    "collab_agent_review": "Автономное ревью @agent запущено",
+    "collab_remote_cursors": "Живое присутствие с несколькими курсорами"
   },
   "es": {
     "offline_title": "Conexión perdida",
@@ -22547,7 +22571,13 @@
     "replay_loading": "Extrayendo métricas y alternativas...",
     "replay_no_alternatives_title": "No se detectaron ramas concurrentes",
     "replay_no_alternatives_desc": "Utilice la acción 'Bifurcar árbol' en un agente para generar alternativas concurrentes con diferentes modelos (Gemini, Claude, GPT).",
-    "replay_inspect_action": "Inspeccionar"
+    "replay_inspect_action": "Inspeccionar",
+    "cmd_desc_review": "Iniciar revisión de código colaborativa autónoma con comentarios en línea",
+    "cmd_desc_collaborate": "Gestionar enlaces de uso compartido colaborativo y permisos de múltiples cursores",
+    "share_permissions_updated": "Permisos del espacio de trabajo actualizados con éxito",
+    "collab_inline_comments": "Comentarios y revisiones en línea",
+    "collab_agent_review": "Revisión autónoma del @agent activada",
+    "collab_remote_cursors": "Presencia en vivo de múltiples cursores"
   },
   "de": {
     "offline_title": "Verbindung verloren",
@@ -27057,7 +27087,13 @@
     "replay_loading": "Metriken und Alternativen werden extrahiert...",
     "replay_no_alternatives_title": "Keine gleichzeitigen Ausführungszweige erkannt",
     "replay_no_alternatives_desc": "Verwenden Sie die Aktion 'Baum abzweigen' auf einem Agentenknoten, um konkurrierende Alternativen mit verschiedenen Modellen (Gemini, Claude, GPT) zu erstellen.",
-    "replay_inspect_action": "Inspizieren"
+    "replay_inspect_action": "Inspizieren",
+    "cmd_desc_review": "Autonome kollaborative Codeüberprüfung mit Inline-Kommentaren starten",
+    "cmd_desc_collaborate": "Kollaborative Freigabelinks und Multi-Cursor-Berechtigungen verwalten",
+    "share_permissions_updated": "Arbeitsbereichsberechtigungen erfolgreich aktualisiert",
+    "collab_inline_comments": "Inline-Kommentare & Überprüfungen",
+    "collab_agent_review": "Autonome @agent-Überprüfung ausgelöst",
+    "collab_remote_cursors": "Live-Multi-Cursor-Präsenz"
   },
   "zh": {
     "offline_title": "连接已断开",
@@ -31567,7 +31603,13 @@
     "replay_loading": "正在提取指标和替代方案...",
     "replay_no_alternatives_title": "未检测到并发执行分支",
     "replay_no_alternatives_desc": "在智能体节点上使用“分叉分支树”操作，通过不同的模型（Gemini、Claude、GPT）生成并发替代方案。",
-    "replay_inspect_action": "详细检查"
+    "replay_inspect_action": "详细检查",
+    "cmd_desc_review": "启动带有行内评论的自主协作代码审查",
+    "cmd_desc_collaborate": "管理协作共享链接和多光标权限",
+    "share_permissions_updated": "工作区权限更新成功",
+    "collab_inline_comments": "行内评论与审查",
+    "collab_agent_review": "已触发自主 @agent 审查",
+    "collab_remote_cursors": "实时多光标协同"
   },
   "zh-Hant": {
     "offline_title": "連線中斷",
@@ -36077,7 +36119,13 @@
     "replay_loading": "正在擷取指標和替代方案...",
     "replay_no_alternatives_title": "未檢測到並發執行分支",
     "replay_no_alternatives_desc": "在智能體節點上使用「分叉分支樹」操作，透過不同的模型（Gemini、Claude、GPT）產生並發替代方案。",
-    "replay_inspect_action": "詳細檢查"
+    "replay_inspect_action": "詳細檢查",
+    "cmd_desc_review": "啟動帶有行內評論的自主協作程式碼審查",
+    "cmd_desc_collaborate": "管理協作共享連結與多游標權限",
+    "share_permissions_updated": "工作區權限更新成功",
+    "collab_inline_comments": "行內評論與審查",
+    "collab_agent_review": "已觸發自主 @agent 審查",
+    "collab_remote_cursors": "即時多游標協同"
   },
   "pt": {
     "offline_title": "Conexão perdida",
@@ -40587,7 +40635,13 @@
     "replay_loading": "A extrair métricas e alternativas...",
     "replay_no_alternatives_title": "Nenhum branch de execução concorrente detetado",
     "replay_no_alternatives_desc": "Utilize a ação 'Bifurcar árvore' num nó de agente para gerar alternativas concorrentes com diferentes modelos (Gemini, Claude, GPT).",
-    "replay_inspect_action": "Inspecionar"
+    "replay_inspect_action": "Inspecionar",
+    "cmd_desc_review": "Iniciar revisão de código colaborativa autônoma com comentários em linha",
+    "cmd_desc_collaborate": "Gerenciar links de compartilhamento colaborativo e permissões de múltiplos cursores",
+    "share_permissions_updated": "Permissões da área de trabalho atualizadas com sucesso",
+    "collab_inline_comments": "Comentários e revisões em linha",
+    "collab_agent_review": "Revisão autônoma do @agent acionada",
+    "collab_remote_cursors": "Presença ao vivo de múltiplos cursores"
   },
   "ko": {
     "offline_title": "연결이 끊겼습니다",
@@ -45097,7 +45151,13 @@
     "replay_loading": "지표 및 대안 추출 중...",
     "replay_no_alternatives_title": "동시 실행 브랜치가 감지되지 않았습니다",
     "replay_no_alternatives_desc": "에이전트 노드에서 '트리 포크' 작업을 사용하여 다양한 모델(Gemini, Claude, GPT)로 동시 대안을 생성하세요.",
-    "replay_inspect_action": "검사"
+    "replay_inspect_action": "검사",
+    "cmd_desc_review": "인라인 댓글이 포함된 자율 협업 코드 검토 시작",
+    "cmd_desc_collaborate": "협업 공유 링크 및 다중 커서 권한 관리",
+    "share_permissions_updated": "워크스페이스 권한이 성공적으로 업데이트되었습니다",
+    "collab_inline_comments": "인라인 댓글 및 검토",
+    "collab_agent_review": "자율 @agent 검토가 트리거되었습니다",
+    "collab_remote_cursors": "실시간 다중 커서 프레즌스"
   },
   "fr": {
     "offline_title": "Connexion perdue",
@@ -49607,7 +49667,13 @@
     "replay_loading": "Extraction des métriques et alternatives...",
     "replay_no_alternatives_title": "Aucune branche concurrente détectée",
     "replay_no_alternatives_desc": "Utilisez l'action « Bifurquer l'arbre » sur un agent pour générer des solutions concurrentes avec des modèles alternatifs (Gemini, Claude, GPT).",
-    "replay_inspect_action": "Inspecter"
+    "replay_inspect_action": "Inspecter",
+    "cmd_desc_review": "Lancer une revue de code collaborative autonome avec les commentaires en ligne",
+    "cmd_desc_collaborate": "Gérer les liens de partage collaboratif et permissions multi-curseurs",
+    "share_permissions_updated": "Permissions de l'espace de travail mises à jour avec succès",
+    "collab_inline_comments": "Commentaires et revues en ligne",
+    "collab_agent_review": "Revue autonome @agent déclenchée",
+    "collab_remote_cursors": "Présence live multi-curseurs"
   },
   "cs": {
     "_label": "Čeština",
@@ -54117,7 +54183,13 @@
     "replay_loading": "Extrakce metrik a alternativ...",
     "replay_no_alternatives_title": "Nebyly zjištěny žádné souběžné větve provádění",
     "replay_no_alternatives_desc": "Použijte akci 'Rozvětvit strom' na uzlu agenta pro vytvoření souběžných alternativ s různými modely (Gemini, Claude, GPT).",
-    "replay_inspect_action": "Zkontrolovat"
+    "replay_inspect_action": "Zkontrolovat",
+    "cmd_desc_review": "Spustit autonomní kolaborativní revizi kódu s inline komentáři",
+    "cmd_desc_collaborate": "Spravovat odkazy pro sdílení a oprávnění pro více kurzorů",
+    "share_permissions_updated": "Oprávnění pracovního prostoru byla úspěšně aktualizována",
+    "collab_inline_comments": "Inline komentáře a revize",
+    "collab_agent_review": "Autonomní revize @agent byla spuštěna",
+    "collab_remote_cursors": "Živá přítomnost s více kurzory"
   },
   "tr": {
     "offline_title": "Bağlantı kesildi",
@@ -58627,7 +58699,13 @@
     "replay_loading": "Metrikler ve alternatifler çıkarılıyor...",
     "replay_no_alternatives_title": "Eşzamanlı yürütme dalı algılanmadı",
     "replay_no_alternatives_desc": "Farklı modellerle (Gemini, Claude, GPT) eşzamanlı alternatifler üretmek için bir aracı düğümünde 'Ağacı Çatalla' eylemini kullanın.",
-    "replay_inspect_action": "Denetle"
+    "replay_inspect_action": "Denetle",
+    "cmd_desc_review": "Satır içi yorumlarla otonom işbirlikçi kod incelemesi başlat",
+    "cmd_desc_collaborate": "İşbirlikçi paylaşım bağlantılarını ve çoklu imleç izinlerini yönet",
+    "share_permissions_updated": "Çalışma alanı izinleri başarıyla güncellendi",
+    "collab_inline_comments": "Satır İçi Yorumlar ve İncelemeler",
+    "collab_agent_review": "Otonom @agent incelemesi tetiklendi",
+    "collab_remote_cursors": "Canlı Çoklu İmleç Varlığı"
   },
   "pl": {
     "offline_title": "Połączenie utracone",
@@ -63137,7 +63215,13 @@
     "replay_loading": "Wyodrębnianie metryk i alternatyw...",
     "replay_no_alternatives_title": "Nie wykryto współbieżnych gałęzi wykonania",
     "replay_no_alternatives_desc": "Użyj akcji 'Rozgałęź drzewo' na węźle agenta, aby wygenerować współbieżne alternatywy z różnymi modelami (Gemini, Claude, GPT).",
-    "replay_inspect_action": "Zbadaj"
+    "replay_inspect_action": "Zbadaj",
+    "cmd_desc_review": "Uruchom autonomiczną współpracę nad przeglądem kodu z komentarzami w tekście",
+    "cmd_desc_collaborate": "Zarządzaj linkami do współpracy i uprawnieniami wielu kursorów",
+    "share_permissions_updated": "Uprawnienia obszaru roboczego zostały pomyślnie zaktualizowane",
+    "collab_inline_comments": "Komentarze i przeglądy w tekście",
+    "collab_agent_review": "Uruchomiono autonomiczną recenzję @agent",
+    "collab_remote_cursors": "Obecność wielu kursorów na żywo"
   },
   "vi": {
     "offline_title": "Mất kết nối",
@@ -67647,6 +67731,12 @@
     "replay_loading": "Đang trích xuất số liệu và phương án thay thế...",
     "replay_no_alternatives_title": "Không phát hiện nhánh thực thi đồng thời nào",
     "replay_no_alternatives_desc": "Sử dụng thao tác 'Phân nhánh cây' trên nút tác nhân để tạo các phương án đồng thời với các mô hình khác nhau (Gemini, Claude, GPT).",
-    "replay_inspect_action": "Kiểm tra"
+    "replay_inspect_action": "Kiểm tra",
+    "cmd_desc_review": "Khởi chạy đánh giá mã cộng tác tự động với nhận xét nội dòng",
+    "cmd_desc_collaborate": "Quản lý liên kết chia sẻ cộng tác và quyền đa con trỏ",
+    "share_permissions_updated": "Quyền không gian làm việc đã được cập nhật thành công",
+    "collab_inline_comments": "Nhận xét và đánh giá nội dòng",
+    "collab_agent_review": "Đã kích hoạt đánh giá @agent tự động",
+    "collab_remote_cursors": "Hiện diện đa con trỏ trực tiếp"
   }
 }

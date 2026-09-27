@@ -231,6 +231,10 @@ async def chat_websocket(
                             "message": f"Échec du lancement du pipeline: {exc}"
                         })
 
+            elif action == "cursor_move":
+                if conv_id:
+                    await execution_manager.broadcast_cursor_move(conv_id, websocket, data)
+
             elif action == "coordinator_cancel":
                 from app.services.workspace_coordinator import cancel_pipeline_run
                 r_id = data.get("run_id")

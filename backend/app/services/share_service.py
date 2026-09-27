@@ -40,7 +40,7 @@ def _get_db():
 
 
 def ensure_share_schema() -> None:
-    """Creates the SQLite shared_sessions table if missing."""
+    """Creates the SQLite shared_sessions table if missing and migrates permission columns."""
     with _get_db() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS shared_sessions (
@@ -51,11 +51,22 @@ def ensure_share_schema() -> None:
                 expires_at TEXT,
                 created_at TEXT NOT NULL,
                 created_by TEXT DEFAULT 'host',
-                is_revoked INTEGER DEFAULT 0
+                is_revoked INTEGER DEFAULT 0,
+                can_write INTEGER DEFAULT 1,
+                can_run_terminal INTEGER DEFAULT 0,
+                requires_approval INTEGER DEFAULT 1
             );
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_shared_sessions_conv ON shared_sessions(conversation_id);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_shared_sessions_token ON shared_sessions(token);")
+
+        cols = [c[1] for c in conn.execute("PRAGMA table_info(shared_sessions);").fetchall()]
+        if "can_write" not in cols:
+            conn.execute("ALTER TABLE shared_sessions ADD COLUMN can_write INTEGER DEFAULT 1;")
+        if "can_run_terminal" not in cols:
+            conn.execute("ALTER TABLE shared_sessions ADD COLUMN can_run_terminal INTEGER DEFAULT 0;")
+        if "requires_approval" not in cols:
+            conn.execute("ALTER TABLE shared_sessions ADD COLUMN requires_approval INTEGER DEFAULT 1;")
 
 
 def _hash_pin(pin_code: str) -> str:
@@ -297,3 +308,79 @@ def get_shared_session_info(token: str) -> dict[str, Any] | None:
         "is_expired": is_expired,
         "is_active": not bool(is_revoked) and not is_expired,
     }
+
+
+def get_share_permissions(token_or_conv_id: str) -> dict[str, Any]:
+    """Returns granular permissions for a shared token or conversation."""
+    ensure_share_schema()
+    identifier = token_or_conv_id.strip()
+    with _get_db() as conn:
+        cursor = conn.execute(
+            """
+            SELECT token, conversation_id, permission, can_write, can_run_terminal, requires_approval, is_revoked
+            FROM shared_sessions
+            WHERE (token = ? OR conversation_id = ?) AND is_revoked = 0
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (identifier, identifier),
+        )
+        row = cursor.fetchone()
+
+    if not row:
+        return {
+            "token": identifier,
+            "conversation_id": identifier,
+            "permission": "read",
+            "can_write": False,
+            "can_run_terminal": False,
+            "requires_approval": True,
+            "is_revoked": False,
+        }
+
+    tok, cid, perm, can_w, can_term, req_appr, is_rev = row
+    return {
+        "token": tok,
+        "conversation_id": cid,
+        "permission": perm,
+        "can_write": bool(can_w) if perm == "write" else False,
+        "can_run_terminal": bool(can_term),
+        "requires_approval": bool(req_appr),
+        "is_revoked": bool(is_rev),
+    }
+
+
+def update_share_permissions(
+    token_or_conv_id: str,
+    can_write: bool | None = None,
+    can_run_terminal: bool | None = None,
+    requires_approval: bool | None = None,
+) -> dict[str, Any]:
+    """Updates granular permissions for a shared token or conversation."""
+    ensure_share_schema()
+    identifier = token_or_conv_id.strip()
+
+    with _get_db() as conn:
+        cursor = conn.execute(
+            "SELECT token, conversation_id, can_write, can_run_terminal, requires_approval FROM shared_sessions WHERE (token = ? OR conversation_id = ?) AND is_revoked = 0 ORDER BY created_at DESC LIMIT 1",
+            (identifier, identifier),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError(f"Share session {identifier} not found")
+
+        tok, cid, cur_w, cur_term, cur_appr = row
+        new_w = int(can_write) if can_write is not None else cur_w
+        new_term = int(can_run_terminal) if can_run_terminal is not None else cur_term
+        new_appr = int(requires_approval) if requires_approval is not None else cur_appr
+
+        conn.execute(
+            """
+            UPDATE shared_sessions
+            SET can_write = ?, can_run_terminal = ?, requires_approval = ?
+            WHERE token = ?
+            """,
+            (new_w, new_term, new_appr, tok),
+        )
+
+    return get_share_permissions(tok)
