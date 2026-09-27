@@ -116,7 +116,10 @@ def verify_share_link(share_token: str):
         }
 
     conv_id = info["conversation_id"]
-    meta = get_conversation_by_id(conv_id) or get_session_meta(conv_id)
+    try:
+        meta = get_conversation_by_id(conv_id) or get_session_meta(conv_id) or {}
+    except Exception:
+        meta = get_session_meta(conv_id) or {}
     title = meta.get("customTitle") or meta.get("title") or conv_id[:8]
 
     if info["requires_pin"]:

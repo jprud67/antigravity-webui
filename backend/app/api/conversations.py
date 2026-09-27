@@ -38,7 +38,6 @@ from app.services.storage import (
     undo_conversation_turn,
     update_conversation_summary_fields,
     update_conversation_title,
-    CONVERSATION_DB,
 )
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
@@ -624,7 +623,6 @@ def remove_bookmark(conversation_id: str, bookmark_id: str, _ = Depends(require_
 async def delete_all_conversations(_ = Depends(require_auth)):
     """Supprime toutes les conversations sauf la session active courante.
     Enregistre les tombstones pour empêcher la réapparition via la réconciliation CLI."""
-    import sqlite3 as _sqlite3
     from app.services.storage import get_db_connection as _get_db
 
     conn = _get_db()

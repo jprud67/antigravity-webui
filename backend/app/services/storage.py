@@ -453,6 +453,7 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
 def get_conversation_by_id(conversation_id: str, conn: Any = None) -> dict[str, Any] | None:
     if not CONVERSATION_DB.exists():
         return None
+    ensure_db_schema(conn)
     should_close = False
     if conn is None:
         conn = get_db_connection()
@@ -484,6 +485,8 @@ def get_conversation_by_id(conversation_id: str, conn: Any = None) -> dict[str, 
             return None
         meta = get_session_meta(conversation_id)
         return _build_conversation_dict(r, meta)
+    except sqlite3.OperationalError:
+        return None
     finally:
         if should_close:
             conn.close()
