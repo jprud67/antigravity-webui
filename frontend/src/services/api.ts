@@ -3279,3 +3279,81 @@ export async function fetchAgentInspectionDetails(agentId: string, conversationI
   }
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Checkpoint & Rewind Studio (v0.4.2)
+// ---------------------------------------------------------------------------
+
+export async function listCheckpoints(conversationId: string): Promise<import('../types').Checkpoint[]> {
+  const res = await fetch(`${API_BASE}/checkpoints/${encodeURIComponent(conversationId)}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du chargement des checkpoints' }));
+    throw new Error(err.detail || 'Échec du chargement des checkpoints');
+  }
+  const data = await res.json();
+  return data.checkpoints || [];
+}
+
+export async function createCheckpoint(conversationId: string, label: string): Promise<import('../types').Checkpoint> {
+  const res = await fetch(`${API_BASE}/checkpoints/${encodeURIComponent(conversationId)}`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ label }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la création du checkpoint' }));
+    throw new Error(err.detail || 'Échec de la création du checkpoint');
+  }
+  const data = await res.json();
+  return data.checkpoint;
+}
+
+export async function getCheckpointDetail(conversationId: string, checkpointId: string): Promise<import('../types').CheckpointDetail> {
+  const res = await fetch(`${API_BASE}/checkpoints/${encodeURIComponent(conversationId)}/${encodeURIComponent(checkpointId)}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du chargement du détail' }));
+    throw new Error(err.detail || 'Échec du chargement du détail');
+  }
+  return res.json();
+}
+
+export async function restoreCheckpoint(conversationId: string, checkpointId: string): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/checkpoints/${encodeURIComponent(conversationId)}/${encodeURIComponent(checkpointId)}/restore`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la restauration' }));
+    throw new Error(err.detail || 'Échec de la restauration');
+  }
+  return res.json();
+}
+
+export async function forkFromCheckpoint(conversationId: string, checkpointId: string, newTitle?: string): Promise<{ success: boolean; new_conversation_id: string }> {
+  const res = await fetch(`${API_BASE}/checkpoints/${encodeURIComponent(conversationId)}/${encodeURIComponent(checkpointId)}/fork`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ new_title: newTitle || null }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la bifurcation' }));
+    throw new Error(err.detail || 'Échec de la bifurcation');
+  }
+  return res.json();
+}
+
+export async function deleteCheckpointApi(conversationId: string, checkpointId: string): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/checkpoints/${encodeURIComponent(conversationId)}/${encodeURIComponent(checkpointId)}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la suppression' }));
+    throw new Error(err.detail || 'Échec de la suppression');
+  }
+  return res.json();
+}

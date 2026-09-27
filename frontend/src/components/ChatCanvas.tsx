@@ -42,7 +42,9 @@ import {
   Share2,
   Eye,
   Users,
-  Network
+  Network,
+  MoreVertical,
+  History
 } from 'lucide-react';
 import type { ChatMessage, ToolCallItem, BookmarkItem, MonacoStudioConfig, ProgressCardData, PresenceParticipant } from '../types';
 import { InteractiveQuestion } from './InteractiveQuestion';
@@ -105,6 +107,7 @@ interface ChatCanvasProps {
   onToggleLivePreview?: () => void;
   isLivePreviewOpen?: boolean;
   onOpenOrchestrator?: () => void;
+  onOpenCheckpointStudio?: () => void;
 }
 
 const copyTextToClipboard = async (text: string): Promise<boolean> => {
@@ -832,6 +835,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   onToggleLivePreview,
   isLivePreviewOpen = false,
   onOpenOrchestrator,
+  onOpenCheckpointStudio,
 }) => {
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
@@ -843,6 +847,37 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+
+  // Responsive More Actions Overflow Menu State
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Close More Actions popover on click outside or Escape
+  useEffect(() => {
+    if (!isMoreMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        moreMenuRef.current &&
+        !moreMenuRef.current.contains(e.target as Node) &&
+        moreButtonRef.current &&
+        !moreButtonRef.current.contains(e.target as Node)
+      ) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMoreMenuOpen]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
@@ -1126,7 +1161,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
           )}
 
           {/* Conversation Title & Project */}
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 max-w-full">
             {projectColor && (
               <span
                 className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
@@ -1135,8 +1170,13 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
               />
             )}
             <span
-              className="text-xs font-semibold truncate max-w-[140px] sm:max-w-xs block"
+              className={`text-xs font-semibold truncate block transition-all ${
+                isRightPanelOpen 
+                  ? 'max-w-[120px] xs:max-w-[160px] sm:max-w-xs md:max-w-sm' 
+                  : 'max-w-[150px] xs:max-w-[220px] sm:max-w-md md:max-w-lg'
+              }`}
               style={{ color: 'var(--strong)' }}
+              title={conversationTitle || t('new_conversation', 'New conversation')}
             >
               {conversationTitle || t('new_conversation', 'New conversation')}
             </span>
@@ -1147,13 +1187,14 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 onClick={onEditSessionMeta}
                 className="p-1 rounded opacity-60 hover:opacity-100 transition-opacity cursor-pointer shrink-0"
                 title={t("manage_meta", "Manage title and metadata")}
+                aria-label={t("manage_meta", "Manage title and metadata")}
               >
                 <Edit3 className="w-3 h-3" style={{ color: 'var(--muted)' }} />
               </button>
             )}
           </div>
 
-          {parentConversationId && (
+          {parentConversationId && !isRightPanelOpen && (
             <div
               className="hidden sm:flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full border shrink-0"
               style={{
@@ -1167,11 +1208,11 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
             </div>
           )}
 
-          {tags && tags.length > 0 && (
-            <div className="hidden md:flex items-center gap-1 shrink-0">
-              {tags.slice(0, 2).map((t) => (
+          {tags && tags.length > 0 && !isRightPanelOpen && (
+            <div className="hidden lg:flex items-center gap-1 shrink-0">
+              {tags.slice(0, 2).map((tg) => (
                 <span
-                  key={t}
+                  key={tg}
                   className="text-[9px] font-mono px-1.5 py-0.2 rounded-full border"
                   style={{
                     backgroundColor: 'var(--surface-subtle)',
@@ -1179,46 +1220,61 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                     color: 'var(--muted)'
                   }}
                 >
-                  #{t}
+                  #{tg}
                 </span>
               ))}
             </div>
           )}
 
+          {/* Model Badge: Compact Icon-Only when volet is open, full pill when closed */}
           {activeModel && (
-            <div
-              className="hidden lg:flex items-center gap-1.5 text-[10px] font-mono font-medium px-2.5 py-0.5 rounded-full border shadow-sm shrink-0"
-              style={{
-                backgroundColor: 'var(--accent-bg)',
-                borderColor: 'var(--accent)',
-                color: 'var(--accent-text)'
-              }}
-            >
-              <Cpu className="w-3 h-3" />
-              <span>{activeModel}</span>
-              {activeEffort && (
-                <span
-                  className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ml-1"
-                  style={{ backgroundColor: 'var(--accent-bg-strong)', color: 'var(--accent-text)' }}
-                >
-                  {activeEffort}
-                </span>
-              )}
-            </div>
+            isRightPanelOpen ? (
+              <div
+                className="hidden md:flex items-center justify-center w-6 h-6 rounded-full border shadow-xs shrink-0 cursor-default"
+                style={{
+                  backgroundColor: 'var(--accent-bg)',
+                  borderColor: 'var(--accent)',
+                  color: 'var(--accent-text)'
+                }}
+                title={`${activeModel}${activeEffort ? ` (${activeEffort})` : ''}`}
+              >
+                <Cpu className="w-3.5 h-3.5" />
+              </div>
+            ) : (
+              <div
+                className="hidden lg:flex items-center gap-1.5 text-[10px] font-mono font-medium px-2.5 py-0.5 rounded-full border shadow-sm shrink-0"
+                style={{
+                  backgroundColor: 'var(--accent-bg)',
+                  borderColor: 'var(--accent)',
+                  color: 'var(--accent-text)'
+                }}
+              >
+                <Cpu className="w-3 h-3" />
+                <span className="truncate max-w-[130px]">{activeModel}</span>
+                {activeEffort && (
+                  <span
+                    className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ml-1"
+                    style={{ backgroundColor: 'var(--accent-bg-strong)', color: 'var(--accent-text)' }}
+                  >
+                    {activeEffort}
+                  </span>
+                )}
+              </div>
+            )
           )}
         </div>
 
-        {/* Right Side: Presence, Preview, Share, Quotas, Search & Volet Latéral Toggle */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Right Side: Presence, Actions Hub (Icon-only & Adaptive Overflow) */}
+        <div className="flex items-center gap-1.5 shrink-0 relative">
           {/* Presence Indicator Hub */}
           {(presenceCount > 1 || isSharedSession) && (
             <div
-              className="py-1 px-2.5 rounded-xl text-xs flex items-center gap-1.5 border border-purple-500/30 bg-purple-500/10 text-purple-300"
+              className="py-1 px-2 rounded-xl text-xs flex items-center gap-1.5 border border-purple-500/30 bg-purple-500/10 text-purple-300"
               title={`${presenceCount} ${t('share_presence_connected') || 'connecté(s)'}`}
             >
               <Users className="w-3.5 h-3.5 text-purple-400" />
               <span className="text-[11px] font-semibold">{presenceCount}</span>
-              {presenceParticipants.length > 0 && (
+              {presenceParticipants.length > 0 && !isRightPanelOpen && (
                 <div className="flex -space-x-1.5 ml-0.5">
                   {presenceParticipants.slice(0, 3).map((p) => (
                     <div
@@ -1235,66 +1291,233 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
             </div>
           )}
 
-          {/* Live Preview Toggle Button */}
-          {onToggleLivePreview && (
+          {/* When volet is CLOSED and NOT mobile: show all icon-only buttons directly */}
+          {!isRightPanelOpen && (
+            <div className="hidden sm:flex items-center gap-1.5">
+              {/* Live Preview Toggle Button */}
+              {onToggleLivePreview && (
+                <button
+                  type="button"
+                  onClick={onToggleLivePreview}
+                  className={`p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border ${
+                    isLivePreviewOpen
+                      ? 'border-cyan-500 bg-cyan-500/20 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.3)]'
+                      : 'border-zinc-800 bg-zinc-800/60 text-zinc-400 hover:text-white hover:border-zinc-700'
+                  }`}
+                  title={t('share_live_preview', 'Aperçu Live & Inspection (/preview)')}
+                  aria-label={t('share_live_preview', 'Aperçu Live & Inspection (/preview)')}
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Agent Orchestration Studio Button */}
+              {onOpenOrchestrator && (
+                <button
+                  type="button"
+                  onClick={onOpenOrchestrator}
+                  className="p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20"
+                  title={t('orchestrator_modal_title', 'Multi-Agent Visual Orchestration Studio (Ctrl+Alt+A)')}
+                  aria-label={t('orchestrator_title', 'Agents')}
+                >
+                  <Network className="w-4 h-4 text-cyan-400" />
+                </button>
+              )}
+
+              {/* Checkpoint & Rewind Studio Button */}
+              {onOpenCheckpointStudio && (
+                <button
+                  type="button"
+                  onClick={onOpenCheckpointStudio}
+                  className="p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                  title={t('checkpoint_studio_title', 'Checkpoints & Rewind Studio (Ctrl+Alt+C)')}
+                  aria-label={t('checkpoint_studio_title', 'Checkpoints & Rewind Studio (Ctrl+Alt+C)')}
+                >
+                  <History className="w-4 h-4 text-amber-400" />
+                </button>
+              )}
+
+              {/* Share / Collaborate Button */}
+              {onOpenShare && (
+                <button
+                  type="button"
+                  onClick={onOpenShare}
+                  className="p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20"
+                  title={t('share_session', 'Partager la session (/share)')}
+                  aria-label={t('share_session', 'Partager la session')}
+                >
+                  <Share2 className="w-4 h-4 text-purple-400" />
+                </button>
+              )}
+
+              {/* Quotas Button */}
+              {onOpenAnalytics && (
+                <button
+                  type="button"
+                  onClick={onOpenAnalytics}
+                  className="p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border"
+                  style={{
+                    backgroundColor: 'var(--surface-subtle)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text)'
+                  }}
+                  title={t("analytics_dashboard", "Dashboard Quotas & Analytique (/analytics)")}
+                  aria-label={t('quotas', 'Quotas')}
+                >
+                  <BarChart3 className="w-4 h-4 text-sky-400" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* If LivePreview is active while volet is open, keep it visible so user can see and toggle it directly */}
+          {isRightPanelOpen && isLivePreviewOpen && onToggleLivePreview && (
             <button
               type="button"
               onClick={onToggleLivePreview}
-              className={`p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border ${
-                isLivePreviewOpen
-                  ? 'border-cyan-500 bg-cyan-500/20 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.3)]'
-                  : 'border-zinc-800 bg-zinc-800/60 text-zinc-400 hover:text-white hover:border-zinc-700'
-              }`}
+              className="p-2 rounded-xl text-xs flex items-center justify-center transition-colors cursor-pointer border border-cyan-500 bg-cyan-500/20 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.3)]"
               title={t('share_live_preview', 'Aperçu Live & Inspection (/preview)')}
+              aria-label={t('share_live_preview', 'Aperçu Live')}
             >
               <Eye className="w-4 h-4" />
             </button>
           )}
 
-          {/* Agent Orchestration Studio Button */}
-          {onOpenOrchestrator && (
-            <button
-              type="button"
-              onClick={onOpenOrchestrator}
-              className="py-1.5 px-2.5 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20"
-              title={t('orchestrator_modal_title', 'Multi-Agent Visual Orchestration Studio (Ctrl+Alt+A)')}
-            >
-              <Network className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="text-[11px] font-medium hidden sm:inline">{t('orchestrator_title', 'Agents')}</span>
-            </button>
+          {/* Overflow Menu Button ("...") - Visible when volet is OPEN OR on mobile */}
+          {(isRightPanelOpen || (!isRightPanelOpen && (onOpenOrchestrator || onOpenCheckpointStudio || onOpenShare || onOpenAnalytics))) && (
+            <div className={`relative ${isRightPanelOpen ? 'block' : 'sm:hidden'}`}>
+              <button
+                ref={moreButtonRef}
+                type="button"
+                onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+                className={`p-2 rounded-xl text-xs flex items-center justify-center transition-all cursor-pointer border ${
+                  isMoreMenuOpen
+                    ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
+                    : 'border-border bg-surface-subtle hover:bg-surface text-muted hover:text-strong'
+                }`}
+                style={{
+                  backgroundColor: isMoreMenuOpen ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                  borderColor: isMoreMenuOpen ? 'var(--accent)' : 'var(--border)',
+                  color: isMoreMenuOpen ? 'var(--accent-text)' : 'var(--muted)',
+                }}
+                title={t('more_actions', 'Plus d\'actions')}
+                aria-label={t('more_actions', 'Plus d\'actions')}
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+
+              {/* Elegant Dropdown Popover */}
+              {isMoreMenuOpen && (
+                <div
+                  ref={moreMenuRef}
+                  className="absolute right-0 top-full mt-2 w-56 p-1.5 rounded-2xl border shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1 backdrop-blur-md"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border2)',
+                    boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.4)'
+                  }}
+                >
+                  <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted opacity-70 border-b pb-1 mb-0.5" style={{ borderColor: 'var(--border)' }}>
+                    {t('quick_tools', 'Outils & Actions')}
+                  </div>
+
+                  {onOpenOrchestrator && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        onOpenOrchestrator();
+                      }}
+                      className="w-full px-2.5 py-2 rounded-xl text-left text-xs flex items-center justify-between hover:bg-cyan-500/10 transition-colors cursor-pointer group"
+                      style={{ color: 'var(--text)' }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Network className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <span className="font-medium">{t('orchestrator_title', 'Orchestrateur')}</span>
+                      </div>
+                      <span className="text-[10px] opacity-50 font-mono">Ctrl+Alt+A</span>
+                    </button>
+                  )}
+
+                  {onOpenCheckpointStudio && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        onOpenCheckpointStudio();
+                      }}
+                      className="w-full px-2.5 py-2 rounded-xl text-left text-xs flex items-center justify-between hover:bg-amber-500/10 transition-colors cursor-pointer group"
+                      style={{ color: 'var(--text)' }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <History className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span className="font-medium">{t('checkpoint_nav_label', 'Checkpoints')}</span>
+                      </div>
+                      <span className="text-[10px] opacity-50 font-mono">Ctrl+Alt+C</span>
+                    </button>
+                  )}
+
+                  {onOpenShare && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        onOpenShare();
+                      }}
+                      className="w-full px-2.5 py-2 rounded-xl text-left text-xs flex items-center justify-between hover:bg-purple-500/10 transition-colors cursor-pointer group"
+                      style={{ color: 'var(--text)' }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Share2 className="w-4 h-4 text-purple-400 shrink-0" />
+                        <span className="font-medium">{t('share_session', 'Partager')}</span>
+                      </div>
+                      <span className="text-[10px] opacity-50 font-mono">/share</span>
+                    </button>
+                  )}
+
+                  {onOpenAnalytics && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        onOpenAnalytics();
+                      }}
+                      className="w-full px-2.5 py-2 rounded-xl text-left text-xs flex items-center justify-between hover:bg-sky-500/10 transition-colors cursor-pointer group"
+                      style={{ color: 'var(--text)' }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-sky-400 shrink-0" />
+                        <span className="font-medium">{t('quotas', 'Quotas')}</span>
+                      </div>
+                      <span className="text-[10px] opacity-50 font-mono">/analytics</span>
+                    </button>
+                  )}
+
+                  {onToggleLivePreview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        onToggleLivePreview();
+                      }}
+                      className={`w-full px-2.5 py-2 rounded-xl text-left text-xs flex items-center justify-between transition-colors cursor-pointer group ${
+                        isLivePreviewOpen ? 'bg-cyan-500/15 text-cyan-300' : 'hover:bg-black/5 dark:hover:bg-white/5'
+                      }`}
+                      style={{ color: isLivePreviewOpen ? undefined : 'var(--text)' }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <span className="font-medium">{t('live_preview', 'Aperçu Live')}</span>
+                      </div>
+                      <span className="text-[10px] opacity-50 font-mono">/preview</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
-          {/* Share / Collaborate Button */}
-          {onOpenShare && (
-            <button
-              type="button"
-              onClick={onOpenShare}
-              className="py-1.5 px-2.5 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20"
-              title={t('share_session', 'Partager la session (/share)')}
-            >
-              <Share2 className="w-3.5 h-3.5 text-purple-400" />
-              <span className="text-[11px] font-medium hidden sm:inline">{t('share_session', 'Partager')}</span>
-            </button>
-          )}
-          {/* Quotas Button */}
-          {onOpenAnalytics && (
-            <button
-              type="button"
-              onClick={onOpenAnalytics}
-              className="py-1.5 px-2.5 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer border"
-              style={{
-                backgroundColor: 'var(--surface-subtle)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)'
-              }}
-              title={t("analytics_dashboard", "Dashboard Quotas & Analytique (/analytics)")}
-            >
-              <BarChart3 className="w-3.5 h-3.5 text-sky-400" />
-              <span className="text-[11px] font-medium hidden sm:inline">{t('quotas', 'Quotas')}</span>
-            </button>
-          )}
-
-          {/* Conversation Search Toggle Button */}
+          {/* Conversation Search Toggle Button - Always 1-click accessible */}
           <button
             type="button"
             onClick={handleToggleSearch}
@@ -1305,10 +1528,12 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
               color: isSearchOpen ? 'var(--accent-text)' : 'var(--muted)',
             }}
             title={t('search_in_conversation', 'Rechercher dans la conversation (Ctrl+F)')}
+            aria-label={t('search_in_conversation', 'Rechercher dans la conversation (Ctrl+F)')}
           >
             <Search className="w-4 h-4" />
           </button>
 
+          {/* Volet Latéral Toggle Button - Always 1-click accessible */}
           {onToggleRightPanel && (
             <button
               onClick={onToggleRightPanel}
@@ -1319,6 +1544,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = React.memo(({
                 color: isRightPanelOpen ? 'var(--accent-text)' : 'var(--muted)'
               }}
               title={isRightPanelOpen ? t('close_side_panel', 'Fermer le volet latéral') : t('open_side_panel', 'Ouvrir le volet latéral')}
+              aria-label={isRightPanelOpen ? t('close_side_panel', 'Fermer le volet latéral') : t('open_side_panel', 'Ouvrir le volet latéral')}
             >
               <PanelRight className="w-4 h-4" />
             </button>

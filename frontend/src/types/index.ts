@@ -1215,5 +1215,28 @@ export interface AgentInspectionDetails {
 }
 
 
+// ---------------------------------------------------------------------------
+// Checkpoint & Rewind Studio (v0.4.2)
+// ---------------------------------------------------------------------------
+
+export interface Checkpoint {
+  id: string;
+  conversation_id: string;
+  step_index: number;
+  label: string;
+  timestamp: string;
+  token_count: number;
+  message_count: number;
+  agent_state: 'running' | 'idle' | 'completed';
+  auto_generated: boolean;
+  artifacts_count: number;
+}
+
+export interface CheckpointDetail extends Checkpoint {
+  preview_messages: Array<{ role: string; content: string }>;
+  modified_files: Array<{ path: string; additions: number; deletions: number }>;
+  tools_used: string[];
+  artifacts: string[];
+}
 
 

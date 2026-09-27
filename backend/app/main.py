@@ -12,6 +12,7 @@ from app.api.artifacts import router as art_router
 from app.api.auth import router as auth_router
 from app.api.canvas_documents import router as canvas_documents_router
 from app.api.chat import router as chat_router
+from app.api.checkpoints import router as checkpoints_router
 from app.api.code_kernel import router as code_kernel_router
 from app.api.conversations import router as conv_router
 from app.api.copilot import router as copilot_router
@@ -128,7 +129,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Antigravity WebUI",
     description="Web Interface to orchestrate Antigravity CLI without touching the terminal",
-    version="0.4.1",
+    version="0.4.2",
     lifespan=lifespan
 )
 
@@ -181,6 +182,7 @@ app.include_router(database_studio_router)  # Database Explorer & Visual SQL Que
 app.include_router(editor_diagnostics_router)  # Live Syntax & Linter Diagnostics Studio
 app.include_router(share_router)  # Collaborative Session Sharing & Live Preview
 app.include_router(orchestrator_router)  # Multi-Agent Visual Orchestration Studio & Hierarchical Steering
+app.include_router(checkpoints_router)  # Agent Dynamic Checkpoint & Rewind Studio
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])

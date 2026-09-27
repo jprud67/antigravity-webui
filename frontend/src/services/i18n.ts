@@ -50,6 +50,42 @@ if (typeof window !== 'undefined') {
 
 
 export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
+  more_actions: {
+    en: 'More actions',
+    fr: 'Plus d\'actions',
+    es: 'Más acciones',
+    de: 'Weitere Aktionen',
+  },
+  quick_tools: {
+    en: 'Tools & Actions',
+    fr: 'Outils & Actions',
+    es: 'Herramientas y Acciones',
+    de: 'Werkzeuge & Aktionen',
+  },
+  checkpoint_title: {
+    en: 'Checkpoint & Rewind Studio',
+    fr: 'Checkpoint & Rewind Studio',
+    es: 'Estudio de Checkpoints y Retroceso',
+    de: 'Checkpoint & Rewind Studio',
+  },
+  checkpoint_studio_title: {
+    en: 'Checkpoint & Rewind Studio (Ctrl+Alt+C)',
+    fr: 'Studio Checkpoints & Rewind (Ctrl+Alt+C)',
+    es: 'Estudio Checkpoints y Retroceso (Ctrl+Alt+C)',
+    de: 'Checkpoint & Rewind Studio (Strg+Alt+C)',
+  },
+  checkpoint_nav_label: {
+    en: 'Checkpoints',
+    fr: 'Checkpoints',
+    es: 'Checkpoints',
+    de: 'Checkpoints',
+  },
+  live_preview: {
+    en: 'Live Preview',
+    fr: 'Aperçu Live',
+    es: 'Vista previa en vivo',
+    de: 'Live-Vorschau',
+  },
   dictation_recording: {
     en: 'Live Voice Dictation Studio',
     fr: 'Studio Dictée Vocale en direct',
