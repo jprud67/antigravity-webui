@@ -4513,7 +4513,13 @@
     "share_permissions_updated": "Workspace permissions updated successfully",
     "collab_inline_comments": "Inline Comments & Reviews",
     "collab_agent_review": "Autonomous @agent review triggered",
-    "collab_remote_cursors": "Live Multi-Cursor Presence"
+    "collab_remote_cursors": "Live Multi-Cursor Presence",
+    "cmd_desc_plugins": "Open the Wasm sandboxed plugin catalog",
+    "cmd_desc_sdk": "Open the developer SDK portal & interactive documentation",
+    "plugin_catalog_title": "Plugin Catalog",
+    "sdk_portal_title": "SDK Developer Portal",
+    "watchdog_sentinel": "Watchdog Sentinel",
+    "maintenance_sweeps": "Maintenance Sweeps"
   },
   "it": {
     "offline_title": "Connessione persa",
@@ -9029,7 +9035,13 @@
     "share_permissions_updated": "Permessi dell'area di lavoro aggiornati con successo",
     "collab_inline_comments": "Commenti e revisioni inline",
     "collab_agent_review": "Revisione autonoma dell'@agent avviata",
-    "collab_remote_cursors": "Presenza live multi-cursore"
+    "collab_remote_cursors": "Presenza live multi-cursore",
+    "cmd_desc_plugins": "Apri il catalogo plugin Wasm sandboxed",
+    "cmd_desc_sdk": "Apri il portale SDK sviluppatori & documentazione interattiva",
+    "plugin_catalog_title": "Catalogo Plugin",
+    "sdk_portal_title": "SDK Developer Portal",
+    "watchdog_sentinel": "Sentinel Watchdog",
+    "maintenance_sweeps": "Scansioni di Manutenzione"
   },
   "ja": {
     "offline_title": "接続が切断されました",
@@ -13545,7 +13557,13 @@
     "share_permissions_updated": "ワークスペースの権限が正常に更新されました",
     "collab_inline_comments": "インラインコメントとレビュー",
     "collab_agent_review": "自律型@agentレビューがトリガーされました",
-    "collab_remote_cursors": "ライブマルチカーソルプレゼンス"
+    "collab_remote_cursors": "ライブマルチカーソルプレゼンス",
+    "cmd_desc_plugins": "Wasmサンドボックスプラグインカタログを開く",
+    "cmd_desc_sdk": "開発者SDKポータルとインタラクティブドキュメントを開く",
+    "plugin_catalog_title": "プラグインカタログ",
+    "sdk_portal_title": "SDK開発者ポータル",
+    "watchdog_sentinel": "ウォッチドッグセンチネル",
+    "maintenance_sweeps": "メンテナンススキャン"
   },
   "ru": {
     "offline_title": "Соединение потеряно",
@@ -18061,7 +18079,13 @@
     "share_permissions_updated": "Разрешения рабочей области успешно обновлены",
     "collab_inline_comments": "Инлайн-комментарии и ревью",
     "collab_agent_review": "Автономное ревью @agent запущено",
-    "collab_remote_cursors": "Живое присутствие с несколькими курсорами"
+    "collab_remote_cursors": "Живое присутствие с несколькими курсорами",
+    "cmd_desc_plugins": "Открыть каталог плагинов Wasm-песочницы",
+    "cmd_desc_sdk": "Открыть портал SDK для разработчиков и интерактивную документацию",
+    "plugin_catalog_title": "Каталог плагинов",
+    "sdk_portal_title": "Портал разработчика SDK",
+    "watchdog_sentinel": "Дозорный страж",
+    "maintenance_sweeps": "Обслуживание системы"
   },
   "es": {
     "offline_title": "Conexión perdida",
@@ -22577,7 +22601,13 @@
     "share_permissions_updated": "Permisos del espacio de trabajo actualizados con éxito",
     "collab_inline_comments": "Comentarios y revisiones en línea",
     "collab_agent_review": "Revisión autónoma del @agent activada",
-    "collab_remote_cursors": "Presencia en vivo de múltiples cursores"
+    "collab_remote_cursors": "Presencia en vivo de múltiples cursores",
+    "cmd_desc_plugins": "Abrir el catálogo de plugins Wasm sandboxed",
+    "cmd_desc_sdk": "Abrir el portal SDK para desarrolladores y documentación interactiva",
+    "plugin_catalog_title": "Catálogo de Plugins",
+    "sdk_portal_title": "Portal SDK para Desarrolladores",
+    "watchdog_sentinel": "Centinela Watchdog",
+    "maintenance_sweeps": "Barridos de Mantenimiento"
   },
   "de": {
     "offline_title": "Verbindung verloren",
@@ -27093,7 +27123,13 @@
     "share_permissions_updated": "Arbeitsbereichsberechtigungen erfolgreich aktualisiert",
     "collab_inline_comments": "Inline-Kommentare & Überprüfungen",
     "collab_agent_review": "Autonome @agent-Überprüfung ausgelöst",
-    "collab_remote_cursors": "Live-Multi-Cursor-Präsenz"
+    "collab_remote_cursors": "Live-Multi-Cursor-Präsenz",
+    "cmd_desc_plugins": "Wasm-Sandbox-Plugin-Katalog öffnen",
+    "cmd_desc_sdk": "Entwickler-SDK-Portal & interaktive Dokumentation öffnen",
+    "plugin_catalog_title": "Plugin-Katalog",
+    "sdk_portal_title": "SDK-Entwicklerportal",
+    "watchdog_sentinel": "Watchdog-Sentinel",
+    "maintenance_sweeps": "Wartungs-Scans"
   },
   "zh": {
     "offline_title": "连接已断开",
@@ -31609,7 +31645,13 @@
     "share_permissions_updated": "工作区权限更新成功",
     "collab_inline_comments": "行内评论与审查",
     "collab_agent_review": "已触发自主 @agent 审查",
-    "collab_remote_cursors": "实时多光标协同"
+    "collab_remote_cursors": "实时多光标协同",
+    "cmd_desc_plugins": "打开Wasm沙箱插件目录",
+    "cmd_desc_sdk": "打开开发者SDK门户和交互式文档",
+    "plugin_catalog_title": "插件目录",
+    "sdk_portal_title": "SDK开发者门户",
+    "watchdog_sentinel": "看门狗哨兵",
+    "maintenance_sweeps": "维护扫描"
   },
   "zh-Hant": {
     "offline_title": "連線中斷",
@@ -36125,7 +36167,13 @@
     "share_permissions_updated": "工作區權限更新成功",
     "collab_inline_comments": "行內評論與審查",
     "collab_agent_review": "已觸發自主 @agent 審查",
-    "collab_remote_cursors": "即時多游標協同"
+    "collab_remote_cursors": "即時多游標協同",
+    "cmd_desc_plugins": "Open the Wasm sandboxed plugin catalog",
+    "cmd_desc_sdk": "Open the developer SDK portal & interactive documentation",
+    "plugin_catalog_title": "Plugin Catalog",
+    "sdk_portal_title": "SDK Developer Portal",
+    "watchdog_sentinel": "Watchdog Sentinel",
+    "maintenance_sweeps": "Maintenance Sweeps"
   },
   "pt": {
     "offline_title": "Conexão perdida",
@@ -40641,7 +40689,13 @@
     "share_permissions_updated": "Permissões da área de trabalho atualizadas com sucesso",
     "collab_inline_comments": "Comentários e revisões em linha",
     "collab_agent_review": "Revisão autônoma do @agent acionada",
-    "collab_remote_cursors": "Presença ao vivo de múltiplos cursores"
+    "collab_remote_cursors": "Presença ao vivo de múltiplos cursores",
+    "cmd_desc_plugins": "Abrir o catálogo de plugins Wasm sandboxed",
+    "cmd_desc_sdk": "Abrir o portal SDK para desenvolvedores e documentação interativa",
+    "plugin_catalog_title": "Catálogo de Plugins",
+    "sdk_portal_title": "Portal SDK para Desenvolvedores",
+    "watchdog_sentinel": "Sentinela Watchdog",
+    "maintenance_sweeps": "Varreduras de Manutenção"
   },
   "ko": {
     "offline_title": "연결이 끊겼습니다",
@@ -45157,7 +45211,13 @@
     "share_permissions_updated": "워크스페이스 권한이 성공적으로 업데이트되었습니다",
     "collab_inline_comments": "인라인 댓글 및 검토",
     "collab_agent_review": "자율 @agent 검토가 트리거되었습니다",
-    "collab_remote_cursors": "실시간 다중 커서 프레즌스"
+    "collab_remote_cursors": "실시간 다중 커서 프레즌스",
+    "cmd_desc_plugins": "Wasm 샌드박스 플러그인 카탈로그 열기",
+    "cmd_desc_sdk": "개발자 SDK 포털 및 대화형 문서 열기",
+    "plugin_catalog_title": "플러그인 카탈로그",
+    "sdk_portal_title": "SDK 개발자 포털",
+    "watchdog_sentinel": "워치독 센티넬",
+    "maintenance_sweeps": "유지보수 스캔"
   },
   "fr": {
     "offline_title": "Connexion perdue",
@@ -49673,7 +49733,13 @@
     "share_permissions_updated": "Permissions de l'espace de travail mises à jour avec succès",
     "collab_inline_comments": "Commentaires et revues en ligne",
     "collab_agent_review": "Revue autonome @agent déclenchée",
-    "collab_remote_cursors": "Présence live multi-curseurs"
+    "collab_remote_cursors": "Présence live multi-curseurs",
+    "cmd_desc_plugins": "Ouvrir le catalogue de plugins sandboxés Wasm",
+    "cmd_desc_sdk": "Ouvrir le portail développeur SDK & documentation interactive",
+    "plugin_catalog_title": "Catalogue de Plugins",
+    "sdk_portal_title": "SDK Developer Portal",
+    "watchdog_sentinel": "Sentinel Watchdog",
+    "maintenance_sweeps": "Balayages de Maintenance"
   },
   "cs": {
     "_label": "Čeština",
@@ -54189,7 +54255,13 @@
     "share_permissions_updated": "Oprávnění pracovního prostoru byla úspěšně aktualizována",
     "collab_inline_comments": "Inline komentáře a revize",
     "collab_agent_review": "Autonomní revize @agent byla spuštěna",
-    "collab_remote_cursors": "Živá přítomnost s více kurzory"
+    "collab_remote_cursors": "Živá přítomnost s více kurzory",
+    "cmd_desc_plugins": "Open the Wasm sandboxed plugin catalog",
+    "cmd_desc_sdk": "Open the developer SDK portal & interactive documentation",
+    "plugin_catalog_title": "Plugin Catalog",
+    "sdk_portal_title": "SDK Developer Portal",
+    "watchdog_sentinel": "Watchdog Sentinel",
+    "maintenance_sweeps": "Maintenance Sweeps"
   },
   "tr": {
     "offline_title": "Bağlantı kesildi",
@@ -58705,7 +58777,13 @@
     "share_permissions_updated": "Çalışma alanı izinleri başarıyla güncellendi",
     "collab_inline_comments": "Satır İçi Yorumlar ve İncelemeler",
     "collab_agent_review": "Otonom @agent incelemesi tetiklendi",
-    "collab_remote_cursors": "Canlı Çoklu İmleç Varlığı"
+    "collab_remote_cursors": "Canlı Çoklu İmleç Varlığı",
+    "cmd_desc_plugins": "Wasm sandbox eklenti kataloğunu aç",
+    "cmd_desc_sdk": "Geliştirici SDK portalını ve etkileşimli belgeleri aç",
+    "plugin_catalog_title": "Eklenti Kataloğu",
+    "sdk_portal_title": "SDK Geliştirici Portalı",
+    "watchdog_sentinel": "Watchdog Nöbetçisi",
+    "maintenance_sweeps": "Bakım Taramaları"
   },
   "pl": {
     "offline_title": "Połączenie utracone",
@@ -63221,7 +63299,13 @@
     "share_permissions_updated": "Uprawnienia obszaru roboczego zostały pomyślnie zaktualizowane",
     "collab_inline_comments": "Komentarze i przeglądy w tekście",
     "collab_agent_review": "Uruchomiono autonomiczną recenzję @agent",
-    "collab_remote_cursors": "Obecność wielu kursorów na żywo"
+    "collab_remote_cursors": "Obecność wielu kursorów na żywo",
+    "cmd_desc_plugins": "Otwórz katalog wtyczek Wasm sandbox",
+    "cmd_desc_sdk": "Otwórz portal SDK dla deweloperów i dokumentację interaktywną",
+    "plugin_catalog_title": "Katalog Wtyczek",
+    "sdk_portal_title": "Portal Deweloperski SDK",
+    "watchdog_sentinel": "Strażnik Watchdog",
+    "maintenance_sweeps": "Skany Konserwacyjne"
   },
   "vi": {
     "offline_title": "Mất kết nối",
@@ -67737,6 +67821,12 @@
     "share_permissions_updated": "Quyền không gian làm việc đã được cập nhật thành công",
     "collab_inline_comments": "Nhận xét và đánh giá nội dòng",
     "collab_agent_review": "Đã kích hoạt đánh giá @agent tự động",
-    "collab_remote_cursors": "Hiện diện đa con trỏ trực tiếp"
+    "collab_remote_cursors": "Hiện diện đa con trỏ trực tiếp",
+    "cmd_desc_plugins": "Open the Wasm sandboxed plugin catalog",
+    "cmd_desc_sdk": "Open the developer SDK portal & interactive documentation",
+    "plugin_catalog_title": "Plugin Catalog",
+    "sdk_portal_title": "SDK Developer Portal",
+    "watchdog_sentinel": "Watchdog Sentinel",
+    "maintenance_sweeps": "Maintenance Sweeps"
   }
 }

@@ -3605,3 +3605,95 @@ export async function updateSharePermissions(
 }
 
 
+
+// ─────────────────────────── v0.5.0 Plugin Ecosystem API ─────────────────────
+
+export async function fetchPlugins(activeOnly = true): Promise<import('../types').Plugin[]> {
+  const res = await fetch(`${API_BASE}/plugins?active_only=${activeOnly}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch plugins');
+  const data = await res.json();
+  return data.plugins;
+}
+
+export async function registerPlugin(body: {
+  slug: string; name: string; version?: string; description?: string;
+  entry_point?: string; scopes?: string[]; author?: string; homepage?: string;
+}): Promise<import('../types').Plugin> {
+  const res = await fetch(`${API_BASE}/plugins`, {
+    method: 'POST', headers: getHeaders(), body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Failed to register plugin');
+  return res.json();
+}
+
+export async function fetchPlugin(slug: string): Promise<import('../types').Plugin> {
+  const res = await fetch(`${API_BASE}/plugins/${encodeURIComponent(slug)}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Plugin not found');
+  return res.json();
+}
+
+export async function disablePlugin(slug: string): Promise<void> {
+  await fetch(`${API_BASE}/plugins/${encodeURIComponent(slug)}`, { method: 'DELETE', headers: getHeaders() });
+}
+
+export async function invokePlugin(slug: string, method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+  const res = await fetch(`${API_BASE}/plugins/${encodeURIComponent(slug)}/invoke`, {
+    method: 'POST', headers: getHeaders(), body: JSON.stringify({ method, params }),
+  });
+  if (!res.ok) throw new Error('Plugin invocation failed');
+  return res.json();
+}
+
+// Watchdog
+export async function fetchWatchdogStatus(): Promise<import('../types').WatchdogStatus> {
+  const res = await fetch(`${API_BASE}/watchdog/status`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch watchdog status');
+  return res.json();
+}
+
+export async function fetchWatchdogAlerts(workspace?: string, unresolvedOnly = true): Promise<import('../types').WatchdogAlert[]> {
+  const params = new URLSearchParams({ unresolved_only: String(unresolvedOnly) });
+  if (workspace) params.set('workspace', workspace);
+  const res = await fetch(`${API_BASE}/watchdog/alerts?${params}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch alerts');
+  return (await res.json()).alerts;
+}
+
+export async function resolveWatchdogAlert(alertId: string): Promise<void> {
+  await fetch(`${API_BASE}/watchdog/alerts/${encodeURIComponent(alertId)}/resolve`, { method: 'PATCH', headers: getHeaders() });
+}
+
+// SDK Portal
+export async function fetchSDKSpec(): Promise<unknown> {
+  const res = await fetch(`${API_BASE}/sdk/spec`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch SDK spec');
+  return res.json();
+}
+
+export async function fetchSDKGuides(): Promise<import('../types').SDKGuide[]> {
+  const res = await fetch(`${API_BASE}/sdk/guides`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch guides');
+  return (await res.json()).guides;
+}
+
+export async function fetchSDKGuide(guideId: string): Promise<import('../types').SDKGuide> {
+  const res = await fetch(`${API_BASE}/sdk/guides/${encodeURIComponent(guideId)}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Guide not found');
+  return res.json();
+}
+
+export async function fetchSDKExamples(): Promise<Record<string, import('../types').SDKExample>> {
+  const res = await fetch(`${API_BASE}/sdk/examples`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch examples');
+  return (await res.json()).examples;
+}
+
+// Maintenance Sweeps
+export async function runMaintenanceSweep(workspacePath: string, sweepType = 'all'): Promise<import('../types').SweepResult | Record<string, import('../types').SweepResult>> {
+  const res = await fetch(`${API_BASE}/sweeps/run`, {
+    method: 'POST', headers: getHeaders(),
+    body: JSON.stringify({ workspace_path: workspacePath, sweep_type: sweepType }),
+  });
+  if (!res.ok) throw new Error('Sweep failed');
+  return res.json();
+}

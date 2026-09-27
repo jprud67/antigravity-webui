@@ -54,7 +54,8 @@ import {
   Share2,
   Eye,
   Network,
-  GitFork
+  GitFork,
+  Package
 } from 'lucide-react';
 
 export interface SlashCommandDef {
@@ -796,6 +797,24 @@ export const ALL_SLASH_COMMANDS: SlashCommandDef[] = [
     category: 'action',
     icon: GitCompare,
     color: 'text-cyan-400',
+    isAction: true
+  },
+  {
+    cmd: '/plugins',
+    descKey: 'cmd_desc_plugins',
+    desc: 'Ouvrir le catalogue de plugins sandboxés Wasm',
+    category: 'system',
+    icon: Package,
+    color: 'text-purple-400',
+    isAction: true
+  },
+  {
+    cmd: '/sdk',
+    descKey: 'cmd_desc_sdk',
+    desc: 'Ouvrir le portail développeur SDK & documentation interactive',
+    category: 'system',
+    icon: Code2,
+    color: 'text-emerald-400',
     isAction: true
   },
   {

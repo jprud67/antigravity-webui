@@ -133,7 +133,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Antigravity WebUI",
     description="Web Interface to orchestrate Antigravity CLI without touching the terminal",
-    version="0.4.5",
+    version="0.5.0",
     lifespan=lifespan
 )
 
@@ -189,6 +189,14 @@ app.include_router(inline_comments_router)  # Inline Code Reviews & Annotated Co
 app.include_router(orchestrator_router)  # Multi-Agent Visual Orchestration Studio & Hierarchical Steering
 app.include_router(checkpoints_router)   # Agent Dynamic Checkpoint & Rewind Studio
 app.include_router(coordinator_router)   # Autonomous Multi-Workspace Coordinator & Pipelines Engine
+
+# Jalon v0.5.0 — Agentic IDE Ecosystem
+from app.api.plugins import router as plugins_router, watchdog_router, sweeps_router
+app.include_router(plugins_router)   # Plugin Sandbox Engine
+app.include_router(watchdog_router)  # Self-Healing Watchdog Sentinel
+app.include_router(sweeps_router)    # Scheduled Maintenance Sweeps
+from app.api.sdk_portal import router as sdk_portal_router
+app.include_router(sdk_portal_router)  # Developer SDK & Interactive Documentation Portal
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])

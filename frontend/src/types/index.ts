@@ -1445,3 +1445,72 @@ export interface RemoteCursorPresence {
 
 
 
+
+// ─────────────────────────── v0.5.0 Plugin Ecosystem ─────────────────────────
+
+export type PluginScope =
+  | 'register_command'
+  | 'register_tool'
+  | 'register_view'
+  | 'read_workspace'
+  | 'write_workspace'
+  | 'run_terminal'
+  | 'chat_access';
+
+export interface Plugin {
+  id: string;
+  slug: string;
+  name: string;
+  version: string;
+  description?: string;
+  entry_point?: string;
+  scopes: PluginScope[];
+  author: string;
+  homepage?: string;
+  is_active: boolean;
+  installed_at: string;
+  last_invoked_at?: string;
+}
+
+export interface WatchdogAlert {
+  id: string;
+  category: string;
+  severity: 'info' | 'warning' | 'error';
+  message: string;
+  workspace: string;
+  timestamp: string;
+  resolved: boolean;
+}
+
+export interface WatchdogStatus {
+  running: boolean;
+  pending_alerts: number;
+  total_alerts: number;
+}
+
+export interface SweepResult {
+  type: string;
+  workspace: string;
+  scanned_at?: string;
+  skipped?: boolean;
+  reason?: string;
+  healthy?: boolean;
+  issues_found?: boolean;
+  findings?: Array<{ source: string; issues?: string; raw?: string }>;
+  dead_branches?: string[];
+  count?: number;
+  commit_count?: number;
+  markdown?: string;
+}
+
+export interface SDKExample {
+  description: string;
+  code: string;
+}
+
+export interface SDKGuide {
+  id: string;
+  title: string;
+  description: string;
+  content?: string;
+}

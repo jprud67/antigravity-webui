@@ -37,6 +37,8 @@ const LivePreviewDrawer = lazy(() => import('./components/LivePreviewDrawer').th
 const AgentOrchestrationModal = lazy(() => import('./components/AgentOrchestrationModal').then(m => ({ default: m.AgentOrchestrationModal })));
 const CheckpointRewindModal = lazy(() => import('./components/CheckpointRewindModal').then(m => ({ default: m.CheckpointRewindModal })));
 const MultiWorkspaceCoordinatorModal = lazy(() => import('./components/MultiWorkspaceCoordinatorModal').then(m => ({ default: m.MultiWorkspaceCoordinatorModal })));
+const PluginCatalogModal = lazy(() => import('./components/PluginCatalogModal'));
+const SDKPortalModal = lazy(() => import('./components/SDKPortalModal'));
 
 import type { TokenUsageData } from './components/ContextRing';
 import type { Conversation, ChatMessage, ModelOption, BookmarkItem, MonacoStudioConfig, AppSettings, ProgressCardData, PresenceParticipant } from './types';
@@ -297,6 +299,9 @@ export function App() {
   const [presenceParticipants, setPresenceParticipants] = useState<PresenceParticipant[]>([]);
   const [isLivePreviewOpen, setIsLivePreviewOpen] = useState(false);
   const [activeProgressCard, setActiveProgressCard] = useState<ProgressCardData | null>(null);
+  // v0.5.0
+  const [isPluginCatalogOpen, setIsPluginCatalogOpen] = useState(false);
+  const [isSDKPortalOpen, setIsSDKPortalOpen] = useState(false);
 
   useEffect(() => {
     const handleOpenFile = (e: any) => {
@@ -356,6 +361,10 @@ export function App() {
     window.addEventListener('antigravity:open-checkpoint-studio', handleOpenCheckpointStudio);
     window.addEventListener('open-coordinator-studio', handleOpenCoordinator);
     window.addEventListener('antigravity:open-coordinator-studio', handleOpenCoordinator);
+    const handleOpenPluginCatalog = () => setIsPluginCatalogOpen(true);
+    const handleOpenSDKPortal = () => setIsSDKPortalOpen(true);
+    window.addEventListener('open-plugin-catalog', handleOpenPluginCatalog);
+    window.addEventListener('open-sdk-portal', handleOpenSDKPortal);
     return () => {
       window.removeEventListener('open-workspace-file', handleOpenFile);
       window.removeEventListener('terminal-run-command', handleRunTerminal);
@@ -371,6 +380,8 @@ export function App() {
       window.removeEventListener('antigravity:open-checkpoint-studio', handleOpenCheckpointStudio);
       window.removeEventListener('open-coordinator-studio', handleOpenCoordinator);
       window.removeEventListener('antigravity:open-coordinator-studio', handleOpenCoordinator);
+      window.removeEventListener('open-plugin-catalog', handleOpenPluginCatalog);
+      window.removeEventListener('open-sdk-portal', handleOpenSDKPortal);
     };
   }, []);
 
@@ -1569,6 +1580,20 @@ export function App() {
         return;
       }
 
+      // Ctrl+Alt+P — Plugin Catalog
+      if (mod && e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setIsPluginCatalogOpen((prev) => !prev);
+        return;
+      }
+
+      // Ctrl+Alt+K — SDK Developer Portal
+      if (mod && e.altKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setIsSDKPortalOpen((prev) => !prev);
+        return;
+      }
+
       // Ctrl+Shift+P — Live Preview & Inspection
       if (mod && shift && (e.key === 'P' || e.key === 'p')) {
         e.preventDefault();
@@ -2592,6 +2617,16 @@ export function App() {
           currentWorkspace={currentWorkspace}
         />
       )}
+
+      {/* v0.5.0 — Plugin Ecosystem */}
+      <PluginCatalogModal
+        isOpen={isPluginCatalogOpen}
+        onClose={() => setIsPluginCatalogOpen(false)}
+      />
+      <SDKPortalModal
+        isOpen={isSDKPortalOpen}
+        onClose={() => setIsSDKPortalOpen(false)}
+      />
       </Suspense>
 
       {/* Global Toast & Confirm Dialog containers */}
