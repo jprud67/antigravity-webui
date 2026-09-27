@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
-from app.platform_utils import is_blocked_sensitive_path
+from app.platform_utils import is_blocked_sensitive_path, is_safe_path
+from app.services.storage import get_allowed_workspace_roots
 from app.services.database_studio import (
     DatabaseConnectionInfo,
     DatabaseSchema,
@@ -26,6 +27,18 @@ from app.services.database_studio import (
 router = APIRouter(prefix="/api/database", tags=["Database Studio"], dependencies=[Depends(require_auth)])
 
 
+def _validate_safe_db_path(db_path: str) -> None:
+    if not db_path or not db_path.strip():
+        raise HTTPException(status_code=400, detail="Chemin de base de données vide.")
+    if "\x00" in db_path:
+        raise HTTPException(status_code=400, detail="Chemin de base de données invalide.")
+    if is_blocked_sensitive_path(db_path):
+        raise HTTPException(status_code=403, detail="Accès au fichier de base de données interdit.")
+    allowed_roots = get_allowed_workspace_roots()
+    if not is_safe_path(db_path, allowed_roots):
+        raise HTTPException(status_code=403, detail="Accès refusé : base de données en dehors des répertoires autorisés.")
+
+
 @router.get("/discover", response_model=list[DatabaseConnectionInfo])
 def api_discover_databases(
     workspace: str | None = Query(None, description="Workspace root directory to scan"),
@@ -34,6 +47,9 @@ def api_discover_databases(
     ws = workspace or DEFAULT_WORKSPACE
     if is_blocked_sensitive_path(ws):
         raise HTTPException(status_code=403, detail="Accès au répertoire interdit.")
+    allowed_roots = get_allowed_workspace_roots()
+    if not is_safe_path(ws, allowed_roots):
+        raise HTTPException(status_code=403, detail="Accès refusé : répertoire en dehors des répertoires autorisés.")
     return discover_databases(ws)
 
 
@@ -42,8 +58,7 @@ def api_get_database_schema(
     db_path: str = Query(..., description="Path to SQLite database file"),
 ):
     """Introspects schema (tables, views, columns) of a database."""
-    if is_blocked_sensitive_path(db_path):
-        raise HTTPException(status_code=403, detail="Accès au fichier de base de données interdit.")
+    _validate_safe_db_path(db_path)
     try:
         return inspect_database_schema(db_path)
     except PermissionError as e:
@@ -57,16 +72,14 @@ def api_get_database_schema(
 @router.post("/query", response_model=QueryResult)
 def api_execute_query(payload: QueryRequest):
     """Executes a SQL query with timeout and row bounds."""
-    if is_blocked_sensitive_path(payload.db_path):
-        raise HTTPException(status_code=403, detail="Accès au fichier de base de données interdit.")
+    _validate_safe_db_path(payload.db_path)
     return execute_query(payload.db_path, payload.query, limit=payload.limit)
 
 
 @router.post("/export")
 def api_export_query(payload: ExportRequest):
     """Executes query and streams exported CSV or JSON."""
-    if is_blocked_sensitive_path(payload.db_path):
-        raise HTTPException(status_code=403, detail="Accès au fichier de base de données interdit.")
+    _validate_safe_db_path(payload.db_path)
     try:
         clean_fmt = (payload.format or "csv").strip().lower()
         content = export_query_results(payload.db_path, payload.query, format=clean_fmt)

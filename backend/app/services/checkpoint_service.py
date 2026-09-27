@@ -19,6 +19,7 @@ from app.services.storage import (
     fork_conversation,
     get_conversation_transcript,
     is_safe_conversation_id,
+    update_conversation_after_step_change,
 )
 
 logger = logging.getLogger("antigravity.checkpoint")
@@ -332,11 +333,25 @@ def restore_checkpoint(conversation_id: str, checkpoint_id: str) -> dict[str, An
         logger.warning(f"Failed creating safety backup before restore: {e}")
 
     # Overwrite transcript files with the snapshot
+    logs_dir.mkdir(parents=True, exist_ok=True)
     transcript_path = logs_dir / "transcript.jsonl"
     transcript_full_path = logs_dir / "transcript_full.jsonl"
 
     atomic_write_jsonl(transcript_path, snapshot_transcript)
     atomic_write_jsonl(transcript_full_path, snapshot_transcript)
+
+    legacy_transcript = conv_dir / "transcript.jsonl"
+    if legacy_transcript.exists():
+        try:
+            atomic_write_jsonl(legacy_transcript, snapshot_transcript)
+        except Exception as e:
+            logger.debug(f"Failed updating legacy transcript during restore: {e}")
+
+    # Synchronize SQLite conversation summaries (step_count, preview, last_modified) and trigger SSE
+    try:
+        update_conversation_after_step_change(conversation_id, snapshot_transcript)
+    except Exception as e:
+        logger.warning(f"Failed to sync conversation summary after restore: {e}")
 
     logger.info(
         f"Conversation {conversation_id} restored to checkpoint {checkpoint_id} "

@@ -58,8 +58,8 @@ export const ShareSessionModal: React.FC<ShareSessionModalProps> = ({
 
   const loadLinks = useCallback(async () => {
     if (!conversationId) return;
-    setLoadingLinks(true);
     try {
+      setLoadingLinks(true);
       const res = await fetchShareLinks(conversationId);
       setActiveLinks(res.links || []);
     } catch (err: any) {
@@ -70,12 +70,24 @@ export const ShareSessionModal: React.FC<ShareSessionModalProps> = ({
   }, [conversationId]);
 
   useEffect(() => {
-    if (isOpen && conversationId) {
-      loadLinks();
+    if (!isOpen || !conversationId) return;
+    let isCancelled = false;
+    fetchShareLinks(conversationId)
+      .then((res) => {
+        if (!isCancelled) {
+          setActiveLinks(res.links || []);
+        }
+      })
+      .catch((err: any) => {
+        console.error('Failed to load share links:', err);
+      });
+
+    return () => {
+      isCancelled = true;
       setNewlyCreatedUrl(null);
       setCopiedLink(false);
-    }
-  }, [isOpen, conversationId, loadLinks]);
+    };
+  }, [isOpen, conversationId]);
 
   if (!isOpen) return null;
 

@@ -74,6 +74,16 @@ def ensure_fts_schema(conn: sqlite3.Connection | None = None) -> None:
                 """
             )
 
+            # 1c. Table des conversations supprimées (tombstones)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS deleted_conversations (
+                    conversation_id TEXT PRIMARY KEY,
+                    deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+
             # 2. Table virtuelle FTS5
             # Test d'abord avec le tokenizer trigram (recherche par sous-chaînes partielles et code)
             try:
@@ -349,6 +359,12 @@ class TranscriptFtsService:
         conn = _get_connection()
         try:
             clauses = ["session_transcript_fts MATCH ?"]
+            try:
+                chk = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='deleted_conversations'")
+                if chk.fetchone() is not None:
+                    clauses.append("session_id NOT IN (SELECT conversation_id FROM deleted_conversations)")
+            except Exception:
+                pass
             params: list[Any] = [q_cleaned]
 
             if role:

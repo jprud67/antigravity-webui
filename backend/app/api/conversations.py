@@ -623,16 +623,26 @@ def remove_bookmark(conversation_id: str, bookmark_id: str, _ = Depends(require_
 async def delete_all_conversations(_ = Depends(require_auth)):
     """Supprime toutes les conversations sauf la session active courante.
     Enregistre les tombstones pour empêcher la réapparition via la réconciliation CLI."""
+    from app.config import BRAIN_DIR
     from app.services.storage import get_db_connection as _get_db
 
     conn = _get_db()
     try:
         cursor = conn.cursor()
-        # Récupère tous les IDs sauf la session active
         cursor.execute("SELECT conversation_id FROM conversation_summaries")
         all_ids = [r[0] for r in cursor.fetchall()]
     finally:
         conn.close()
+
+    # Inclure également les répertoires résiduels sur disque non indexés
+    if BRAIN_DIR.exists():
+        try:
+            for child in BRAIN_DIR.iterdir():
+                if child.is_dir() and is_safe_conversation_id(child.name):
+                    if child.name not in all_ids:
+                        all_ids.append(child.name)
+        except Exception as e:
+            logger.debug(f"Brain dir scan in delete_all_conversations error: {e}")
 
     if all_ids:
         await asyncio.to_thread(bulk_delete_conversations, all_ids)
@@ -648,20 +658,15 @@ async def delete_all_conversations(_ = Depends(require_auth)):
 
 
 @router.post("/{conversation_id}/restore")
-async def restore_conversation(conversation_id: str, _ = Depends(require_auth)):
+async def restore_conversation_endpoint(conversation_id: str, _ = Depends(require_auth)):
     """Retire une conversation de la liste des tombstones (la rend à nouveau visible si le CLI la réinjecte)."""
     if not is_safe_conversation_id(conversation_id):
         raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
 
-    from app.services.storage import get_db_connection as _get_db
-    conn = _get_db()
-    try:
-        conn.execute("DELETE FROM deleted_conversations WHERE conversation_id = ?", (conversation_id,))
-        conn.commit()
-    finally:
-        conn.close()
+    from app.services.storage import restore_conversation as _restore_conv
+    success = _restore_conv(conversation_id)
 
-    return {"success": True, "conversation_id": conversation_id, "restored": True}
+    return {"success": success, "conversation_id": conversation_id, "restored": success}
 
 
 

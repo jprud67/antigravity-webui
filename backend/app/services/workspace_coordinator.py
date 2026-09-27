@@ -113,6 +113,15 @@ def _get_semaphore() -> asyncio.Semaphore:
 
 _active_tasks: dict[str, asyncio.Task] = {}
 _run_history: dict[str, PipelineExecutionRun] = {}
+MAX_RUN_HISTORY = 100
+
+
+def _record_run(run_obj: PipelineExecutionRun) -> None:
+    _run_history[run_obj.run_id] = run_obj
+    if len(_run_history) > MAX_RUN_HISTORY:
+        excess = len(_run_history) - MAX_RUN_HISTORY
+        for k in list(_run_history.keys())[:excess]:
+            _run_history.pop(k, None)
 
 
 # ============================================================================
@@ -539,7 +548,7 @@ async def execute_pipeline_run(
         steps=run_steps,
         started_at=started_at
     )
-    _run_history[run_id] = run_obj
+    _record_run(run_obj)
 
     async def _runner_coroutine():
         async with _get_semaphore():
@@ -553,122 +562,131 @@ async def execute_pipeline_run(
                 pass
             run_log_file = logs_dir / f"pipeline_{run_id}.log"
 
-            async with aiofiles.open(run_log_file, "a", encoding="utf-8") as log_file:
-                await log_file.write(f"=== PIPELINE RUN: {target_pipeline.name} ({run_id}) ===\n")
-                await log_file.write(f"Workspace: {resolved_path}\nStarted: {time.ctime(started_at)}\n\n")
+            try:
+                async with aiofiles.open(run_log_file, "a", encoding="utf-8") as log_file:
+                    await log_file.write(f"=== PIPELINE RUN: {target_pipeline.name} ({run_id}) ===\n")
+                    await log_file.write(f"Workspace: {resolved_path}\nStarted: {time.ctime(started_at)}\n\n")
 
-                for idx, step in enumerate(run_obj.steps):
-                    run_obj.current_step_index = idx
-                    step.status = "running"
-                    step_start = time.time()
-                    step.started_at = step_start
-
-                    if on_step_update:
-                        await on_step_update({
-                            "event": "step_started",
-                            "run_id": run_id,
-                            "workspace_path": str(resolved_path),
-                            "pipeline_id": pipeline_id,
-                            "step_id": step.id,
-                            "status": "running"
-                        })
-
-                    # Execute command safely via shell with process group isolation
-                    process = None
-                    try:
-                        process = await asyncio.create_subprocess_shell(
-                            step.command,
-                            cwd=step.cwd,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                            **spawn_group_kwargs()
-                        )
-
-                        stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                            process.communicate(),
-                            timeout=120.0
-                        )
-
-                        step_end = time.time()
-                        step_duration = (step_end - step_start) * 1000.0
-                        total_duration += step_duration
-                        step.finished_at = step_end
-                        step.duration_ms = step_duration
-                        step.exit_code = process.returncode
-
-                        stdout_str = stdout_bytes.decode("utf-8", errors="replace")
-                        stderr_str = stderr_bytes.decode("utf-8", errors="replace")
-                        combined_output = (stdout_str + ("\n" + stderr_str if stderr_str else "")).strip()
-
-                        # Keep memory output preview limited to last 20,000 chars
-                        step.output_preview = combined_output[-20000:]
-                        await log_file.write(f"--- STEP: {step.name} ({step.command}) ---\n")
-                        await log_file.write(combined_output + "\n\n")
-                        await log_file.flush()
-
-                        if process.returncode == 0:
-                            step.status = "success"
-                        else:
-                            step.status = "failed"
-                            overall_success = False
+                    for idx, step in enumerate(run_obj.steps):
+                        run_obj.current_step_index = idx
+                        step.status = "running"
+                        step_start = time.time()
+                        step.started_at = step_start
 
                         if on_step_update:
                             await on_step_update({
-                                "event": "step_finished",
+                                "event": "step_started",
                                 "run_id": run_id,
                                 "workspace_path": str(resolved_path),
                                 "pipeline_id": pipeline_id,
                                 "step_id": step.id,
-                                "status": step.status,
-                                "duration_ms": step_duration,
-                                "exit_code": step.exit_code,
-                                "output_preview": step.output_preview
+                                "status": "running"
                             })
 
-                        if not overall_success:
-                            # Skip subsequent steps
-                            for rem_step in run_obj.steps[idx + 1:]:
-                                rem_step.status = "skipped"
+                        # Execute command safely via shell with process group isolation
+                        process = None
+                        try:
+                            process = await asyncio.create_subprocess_shell(
+                                step.command,
+                                cwd=step.cwd,
+                                stdout=asyncio.subprocess.PIPE,
+                                stderr=asyncio.subprocess.PIPE,
+                                **spawn_group_kwargs()
+                            )
+
+                            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                                process.communicate(),
+                                timeout=120.0
+                            )
+
+                            step_end = time.time()
+                            step_duration = (step_end - step_start) * 1000.0
+                            total_duration += step_duration
+                            step.finished_at = step_end
+                            step.duration_ms = step_duration
+                            step.exit_code = process.returncode
+
+                            stdout_str = stdout_bytes.decode("utf-8", errors="replace")
+                            stderr_str = stderr_bytes.decode("utf-8", errors="replace")
+                            combined_output = (stdout_str + ("\n" + stderr_str if stderr_str else "")).strip()
+
+                            # Keep memory output preview limited to last 20,000 chars
+                            step.output_preview = combined_output[-20000:]
+                            await log_file.write(f"--- STEP: {step.name} ({step.command}) ---\n")
+                            await log_file.write(combined_output + "\n\n")
+                            await log_file.flush()
+
+                            if process.returncode == 0:
+                                step.status = "success"
+                            else:
+                                step.status = "failed"
+                                overall_success = False
+
+                            if on_step_update:
+                                await on_step_update({
+                                    "event": "step_finished",
+                                    "run_id": run_id,
+                                    "workspace_path": str(resolved_path),
+                                    "pipeline_id": pipeline_id,
+                                    "step_id": step.id,
+                                    "status": step.status,
+                                    "duration_ms": step_duration,
+                                    "exit_code": step.exit_code,
+                                    "output_preview": step.output_preview
+                                })
+
+                            if not overall_success:
+                                # Skip subsequent steps
+                                for rem_step in run_obj.steps[idx + 1:]:
+                                    rem_step.status = "skipped"
+                                break
+
+                        except asyncio.TimeoutError:
+                            if process and process.returncode is None:
+                                try:
+                                    await terminate_process_group_async(process, grace=0.5)
+                                except Exception as te:
+                                    logger.debug(f"Error terminating child process on timeout: {te}")
+                            step_end = time.time()
+                            step_duration = (step_end - step_start) * 1000.0
+                            total_duration += step_duration
+                            step.status = "failed"
+                            step.exit_code = 124
+                            step.output_preview = "Erreur : délai d'exécution dépassé (120 secondes)."
+                            overall_success = False
                             break
+                        except asyncio.CancelledError:
+                            if process and process.returncode is None:
+                                try:
+                                    await terminate_process_group_async(process, grace=0.5)
+                                except Exception as te:
+                                    logger.debug(f"Error terminating child process on cancel: {te}")
+                            step.status = "failed"
+                            step.output_preview = "Exécution annulée par l'utilisateur."
+                            run_obj.status = "cancelled"
+                            raise
+            except asyncio.CancelledError:
+                run_obj.status = "cancelled"
+                raise
+            finally:
+                if run_obj.finished_at is None:
+                    run_obj.finished_at = time.time()
+                run_obj.total_duration_ms = total_duration
+                if run_obj.status != "cancelled":
+                    run_obj.status = "success" if overall_success else "failed"
 
-                    except asyncio.TimeoutError:
-                        if process and process.returncode is None:
-                            try:
-                                await terminate_process_group_async(process, grace=0.5)
-                            except Exception as te:
-                                logger.debug(f"Error terminating child process on timeout: {te}")
-                        step_end = time.time()
-                        step_duration = (step_end - step_start) * 1000.0
-                        total_duration += step_duration
-                        step.status = "failed"
-                        step.exit_code = 124
-                        step.output_preview = "Erreur : délai d'exécution dépassé (120 secondes)."
-                        overall_success = False
-                        break
-                    except asyncio.CancelledError:
-                        if process and process.returncode is None:
-                            try:
-                                await terminate_process_group_async(process, grace=0.5)
-                            except Exception as te:
-                                logger.debug(f"Error terminating child process on cancel: {te}")
-                        step.status = "failed"
-                        step.output_preview = "Exécution annulée par l'utilisateur."
-                        run_obj.status = "cancelled"
-                        raise
-
-            run_obj.finished_at = time.time()
-            run_obj.total_duration_ms = total_duration
-            run_obj.status = "success" if overall_success else "failed"
-
-            if on_step_update:
-                await on_step_update({
-                    "event": "pipeline_finished",
-                    "run_id": run_id,
-                    "workspace_path": str(resolved_path),
-                    "pipeline_id": pipeline_id,
-                    "status": run_obj.status,
-                    "total_duration_ms": total_duration
-                })
+                if on_step_update:
+                    try:
+                        await on_step_update({
+                            "event": "pipeline_finished",
+                            "run_id": run_id,
+                            "workspace_path": str(resolved_path),
+                            "pipeline_id": pipeline_id,
+                            "status": run_obj.status,
+                            "total_duration_ms": total_duration
+                        })
+                    except Exception as notif_err:
+                        logger.debug(f"Notification error in pipeline_finished: {notif_err}")
 
     task = asyncio.create_task(_runner_coroutine())
     _active_tasks[run_id] = task
@@ -762,8 +780,23 @@ def build_remediation_context(
 async def execute_batch_action(action: str, workspace_paths: list[str]) -> dict[str, Any]:
     """Execute batch operations across target workspaces."""
     settings = get_settings()
-    all_trusted = settings.get("trustedWorkspaces", [])
-    targets = [p for p in workspace_paths if p in all_trusted] if workspace_paths else all_trusted
+    trusted_raw = settings.get("trustedWorkspaces", [])
+    all_trusted = list(trusted_raw) if isinstance(trusted_raw, list) else []
+    default_ws = settings.get("defaultWorkspace", DEFAULT_WORKSPACE)
+    if default_ws and default_ws not in all_trusted:
+        all_trusted.insert(0, default_ws)
+
+    def _norm(p: str) -> str:
+        try:
+            return str(Path(p).resolve()).lower()
+        except Exception:
+            return str(p).strip().lower()
+
+    trusted_norm = {_norm(w) for w in all_trusted}
+    if workspace_paths:
+        targets = [p for p in workspace_paths if _norm(p) in trusted_norm]
+    else:
+        targets = all_trusted
 
     results = []
     git_bin = shutil.which("git") or "git"

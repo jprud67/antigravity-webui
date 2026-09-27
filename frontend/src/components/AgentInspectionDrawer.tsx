@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Send, 
@@ -40,26 +40,25 @@ export const AgentInspectionDrawer: React.FC<AgentInspectionDrawerProps> = ({
   const [sendingSteer, setSendingSteer] = useState(false);
   const [terminating, setTerminating] = useState(false);
 
-  // Load inspection details
-  const loadDetails = useCallback(async (nodeId: string) => {
-    setLoading(true);
-    try {
-      const data = await fetchAgentInspectionDetails(nodeId, conversationId);
-      setDetails(data);
-    } catch {
-      // Non-blocking fallback to node props
-    } finally {
-      setLoading(false);
-    }
-  }, [conversationId]);
-
   useEffect(() => {
-    if (agentNode) {
-      loadDetails(agentNode.id);
-    } else {
+    if (!agentNode) return;
+    let isCancelled = false;
+    fetchAgentInspectionDetails(agentNode.id, conversationId)
+      .then((data) => {
+        if (!isCancelled) {
+          setDetails(data);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) setLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
       setDetails(null);
-    }
-  }, [agentNode, loadDetails]);
+    };
+  }, [agentNode, conversationId]);
 
   if (!agentNode) return null;
 

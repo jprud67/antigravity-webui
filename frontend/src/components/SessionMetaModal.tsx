@@ -87,7 +87,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
     try {
       const parsedTags = tagsStr
         .split(',')
-        .map((t) => t.trim().replace(/^#/, ''))
+        .map((tag) => tag.trim().replace(/^#/, ''))
         .filter(Boolean);
 
       await updateConversationMetadata(conversation.conversation_id, {

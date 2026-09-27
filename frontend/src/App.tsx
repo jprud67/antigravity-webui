@@ -194,11 +194,13 @@ export function App() {
   // Stable refs — used in effects with empty deps to avoid stale closures
   const activeConversationIdRef = React.useRef<string | null>(null);
   const isStreamingRef = React.useRef<boolean>(false);
+  const tRef = React.useRef(t);
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
     isStreamingRef.current = isStreaming;
-  }, [activeConversationId, isStreaming]);
+    tRef.current = t;
+  }, [activeConversationId, isStreaming, t]);
 
 
   // Telemetry, Queue & Approval States (Phase 2)
@@ -255,6 +257,44 @@ export function App() {
   const [workspaceSearchMode, setWorkspaceSearchMode] = useState<'find' | 'replace'>('find');
   const [isDatabaseStudioOpen, setIsDatabaseStudioOpen] = useState(false);
   const [databaseStudioInitialQuery, setDatabaseStudioInitialQuery] = useState<string | undefined>(undefined);
+
+  // Authentication & Modals State
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isWorkspacesOpen, setIsWorkspacesOpen] = useState(false);
+  const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(false);
+  const [isTaskDashboardOpen, setIsTaskDashboardOpen] = useState(false);
+  const [isCronModalOpen, setIsCronModalOpen] = useState(false);
+  const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isContextCompactorOpen, setIsContextCompactorOpen] = useState(false);
+  const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+  const [isMonacoStudioOpen, setIsMonacoStudioOpen] = useState(false);
+  const [monacoStudioConfig, setMonacoStudioConfig] = useState<MonacoStudioConfig>({ mode: 'editor' });
+  const [isFtsSearchOpen, setIsFtsSearchOpen] = useState(false);
+  const [isMcpCatalogOpen, setIsMcpCatalogOpen] = useState(false);
+  const [isDoctorOpen, setIsDoctorOpen] = useState(false);
+  const [isRemoteAccessOpen, setIsRemoteAccessOpen] = useState(false);
+  const [isGatewayOpen, setIsGatewayOpen] = useState(false);
+  const [isWorktreeOpen, setIsWorktreeOpen] = useState(false);
+  const [isCanvasStudioOpen, setIsCanvasStudioOpen] = useState(false);
+  const [isVectorMemoryOpen, setIsVectorMemoryOpen] = useState(false);
+  const [isDockerStudioOpen, setIsDockerStudioOpen] = useState(false);
+  const [isOrchestratorOpen, setIsOrchestratorOpen] = useState(false);
+  const [isCheckpointModalOpen, setIsCheckpointModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [activeShareToken, setActiveShareToken] = useState<string | null>(null);
+  const [activePinCode, setActivePinCode] = useState<string | null>(null);
+  const [isSharedSession, setIsSharedSession] = useState(false);
+  const [sharePermission, setSharePermission] = useState<'read' | 'write' | null>(null);
+  const [presenceCount, setPresenceCount] = useState<number>(1);
+  const [presenceParticipants, setPresenceParticipants] = useState<PresenceParticipant[]>([]);
+  const [isLivePreviewOpen, setIsLivePreviewOpen] = useState(false);
+  const [activeProgressCard, setActiveProgressCard] = useState<ProgressCardData | null>(null);
 
   useEffect(() => {
     const handleOpenFile = (e: any) => {
@@ -324,44 +364,6 @@ export function App() {
       window.removeEventListener('antigravity:open-checkpoint-studio', handleOpenCheckpointStudio);
     };
   }, []);
-
-  // Authentication & Modals State
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isWorkspacesOpen, setIsWorkspacesOpen] = useState(false);
-  const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(false);
-  const [isTaskDashboardOpen, setIsTaskDashboardOpen] = useState(false);
-  const [isCronModalOpen, setIsCronModalOpen] = useState(false);
-  const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
-  const [isContextCompactorOpen, setIsContextCompactorOpen] = useState(false);
-  const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
-  const [isMonacoStudioOpen, setIsMonacoStudioOpen] = useState(false);
-  const [monacoStudioConfig, setMonacoStudioConfig] = useState<MonacoStudioConfig>({ mode: 'editor' });
-  const [isFtsSearchOpen, setIsFtsSearchOpen] = useState(false);
-  const [isMcpCatalogOpen, setIsMcpCatalogOpen] = useState(false);
-  const [isDoctorOpen, setIsDoctorOpen] = useState(false);
-  const [isRemoteAccessOpen, setIsRemoteAccessOpen] = useState(false);
-  const [isGatewayOpen, setIsGatewayOpen] = useState(false);
-  const [isWorktreeOpen, setIsWorktreeOpen] = useState(false);
-  const [isCanvasStudioOpen, setIsCanvasStudioOpen] = useState(false);
-  const [isVectorMemoryOpen, setIsVectorMemoryOpen] = useState(false);
-  const [isDockerStudioOpen, setIsDockerStudioOpen] = useState(false);
-  const [isOrchestratorOpen, setIsOrchestratorOpen] = useState(false);
-  const [isCheckpointModalOpen, setIsCheckpointModalOpen] = useState(false);
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [activeShareToken, setActiveShareToken] = useState<string | null>(null);
-  const [activePinCode, setActivePinCode] = useState<string | null>(null);
-  const [isSharedSession, setIsSharedSession] = useState(false);
-  const [sharePermission, setSharePermission] = useState<'read' | 'write' | null>(null);
-  const [presenceCount, setPresenceCount] = useState<number>(1);
-  const [presenceParticipants, setPresenceParticipants] = useState<PresenceParticipant[]>([]);
-  const [isLivePreviewOpen, setIsLivePreviewOpen] = useState(false);
-  const [activeProgressCard, setActiveProgressCard] = useState<ProgressCardData | null>(null);
 
   // Global FTS search shortcut (Ctrl+Shift+K or Cmd+Shift+K)
   useEffect(() => {
@@ -1311,11 +1313,11 @@ export function App() {
           setPresenceParticipants(event.participants);
         }
       } else if (event.event === 'share_revoked') {
-        showToast(t('share_access_revoked') || 'Accès à la session révoqué', 'error');
+        showToast(tRef.current('share_access_revoked') || 'Accès à la session révoqué', 'error');
         setIsSharedSession(false);
         setSharePermission(null);
       } else if (event.event === 'forbidden') {
-        showToast(event.message || t('share_prompt_disabled_spectator') || 'Action interdite en mode spectateur', 'warning');
+        showToast(event.message || tRef.current('share_prompt_disabled_spectator') || 'Action interdite en mode spectateur', 'warning');
       }
     });
 

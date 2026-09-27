@@ -16,7 +16,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from app.config import BRAIN_DIR, CONVERSATION_DB, DEFAULT_WORKSPACE, SETTINGS_FILE
+from app.config import (
+    BRAIN_DIR,
+    CONVERSATION_DB,
+    DEFAULT_WORKSPACE,
+    GEMINI_DIR,
+    REPO_ROOT,
+    SETTINGS_FILE,
+)
 from app.platform_utils import (
     is_blocked_sensitive_path,
     is_safe_path,
@@ -100,12 +107,22 @@ def get_db_connection() -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA busy_timeout=5000")
-    # Double-checked locking: cheap read without lock, then initialize if needed under lock
     db_path_str = str(CONVERSATION_DB)
+    needs_schema = False
     if not _schema_initialized or db_path_str not in _initialized_db_paths:
+        needs_schema = True
+    else:
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='conversation_summaries'")
+            if cur.fetchone() is None:
+                needs_schema = True
+        except Exception:
+            needs_schema = True
+
+    if needs_schema:
         with _schema_lock:
-            if not _schema_initialized or db_path_str not in _initialized_db_paths:
-                ensure_db_schema(conn)
+            ensure_db_schema(conn)
     return conn
 
 
@@ -273,6 +290,46 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None, force: bool = False
         finally:
             if close_after:
                 conn.close()
+
+
+def is_conversation_tombstoned(conversation_id: str, conn: Any = None) -> bool:
+    """Vérifie si une conversation est marquée comme supprimée (tombstone)."""
+    if not is_safe_conversation_id(conversation_id):
+        return True
+    if not CONVERSATION_DB.exists():
+        return False
+    close_after = False
+    if conn is None:
+        conn = get_db_connection()
+        close_after = True
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM deleted_conversations WHERE conversation_id = ? LIMIT 1", (conversation_id,))
+        return cursor.fetchone() is not None
+    except Exception:
+        return False
+    finally:
+        if close_after:
+            conn.close()
+
+
+def restore_conversation(conversation_id: str) -> bool:
+    """Retire une conversation de la table des tombstones."""
+    if not is_safe_conversation_id(conversation_id) or not CONVERSATION_DB.exists():
+        return False
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM deleted_conversations WHERE conversation_id = ?", (conversation_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.warning(f"Error restoring conversation {conversation_id}: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
 
 _ALLOWED_CONVERSATION_SUMMARY_COLUMNS: frozenset[str] = frozenset({
     "conversation_id",
@@ -446,7 +503,7 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
         all_meta = get_all_session_metadata()
 
         # Guarantee all pinned conversations are fetched even if older than limit * 2
-        pinned_ids = [cid for cid, m in all_meta.items() if m.get("pinned") and is_safe_conversation_id(cid)]
+        pinned_ids = [cid for cid, m in all_meta.items() if m.get("pinned") and is_safe_conversation_id(cid) and cid not in deleted_ids]
         fetched_ids = {r["conversation_id"] for r in rows}
         missing_pinned = [cid for cid in pinned_ids if cid not in fetched_ids]
         if missing_pinned:
@@ -456,7 +513,7 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
                 chunk = missing_pinned[i : i + chunk_size]
                 placeholders = ",".join("?" * len(chunk))
                 query_sql = (
-                    f"SELECT conversation_id, title, preview, step_count, last_modified_time, workspace_uris, status, agent_name, parent_conversation_id, project_id, group_id FROM conversation_summaries WHERE conversation_id IN ({placeholders})"  # nosec B608
+                    f"SELECT conversation_id, title, preview, step_count, last_modified_time, workspace_uris, status, agent_name, parent_conversation_id, project_id, group_id FROM conversation_summaries WHERE conversation_id IN ({placeholders}) AND conversation_id NOT IN (SELECT conversation_id FROM deleted_conversations)"  # nosec B608
                 )
                 cursor.execute(query_sql, tuple(chunk))
                 rows.extend(cursor.fetchall())
@@ -464,6 +521,8 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
         result = []
         for r in rows:
             cid = r["conversation_id"]
+            if cid in deleted_ids:
+                continue
             meta = all_meta.get(cid, {})
             result.append(_build_conversation_dict(r, meta))
 
@@ -475,7 +534,7 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
         conn.close()
 
 def get_conversation_by_id(conversation_id: str, conn: Any = None) -> dict[str, Any] | None:
-    if not CONVERSATION_DB.exists():
+    if not CONVERSATION_DB.exists() or not is_safe_conversation_id(conversation_id):
         return None
     ensure_db_schema(conn)
     should_close = False
@@ -484,6 +543,9 @@ def get_conversation_by_id(conversation_id: str, conn: Any = None) -> dict[str, 
         should_close = True
     try:
         cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM deleted_conversations WHERE conversation_id = ? LIMIT 1", (conversation_id,))
+        if cursor.fetchone():
+            return None
         cursor.execute(
             """
             SELECT 
@@ -517,7 +579,7 @@ def get_conversation_by_id(conversation_id: str, conn: Any = None) -> dict[str, 
 
 
 def get_conversation_transcript(conversation_id: str) -> list[dict[str, Any]]:
-    if not is_safe_conversation_id(conversation_id):
+    if not is_safe_conversation_id(conversation_id) or is_conversation_tombstoned(conversation_id):
         return []
     conv_dir = BRAIN_DIR / conversation_id
     transcript_file = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
@@ -1725,6 +1787,16 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
             "INSERT OR REPLACE INTO deleted_conversations (conversation_id, deleted_at) VALUES (?, CURRENT_TIMESTAMP)",
             [(cid,) for cid in safe_ids]
         )
+        # Nettoyage en cascade FTS et partages associés
+        for table in ("session_fts_index_state", "session_fts_indexed_messages", "shared_sessions"):
+            try:
+                cursor.executemany(f"DELETE FROM {table} WHERE conversation_id = ?", [(cid,) for cid in safe_ids])
+            except Exception:
+                pass
+        try:
+            cursor.executemany("DELETE FROM session_transcript_fts WHERE session_id = ?", [(cid,) for cid in safe_ids])
+        except Exception:
+            pass
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1758,6 +1830,16 @@ def delete_conversation(conversation_id: str) -> bool:
             "INSERT OR REPLACE INTO deleted_conversations (conversation_id, deleted_at) VALUES (?, CURRENT_TIMESTAMP)",
             (conversation_id,)
         )
+        # Nettoyage en cascade FTS et partages associés
+        for table in ("session_fts_index_state", "session_fts_indexed_messages", "shared_sessions"):
+            try:
+                cursor.execute(f"DELETE FROM {table} WHERE conversation_id = ?", (conversation_id,))
+            except Exception:
+                pass
+        try:
+            cursor.execute("DELETE FROM session_transcript_fts WHERE session_id = ?", (conversation_id,))
+        except Exception:
+            pass
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1844,6 +1926,64 @@ def update_conversation_summary_fields(
         logger.debug(f"Could not sync summary fields to session_metadata: {e}")
     _notify_conversations_changed()
     return True
+
+
+def update_conversation_after_step_change(
+    conversation_id: str,
+    steps: list[dict[str, Any]],
+) -> None:
+    """Updates SQLite conversation_summaries (step_count, preview, last_modified_time, last_user_input)
+    and dispatches SSE notifications for transcript and conversation list."""
+    if not is_safe_conversation_id(conversation_id):
+        return
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
+        last_step = steps[-1] if steps else {}
+        raw_prev = last_step.get("content") or last_step.get("thinking") or ""
+        if last_step.get("source") == "USER_EXPLICIT" or last_step.get("type") == "USER_INPUT":
+            new_preview = clean_user_prompt(raw_prev)[:150]
+        else:
+            new_preview = str(raw_prev)[:150]
+
+        new_last_user_idx = -1
+        new_last_user_time = None
+        for i in range(len(steps) - 1, -1, -1):
+            s = steps[i]
+            if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
+                try:
+                    new_last_user_idx = int(s.get("step_index", i))
+                except (ValueError, TypeError):
+                    new_last_user_idx = i
+                new_last_user_time = s.get("created_at") or s.get("timestamp")
+                break
+
+        if new_last_user_idx != -1:
+            effective_user_time = new_last_user_time or now_str
+        else:
+            meta = get_session_meta(conversation_id)
+            effective_user_time = (meta.get("createdAt") if isinstance(meta, dict) else None) or now_str
+
+        cursor.execute(
+            """
+            UPDATE conversation_summaries
+            SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = ?
+            WHERE conversation_id = ?
+            """,
+            (len(steps), new_preview, now_str, new_last_user_idx, effective_user_time, conversation_id),
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.warning(f"Failed updating conversation summary for {conversation_id}: {e}")
+    finally:
+        conn.close()
+
+    _notify_transcript_changed(conversation_id)
+    _notify_conversations_changed()
+
 
 def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
     if not is_safe_conversation_id(conversation_id):
@@ -1933,53 +2073,10 @@ def undo_conversation_turn(conversation_id: str) -> dict[str, Any]:
         atomic_write_jsonl(transcript_full_file, remaining_full_steps)
 
 
-    # Update summary in SQLite database
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
-        last_step = remaining_steps[-1] if remaining_steps else {}
-        raw_prev = last_step.get("content") or last_step.get("thinking") or ""
-        if last_step.get("source") == "USER_EXPLICIT" or last_step.get("type") == "USER_INPUT":
-            new_preview = clean_user_prompt(raw_prev)[:150]
-        else:
-            new_preview = str(raw_prev)[:150]
-
-        new_last_user_idx = -1
-        new_last_user_time = None
-        for i in range(len(remaining_steps) - 1, -1, -1):
-            s = remaining_steps[i]
-            if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
-                try:
-                    new_last_user_idx = int(s.get("step_index", i))
-                except (ValueError, TypeError):
-                    new_last_user_idx = i
-                new_last_user_time = s.get("created_at") or s.get("timestamp")
-                break
-
-        if new_last_user_idx != -1:
-            effective_user_time = new_last_user_time or now_str
-        else:
-            meta = get_session_meta(conversation_id)
-            effective_user_time = (meta.get("createdAt") if isinstance(meta, dict) else None) or now_str
-        cursor.execute(
-            """
-            UPDATE conversation_summaries
-            SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = ?
-            WHERE conversation_id = ?
-            """,
-            (len(remaining_steps), new_preview, now_str, new_last_user_idx, effective_user_time, conversation_id)
-        )
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    # Update summary in SQLite database and notify listeners
+    update_conversation_after_step_change(conversation_id, remaining_steps)
 
     usage = calculate_conversation_tokens(remaining_steps)
-    _notify_transcript_changed(conversation_id)
-    _notify_conversations_changed()
 
     return {
         "conversation_id": conversation_id,
@@ -2011,6 +2108,13 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        # Récupère tous les tombstones pour garantir l'exclusion à tous les niveaux
+        try:
+            cursor.execute("SELECT conversation_id FROM deleted_conversations")
+            deleted_ids = {r[0] for r in cursor.fetchall()}
+        except Exception:
+            deleted_ids = set()
+
         escaped_query = q_clean.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         cursor.execute(
             """
@@ -2036,6 +2140,8 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
         )
         for r in cursor.fetchall():
             cid = r["conversation_id"]
+            if cid in deleted_ids:
+                continue
             meta = all_meta.get(cid, {})
             c = _build_conversation_dict(r, meta)
             c["match_type"] = "metadata"
@@ -2047,7 +2153,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
         if len(matched) < limit:
             metadata_cids = []
             for cid, meta in all_meta.items():
-                if cid in seen_ids or not is_safe_conversation_id(cid):
+                if cid in seen_ids or cid in deleted_ids or not is_safe_conversation_id(cid):
                     continue
                 custom_title = (meta.get("customTitle") or "").lower()
                 project = (meta.get("project") or "").lower()
@@ -2083,11 +2189,14 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                             group_id
                         FROM conversation_summaries
                         WHERE conversation_id IN ({placeholders})
+                          AND conversation_id NOT IN (SELECT conversation_id FROM deleted_conversations)
                         """,  # nosec B608
                         tuple(chunk),
                     )
                     for r in cursor.fetchall():
                         cid = r["conversation_id"]
+                        if cid in deleted_ids:
+                            continue
                         meta = all_meta.get(cid, {})
                         c_item = _build_conversation_dict(r, meta)
                         c_item["match_type"] = "metadata"
@@ -2098,7 +2207,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                             break
                     if len(matched) < limit:
                         for cid in chunk:
-                            if cid not in seen_ids:
+                            if cid not in seen_ids and cid not in deleted_ids:
                                 meta = all_meta.get(cid, {})
                                 conv = get_conversation_by_id(cid, conn=conn)
                                 if conv:
@@ -2116,10 +2225,10 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
 
     # 3. Deep transcript scan for content if room left (scans recent active sessions)
     if len(matched) < limit:
-        recent_convs = list_conversations(limit=30)
+        recent_convs = [c for c in list_conversations(limit=30) if c.get("conversation_id") not in deleted_ids]
         for c in recent_convs:
             cid = c["conversation_id"]
-            if cid in seen_ids:
+            if cid in seen_ids or cid in deleted_ids:
                 continue
 
             conv_dir = BRAIN_DIR / cid
@@ -3197,6 +3306,36 @@ def save_settings(new_settings: dict[str, Any]) -> dict[str, Any]:
             raise
         return copy.deepcopy(current)
 
+
+def get_allowed_workspace_roots() -> list[Path]:
+    """Returns the list of allowed workspace root paths based on settings and system config."""
+    settings = get_settings()
+    workspaces = settings.get("trustedWorkspaces", [])
+    allowed_roots: list[Path] = [
+        Path(DEFAULT_WORKSPACE).resolve(),
+        Path(GEMINI_DIR).resolve(),
+        REPO_ROOT.resolve(),
+    ]
+    if settings.get("defaultWorkspace"):
+        try:
+            allowed_roots.append(Path(settings["defaultWorkspace"]).resolve())
+        except Exception:
+            pass
+
+    for ws in workspaces:
+        try:
+            allowed_roots.append(Path(ws).resolve())
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
+
+    import tempfile
+    try:
+        allowed_roots.append(Path(tempfile.gettempdir()).resolve())
+    except Exception:
+        pass
+
+    return allowed_roots
+
 def _import_single_conversation(payload: dict[str, Any], now_iso: str, now_db: str, conn: sqlite3.Connection | None = None) -> dict[str, Any]:
     new_id = str(uuid.uuid4())
     title = payload.get("title") or "Conversation importée"
@@ -3496,6 +3635,7 @@ def get_conversation_branch_tree(conversation_id: str) -> dict[str, Any]:
             """
             SELECT conversation_id, title, preview, step_count, last_modified_time, parent_conversation_id, project_id, group_id
             FROM conversation_summaries
+            WHERE conversation_id NOT IN (SELECT conversation_id FROM deleted_conversations)
             """
         )
         all_rows = cursor.fetchall()

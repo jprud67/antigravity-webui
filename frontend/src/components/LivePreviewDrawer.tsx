@@ -66,7 +66,6 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
     if (!isOpen) return;
 
     let isMounted = true;
-    setLoadingFiles(true);
 
     // Fetch git status to get modified files in workspace
     fetchGitStatus(currentWorkspace)
@@ -116,29 +115,26 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
 
   // Load file content when selectedFile changes
   useEffect(() => {
-    if (!selectedFile) {
-      setFileContent('');
-      return;
-    }
+    if (!selectedFile) return;
+
     let isMounted = true;
-    setLoadingContent(true);
     fetchFileContent(selectedFile, currentWorkspace)
       .then((res) => {
         if (isMounted) {
           setFileContent(res.content || '');
+          setLoadingContent(false);
         }
       })
       .catch((err) => {
         if (isMounted) {
           setFileContent(`// Error reading file: ${err.message}`);
+          setLoadingContent(false);
         }
-      })
-      .finally(() => {
-        if (isMounted) setLoadingContent(false);
       });
 
     return () => {
       isMounted = false;
+      setFileContent('');
     };
   }, [selectedFile, currentWorkspace]);
 

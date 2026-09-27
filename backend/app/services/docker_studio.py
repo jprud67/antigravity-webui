@@ -23,7 +23,8 @@ except ImportError:
     yaml = None  # type: ignore[assignment]
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-from app.platform_utils import is_blocked_sensitive_path
+from app.platform_utils import is_blocked_sensitive_path, is_safe_path
+from app.services.storage import get_allowed_workspace_roots
 
 logger = logging.getLogger("antigravity.docker_studio")
 
@@ -189,7 +190,8 @@ def get_docker_status() -> DockerEngineStatus:
 def scan_workspace_docker_files(workspace_dir: str) -> list[WorkspaceDockerItem]:
     """Scans workspace directory recursively (max depth 3) for Dockerfile and compose files."""
     root = Path(workspace_dir).resolve()
-    if is_blocked_sensitive_path(root) or not root.exists() or not root.is_dir():
+    allowed_roots = get_allowed_workspace_roots()
+    if is_blocked_sensitive_path(root) or not is_safe_path(root, allowed_roots) or not root.exists() or not root.is_dir():
         return []
 
     items: list[WorkspaceDockerItem] = []
@@ -475,6 +477,10 @@ def execute_compose_action(compose_file_path: str, action: str) -> dict[str, Any
     comp_path = Path(compose_file_path).resolve()
     if is_blocked_sensitive_path(comp_path):
         raise PermissionError(f"Accès refusé au fichier sensible : {compose_file_path}")
+
+    allowed_roots = get_allowed_workspace_roots()
+    if not is_safe_path(comp_path, allowed_roots):
+        raise PermissionError(f"Accès refusé : fichier compose en dehors des répertoires autorisés : {compose_file_path}")
 
     if comp_path.suffix.lower() not in (".yml", ".yaml"):
         raise ValueError("Le fichier compose doit être un fichier .yml ou .yaml")

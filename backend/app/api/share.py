@@ -116,6 +116,16 @@ def verify_share_link(share_token: str):
         }
 
     conv_id = info["conversation_id"]
+    from app.services.storage import is_conversation_tombstoned
+    if is_conversation_tombstoned(conv_id):
+        return {
+            "valid": False,
+            "reason": "deleted",
+            "token": clean_token,
+            "is_deleted": True,
+            "conversation_id": conv_id,
+        }
+
     try:
         meta = get_conversation_by_id(conv_id) or get_session_meta(conv_id) or {}
     except Exception:
@@ -185,8 +195,9 @@ def get_shared_transcript(share_token: str, pin_code: str | None = Query(default
         raise HTTPException(status_code=status, detail=f"Accès refusé ({reason})")
 
     conv_id = res["conversation_id"]
-    if not is_safe_conversation_id(conv_id):
-        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
+    from app.services.storage import is_conversation_tombstoned
+    if not is_safe_conversation_id(conv_id) or is_conversation_tombstoned(conv_id):
+        raise HTTPException(status_code=404, detail="Conversation introuvable ou supprimée")
 
     transcript = get_conversation_transcript(conv_id)
     meta = get_conversation_by_id(conv_id) or get_session_meta(conv_id)

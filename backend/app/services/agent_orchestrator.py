@@ -329,6 +329,8 @@ def get_agent_inspection_details(agent_id: str, conversation_id: str) -> dict[st
 
     thoughts: list[dict[str, Any]] = []
     tools: list[dict[str, Any]] = []
+    modified_files: list[dict[str, Any]] = []
+    seen_files: set[str] = set()
     thought_preview = ""
 
     if t_path.exists():
@@ -347,13 +349,35 @@ def get_agent_inspection_details(agent_id: str, conversation_id: str) -> dict[st
                                 thought_preview = content
                         tcs = entry.get("tool_calls") or []
                         for tc in tcs:
+                            t_name = tc.get("tool_name") or tc.get("name") or ""
+                            t_args = tc.get("tool_arguments") or tc.get("args") or {}
                             tools.append({
                                 "step": step,
                                 "id": tc.get("id"),
-                                "name": tc.get("tool_name") or tc.get("name"),
-                                "args": tc.get("tool_arguments") or tc.get("args") or {},
+                                "name": t_name,
+                                "args": t_args,
                                 "status": "completed"
                             })
+                            if isinstance(t_args, dict):
+                                path = (
+                                    t_args.get("TargetFile")
+                                    or t_args.get("target_file")
+                                    or t_args.get("AbsolutePath")
+                                    or t_args.get("path")
+                                )
+                                if path and str(path) not in seen_files:
+                                    seen_files.add(str(path))
+                                    is_write = str(t_name).lower() in (
+                                        "write_to_file",
+                                        "replace_file_content",
+                                        "multi_replace_file_content",
+                                        "save_file",
+                                    )
+                                    modified_files.append({
+                                        "path": str(path),
+                                        "step": step,
+                                        "is_write": is_write,
+                                    })
                     except Exception:
                         continue
         except Exception as e:
@@ -365,5 +389,5 @@ def get_agent_inspection_details(agent_id: str, conversation_id: str) -> dict[st
         "thought_preview": thought_preview,
         "thoughts": thoughts[-10:],
         "tools": tools[-20:],
-        "modified_files": []
+        "modified_files": modified_files[-30:]
     }

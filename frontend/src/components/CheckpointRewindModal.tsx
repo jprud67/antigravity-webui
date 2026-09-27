@@ -81,13 +81,28 @@ export const CheckpointRewindModal: React.FC<CheckpointRewindModalProps> = ({
 
   useEffect(() => {
     if (!isOpen || !currentConversationId) return;
-    loadCheckpoints();
-    setSelectedId(null);
-    setDetail(null);
-    setShowCreateForm(false);
-    setConfirmAction(null);
-    setShowForkInput(false);
-  }, [isOpen, currentConversationId, loadCheckpoints]);
+    let isCancelled = false;
+    listCheckpoints(currentConversationId)
+      .then((res) => {
+        if (!isCancelled) {
+          setCheckpoints(res);
+        }
+      })
+      .catch((err: any) => {
+        if (!isCancelled) {
+          showToast(err.message || t('checkpoint_load_error', 'Impossible de charger les checkpoints'), 'error');
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+      setSelectedId(null);
+      setDetail(null);
+      setShowCreateForm(false);
+      setConfirmAction(null);
+      setShowForkInput(false);
+    };
+  }, [isOpen, currentConversationId, t]);
 
   // ESC key
   useEffect(() => {

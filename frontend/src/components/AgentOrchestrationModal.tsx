@@ -53,13 +53,28 @@ export const AgentOrchestrationModal: React.FC<AgentOrchestrationModalProps> = (
 
   // Initial load when modal opens
   useEffect(() => {
-    if (isOpen && conversationId) {
-      loadGraph();
-    } else {
+    if (!isOpen || !conversationId) return;
+    let isCancelled = false;
+    fetchOrchestratorGraph(conversationId)
+      .then((data: OrchestratorGraphResponse) => {
+        if (!isCancelled) {
+          setGraphData(data);
+          setLoading(false);
+        }
+      })
+      .catch((e: any) => {
+        if (!isCancelled) {
+          showToast(e?.message || 'Erreur lors du chargement du graphe', 'error');
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
       setGraphData(null);
       setSelectedNodeId(null);
-    }
-  }, [isOpen, conversationId, loadGraph]);
+    };
+  }, [isOpen, conversationId]);
 
   // Auto-refresh polling every 3.5 seconds when open
   useEffect(() => {

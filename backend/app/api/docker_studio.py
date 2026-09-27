@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
-from app.platform_utils import is_blocked_sensitive_path
+from app.platform_utils import is_blocked_sensitive_path, is_safe_path
+from app.services.storage import get_allowed_workspace_roots
 from app.services.docker_studio import (
     ComposeActionRequest,
     ContainerActionRequest,
@@ -45,6 +46,9 @@ def api_scan_workspace_docker(
     ws = workspace or DEFAULT_WORKSPACE
     if is_blocked_sensitive_path(ws):
         raise HTTPException(status_code=403, detail="Accès au chemin spécifié interdit.")
+    allowed_roots = get_allowed_workspace_roots()
+    if not is_safe_path(ws, allowed_roots):
+        raise HTTPException(status_code=403, detail="Accès refusé : chemin en dehors des répertoires autorisés.")
     return scan_workspace_docker_files(ws)
 
 
