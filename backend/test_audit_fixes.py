@@ -4027,6 +4027,13 @@ def test_storage_project_and_group_id_in_queries(tmp_path):
             '["/root"]', 'DONE', 'antigravity', NULL, 'proj_alpha', 'grp_beta'
         )
     """)
+    # Table tombstone requise par search_conversations et list_conversations
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS deleted_conversations (
+            conversation_id TEXT PRIMARY KEY,
+            deleted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.commit()
     conn.close()
 

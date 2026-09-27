@@ -1,7 +1,7 @@
 import logging
-from typing import Any, Literal, Optional
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Path as FastApiPath, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.api.auth import require_auth
@@ -23,8 +23,8 @@ router = APIRouter(prefix="/api/share", tags=["Collaborative Session Sharing"])
 class ShareCreateRequest(BaseModel):
     conversation_id: str
     permission: Literal["read", "write"] = "read"
-    duration_hours: Optional[int] = Field(default=None, ge=-1, le=8760)  # up to 1 year
-    pin_code: Optional[str] = None
+    duration_hours: int | None = Field(default=None, ge=-1, le=8760)  # up to 1 year
+    pin_code: str | None = None
 
 
 class ShareUnlockRequest(BaseModel):
@@ -169,7 +169,7 @@ def unlock_share_link(share_token: str, req: ShareUnlockRequest):
 
 
 @router.get("/transcript/{share_token}")
-def get_shared_transcript(share_token: str, pin_code: Optional[str] = Query(default=None)):
+def get_shared_transcript(share_token: str, pin_code: str | None = Query(default=None)):
     """Fetches the conversation transcript for a validated share link."""
     clean_token = (share_token or "").strip()
     if not clean_token:

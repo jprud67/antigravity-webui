@@ -1,20 +1,20 @@
 """
 Tests unitaires pour Checkpoint & Rewind Service (v0.4.2)
 """
-import pytest
 import json
-import shutil
-from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from app.services.checkpoint_service import (
     create_checkpoint,
-    list_checkpoints,
-    get_checkpoint_detail,
-    restore_checkpoint,
-    fork_from_checkpoint,
     delete_checkpoint,
+    fork_from_checkpoint,
+    get_checkpoint_detail,
+    list_checkpoints,
+    restore_checkpoint,
 )
+
 
 @pytest.fixture
 def mock_brain_dir(tmp_path):
@@ -37,8 +37,7 @@ def test_checkpoint_lifecycle(mock_brain_dir):
         {"step_index": 3, "type": "PLANNER_RESPONSE", "content": "Fichier créé.", "timestamp": "2026-09-27T01:03:00Z"}
     ]
     with open(transcript_file, "w", encoding="utf-8") as f:
-        for s in steps:
-            f.write(json.dumps(s) + "\n")
+        f.writelines(json.dumps(s) + "\n" for s in steps)
 
     # 2. Create checkpoint
     chk = create_checkpoint(conv_id, label="Étape 3 - Fichier créé")
@@ -64,8 +63,7 @@ def test_checkpoint_lifecycle(mock_brain_dir):
         {"step_index": 5, "type": "PLANNER_RESPONSE", "content": "Erreur produite", "timestamp": "2026-09-27T01:05:00Z"}
     ]
     with open(transcript_file, "a", encoding="utf-8") as f:
-        for s in new_steps:
-            f.write(json.dumps(s) + "\n")
+        f.writelines(json.dumps(s) + "\n" for s in new_steps)
 
     # 6. Rewind / Restore to checkpoint
     restore_res = restore_checkpoint(conv_id, chk_id)

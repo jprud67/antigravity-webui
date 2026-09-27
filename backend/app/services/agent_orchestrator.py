@@ -1,17 +1,13 @@
 import json
 import logging
-import os
-import re
-import time
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-import psutil
 from pydantic import BaseModel, Field
 
-from app.config import BRAIN_DIR, REPO_ROOT
+from app.config import BRAIN_DIR
 from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.orchestrator")
@@ -36,29 +32,29 @@ class AgentNodeStatus(str, Enum):
 
 
 class AgentNodeMetrics(BaseModel):
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
+    started_at: str | None = None
+    completed_at: str | None = None
     duration_ms: int = 0
     cpu_percent: float = 0.0
     memory_mb: float = 0.0
     tool_call_count: int = 0
-    token_count: Optional[int] = None
+    token_count: int | None = None
 
 
 class AgentNode(BaseModel):
     id: str
     name: str
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     depth: int = 0
     role: AgentNodeRole = AgentNodeRole.WORKER
     status: AgentNodeStatus = AgentNodeStatus.PENDING
-    model: Optional[str] = None
+    model: str | None = None
     task_summary: str = ""
-    current_activity: Optional[str] = None
-    thought_preview: Optional[str] = None
-    pid: Optional[int] = None
-    worktree_path: Optional[str] = None
-    worktree_branch: Optional[str] = None
+    current_activity: str | None = None
+    thought_preview: str | None = None
+    pid: int | None = None
+    worktree_path: str | None = None
+    worktree_branch: str | None = None
     metrics: AgentNodeMetrics = Field(default_factory=AgentNodeMetrics)
 
 

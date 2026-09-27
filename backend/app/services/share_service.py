@@ -9,12 +9,10 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
-import os
 import secrets
 import sqlite3
-import time
 from contextlib import contextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
 from app.config import CONVERSATION_DB

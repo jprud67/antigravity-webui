@@ -1,5 +1,6 @@
 import logging
 from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.auth import require_auth
@@ -8,9 +9,9 @@ from app.services.agent_orchestrator import (
     SteerRequest,
     TerminateRequest,
     build_orchestrator_graph,
+    get_agent_inspection_details,
     steer_agent,
     terminate_agent,
-    get_agent_inspection_details,
 )
 
 logger = logging.getLogger("antigravity.orchestrator.api")
@@ -28,8 +29,8 @@ def get_graph(
         return build_orchestrator_graph(conversation_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception(f"Error building orchestrator graph for {conversation_id}: {e}")
+    except Exception:
+        logger.exception(f"Error building orchestrator graph for {conversation_id}")
         raise HTTPException(status_code=500, detail="Internal error generating agent graph")
 
 
@@ -47,8 +48,8 @@ def post_steer(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception(f"Error steering agent {req.target_agent_id}: {e}")
+    except Exception:
+        logger.exception(f"Error steering agent {req.target_agent_id}")
         raise HTTPException(status_code=500, detail="Internal error sending steering instruction")
 
 
@@ -66,8 +67,8 @@ def post_terminate(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception(f"Error terminating agent {req.target_agent_id}: {e}")
+    except Exception:
+        logger.exception(f"Error terminating agent {req.target_agent_id}")
         raise HTTPException(status_code=500, detail="Internal error terminating agent")
 
 
@@ -82,6 +83,6 @@ def get_inspect(
         return get_agent_inspection_details(agent_id=agent_id, conversation_id=conversation_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception(f"Error inspecting agent {agent_id}: {e}")
+    except Exception:
+        logger.exception(f"Error inspecting agent {agent_id}")
         raise HTTPException(status_code=500, detail="Internal error retrieving agent telemetry")

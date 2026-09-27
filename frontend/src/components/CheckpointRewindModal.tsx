@@ -149,7 +149,10 @@ export const CheckpointRewindModal: React.FC<CheckpointRewindModalProps> = ({
       showToast(res.message || t('checkpoint_restored', 'Conversation restaurée avec succès'), 'success');
       setConfirmAction(null);
       setConfirmTarget(null);
-      await loadCheckpoints();
+      if (onSelectConversation) {
+        onSelectConversation(currentConversationId);
+      }
+      onClose();
     } catch (err: any) {
       showToast(err.message || t('checkpoint_restore_error', 'Erreur lors de la restauration'), 'error');
     } finally {

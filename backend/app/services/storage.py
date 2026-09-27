@@ -227,6 +227,19 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None, force: bool = False
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_conv_group_id ON conversation_summaries(group_id);"
             )
+            # Table de tombstones : empêche la réapparition des conversations supprimées
+            # même après la réconciliation automatique du CLI agy (store_client.go).
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS deleted_conversations (
+                    conversation_id TEXT PRIMARY KEY,
+                    deleted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_deleted_conv_id ON deleted_conversations(conversation_id);"
+            )
             conn.commit()
             if conn is None or db_path_str == str(CONVERSATION_DB):
                 _schema_initialized = True
@@ -361,6 +374,30 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+
+        # Récupère les IDs tombstones (conversations supprimées par l'utilisateur)
+        try:
+            cursor.execute("SELECT conversation_id FROM deleted_conversations")
+            deleted_ids: set[str] = {r[0] for r in cursor.fetchall()}
+        except Exception:
+            deleted_ids = set()
+
+        # Auto-purge : supprime les fantômes réinjectés par la réconciliation CLI
+        if deleted_ids:
+            chunk_size = 500
+            deleted_list = list(deleted_ids)
+            for i in range(0, len(deleted_list), chunk_size):
+                chunk = deleted_list[i:i + chunk_size]
+                placeholders = ",".join("?" * len(chunk))
+                try:
+                    cursor.execute(
+                        f"DELETE FROM conversation_summaries WHERE conversation_id IN ({placeholders})",  # nosec B608
+                        tuple(chunk)
+                    )
+                except Exception:
+                    pass
+            conn.commit()
+
         cursor.execute(
             """
             SELECT 
@@ -1656,6 +1693,11 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
     try:
         cursor = conn.cursor()
         cursor.executemany("DELETE FROM conversation_summaries WHERE conversation_id = ?", [(cid,) for cid in safe_ids])
+        # Enregistre dans les tombstones pour empêcher la réapparition via la réconciliation CLI
+        cursor.executemany(
+            "INSERT OR REPLACE INTO deleted_conversations (conversation_id, deleted_at) VALUES (?, CURRENT_TIMESTAMP)",
+            [(cid,) for cid in safe_ids]
+        )
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1684,6 +1726,11 @@ def delete_conversation(conversation_id: str) -> bool:
     try:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM conversation_summaries WHERE conversation_id = ?", (conversation_id,))
+        # Enregistre dans les tombstones pour empêcher la réapparition via la réconciliation CLI
+        cursor.execute(
+            "INSERT OR REPLACE INTO deleted_conversations (conversation_id, deleted_at) VALUES (?, CURRENT_TIMESTAMP)",
+            (conversation_id,)
+        )
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1953,7 +2000,8 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 project_id,
                 group_id
             FROM conversation_summaries
-            WHERE title LIKE ? ESCAPE '\\' OR preview LIKE ? ESCAPE '\\'
+            WHERE (title LIKE ? ESCAPE '\\' OR preview LIKE ? ESCAPE '\\')
+              AND conversation_id NOT IN (SELECT conversation_id FROM deleted_conversations)
             ORDER BY last_modified_time DESC
             LIMIT ?
             """,

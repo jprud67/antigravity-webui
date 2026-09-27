@@ -55,11 +55,6 @@ export const AgentOrchestrationModal: React.FC<AgentOrchestrationModalProps> = (
   useEffect(() => {
     if (isOpen && conversationId) {
       loadGraph();
-      // Set root node selected by default if available
-      const timer = setTimeout(() => {
-        loadGraph(false);
-      }, 50);
-      return () => clearTimeout(timer);
     } else {
       setGraphData(null);
       setSelectedNodeId(null);

@@ -80,8 +80,8 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
         // Deduplicate
         const unique = Array.from(new Set(allModified));
         setModifiedFiles(unique);
-        if (unique.length > 0 && !selectedFile) {
-          setSelectedFile(unique[0]);
+        if (unique.length > 0) {
+          setSelectedFile((prev) => prev || unique[0]);
         }
       })
       .catch((err) => {
@@ -102,8 +102,8 @@ export const LivePreviewDrawer: React.FC<LivePreviewDrawerProps> = ({
             conversation_id: i.conversation_id
           }));
           setArtifacts(mapped);
-          if (mapped.length > 0 && !selectedArtifact) {
-            setSelectedArtifact(mapped[0]);
+          if (mapped.length > 0) {
+            setSelectedArtifact((prev) => prev || mapped[0]);
           }
         })
         .catch(() => {});

@@ -9,7 +9,6 @@ directly inside the kernel without round-tripping through the LLM.
 
 from __future__ import annotations
 
-import contextlib
 import io
 import logging
 import os
@@ -18,6 +17,7 @@ import sys
 import threading
 import time
 import traceback
+import types
 from typing import Any
 
 from app.platform_utils import is_blocked_sensitive_path
@@ -193,7 +193,12 @@ class SafeStreamRedirect:
         setattr(sys, self.stream_name, self.new_target)
         return self.new_target
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         if getattr(sys, self.stream_name) is self.new_target:
             setattr(sys, self.stream_name, self.old_target)
 

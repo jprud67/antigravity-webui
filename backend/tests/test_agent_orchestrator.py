@@ -1,18 +1,18 @@
 import json
-from pathlib import Path
+
 import pytest
 
 from app.services.agent_orchestrator import (
+    AgentEdge,
+    AgentNode,
+    AgentNodeMetrics,
     AgentNodeRole,
     AgentNodeStatus,
-    AgentNodeMetrics,
-    AgentNode,
-    AgentEdge,
     OrchestratorGraphResponse,
     build_orchestrator_graph,
+    get_agent_inspection_details,
     steer_agent,
     terminate_agent,
-    get_agent_inspection_details,
 )
 
 
@@ -171,6 +171,7 @@ def test_get_agent_inspection_details(tmp_path, monkeypatch):
 
 
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 api_client = TestClient(app)

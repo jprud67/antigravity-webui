@@ -38,6 +38,7 @@ from app.services.storage import (
     undo_conversation_turn,
     update_conversation_summary_fields,
     update_conversation_title,
+    CONVERSATION_DB,
 )
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
@@ -617,6 +618,53 @@ def remove_bookmark(conversation_id: str, bookmark_id: str, _ = Depends(require_
     filtered = [b for b in existing_bms if isinstance(b, dict) and b.get("id") != bookmark_id]
     update_session_meta(conversation_id, {"bookmarks": filtered})
     return {"success": True, "bookmarks": filtered}
+
+
+@router.delete("")
+async def delete_all_conversations(_ = Depends(require_auth)):
+    """Supprime toutes les conversations sauf la session active courante.
+    Enregistre les tombstones pour empêcher la réapparition via la réconciliation CLI."""
+    import sqlite3 as _sqlite3
+    from app.services.storage import get_db_connection as _get_db
+
+    conn = _get_db()
+    try:
+        cursor = conn.cursor()
+        # Récupère tous les IDs sauf la session active
+        cursor.execute("SELECT conversation_id FROM conversation_summaries")
+        all_ids = [r[0] for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+    if all_ids:
+        await asyncio.to_thread(bulk_delete_conversations, all_ids)
+
+    conn2 = _get_db()
+    try:
+        remaining = conn2.execute("SELECT count(*) FROM conversation_summaries").fetchone()[0]
+        tombstones = conn2.execute("SELECT count(*) FROM deleted_conversations").fetchone()[0]
+    finally:
+        conn2.close()
+
+    return {"success": True, "deleted": len(all_ids), "remaining": remaining, "tombstones": tombstones}
+
+
+@router.post("/{conversation_id}/restore")
+async def restore_conversation(conversation_id: str, _ = Depends(require_auth)):
+    """Retire une conversation de la liste des tombstones (la rend à nouveau visible si le CLI la réinjecte)."""
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
+
+    from app.services.storage import get_db_connection as _get_db
+    conn = _get_db()
+    try:
+        conn.execute("DELETE FROM deleted_conversations WHERE conversation_id = ?", (conversation_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"success": True, "conversation_id": conversation_id, "restored": True}
+
 
 
 

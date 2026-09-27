@@ -1,6 +1,7 @@
-import pytest
 import time
-from datetime import datetime, timezone, timedelta
+
+import pytest
+
 from app.services import share_service
 
 
@@ -77,6 +78,8 @@ def test_list_share_links():
 
 
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
+
 from app.main import app
 
 client = TestClient(app)
@@ -195,14 +198,12 @@ def test_ws_share_pin_protection():
     token = link["token"]
 
     # Connect without pin -> should be rejected with 1008
-    with pytest.raises(Exception):
-        with client.websocket_connect(f"/ws/chat?share_token={token}") as ws:
-            ws.receive_json()
+    with pytest.raises(WebSocketDisconnect), client.websocket_connect(f"/ws/chat?share_token={token}") as ws:
+        ws.receive_json()
 
     # Connect with wrong pin -> should be rejected
-    with pytest.raises(Exception):
-        with client.websocket_connect(f"/ws/chat?share_token={token}&pin_code=0000") as ws:
-            ws.receive_json()
+    with pytest.raises(WebSocketDisconnect), client.websocket_connect(f"/ws/chat?share_token={token}&pin_code=0000") as ws:
+        ws.receive_json()
 
     # Connect with correct pin -> should succeed
     with client.websocket_connect(f"/ws/chat?share_token={token}&pin_code=9876") as ws:

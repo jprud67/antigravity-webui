@@ -4,7 +4,6 @@ Permet de capturer des snapshots (checkpoints) de l'état d'une conversation,
 puis de restaurer (rewind) ou bifurquer (fork) depuis n'importe quel checkpoint.
 """
 
-import copy
 import json
 import logging
 import shutil

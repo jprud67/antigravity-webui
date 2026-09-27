@@ -1,7 +1,7 @@
-from pathlib import Path
 import sys
 import urllib.error
 import uuid
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -21,7 +21,11 @@ from app.services.docker_studio import execute_compose_action
 from app.services.doctor import _check_sqlite_integrity, run_auto_repair
 from app.services.fts_search import fts_service, reindex_all_conversations
 from app.services.git_worktree import create_subagent_worktree
-from app.services.messaging_gateway import approve_pairing_code, request_pairing, reset_approval_rate_limits
+from app.services.messaging_gateway import (
+    approve_pairing_code,
+    request_pairing,
+    reset_approval_rate_limits,
+)
 from app.services.tailscale import toggle_tailscale_serve
 from app.services.vector_memory import AutoRecallConfig, compute_embedding
 from app.services.web_push import send_web_push_notification
@@ -748,6 +752,7 @@ def test_messaging_gateway_preserve_token_on_update():
 
 def test_database_studio_export_validation(tmp_path):
     import sqlite3
+
     from app.services.database_studio import export_query_results
 
     db_file = tmp_path / "export_test.db"

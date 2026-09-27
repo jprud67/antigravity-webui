@@ -186,11 +186,11 @@ async def chat_websocket(
                 await execution_manager.handle_stdin_input(conv_id, input_text)
 
             elif action == "ping":
-                session = execution_manager.get_session(conv_id)
+                target_session = execution_manager.get_session(conv_id)
                 await websocket.send_json({
                     "event": "pong",
                     "conversation_id": conv_id,
-                    "queue_size": session.message_queue.qsize() if session else 0,
+                    "queue_size": target_session.message_queue.qsize() if target_session else 0,
                     "is_running": execution_manager.is_running(conv_id),
                     "active_conversations": execution_manager.get_running_conversations()
                 })

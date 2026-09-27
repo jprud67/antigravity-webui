@@ -1605,7 +1605,7 @@ export function App() {
     isSessionMetaOpen, isBranchModalOpen, isRightPanelOpen, isMobileSidebarOpen,
     isQuickOpenOpen, isMcpCatalogOpen, isDoctorOpen,
     isRemoteAccessOpen, isGatewayOpen, isWorktreeOpen,
-    isDockerStudioOpen, isDatabaseStudioOpen,
+    isDockerStudioOpen, isDatabaseStudioOpen, isOrchestratorOpen, isCheckpointModalOpen,
     isShareModalOpen, isPinModalOpen, isLivePreviewOpen,
   ]);
 

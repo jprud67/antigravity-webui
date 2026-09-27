@@ -1,18 +1,23 @@
 import asyncio
 import json
 import logging
-import os
 import re
 import shutil
 import time
 import uuid
+from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Literal
+from typing import Any, Literal
 
+import aiofiles
 from pydantic import BaseModel, Field
 
 from app.config import DEFAULT_WORKSPACE
-from app.platform_utils import is_blocked_sensitive_path
+from app.platform_utils import (
+    is_blocked_sensitive_path,
+    spawn_group_kwargs,
+    terminate_process_group_async,
+)
 from app.services.project_detector import detect_project_details
 from app.services.storage import get_settings
 
@@ -96,7 +101,16 @@ class BatchActionRequest(BaseModel):
 # Concurrency & In-Memory Execution State
 # ============================================================================
 
-_CONCURRENCY_SEMAPHORE = asyncio.Semaphore(4)
+_concurrency_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_semaphore() -> asyncio.Semaphore:
+    global _concurrency_semaphore
+    if _concurrency_semaphore is None:
+        _concurrency_semaphore = asyncio.Semaphore(4)
+    return _concurrency_semaphore
+
+
 _active_tasks: dict[str, asyncio.Task] = {}
 _run_history: dict[str, PipelineExecutionRun] = {}
 
@@ -119,8 +133,11 @@ def validate_workspace_path(path_str: str) -> Path:
     except Exception as e:
         raise ValueError(f"Impossible de résoudre le chemin '{path_str}': {e}")
 
-    parts = [p.lower() for p in resolved.parts]
-    if any(p in ("windows", "winnt", "system32", "syswow64", "program files") for p in parts) or is_blocked_sensitive_path(resolved):
+    raw_segments = {p.lower() for p in re.split(r"[\\/]+", cleaned) if p}
+    resolved_segments = {p.lower() for p in resolved.parts if p}
+    all_segments = raw_segments | resolved_segments
+    system_dirs = {"windows", "winnt", "system32", "syswow64", "program files", "proc", "sys", "dev"}
+    if any(s in system_dirs for s in all_segments) or is_blocked_sensitive_path(resolved):
         raise ValueError(f"Accès interdit ou sensible : '{path_str}' est un dossier système.")
 
     # Validate against trustedWorkspaces
@@ -393,7 +410,9 @@ def discover_workspace_pipelines(workspace_path: str) -> list[WorkspacePipeline]
             targets = re.findall(r"^([a-zA-Z0-9_\-]+):", content, flags=re.MULTILINE)
             for t in ["test", "build", "lint", "check"]:
                 if t in targets:
-                    p_type = "test" if t == "test" else ("build" if t == "build" else "lint")
+                    p_type: Literal["test", "build", "lint", "custom", "full"] = (
+                        "test" if t == "test" else ("build" if t == "build" else "lint")
+                    )
                     pipelines.append(WorkspacePipeline(
                         id=f"make_{t}",
                         workspace_path=str(p),
@@ -523,7 +542,7 @@ async def execute_pipeline_run(
     _run_history[run_id] = run_obj
 
     async def _runner_coroutine():
-        async with _CONCURRENCY_SEMAPHORE:
+        async with _get_semaphore():
             total_duration = 0.0
             overall_success = True
 
@@ -534,9 +553,9 @@ async def execute_pipeline_run(
                 pass
             run_log_file = logs_dir / f"pipeline_{run_id}.log"
 
-            with open(run_log_file, "a", encoding="utf-8") as log_file:
-                log_file.write(f"=== PIPELINE RUN: {target_pipeline.name} ({run_id}) ===\n")
-                log_file.write(f"Workspace: {resolved_path}\nStarted: {time.ctime(started_at)}\n\n")
+            async with aiofiles.open(run_log_file, "a", encoding="utf-8") as log_file:
+                await log_file.write(f"=== PIPELINE RUN: {target_pipeline.name} ({run_id}) ===\n")
+                await log_file.write(f"Workspace: {resolved_path}\nStarted: {time.ctime(started_at)}\n\n")
 
                 for idx, step in enumerate(run_obj.steps):
                     run_obj.current_step_index = idx
@@ -554,13 +573,15 @@ async def execute_pipeline_run(
                             "status": "running"
                         })
 
-                    # Execute command safely via shell or direct exec
+                    # Execute command safely via shell with process group isolation
+                    process = None
                     try:
                         process = await asyncio.create_subprocess_shell(
                             step.command,
                             cwd=step.cwd,
                             stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE
+                            stderr=asyncio.subprocess.PIPE,
+                            **spawn_group_kwargs()
                         )
 
                         stdout_bytes, stderr_bytes = await asyncio.wait_for(
@@ -581,9 +602,9 @@ async def execute_pipeline_run(
 
                         # Keep memory output preview limited to last 20,000 chars
                         step.output_preview = combined_output[-20000:]
-                        log_file.write(f"--- STEP: {step.name} ({step.command}) ---\n")
-                        log_file.write(combined_output + "\n\n")
-                        log_file.flush()
+                        await log_file.write(f"--- STEP: {step.name} ({step.command}) ---\n")
+                        await log_file.write(combined_output + "\n\n")
+                        await log_file.flush()
 
                         if process.returncode == 0:
                             step.status = "success"
@@ -611,6 +632,11 @@ async def execute_pipeline_run(
                             break
 
                     except asyncio.TimeoutError:
+                        if process and process.returncode is None:
+                            try:
+                                await terminate_process_group_async(process, grace=0.5)
+                            except Exception as te:
+                                logger.debug(f"Error terminating child process on timeout: {te}")
                         step_end = time.time()
                         step_duration = (step_end - step_start) * 1000.0
                         total_duration += step_duration
@@ -620,6 +646,11 @@ async def execute_pipeline_run(
                         overall_success = False
                         break
                     except asyncio.CancelledError:
+                        if process and process.returncode is None:
+                            try:
+                                await terminate_process_group_async(process, grace=0.5)
+                            except Exception as te:
+                                logger.debug(f"Error terminating child process on cancel: {te}")
                         step.status = "failed"
                         step.output_preview = "Exécution annulée par l'utilisateur."
                         run_obj.status = "cancelled"
@@ -719,7 +750,7 @@ def build_remediation_context(
         "run_id": run_id,
         "failed_step_id": failed_step_id,
         "error_summary": error_summary,
-        "suspected_files": sorted(list(suspected_files)),
+        "suspected_files": sorted(suspected_files),
         "remediation_prompt": prompt
     }
 
@@ -750,7 +781,7 @@ async def execute_batch_action(action: str, workspace_paths: list[str]) -> dict[
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )
-                stdout, stderr = await proc.communicate()
+                stdout, _stderr = await proc.communicate()
                 results.append({
                     "workspace": str(ws_path),
                     "status": "success" if proc.returncode == 0 else "failed",
@@ -765,7 +796,7 @@ async def execute_batch_action(action: str, workspace_paths: list[str]) -> dict[
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )
-                stdout, stderr = await proc.communicate()
+                stdout, _stderr = await proc.communicate()
                 results.append({
                     "workspace": str(ws_path),
                     "status": "success" if proc.returncode == 0 else "failed",
@@ -790,7 +821,7 @@ async def execute_batch_action(action: str, workspace_paths: list[str]) -> dict[
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE
                     )
-                    stdout, stderr = await proc.communicate()
+                    stdout, _stderr = await proc.communicate()
                     results.append({
                         "workspace": str(ws_path),
                         "status": "success" if proc.returncode == 0 else "failed",

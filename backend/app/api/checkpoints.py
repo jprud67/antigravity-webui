@@ -43,8 +43,8 @@ def get_checkpoints(
         return {"checkpoints": checkpoints, "count": len(checkpoints)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception(f"Erreur lors du listing des checkpoints : {e}")
+    except Exception:
+        logger.exception("Erreur lors du listing des checkpoints")
         raise HTTPException(status_code=500, detail="Erreur interne lors du listing des checkpoints")
 
 
@@ -64,8 +64,8 @@ def post_create_checkpoint(
         return {"success": True, "checkpoint": checkpoint}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception(f"Erreur lors de la création du checkpoint : {e}")
+    except Exception:
+        logger.exception("Erreur lors de la création du checkpoint")
         raise HTTPException(status_code=500, detail="Erreur interne lors de la création du checkpoint")
 
 
@@ -81,8 +81,8 @@ def get_checkpoint(
         return detail
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception(f"Erreur lors de la récupération du checkpoint : {e}")
+    except Exception:
+        logger.exception("Erreur lors de la récupération du checkpoint")
         raise HTTPException(status_code=500, detail="Erreur interne lors de la récupération du checkpoint")
 
 
@@ -98,8 +98,8 @@ def post_restore_checkpoint(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception(f"Erreur lors de la restauration : {e}")
+    except Exception:
+        logger.exception("Erreur lors de la restauration du checkpoint")
         raise HTTPException(status_code=500, detail="Erreur interne lors de la restauration du checkpoint")
 
 
@@ -117,8 +117,8 @@ def post_fork_from_checkpoint(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception(f"Erreur lors de la bifurcation : {e}")
+    except Exception:
+        logger.exception("Erreur lors de la bifurcation du checkpoint")
         raise HTTPException(status_code=500, detail="Erreur interne lors de la bifurcation du checkpoint")
 
 
@@ -134,6 +134,6 @@ def delete_checkpoint_endpoint(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception(f"Erreur lors de la suppression du checkpoint : {e}")
+    except Exception:
+        logger.exception("Erreur lors de la suppression du checkpoint")
         raise HTTPException(status_code=500, detail="Erreur interne lors de la suppression du checkpoint")

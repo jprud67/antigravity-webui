@@ -863,8 +863,9 @@ class ExecutionManager:
         if self.active_session:
             if ws in self.active_session.subscribers:
                 self.active_session.remove_subscriber(ws)
-                if getattr(self.active_session, "conversation_id", None):
-                    affected_cids.add(self.active_session.conversation_id)
+                act_cid = getattr(self.active_session, "conversation_id", None)
+                if act_cid:
+                    affected_cids.add(act_cid)
 
         if affected_cids:
             try:

@@ -48,6 +48,13 @@ export const ShareSessionModal: React.FC<ShareSessionModalProps> = ({
   const [activeLinks, setActiveLinks] = useState<ShareLinkItem[]>([]);
   const [loadingLinks, setLoadingLinks] = useState<boolean>(false);
   const [revokingToken, setRevokingToken] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const interval = setInterval(() => setNowMs(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, [isOpen]);
 
   const loadLinks = useCallback(async () => {
     if (!conversationId) return;
@@ -142,7 +149,7 @@ export const ShareSessionModal: React.FC<ShareSessionModalProps> = ({
 
   const formatRemainingTime = (expiresAt: string | null) => {
     if (!expiresAt) return t('share_duration_forever');
-    const diff = new Date(expiresAt).getTime() - Date.now();
+    const diff = new Date(expiresAt).getTime() - nowMs;
     if (diff <= 0) return 'Expired';
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
