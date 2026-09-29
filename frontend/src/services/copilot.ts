@@ -165,6 +165,9 @@ export function registerMonacoCopilot(monaco: any, options: CopilotOptions = {})
     },
     freeInlineCompletions: () => {
       // Nettoyage éventuel
+    },
+    disposeInlineCompletions: () => {
+      // Compatibilité Monaco Editor disposeInlineCompletions
     }
   };
 
