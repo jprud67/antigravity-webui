@@ -42,6 +42,9 @@ Loader2,
   CheckCircle2,
   RotateCw,
   Info,
+  ClipboardCopy,
+  FolderOpen,
+  ExternalLink,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon';
 import ReactMarkdown from 'react-markdown';
@@ -267,12 +270,129 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   // Tab Context Menu State
   const [tabContextMenu, setTabContextMenu] = useState<{ x: number; y: number; tabIndex: number } | null>(null);
 
+  // Tree Context Menu State
+  const [treeContextMenu, setTreeContextMenu] = useState<{
+    x: number;
+    y: number;
+    item: any;
+  } | null>(null);
+
   useEffect(() => {
-    if (!tabContextMenu) return;
-    const handleCloseMenu = () => setTabContextMenu(null);
+    if (!tabContextMenu && !treeContextMenu) return;
+    const handleCloseMenu = () => {
+      setTabContextMenu(null);
+      setTreeContextMenu(null);
+    };
     window.addEventListener('click', handleCloseMenu);
-    return () => window.removeEventListener('click', handleCloseMenu);
-  }, [tabContextMenu]);
+    window.addEventListener('contextmenu', handleCloseMenu);
+    return () => {
+      window.removeEventListener('click', handleCloseMenu);
+      window.removeEventListener('contextmenu', handleCloseMenu);
+    };
+  }, [tabContextMenu, treeContextMenu]);
+
+  const getRelativePath = useCallback((fullPath: string) => {
+    if (!fullPath) return '';
+    const normFull = fullPath.replace(/\\/g, '/');
+    const normRoot = (currentWorkspace || '').replace(/\\/g, '/').replace(/\/+$/, '');
+    if (normRoot && normFull.startsWith(normRoot)) {
+      const rel = normFull.slice(normRoot.length).replace(/^\/+/, '');
+      return rel || '.';
+    }
+    return normFull;
+  }, [currentWorkspace]);
+
+  const getAbsolutePath = useCallback((pathOrRelative: string) => {
+    if (!pathOrRelative) return '';
+    const norm = pathOrRelative.replace(/\\/g, '/');
+    if (norm.startsWith('/') || /^[a-zA-Z]:\//.test(norm)) {
+      return norm;
+    }
+    const normRoot = (currentWorkspace || '').replace(/\\/g, '/').replace(/\/+$/, '');
+    return `${normRoot}/${norm.replace(/^\/+/, '')}`;
+  }, [currentWorkspace]);
+
+  const copyToClipboard = useCallback(async (text: string, successMessage?: string) => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      if (successMessage) {
+        showToast(successMessage, 'success');
+      }
+      return true;
+    } catch (err: any) {
+      showToast(t('copy_failed', 'Échec de la copie : {0}', err.message || err), 'error');
+      return false;
+    }
+  }, [t]);
+
+  const handleCopyRelativePath = useCallback((fullPath: string) => {
+    const rel = getRelativePath(fullPath);
+    copyToClipboard(rel, t('relative_path_copied', 'Chemin relatif copié : {0}', rel));
+  }, [getRelativePath, copyToClipboard, t]);
+
+  const handleCopyAbsolutePath = useCallback((fullPath: string) => {
+    const abs = getAbsolutePath(fullPath);
+    copyToClipboard(abs, t('absolute_path_copied', 'Chemin absolu copié : {0}', abs));
+  }, [getAbsolutePath, copyToClipboard, t]);
+
+  const handleCopyName = useCallback((fullPath: string) => {
+    const name = fullPath.split(/[/\\]/).filter(Boolean).pop() || fullPath;
+    copyToClipboard(name, t('name_copied', 'Nom copié : {0}', name));
+  }, [copyToClipboard, t]);
+
+  const handleDownloadFile = useCallback((filePath: string) => {
+    try {
+      const filename = filePath.split(/[/\\]/).pop() || 'file';
+      const token = getAuthToken();
+      const downloadUrl = `/api/files/download?path=${encodeURIComponent(filePath)}${currentWorkspace ? `&workspace=${encodeURIComponent(currentWorkspace)}` : ''}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast(t('download_started_named', 'Téléchargement de « {0} » lancé', filename), 'success');
+    } catch (err: any) {
+      showToast(t('error_downloading_file', 'Erreur lors du téléchargement : {0}', err.message || err), 'error');
+    }
+  }, [currentWorkspace, t]);
+
+  const handleTreeContextMenu = useCallback((e: React.MouseEvent, item: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const menuWidth = 230;
+    const menuHeight = item.is_dir ? 280 : 360;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+    setTreeContextMenu({ x, y, item });
+  }, []);
+
+  const handleTreeBackgroundContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rootName = currentWorkspace.split(/[/\\]/).filter(Boolean).pop() || 'workspace';
+    setTreeContextMenu({
+      x: Math.min(e.clientX, window.innerWidth - 230),
+      y: Math.min(e.clientY, window.innerHeight - 240),
+      item: {
+        name: rootName,
+        path: currentWorkspace,
+        is_dir: true,
+        is_root: true
+      }
+    });
+  }, [currentWorkspace]);
 
   // Sync Monaco Theme
   useEffect(() => {
@@ -1223,7 +1343,12 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     if (e.key === 'Enter') handleRenameItem();
                     if (e.key === 'Escape') setRenamingPath(null);
                   }}
-                  className="flex-1 px-2 py-0.5 text-xs rounded border border-sky-500 bg-zinc-900 text-zinc-100 outline-none"
+                  className="flex-1 px-2 py-0.5 text-xs rounded border border-sky-500 outline-none font-mono transition-colors shadow-xs"
+                  style={{
+                    backgroundColor: 'var(--input-bg, var(--surface))',
+                    color: 'var(--text)',
+                    borderColor: 'var(--accent, #0284c7)',
+                  }}
                 />
                 <button
                   type="button"
@@ -1236,7 +1361,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                 <button
                   type="button"
                   onClick={() => setRenamingPath(null)}
-                  className="p-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 cursor-pointer"
+                  className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
+                  style={{ color: 'var(--muted)' }}
                   title={t('cancel', 'Annuler')}
                 >
                   <X className="w-3 h-3" />
@@ -1249,20 +1375,24 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             <div key={item.path}>
               <div
                 onClick={() => (isDir ? toggleFolder(item.path) : handleSelectFile(item.path))}
-                style={{ paddingLeft: `${level * 14 + 10}px` }}
+                onContextMenu={(e) => handleTreeContextMenu(e, item)}
+                style={{
+                  paddingLeft: `${level * 14 + 10}px`,
+                  color: isSelected ? undefined : 'var(--text)',
+                }}
                 className={`flex items-center justify-between py-1 pr-1.5 rounded-lg text-xs cursor-pointer group transition-colors ${
                   isSelected
                     ? 'bg-sky-500/15 text-sky-600 dark:text-sky-300 font-medium border-l-2 border-sky-500'
-                    : 'text-slate-700 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
+                    : 'hover:bg-black/5 dark:hover:bg-white/5'
                 }`}
               >
                 <div className="flex items-center gap-1.5 truncate flex-1 min-w-0 mr-1">
                   {isDir ? (
                     <>
                       {isExpanded ? (
-                        <ChevronDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--muted)' }} />
                       ) : (
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--muted)' }} />
                       )}
                       <FileIcon filename={item.name} isDir={true} isExpanded={isExpanded} className="w-3.5 h-3.5 shrink-0" />
                     </>
@@ -1277,6 +1407,20 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
                 {/* Hover Quick Action Buttons */}
                 <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity">
+                  {/* Quick Copy Relative Path */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopyRelativePath(item.path);
+                    }}
+                    title={t('copy_relative_path', 'Copier le chemin relatif (clic droit pour plus d\'options)')}
+                    className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors cursor-pointer"
+                    style={{ color: 'var(--muted)' }}
+                  >
+                    <Copy className="w-3 h-3 hover:text-sky-500" />
+                  </button>
+
                   {isDir && (
                     <>
                       <button
@@ -1288,9 +1432,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           setNewItemName('');
                         }}
                         title={t('new_file_here', 'Nouveau fichier ici')}
-                        className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
+                        className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors cursor-pointer"
+                        style={{ color: 'var(--muted)' }}
                       >
-                        <FilePlus className="w-3 h-3" />
+                        <FilePlus className="w-3 h-3 hover:text-sky-500" />
                       </button>
                       <button
                         type="button"
@@ -1301,9 +1446,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           setNewItemName('');
                         }}
                         title={t('new_folder_here', 'Nouveau dossier ici')}
-                        className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
+                        className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors cursor-pointer"
+                        style={{ color: 'var(--muted)' }}
                       >
-                        <FolderPlus className="w-3 h-3" />
+                        <FolderPlus className="w-3 h-3 hover:text-sky-500" />
                       </button>
                     </>
                   )}
@@ -1320,9 +1466,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         });
                       }}
                       title={t('open_in_monaco_studio', 'Ouvrir dans Monaco Studio')}
-                      className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
+                      className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors cursor-pointer"
+                      style={{ color: 'var(--muted)' }}
                     >
-                      <Code2 className="w-3 h-3" />
+                      <Code2 className="w-3 h-3 hover:text-sky-500" />
                     </button>
                   )}
                   {!isDir && (
@@ -1333,9 +1480,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         handleDuplicateFile(item.path);
                       }}
                       title={t('duplicate_file', 'Dupliquer le fichier')}
-                      className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300 cursor-pointer"
+                      className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors cursor-pointer"
+                      style={{ color: 'var(--muted)' }}
                     >
-                      <Copy className="w-3 h-3" />
+                      <Copy className="w-3 h-3 hover:text-amber-500" />
                     </button>
                   )}
                   <button
@@ -1346,9 +1494,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       setRenamedName(item.name);
                     }}
                     title={t('rename', 'Renommer')}
-                    className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-amber-300"
+                    className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors cursor-pointer"
+                    style={{ color: 'var(--muted)' }}
                   >
-                    <Edit2 className="w-3 h-3" />
+                    <Edit2 className="w-3 h-3 hover:text-amber-500" />
                   </button>
                   <button
                     type="button"
@@ -1357,7 +1506,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       handleDeleteItem(item.path, isDir, item.name);
                     }}
                     title={t('delete', 'Supprimer')}
-                    className="p-1 hover:bg-rose-500/20 rounded text-slate-400 hover:text-rose-400"
+                    className="p-1 hover:bg-rose-500/20 rounded transition-colors cursor-pointer text-rose-500 hover:text-rose-600"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -1366,12 +1515,15 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onInsertPath(item.path);
+                        const rel = getRelativePath(item.path);
+                        onInsertPath(`@${rel} `);
+                        showToast(t('path_inserted_in_prompt', 'Chemin inséré dans le chat : @{0}', rel), 'info');
                       }}
-                      title={t('insert_path_in_prompt', 'Insérer le chemin')}
-                      className="p-1 hover:bg-slate-700/60 rounded text-slate-400 hover:text-sky-300"
+                      title={t('insert_path_in_prompt', 'Insérer le chemin relatif dans le prompt')}
+                      className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors cursor-pointer"
+                      style={{ color: 'var(--muted)' }}
                     >
-                      <Plus className="w-3 h-3" />
+                      <Plus className="w-3 h-3 hover:text-emerald-500" />
                     </button>
                   )}
                 </div>
@@ -1701,7 +1853,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
           <button
             onClick={handleClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            className="p-1.5 rounded-xl opacity-70 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0"
             title={t('close_side_panel', 'Close side panel')}
             aria-label={t('close_side_panel', 'Close side panel')}
           >
@@ -1827,14 +1979,19 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       value={treeSearch}
                       onChange={(e) => setTreeSearch(e.target.value)}
                       placeholder={t('filter_ellipsis', 'Filtrer...')}
-                      className="w-full pl-6 pr-5 py-1 text-xs rounded-lg border bg-black/5 dark:bg-white/5 outline-none font-mono text-slate-200 focus:border-sky-500"
-                      style={{ borderColor: 'var(--border)' }}
+                      className="w-full pl-6 pr-5 py-1 text-xs rounded-lg border outline-none font-mono focus:border-sky-500 transition-colors"
+                      style={{
+                        borderColor: 'var(--border)',
+                        backgroundColor: 'var(--input-bg, var(--surface))',
+                        color: 'var(--text)',
+                      }}
                     />
                     {treeSearch && (
                       <button
                         type="button"
                         onClick={() => setTreeSearch('')}
-                        className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-200 cursor-pointer"
+                        className="absolute right-1.5 top-1.5 hover:opacity-100 cursor-pointer"
+                        style={{ color: 'var(--muted)' }}
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -1845,8 +2002,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     type="button"
                     onClick={() => window.dispatchEvent(new CustomEvent('open-quick-open'))}
                     title={t('quick_file_search_tooltip', 'Recherche rapide de fichiers (Ctrl+P)')}
-                    className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-sky-400 cursor-pointer shrink-0"
-                    style={{ borderColor: 'var(--border)' }}
+                    className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shrink-0 transition-colors"
+                    style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
                   >
                     <Search className="w-3.5 h-3.5" />
                   </button>
@@ -1855,8 +2012,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     type="button"
                     onClick={() => handleTabClick('search')}
                     title={t('search_replace_global_tooltip', 'Recherche & Remplacement global dans le workspace (Ctrl+Shift+F)')}
-                    className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-amber-400 cursor-pointer shrink-0"
-                    style={{ borderColor: 'var(--border)' }}
+                    className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shrink-0 transition-colors"
+                    style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
                   </button>
@@ -1865,7 +2022,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     title={t('upload_files_tooltip', 'Importer des fichiers depuis votre ordinateur')}
-                    className="p-1.5 rounded-lg border hover:bg-emerald-500/10 text-emerald-400 border-emerald-500/30 cursor-pointer shrink-0"
+                    className="p-1.5 rounded-lg border hover:bg-emerald-500/10 text-emerald-500 border-emerald-500/30 cursor-pointer shrink-0 transition-colors"
                   >
                     <Upload className="w-3.5 h-3.5" />
                   </button>
@@ -1878,7 +2035,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       setNewItemName('');
                     }}
                     title={t('new_file_root', 'Nouveau fichier à la racine')}
-                    className="p-1.5 rounded-lg border hover:bg-sky-500/10 text-sky-400 border-sky-500/30 cursor-pointer shrink-0"
+                    className="p-1.5 rounded-lg border hover:bg-sky-500/10 text-sky-500 border-sky-500/30 cursor-pointer shrink-0 transition-colors"
                   >
                     <FilePlus className="w-3.5 h-3.5" />
                   </button>
@@ -1891,7 +2048,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       setNewItemName('');
                     }}
                     title={t('new_folder_root', 'Nouveau dossier à la racine')}
-                    className="p-1.5 rounded-lg border hover:bg-sky-500/10 text-sky-400 border-sky-500/30 cursor-pointer shrink-0"
+                    className="p-1.5 rounded-lg border hover:bg-sky-500/10 text-sky-500 border-sky-500/30 cursor-pointer shrink-0 transition-colors"
                   >
                     <FolderPlus className="w-3.5 h-3.5" />
                   </button>
@@ -1901,8 +2058,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     onClick={loadTree}
                     disabled={loadingTree}
                     title={t('refresh', 'Actualiser')}
-                    className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-200 cursor-pointer shrink-0"
-                    style={{ borderColor: 'var(--border)' }}
+                    className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shrink-0 transition-colors"
+                    style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${loadingTree ? 'animate-spin' : ''}`} />
                   </button>
@@ -1911,7 +2068,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                 {/* Inline Creation Row */}
                 {creatingType && (
                   <div className="p-2 border-b bg-sky-500/10 flex items-center gap-1.5 shrink-0" style={{ borderColor: 'var(--border)' }}>
-                    <span className="text-[11px] font-semibold text-sky-400 shrink-0">
+                    <span className="text-[11px] font-semibold text-sky-500 shrink-0">
                       {creatingType === 'file' ? t('plus_file', '+ Fichier') : t('plus_folder', '+ Dossier')}
                     </span>
                     <input
@@ -1924,7 +2081,12 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         if (e.key === 'Escape') setCreatingType(null);
                       }}
                       placeholder={creatingType === 'file' ? t('file_name_placeholder', 'nom.ts') : t('folder_name_placeholder', 'dossier')}
-                      className="flex-1 min-w-0 px-2 py-0.5 text-xs rounded border border-sky-500 bg-zinc-950 text-zinc-100 outline-none font-mono"
+                      className="flex-1 min-w-0 px-2 py-0.5 text-xs rounded border border-sky-500 outline-none font-mono transition-colors shadow-xs"
+                      style={{
+                        backgroundColor: 'var(--input-bg, var(--surface))',
+                        color: 'var(--text)',
+                        borderColor: 'var(--accent, #0284c7)',
+                      }}
                     />
                     <button
                       type="button"
@@ -1937,7 +2099,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     <button
                       type="button"
                       onClick={() => setCreatingType(null)}
-                      className="p-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 cursor-pointer"
+                      className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
+                      style={{ color: 'var(--muted)' }}
                       title={t('cancel_escape_tooltip', 'Annuler (Échap)')}
                     >
                       <X className="w-3 h-3" />
@@ -1946,7 +2109,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                 )}
 
                 {/* Tree Item List */}
-                <div className="flex-1 overflow-y-auto p-2">
+                <div
+                  onContextMenu={handleTreeBackgroundContextMenu}
+                  className="flex-1 overflow-y-auto p-2"
+                >
                   {loadingTree && !fileTree ? (
                     <div className="p-4 text-center text-xs flex items-center justify-center gap-2" style={{ color: 'var(--muted)' }}>
                       <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
@@ -1978,9 +2144,12 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           onContextMenu={(e) => handleTabContextMenu(e, idx)}
                           className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono cursor-pointer border transition-colors shrink-0 max-w-[170px] ${
                             isActive
-                              ? 'bg-sky-500/15 border-sky-500/40 text-sky-400 font-semibold'
-                              : 'bg-transparent border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-slate-400 hover:text-slate-200'
+                              ? 'bg-sky-500/15 border-sky-500/40 text-sky-600 dark:text-sky-400 font-semibold'
+                              : 'bg-transparent border-transparent hover:bg-black/5 dark:hover:bg-white/5'
                           }`}
+                          style={{
+                            color: isActive ? undefined : 'var(--muted)',
+                          }}
                           title={`${tab.path} (clic droit pour plus d'options)`}
                         >
                           <FileIcon filename={tab.name} isDir={false} className="w-3 h-3 shrink-0" />
@@ -1991,7 +2160,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           <button
                             type="button"
                             onClick={(e) => handleCloseTab(idx, e)}
-                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/20 text-slate-400 hover:text-slate-200 cursor-pointer"
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
+                            style={{ color: 'var(--muted)' }}
                             title={t('close_tab', "Fermer l'onglet")}
                           >
                             <X className="w-3 h-3" />
@@ -2007,28 +2177,31 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           top: `${tabContextMenu.y}px`,
                           left: `${Math.min(tabContextMenu.x, window.innerWidth - 220)}px`,
                           backgroundColor: 'var(--surface)',
-                          borderColor: 'var(--border)',
+                          borderColor: 'var(--border2, var(--border))',
+                          color: 'var(--text)',
                         }}
                         className="fixed z-50 min-w-[210px] py-1.5 rounded-xl border shadow-2xl backdrop-blur-md text-xs font-sans animate-fadeIn select-none"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="px-3 py-1 text-[10px] font-mono text-slate-400 border-b border-white/5 truncate max-w-[210px]">
+                        <div className="px-3 py-1 text-[10px] font-mono border-b truncate max-w-[210px]" style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}>
                           {openTabs[tabContextMenu.tabIndex]?.name}
                         </div>
 
                         <button
                           type="button"
                           onClick={() => handleCloseTab(tabContextMenu.tabIndex)}
-                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+                          style={{ color: 'var(--text)' }}
                         >
                           <span>{t('close', 'Fermer')}</span>
-                          <span className="text-[10px] text-slate-500 font-mono">{t('close_tab', 'Fermer onglet')}</span>
+                          <span className="text-[10px] opacity-50 font-mono">{t('close_tab', 'Fermer onglet')}</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleCloseOtherTabs(tabContextMenu.tabIndex)}
-                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+                          style={{ color: 'var(--text)' }}
                         >
                           <span>{t('close_others', 'Fermer les autres')}</span>
                         </button>
@@ -2036,7 +2209,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         <button
                           type="button"
                           onClick={() => handleCloseTabsToRight(tabContextMenu.tabIndex)}
-                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+                          style={{ color: 'var(--text)' }}
                         >
                           <span>{t('close_to_the_right', 'Fermer à droite')}</span>
                         </button>
@@ -2044,7 +2218,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         <button
                           type="button"
                           onClick={handleCloseSavedTabs}
-                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+                          style={{ color: 'var(--text)' }}
                         >
                           <span>{t('close_saved_tabs', 'Fermer les onglets enregistrés')}</span>
                         </button>
@@ -2052,12 +2227,82 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         <button
                           type="button"
                           onClick={handleCloseAllTabs}
-                          className="w-full text-left px-3 py-1.5 hover:bg-rose-500/10 flex items-center justify-between text-rose-400 hover:text-rose-300 cursor-pointer"
+                          className="w-full text-left px-3 py-1.5 hover:bg-rose-500/10 text-rose-500 dark:text-rose-400 flex items-center justify-between transition-colors cursor-pointer"
                         >
                           <span>{t('close_all', 'Tout fermer')}</span>
                         </button>
 
-                        <div className="my-1 border-t border-white/5" />
+                        <div className="my-1 border-t" style={{ borderColor: 'var(--border)' }} />
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tab = openTabs[tabContextMenu.tabIndex];
+                            if (tab) handleCopyRelativePath(tab.path);
+                            setTabContextMenu(null);
+                          }}
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+                          style={{ color: 'var(--text)' }}
+                        >
+                          <span className="flex items-center gap-2">
+                            <Copy className="w-3.5 h-3.5 text-sky-500" />
+                            <span>{t('copy_relative_path', 'Copier le chemin relatif')}</span>
+                          </span>
+                          <span className="text-[10px] font-mono opacity-50">rel</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tab = openTabs[tabContextMenu.tabIndex];
+                            if (tab) handleCopyAbsolutePath(tab.path);
+                            setTabContextMenu(null);
+                          }}
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+                          style={{ color: 'var(--text)' }}
+                        >
+                          <span className="flex items-center gap-2">
+                            <ClipboardCopy className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>{t('copy_absolute_path', 'Copier le chemin absolu')}</span>
+                          </span>
+                          <span className="text-[10px] font-mono opacity-50">abs</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tab = openTabs[tabContextMenu.tabIndex];
+                            if (tab) handleCopyName(tab.path);
+                            setTabContextMenu(null);
+                          }}
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                          style={{ color: 'var(--text)' }}
+                        >
+                          <FileText className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{t('copy_name', 'Copier le nom')}</span>
+                        </button>
+
+                        {onInsertPath && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const tab = openTabs[tabContextMenu.tabIndex];
+                              if (tab) {
+                                const rel = getRelativePath(tab.path);
+                                onInsertPath(`@${rel} `);
+                                showToast(t('path_inserted_in_prompt', 'Chemin inséré dans le chat : @{0}', rel), 'info');
+                              }
+                              setTabContextMenu(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                            style={{ color: 'var(--text)' }}
+                          >
+                            <Plus className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>{t('insert_in_prompt', 'Insérer dans le prompt')}</span>
+                          </button>
+                        )}
+
+                        <div className="my-1 border-t" style={{ borderColor: 'var(--border)' }} />
 
                         <button
                           type="button"
@@ -2066,8 +2311,10 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             if (tab) handleDuplicateFile(tab.path);
                             setTabContextMenu(null);
                           }}
-                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                          style={{ color: 'var(--text)' }}
                         >
+                          <Copy className="w-3.5 h-3.5 text-amber-500" />
                           <span>{t('duplicate_this_file', 'Dupliquer ce fichier')}</span>
                         </button>
 
@@ -2075,15 +2322,14 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           type="button"
                           onClick={() => {
                             const tab = openTabs[tabContextMenu.tabIndex];
-                            if (tab) {
-                              navigator.clipboard.writeText(tab.path);
-                              showToast(t('absolute_path_copied', 'Chemin absolu copié'), 'info');
-                            }
+                            if (tab) handleDownloadFile(tab.path);
                             setTabContextMenu(null);
                           }}
-                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white cursor-pointer"
+                          className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                          style={{ color: 'var(--text)' }}
                         >
-                          <span>{t('copy_absolute_path', 'Copier le chemin absolu')}</span>
+                          <Download className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>{t('download_file', 'Télécharger ce fichier')}</span>
                         </button>
                       </div>
                     )}
@@ -2094,20 +2340,36 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   <>
                     {/* Editor Action Header Bar */}
                     <div
-                      className="flex items-center justify-between px-3 py-1.5 border-b text-[11px] shrink-0 gap-2"
+                      className="flex items-center justify-between px-3 py-1.5 border-b text-[11px] shrink-0 gap-2 overflow-x-auto"
                       style={{
                         backgroundColor: 'var(--surface-subtle)',
                         borderColor: 'var(--border)',
                         color: 'var(--muted)',
                       }}
                     >
-                      {/* Breadcrumb */}
+                      {/* Breadcrumb with workspace root and clickable segments */}
                       <div className="flex items-center gap-1 font-mono text-[11px] truncate flex-1 min-w-0" style={{ color: 'var(--muted)' }}>
-                        {activeTabItem.path.split(/[/\\]/).filter(Boolean).map((part, idx, arr) => (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyRelativePath(activeTabItem.path)}
+                          className="hover:underline opacity-60 hover:opacity-100 cursor-pointer font-bold shrink-0"
+                          style={{ color: 'var(--text)' }}
+                          title={t('click_copy_relative', 'Cliquer pour copier le chemin relatif')}
+                        >
+                          ~
+                        </button>
+                        <span className="opacity-40">/</span>
+                        {getRelativePath(activeTabItem.path).split(/[/\\]/).filter(Boolean).map((part, idx, arr) => (
                           <React.Fragment key={idx}>
                             <span
-                              className={idx === arr.length - 1 ? 'font-semibold' : 'opacity-70'}
+                              onClick={() => {
+                                if (idx === arr.length - 1) {
+                                  handleCopyRelativePath(activeTabItem.path);
+                                }
+                              }}
+                              className={idx === arr.length - 1 ? 'font-semibold cursor-pointer hover:underline' : 'opacity-70'}
                               style={{ color: idx === arr.length - 1 ? 'var(--strong)' : undefined }}
+                              title={idx === arr.length - 1 ? t('click_copy_relative', 'Cliquer pour copier le chemin relatif') : undefined}
                             >
                               {part}
                             </span>
@@ -2121,20 +2383,58 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
                       {/* Header Actions */}
                       <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Copy Relative Path Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleCopyRelativePath(activeTabItem.path)}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:bg-black/5 dark:hover:bg-white/5"
+                          style={{
+                            backgroundColor: 'var(--surface)',
+                            borderColor: 'var(--border)',
+                            color: 'var(--text)',
+                          }}
+                          title={t('copy_relative_path', 'Copier le chemin relatif')}
+                        >
+                          <Copy className="w-2.5 h-2.5 text-sky-500" />
+                          <span>{t('copy_rel_short', 'Relatif')}</span>
+                        </button>
+
+                        {/* Copy Absolute Path Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleCopyAbsolutePath(activeTabItem.path)}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:bg-black/5 dark:hover:bg-white/5"
+                          style={{
+                            backgroundColor: 'var(--surface)',
+                            borderColor: 'var(--border)',
+                            color: 'var(--text)',
+                          }}
+                          title={t('copy_absolute_path', 'Copier le chemin absolu')}
+                        >
+                          <ClipboardCopy className="w-2.5 h-2.5 text-indigo-500" />
+                          <span>{t('copy_abs_short', 'Absolu')}</span>
+                        </button>
+
                         {onInsertPath && (
                           <button
-                            onClick={() => onInsertPath(activeTabItem.path)}
-                            className="text-[10px] text-sky-500 hover:text-sky-400 font-medium cursor-pointer mr-1"
-                            title={t('insert_path_in_prompt', 'Insérer le chemin')}
+                            type="button"
+                            onClick={() => {
+                              const rel = getRelativePath(activeTabItem.path);
+                              onInsertPath(`@${rel} `);
+                              showToast(t('path_inserted_in_prompt', 'Chemin inséré dans le chat : @{0}', rel), 'info');
+                            }}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
+                            title={t('insert_path_in_prompt', 'Insérer le chemin relatif dans le prompt')}
                           >
-                            + {t('insert_path', 'Insérer')}
+                            <Plus className="w-2.5 h-2.5" />
+                            <span>{t('insert', 'Insérer')}</span>
                           </button>
                         )}
 
                         <button
                           type="button"
                           onClick={handleDownloadCurrentFile}
-                          className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:opacity-90"
+                          className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:bg-black/5 dark:hover:bg-white/5"
                           style={{
                             backgroundColor: 'var(--surface)',
                             borderColor: 'var(--border)',
@@ -2142,9 +2442,31 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           }}
                           title={t('download_file_to_device', 'Télécharger le fichier')}
                         >
-                          <Download className="w-2.5 h-2.5" />
+                          <Download className="w-2.5 h-2.5 text-emerald-500" />
                           <span>{t('download', 'Télécharger')}</span>
                         </button>
+
+                        {/* Open in Browser for HTML, SVG, Image */}
+                        {activeTabItem.path.match(/\.(html?|svg|png|jpe?g|webp|gif|pdf)$/i) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const token = getAuthToken();
+                              const url = `/api/files/download?path=${encodeURIComponent(activeTabItem.path)}${currentWorkspace ? `&workspace=${encodeURIComponent(currentWorkspace)}` : ''}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+                              window.open(url, '_blank', 'noopener');
+                            }}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border hover:bg-black/5 dark:hover:bg-white/5"
+                            style={{
+                              backgroundColor: 'var(--surface)',
+                              borderColor: 'var(--border)',
+                              color: 'var(--text)',
+                            }}
+                            title={t('open_in_browser', 'Ouvrir dans le navigateur')}
+                          >
+                            <ExternalLink className="w-2.5 h-2.5 text-sky-500" />
+                            <span>{t('browser', 'Navigateur')}</span>
+                          </button>
+                        )}
 
                         {activeTabItem.path.endsWith('.md') && (
                           <button
@@ -2322,9 +2644,9 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     </div>
 
                     {/* Editor Viewport */}
-                    <div className="flex-1 relative overflow-hidden bg-zinc-950 flex flex-col min-h-0">
+                    <div className="flex-1 relative overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--main-bg, var(--surface))' }}>
                       {loadingContent ? (
-                        <div className="flex-1 flex items-center justify-center gap-2 text-xs text-zinc-400">
+                        <div className="flex-1 flex items-center justify-center gap-2 text-xs" style={{ color: 'var(--muted)' }}>
                           <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
                           <span>{t('loading_content', 'Chargement du contenu...')}</span>
                         </div>
@@ -2333,7 +2655,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           <img
                             src={`/api/files/download?path=${encodeURIComponent(activeTabItem.path)}${getAuthToken() ? `&token=${encodeURIComponent(getAuthToken()!)}` : ''}`}
                             alt={activeTabItem.name}
-                            className="max-w-full max-h-full object-contain rounded-lg shadow-sm border border-zinc-800"
+                            className="max-w-full max-h-full object-contain rounded-lg shadow-sm border"
+                            style={{ borderColor: 'var(--border)' }}
                           />
                         </div>
                       ) : activeTabItem.isBinary ? (
@@ -2419,7 +2742,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             },
                           }}
                           loading={
-                            <div className="flex items-center justify-center h-full gap-2 text-zinc-500">
+                            <div className="flex items-center justify-center h-full gap-2 opacity-70" style={{ color: 'var(--muted)' }}>
                               <Loader2 className="w-5 h-5 animate-spin text-sky-400" />
                               <span className="text-xs">{t('monaco_loading_editor', 'Chargement de Monaco Editor...')}</span>
                             </div>
@@ -2446,7 +2769,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               type="button"
                               onClick={() => loadDiagnostics(activeTabItem.content, activeTabItem.language, activeTabItem.path)}
                               disabled={isLinting}
-                              className="p-0.5 rounded hover:text-zinc-200 transition-colors cursor-pointer"
+                              className="p-0.5 rounded opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
                               title={t('editor_diagnostics_refresh', 'Actualiser les diagnostics')}
                             >
                               <RotateCw className={`w-3 h-3 ${isLinting ? 'animate-spin text-emerald-400' : ''}`} />
@@ -2454,16 +2777,16 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             <button
                               type="button"
                               onClick={() => setIsProblemsOpen(false)}
-                              className="p-0.5 rounded hover:text-zinc-200 transition-colors cursor-pointer"
+                              className="p-0.5 rounded opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
                               title={t('close', 'Fermer')}
                             >
                               <X className="w-3 h-3" />
                             </button>
                           </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40 p-1">
+                        <div className="flex-1 overflow-y-auto divide-y divide-black/5 dark:divide-white/5 p-1">
                           {diagnostics.length === 0 ? (
-                            <div className="flex items-center justify-center py-4 text-zinc-500 gap-1.5 text-[11px]">
+                            <div className="flex items-center justify-center py-4 gap-1.5 text-[11px]" style={{ color: 'var(--muted)' }}>
                               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                               <span>{t('editor_diagnostics_no_problems', 'Aucun problème détecté')}</span>
                             </div>
@@ -2536,13 +2859,16 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                           onClick={() => setIsProblemsOpen(!isProblemsOpen)}
                           className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] border transition-colors cursor-pointer ${
                             isProblemsOpen
-                              ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
+                              ? 'bg-black/10 dark:bg-white/10 text-[var(--text)] border-[var(--border)]'
                               : totalErrors > 0
                               ? 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25'
                               : totalWarnings > 0
                               ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
-                              : 'text-zinc-500 hover:text-zinc-300 border-transparent hover:border-zinc-700'
+                              : 'hover:text-[var(--text)] border-transparent hover:border-[var(--border)]'
                           }`}
+                          style={{
+                            color: isProblemsOpen ? 'var(--text)' : undefined,
+                          }}
                           title={t('editor_diagnostics_toggle_drawer', 'Afficher/Masquer le panneau des problèmes')}
                         >
                           {isLinting ? (
@@ -2567,7 +2893,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
                       <div className="flex items-center gap-2.5 flex-wrap">
                         {diffSummary && diffSummary.total_changes > 0 && (
-                          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/20 dark:bg-white/5 border border-zinc-700/50 text-[9px]">
+                          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/5 border border-[var(--border)] text-[9px]">
                             <span
                               onClick={() => navigateGitDiff(monacoEditorRef.current, diffRangesRef.current, 'next')}
                               className="cursor-pointer hover:underline flex items-center gap-1 font-semibold"
@@ -2577,11 +2903,11 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               <span className="text-sky-400">~{diffSummary.modified_lines}</span>
                               <span className="text-rose-400">-{diffSummary.deleted_lines}</span>
                             </span>
-                            <div className="flex items-center border-l border-zinc-700/60 pl-1 ml-0.5 gap-0.5">
+                            <div className="flex items-center border-l border-[var(--border)] pl-1 ml-0.5 gap-0.5">
                               <button
                                 type="button"
                                 onClick={() => navigateGitDiff(monacoEditorRef.current, diffRangesRef.current, 'prev')}
-                                className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
+                                className="p-0.5 opacity-70 hover:opacity-100 rounded cursor-pointer"
                                 title={t('git_prev_change_hint', 'Modification précédente (Shift+F7)')}
                               >
                                 <ChevronUp className="w-2.5 h-2.5" />
@@ -2589,7 +2915,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                               <button
                                 type="button"
                                 onClick={() => navigateGitDiff(monacoEditorRef.current, diffRangesRef.current, 'next')}
-                                className="p-0.5 hover:text-zinc-100 rounded cursor-pointer"
+                                className="p-0.5 opacity-70 hover:opacity-100 rounded cursor-pointer"
                                 title={t('git_next_change_f7', 'Modification suivante (F7)')}
                               >
                                 <ChevronDown className="w-2.5 h-2.5" />
@@ -2663,11 +2989,22 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                             return next;
                           });
                         }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border hover:bg-black/5 dark:hover:bg-white/5 text-slate-300 cursor-pointer shadow-sm transition-all"
-                        style={{ borderColor: 'var(--border)' }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-xs transition-all"
+                        style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
                       >
-                        <TerminalIcon className="w-3.5 h-3.5 text-sky-400" />
+                        <TerminalIcon className="w-3.5 h-3.5 text-sky-500" />
                         <span>{t('terminal_ctrl_backquote', 'Terminal (Ctrl+`)')}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopyAbsolutePath(currentWorkspace)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-xs transition-all"
+                        style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+                        title={t('copy_workspace_path_tooltip', 'Copier le chemin absolu du workspace')}
+                      >
+                        <ClipboardCopy className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>{t('copy_workspace_path', 'Copier chemin workspace')}</span>
                       </button>
                     </div>
                   </div>
@@ -2931,6 +3268,257 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
         )}
       </div>
     </aside>
+
+    {/* Floating Tree Context Menu */}
+    {treeContextMenu && (
+      <div
+        style={{
+          top: `${treeContextMenu.y}px`,
+          left: `${treeContextMenu.x}px`,
+          backgroundColor: 'var(--surface)',
+          borderColor: 'var(--border2, var(--border))',
+          color: 'var(--text)',
+        }}
+        className="fixed z-50 min-w-[220px] py-1.5 rounded-xl border shadow-2xl backdrop-blur-xl text-xs font-sans animate-fadeIn select-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header showing item icon, name, and relative path */}
+        <div className="px-3 py-1.5 border-b" style={{ borderColor: 'var(--border)' }}>
+          <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold truncate" style={{ color: 'var(--strong)' }}>
+            <FileIcon filename={treeContextMenu.item.name} isDir={treeContextMenu.item.is_dir} className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{treeContextMenu.item.name}</span>
+          </div>
+          <div className="text-[10px] font-mono truncate mt-0.5" style={{ color: 'var(--muted)' }}>
+            {getRelativePath(treeContextMenu.item.path)}
+          </div>
+        </div>
+
+        {/* Section 1: Copy actions */}
+        <div className="py-1">
+          <button
+            type="button"
+            onClick={() => {
+              handleCopyRelativePath(treeContextMenu.item.path);
+              setTreeContextMenu(null);
+            }}
+            className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+            style={{ color: 'var(--text)' }}
+          >
+            <span className="flex items-center gap-2">
+              <Copy className="w-3.5 h-3.5 text-sky-500" />
+              <span>{t('copy_relative_path', 'Copier le chemin relatif')}</span>
+            </span>
+            <span className="text-[10px] font-mono opacity-50">rel</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              handleCopyAbsolutePath(treeContextMenu.item.path);
+              setTreeContextMenu(null);
+            }}
+            className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+            style={{ color: 'var(--text)' }}
+          >
+            <span className="flex items-center gap-2">
+              <ClipboardCopy className="w-3.5 h-3.5 text-indigo-500" />
+              <span>{t('copy_absolute_path', 'Copier le chemin absolu')}</span>
+            </span>
+            <span className="text-[10px] font-mono opacity-50">abs</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              handleCopyName(treeContextMenu.item.path);
+              setTreeContextMenu(null);
+            }}
+            className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+            style={{ color: 'var(--text)' }}
+          >
+            <FileText className="w-3.5 h-3.5 text-slate-400" />
+            <span>{t('copy_name', 'Copier le nom')}</span>
+          </button>
+
+          {onInsertPath && (
+            <button
+              type="button"
+              onClick={() => {
+                const rel = getRelativePath(treeContextMenu.item.path);
+                onInsertPath(`@${rel} `);
+                showToast(t('path_inserted_in_prompt', 'Chemin inséré dans le chat : @{0}', rel), 'info');
+                setTreeContextMenu(null);
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+              style={{ color: 'var(--text)' }}
+            >
+              <span className="flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-emerald-500" />
+                <span>{t('insert_in_prompt', 'Insérer dans le prompt')}</span>
+              </span>
+              <span className="text-[10px] font-mono opacity-50">@...</span>
+            </button>
+          )}
+        </div>
+
+        <div className="my-1 border-t" style={{ borderColor: 'var(--border)' }} />
+
+        {/* Section 2: File/Folder specific actions */}
+        <div className="py-1">
+          {!treeContextMenu.item.is_dir ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  handleSelectFile(treeContextMenu.item.path);
+                  setTreeContextMenu(null);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                style={{ color: 'var(--text)' }}
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-sky-400" />
+                <span>{t('open_file', 'Ouvrir le fichier')}</span>
+              </button>
+
+              {onOpenMonacoStudio && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenMonacoStudio({
+                      mode: 'editor',
+                      filePath: treeContextMenu.item.path,
+                      workspace: currentWorkspace,
+                      openFiles: openTabs.map(t => ({ path: t.path, name: t.name, content: t.content })),
+                    });
+                    setTreeContextMenu(null);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                  style={{ color: 'var(--text)' }}
+                >
+                  <Code2 className="w-3.5 h-3.5 text-sky-400" />
+                  <span>{t('open_in_monaco_studio', 'Ouvrir dans Monaco Studio')}</span>
+                </button>
+              )}
+
+              {treeContextMenu.item.path.match(/\.(html?|svg|png|jpe?g|webp|gif|pdf)$/i) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const token = getAuthToken();
+                    const url = `/api/files/download?path=${encodeURIComponent(treeContextMenu.item.path)}${currentWorkspace ? `&workspace=${encodeURIComponent(currentWorkspace)}` : ''}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+                    window.open(url, '_blank', 'noopener');
+                    setTreeContextMenu(null);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                  style={{ color: 'var(--text)' }}
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
+                  <span>{t('open_in_browser', 'Ouvrir dans le navigateur')}</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleDuplicateFile(treeContextMenu.item.path);
+                  setTreeContextMenu(null);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                style={{ color: 'var(--text)' }}
+              >
+                <Copy className="w-3.5 h-3.5 text-amber-500" />
+                <span>{t('duplicate_file', 'Dupliquer le fichier')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleDownloadFile(treeContextMenu.item.path);
+                  setTreeContextMenu(null);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                style={{ color: 'var(--text)' }}
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-500" />
+                <span>{t('download_file', 'Télécharger le fichier')}</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreatingParent(treeContextMenu.item.path);
+                  setCreatingType('file');
+                  setNewItemName('');
+                  setExpandedFolders(prev => ({ ...prev, [treeContextMenu.item.path]: true }));
+                  setTreeContextMenu(null);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                style={{ color: 'var(--text)' }}
+              >
+                <FilePlus className="w-3.5 h-3.5 text-sky-400" />
+                <span>{t('new_file_here', 'Nouveau fichier ici...')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCreatingParent(treeContextMenu.item.path);
+                  setCreatingType('folder');
+                  setNewItemName('');
+                  setExpandedFolders(prev => ({ ...prev, [treeContextMenu.item.path]: true }));
+                  setTreeContextMenu(null);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                style={{ color: 'var(--text)' }}
+              >
+                <FolderPlus className="w-3.5 h-3.5 text-sky-400" />
+                <span>{t('new_folder_here', 'Nouveau dossier ici...')}</span>
+              </button>
+            </>
+          )}
+        </div>
+
+        {!treeContextMenu.item.is_root && (
+          <>
+            <div className="my-1 border-t" style={{ borderColor: 'var(--border)' }} />
+
+            {/* Section 3: Destructive / Rename actions */}
+            <div className="py-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setRenamingPath(treeContextMenu.item.path);
+                  setRenamedName(treeContextMenu.item.name);
+                  setTreeContextMenu(null);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+                style={{ color: 'var(--text)' }}
+              >
+                <span className="flex items-center gap-2">
+                  <Edit2 className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{t('rename', 'Renommer')}</span>
+                </span>
+                <span className="text-[10px] font-mono opacity-50">F2</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleDeleteItem(treeContextMenu.item.path, treeContextMenu.item.is_dir, treeContextMenu.item.name);
+                  setTreeContextMenu(null);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-rose-500/10 text-rose-500 dark:text-rose-400 flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{t('delete', 'Supprimer')}</span>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    )}
 
     {/* Copilot Action Modal for Workspace Panel */}
     {activeTabItem && !activeTabItem.isBinary && (

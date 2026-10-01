@@ -2428,6 +2428,8 @@ export function App() {
           openRightPanel('terminal');
           window.dispatchEvent(new CustomEvent('terminal-run-command', { detail: { command: cmd } }));
         }}
+        onOpenFiles={() => openRightPanel('files')}
+        onOpenGit={() => openRightPanel('git')}
       />
 
       <SessionMetaModal

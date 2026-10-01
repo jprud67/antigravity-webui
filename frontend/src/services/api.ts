@@ -2172,7 +2172,18 @@ export async function removeWorkspaceProject(path: string): Promise<{ status: st
 
 export async function exploreWorkspaceDirectory(
   path?: string
-): Promise<{ current_path: string; parent_path: string | null; entries: Array<{ name: string; path: string; is_dir: boolean; size?: number | null }> }> {
+): Promise<{
+  current_path: string;
+  parent_path: string | null;
+  entries: Array<{
+    name: string;
+    path: string;
+    is_dir: boolean;
+    size?: number | null;
+    has_git?: boolean;
+    project_type?: string | null;
+  }>;
+}> {
   const query = path ? `?path=${encodeURIComponent(path)}` : '';
   const res = await fetch(`${API_BASE}/workspaces/explore${query}`, {
     headers: getHeaders()
@@ -2180,6 +2191,68 @@ export async function exploreWorkspaceDirectory(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Échec d'exploration du dossier" }));
     throw new Error(err.detail || "Erreur lors de l'exploration du dossier");
+  }
+  return res.json();
+}
+
+export async function createNewWorkspaceProject(params: {
+  parent_path: string;
+  folder_name: string;
+  template?: 'empty' | 'node' | 'python' | 'html' | 'readme';
+  init_git?: boolean;
+}): Promise<{ status: string; path: string; name: string }> {
+  const res = await fetch(`${API_BASE}/workspaces/create`, {
+    method: 'POST',
+    headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      parent_path: params.parent_path,
+      folder_name: params.folder_name,
+      template: params.template || 'empty',
+      init_git: params.init_git ?? true
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de création du projet' }));
+    throw new Error(err.detail || 'Erreur lors de la création du projet');
+  }
+  return res.json();
+}
+
+export async function cloneWorkspaceProject(params: {
+  repo_url: string;
+  parent_path: string;
+  folder_name?: string;
+  branch?: string;
+}): Promise<{ status: string; path: string; name: string }> {
+  const res = await fetch(`${API_BASE}/workspaces/clone`, {
+    method: 'POST',
+    headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      repo_url: params.repo_url,
+      parent_path: params.parent_path,
+      folder_name: params.folder_name || null,
+      branch: params.branch || null
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec du clonage du projet' }));
+    throw new Error(err.detail || 'Erreur lors du clonage du projet');
+  }
+  return res.json();
+}
+
+export async function runGitQuickAction(
+  workspace_path: string,
+  action: 'pull' | 'fetch' | 'status'
+): Promise<{ status: string; exit_code: number; output: string; action: string }> {
+  const res = await fetch(`${API_BASE}/workspaces/git-action`, {
+    method: 'POST',
+    headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ workspace_path, action })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Échec de l'action Git" }));
+    throw new Error(err.detail || "Erreur lors de l'action Git");
   }
   return res.json();
 }

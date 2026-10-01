@@ -8,6 +8,7 @@ import {
    File, 
    Search, 
    Copy, 
+   ClipboardCopy,
    Check, 
    CornerDownLeft, 
    RefreshCw,
@@ -49,7 +50,37 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copiedRel, setCopiedRel] = useState(false);
+  const [copiedAbs, setCopiedAbs] = useState(false);
+
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    node: FileNode;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClose = () => setContextMenu(null);
+    window.addEventListener('click', handleClose);
+    window.addEventListener('contextmenu', handleClose);
+    return () => {
+      window.removeEventListener('click', handleClose);
+      window.removeEventListener('contextmenu', handleClose);
+    };
+  }, [contextMenu]);
+
+  const getRelativePath = useCallback((fullPath: string) => {
+    if (!fullPath) return '';
+    const normFull = fullPath.replace(/\\/g, '/');
+    const normRoot = (currentWorkspace || '').replace(/\\/g, '/').replace(/\/+$/, '');
+    if (normRoot && normFull.startsWith(normRoot)) {
+      const rel = normFull.slice(normRoot.length).replace(/^\/+/, '');
+      return rel || '.';
+    }
+    return normFull;
+  }, [currentWorkspace]);
 
   const loadTree = useCallback(async () => {
     setLoading(true);
@@ -118,13 +149,13 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
     }
   };
 
-  const copyPath = async (path: string) => {
+  const copyText = async (text: string) => {
     try {
       if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(path);
+        await navigator.clipboard.writeText(text);
       } else {
         const ta = document.createElement('textarea');
-        ta.value = path;
+        ta.value = text;
         ta.style.position = 'fixed';
         ta.style.opacity = '0';
         document.body.appendChild(ta);
@@ -132,15 +163,32 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
         document.execCommand('copy');
         document.body.removeChild(ta);
       }
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      return true;
     } catch {
-      // Ignore copy error
+      return false;
+    }
+  };
+
+  const copyRelativePath = async (path: string) => {
+    const rel = getRelativePath(path);
+    const ok = await copyText(rel);
+    if (ok) {
+      setCopiedRel(true);
+      setTimeout(() => setCopiedRel(false), 2000);
+    }
+  };
+
+  const copyAbsolutePath = async (path: string) => {
+    const ok = await copyText(path);
+    if (ok) {
+      setCopiedAbs(true);
+      setTimeout(() => setCopiedAbs(false), 2000);
     }
   };
 
   const insertAndClose = (path: string) => {
-    onInsertPath(`@${path} `);
+    const rel = getRelativePath(path);
+    onInsertPath(`@${rel} `);
     onClose();
   };
 
@@ -181,6 +229,15 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
         <div key={node.path} className="flex flex-col">
           <div
             onClick={() => handleSelectFile(node)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setContextMenu({
+                x: Math.min(e.clientX, window.innerWidth - 220),
+                y: Math.min(e.clientY, window.innerHeight - 200),
+                node
+              });
+            }}
             style={{ paddingLeft: `${depth * 14 + 10}px` }}
             className={`py-1.5 pr-2.5 rounded-lg flex items-center justify-between text-xs cursor-pointer transition-colors group ${
               isSelected
@@ -188,7 +245,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800/60'
             }`}
           >
-            <div className="flex items-center gap-2 truncate">
+            <div className="flex items-center gap-2 truncate flex-1 min-w-0 mr-1">
               {node.is_dir ? (
                 <button
                   onClick={(e) => toggleFolder(node.path, e)}
@@ -208,11 +265,26 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
               </span>
             </div>
 
-            {!node.is_dir && (
-              <span className="text-[10px] text-slate-600 font-mono group-hover:text-slate-400 transition-colors">
-                {(node.size / 1024).toFixed(0)} KB
-              </span>
-            )}
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  copyRelativePath(node.path);
+                }}
+                title={t('copy_relative_path', 'Copier le chemin relatif')}
+                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-opacity cursor-pointer"
+                style={{ color: 'var(--muted)' }}
+              >
+                <Copy className="w-3 h-3 hover:text-sky-500" />
+              </button>
+
+              {!node.is_dir && (
+                <span className="text-[10px] text-slate-600 font-mono group-hover:text-slate-400 transition-colors">
+                  {(node.size / 1024).toFixed(0)} KB
+                </span>
+              )}
+            </div>
           </div>
 
           {node.is_dir && isExpanded && node.children && (
@@ -348,23 +420,41 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
                   </div>
                   <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     <button
-                      onClick={() => copyPath(selectedFile)}
-                      className="py-1 px-2 sm:px-2.5 rounded-lg border text-[10px] flex items-center gap-1.5 transition-colors cursor-pointer font-mono"
+                      type="button"
+                      onClick={() => copyRelativePath(selectedFile)}
+                      className="py-1 px-2 sm:px-2.5 rounded-lg border text-[10px] flex items-center gap-1.5 transition-colors cursor-pointer font-mono hover:bg-black/5 dark:hover:bg-white/5"
                       style={{
                         backgroundColor: 'var(--surface)',
                         borderColor: 'var(--border)',
                         color: 'var(--text)'
                       }}
+                      title={t('copy_relative_path', 'Copier le chemin relatif')}
                     >
-                      {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                      <span className="hidden xs:inline">{copied ? t('copied', 'Copied!') : t('path', 'Path')}</span>
+                      {copiedRel ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-sky-500" />}
+                      <span className="hidden xs:inline">{copiedRel ? t('copied', 'Copié !') : t('copy_rel_short', 'Relatif')}</span>
                     </button>
                     <button
+                      type="button"
+                      onClick={() => copyAbsolutePath(selectedFile)}
+                      className="py-1 px-2 sm:px-2.5 rounded-lg border text-[10px] flex items-center gap-1.5 transition-colors cursor-pointer font-mono hover:bg-black/5 dark:hover:bg-white/5"
+                      style={{
+                        backgroundColor: 'var(--surface)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--text)'
+                      }}
+                      title={t('copy_absolute_path', 'Copier le chemin absolu')}
+                    >
+                      {copiedAbs ? <Check className="w-3 h-3 text-emerald-500" /> : <ClipboardCopy className="w-3 h-3 text-indigo-500" />}
+                      <span className="hidden xs:inline">{copiedAbs ? t('copied', 'Copié !') : t('copy_abs_short', 'Absolu')}</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => insertAndClose(selectedFile)}
-                      className="py-1 px-2.5 sm:px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="py-1 px-2.5 sm:px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      title={t('insert_in_prompt', 'Insérer dans le prompt')}
                     >
                       <CornerDownLeft className="w-3 h-3" />
-                      <span>{t('insert', 'Insert')}</span>
+                      <span>{t('insert', 'Insérer')}</span>
                     </button>
                   </div>
                 </div>
@@ -397,6 +487,80 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Floating Context Menu */}
+      {contextMenu && (
+        <div
+          style={{
+            top: `${contextMenu.y}px`,
+            left: `${contextMenu.x}px`,
+            backgroundColor: 'var(--surface)',
+            borderColor: 'var(--border2, var(--border))',
+            color: 'var(--text)'
+          }}
+          className="fixed z-50 min-w-[210px] py-1.5 rounded-xl border shadow-2xl backdrop-blur-md text-xs font-sans animate-fadeIn select-none"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-1 text-[10px] font-mono border-b truncate" style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}>
+            {getRelativePath(contextMenu.node.path)}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              copyRelativePath(contextMenu.node.path);
+              setContextMenu(null);
+            }}
+            className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+            style={{ color: 'var(--text)' }}
+          >
+            <span className="flex items-center gap-2">
+              <Copy className="w-3.5 h-3.5 text-sky-500" />
+              <span>{t('copy_relative_path', 'Copier le chemin relatif')}</span>
+            </span>
+            <span className="text-[10px] font-mono opacity-50">rel</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              copyAbsolutePath(contextMenu.node.path);
+              setContextMenu(null);
+            }}
+            className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between transition-colors cursor-pointer"
+            style={{ color: 'var(--text)' }}
+          >
+            <span className="flex items-center gap-2">
+              <ClipboardCopy className="w-3.5 h-3.5 text-indigo-500" />
+              <span>{t('copy_absolute_path', 'Copier le chemin absolu')}</span>
+            </span>
+            <span className="text-[10px] font-mono opacity-50">abs</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              copyText(contextMenu.node.name);
+              setContextMenu(null);
+            }}
+            className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+            style={{ color: 'var(--text)' }}
+          >
+            <FileText className="w-3.5 h-3.5 text-slate-400" />
+            <span>{t('copy_name', 'Copier le nom')}</span>
+          </button>
+          {!contextMenu.node.is_dir && (
+            <button
+              type="button"
+              onClick={() => {
+                insertAndClose(contextMenu.node.path);
+                setContextMenu(null);
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer text-sky-500 font-medium"
+            >
+              <CornerDownLeft className="w-3.5 h-3.5" />
+              <span>{t('insert_in_prompt', 'Insérer dans le prompt')}</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

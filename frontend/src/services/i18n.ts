@@ -62,6 +62,48 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     es: 'Herramientas y Acciones',
     de: 'Werkzeuge & Aktionen',
   },
+  copy_relative_path: {
+    en: 'Copy relative path',
+    fr: 'Copier le chemin relatif',
+    es: 'Copiar ruta relativa',
+    de: 'Relativen Pfad kopieren',
+  },
+  copy_absolute_path: {
+    en: 'Copy absolute path',
+    fr: 'Copier le chemin absolu',
+    es: 'Copiar ruta absoluta',
+    de: 'Absoluten Pfad kopieren',
+  },
+  copy_name: {
+    en: 'Copy name',
+    fr: 'Copier le nom',
+    es: 'Copiar nombre',
+    de: 'Namen kopieren',
+  },
+  relative_path_copied: {
+    en: 'Relative path copied',
+    fr: 'Chemin relatif copié',
+    es: 'Ruta relativa copiada',
+    de: 'Relativer Pfad kopiert',
+  },
+  absolute_path_copied: {
+    en: 'Absolute path copied',
+    fr: 'Chemin absolu copié',
+    es: 'Ruta absoluta copiada',
+    de: 'Absoluter Pfad kopiert',
+  },
+  copy_rel_short: {
+    en: 'Relative',
+    fr: 'Relatif',
+    es: 'Relativo',
+    de: 'Relativ',
+  },
+  copy_abs_short: {
+    en: 'Absolute',
+    fr: 'Absolu',
+    es: 'Absolut',
+    de: 'Absolut',
+  },
   checkpoint_title: {
     en: 'Checkpoint & Rewind Studio',
     fr: 'Checkpoint & Rewind Studio',
