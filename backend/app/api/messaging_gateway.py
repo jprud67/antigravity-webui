@@ -103,4 +103,13 @@ def api_configure_bot(req: ConfigureBotModel):
         notify_on_approval=req.notify_on_approval if req.notify_on_approval is not None else True,
         notify_on_complete=req.notify_on_complete if req.notify_on_complete is not None else True,
     )
+    if req.platform.lower() == "telegram":
+        import asyncio
+        from app.services.telegram_gateway import telegram_gateway
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(telegram_gateway.restart())
+        except RuntimeError:
+            pass
     return {"success": ok, "platform": req.platform}
+

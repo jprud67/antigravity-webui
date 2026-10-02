@@ -87,6 +87,12 @@ export interface AppSettings {
   contextBudgetTokens?: number;
   autoCompactContext?: boolean;
   preserveLastNTurns?: number;
+  // File Manager Settings
+  fileManagerMaxUploadSizeMB?: number;
+  fileManagerAllowedExtensions?: string;
+  fileManagerBlockedExtensions?: string;
+  fileManagerShowHiddenFiles?: boolean;
+  fileManagerMaxTreeDepth?: number;
 }
 
 export interface WorkspaceFolder {

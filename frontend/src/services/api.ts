@@ -787,33 +787,68 @@ export async function searchFiles(query: string, path?: string, maxResults = 50)
 
 export async function uploadWorkspaceFile(
   file: File,
-  destinationDir: string,
-  workspace?: string
+  destinationDir?: string,
+  workspace?: string,
+  relativePath?: string,
+  onProgress?: (percent: number, loaded: number, total: number) => void
 ): Promise<{ success: boolean; path: string; filename: string; size: number }> {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('destination_dir', destinationDir);
-  if (workspace) {
-    formData.append('workspace', workspace);
-  }
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('destination_dir', destinationDir || workspace || '.');
+    if (workspace) {
+      formData.append('workspace', workspace);
+    }
+    if (relativePath) {
+      formData.append('relative_path', relativePath);
+    }
 
-  const token = getAuthToken();
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/files/upload`);
 
-  const res = await fetch(`${API_BASE}/files/upload`, {
-    method: 'POST',
-    headers,
-    body: formData,
+    const token = getAuthToken();
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0) {
+          const percent = Math.min(100, Math.round((e.loaded / e.total) * 100));
+          onProgress(percent, e.loaded, e.total);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      let data: any;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        data = null;
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (onProgress) {
+          onProgress(100, file.size, file.size);
+        }
+        resolve(data || { success: true, path: '', filename: file.name, size: file.size });
+      } else {
+        const msg = data?.detail || data?.message || `Erreur d'import (${xhr.status})`;
+        reject(new Error(msg));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error("Erreur réseau lors de l'importation du fichier."));
+    };
+
+    xhr.onabort = () => {
+      reject(new Error("Importation annulée."));
+    };
+
+    xhr.send(formData);
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Échec de l'importation du fichier" }));
-    throw new Error(err.detail || "Erreur lors de l'importation du fichier");
-  }
-  return res.json();
 }
 
 export async function duplicateWorkspaceFile(

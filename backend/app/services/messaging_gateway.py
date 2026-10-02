@@ -349,3 +349,26 @@ def get_gateway_configs() -> dict[str, Any]:
                 "updated_at": r["updated_at"]
             }
         return result
+
+
+def get_gateway_raw_config(platform: str) -> dict[str, Any] | None:
+    """Retrieve raw gateway config including unmasked bot token."""
+    ensure_messaging_gateway_schema()
+    with _get_db() as conn:
+        row = conn.execute(
+            "SELECT platform, bot_token, chat_id, is_active, notify_on_approval, notify_on_complete, updated_at "
+            "FROM messaging_gateway_configs WHERE platform = ?",
+            (platform,)
+        ).fetchone()
+        if not row:
+            return None
+        return {
+            "platform": row["platform"],
+            "bot_token": row["bot_token"],
+            "chat_id": row["chat_id"],
+            "is_active": bool(row["is_active"]),
+            "notify_on_approval": bool(row["notify_on_approval"]),
+            "notify_on_complete": bool(row["notify_on_complete"]),
+            "updated_at": row["updated_at"]
+        }
+

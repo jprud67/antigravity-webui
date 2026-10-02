@@ -32,6 +32,7 @@ import {
   Archive,
   Tag,
   Folder,
+  FolderTree,
   FileText,
   Keyboard,
   RotateCcw,
@@ -111,7 +112,7 @@ export const GoogleIcon = ({ className = "w-4 h-4" }: { className?: string }) =>
   </svg>
 );
 
-export type SettingsTab = 'models' | 'permissions' | 'memory' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates' | 'api_keys';
+export type SettingsTab = 'models' | 'permissions' | 'files' | 'memory' | 'skills' | 'security' | 'appearance' | 'languages' | 'google' | 'conversation' | 'updates' | 'api_keys';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -1097,6 +1098,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
 
             <button
+              onClick={(e) => handleTabClick('files', e)}
+              className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'files'
+                  ? 'border-amber-500 text-amber-600 dark:text-amber-400 font-bold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <FolderTree className="w-4 h-4 text-amber-500" />
+              <span>{t('tab_file_manager', 'Explorateur & Fichiers')}</span>
+            </button>
+
+            <button
               onClick={(e) => handleTabClick('memory', e)}
               className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer shrink-0 ${
                 activeTab === 'memory'
@@ -2049,6 +2062,313 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <Plus className="w-3.5 h-3.5" />
                     <span>{t('add', 'Ajouter')}</span>
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'files' && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header explanation */}
+              <div
+                className="p-4 rounded-2xl border flex items-start gap-3.5"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)'
+                }}
+              >
+                <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                  <FolderTree className="w-4 h-4 text-amber-500" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold" style={{ color: 'var(--strong)' }}>
+                    {t('file_manager_settings_title', 'Configuration du Gestionnaire de Fichiers')}
+                  </h4>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                    {t('file_manager_settings_desc', 'Définissez la taille limite des imports, les extensions acceptées ou filtrées, et les règles d\'exploration de vos workspaces.')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Section 1: Upload Limit */}
+              <div
+                className="p-4 rounded-2xl border space-y-3.5"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)'
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="text-xs font-semibold" style={{ color: 'var(--strong)' }}>
+                      {t('max_upload_size_title', 'Taille maximale par fichier téléversé')}
+                    </h5>
+                    <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                      {t('max_upload_size_desc', 'Limite le poids unitaire des fichiers importés par glisser-déposer ou sélection locale (en Mégaoctets).')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    <span>{settings.fileManagerMaxUploadSizeMB ?? 50}</span>
+                    <span className="text-[10px] opacity-75">MB</span>
+                  </div>
+                </div>
+
+                {/* Presets and manual input */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {[10, 25, 50, 100, 250, 500].map((mb) => {
+                    const isSel = (settings.fileManagerMaxUploadSizeMB ?? 50) === mb;
+                    return (
+                      <button
+                        key={mb}
+                        type="button"
+                        onClick={() => {
+                          const next = { ...settings, fileManagerMaxUploadSizeMB: mb };
+                          setSettings(next);
+                          saveSettings(next).catch(console.error);
+                          showToast(t('max_size_updated', 'Taille maximale définie à {0} Mo', mb), 'info');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-mono font-medium border transition-all cursor-pointer ${
+                          isSel
+                            ? 'bg-amber-500/20 text-amber-500 border-amber-500/50 shadow-xs'
+                            : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-400'
+                        }`}
+                        style={{
+                          backgroundColor: isSel ? undefined : 'var(--surface)',
+                          borderColor: isSel ? undefined : 'var(--border)',
+                        }}
+                      >
+                        {mb} Mo
+                      </button>
+                    );
+                  })}
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{t('custom', 'Personnalisé')} :</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={2048}
+                      value={settings.fileManagerMaxUploadSizeMB ?? 50}
+                      onChange={(e) => {
+                        const val = Math.max(1, Math.min(2048, parseInt(e.target.value, 10) || 50));
+                        const next = { ...settings, fileManagerMaxUploadSizeMB: val };
+                        setSettings(next);
+                        saveSettings(next).catch(console.error);
+                      }}
+                      className="w-20 px-2 py-1 rounded-xl text-xs font-mono text-center border outline-none"
+                      style={{
+                        backgroundColor: 'var(--surface)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--text)'
+                      }}
+                    />
+                    <span className="text-xs font-mono" style={{ color: 'var(--muted)' }}>Mo</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Allowed File Extensions */}
+              <div
+                className="p-4 rounded-2xl border space-y-3.5"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)'
+                }}
+              >
+                <div>
+                  <h5 className="text-xs font-semibold" style={{ color: 'var(--strong)' }}>
+                    {t('allowed_extensions_title', 'Types de fichiers acceptés (Liste blanche)')}
+                  </h5>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                    {t('allowed_extensions_desc', 'Extensions autorisées lors du téléversement (séparées par une virgule). Laissez vide ou mettez « * » pour accepter toutes les extensions sans restriction.')}
+                  </p>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder={t('allowed_extensions_placeholder', '.ts, .tsx, .js, .py, .md, .txt, .json, .png, .jpg (ou vide pour tout accepter)')}
+                  value={settings.fileManagerAllowedExtensions ?? ''}
+                  onChange={(e) => {
+                    const next = { ...settings, fileManagerAllowedExtensions: e.target.value };
+                    setSettings(next);
+                    saveSettings(next).catch(console.error);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl text-xs font-mono border focus:outline-none focus:border-amber-500 transition-colors"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text)'
+                  }}
+                />
+
+                {/* 1-click Quick Profiles for Allowed */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider block" style={{ color: 'var(--muted)' }}>
+                    {t('quick_extension_presets', 'Préréglages d\'extensions rapides :')}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { label: '💻 Code & Web', value: '.ts, .tsx, .js, .jsx, .py, .html, .css, .json, .md, .yaml, .yml' },
+                      { label: '🖼️ Médias & Images', value: '.png, .jpg, .jpeg, .gif, .svg, .webp, .ico, .bmp, .avif' },
+                      { label: '📄 Documents', value: '.md, .txt, .pdf, .docx, .xlsx, .csv, .json' },
+                      { label: '🌐 Tout autoriser (*)', value: '*' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          const next = { ...settings, fileManagerAllowedExtensions: preset.value };
+                          setSettings(next);
+                          saveSettings(next).catch(console.error);
+                          showToast(t('preset_applied', 'Préréglage appliqué : {0}', preset.label), 'info');
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-sans border transition-colors hover:border-amber-500/50 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                        style={{
+                          backgroundColor: 'var(--surface)',
+                          borderColor: 'var(--border)',
+                          color: 'var(--text)'
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Blocked File Extensions */}
+              <div
+                className="p-4 rounded-2xl border space-y-3.5"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)'
+                }}
+              >
+                <div>
+                  <h5 className="text-xs font-semibold flex items-center gap-1.5 text-rose-500">
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>{t('blocked_extensions_title', 'Extensions interdites (Liste noire de sécurité)')}</span>
+                  </h5>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                    {t('blocked_extensions_desc', 'Extensions automatiquement rejetées lors des imports (fichiers exécutables, scripts systèmes potentiellement risqués).')}
+                  </p>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder=".exe, .bat, .cmd, .sh, .msi, .com, .vbs"
+                  value={settings.fileManagerBlockedExtensions ?? '.exe,.bat,.cmd,.sh,.msi'}
+                  onChange={(e) => {
+                    const next = { ...settings, fileManagerBlockedExtensions: e.target.value };
+                    setSettings(next);
+                    saveSettings(next).catch(console.error);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl text-xs font-mono border focus:outline-none focus:border-rose-500 transition-colors"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text)'
+                  }}
+                />
+
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: '🛡️ Exécutables standards (.exe, .bat, .cmd, .sh, .msi)', value: '.exe, .bat, .cmd, .sh, .msi' },
+                    { label: '⚡ Scripts avancés (.exe, .bat, .cmd, .sh, .msi, .vbs, .ps1, .com)', value: '.exe, .bat, .cmd, .sh, .msi, .vbs, .ps1, .com' },
+                    { label: '🧹 Aucun blocage', value: '' },
+                  ].map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => {
+                        const next = { ...settings, fileManagerBlockedExtensions: p.value };
+                        setSettings(next);
+                        saveSettings(next).catch(console.error);
+                        showToast(t('blacklist_updated', 'Liste noire mise à jour'), 'info');
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-sans border transition-colors hover:border-rose-500/50 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                      style={{
+                        backgroundColor: 'var(--surface)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--text)'
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section 4: Tree & Navigation Options */}
+              <div
+                className="p-4 rounded-2xl border space-y-4"
+                style={{
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderColor: 'var(--border)'
+                }}
+              >
+                {/* Show Hidden Files Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 max-w-[80%]">
+                    <h5 className="text-xs font-semibold" style={{ color: 'var(--strong)' }}>
+                      {t('show_hidden_files_title', 'Afficher les fichiers et dossiers cachés')}
+                    </h5>
+                    <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                      {t('show_hidden_files_desc', 'Affiche les éléments commençant par un point (ex: .env, .github, .eslintrc).')}
+                    </p>
+                  </div>
+
+                  <label className="relative inline-flex items-center cursor-pointer select-none shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={settings.fileManagerShowHiddenFiles ?? true}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        const nextSettings = { ...settings, fileManagerShowHiddenFiles: next };
+                        setSettings(nextSettings);
+                        saveSettings(nextSettings).catch(console.error);
+                        showToast(next ? t('hidden_files_shown', 'Fichiers cachés visibles') : t('hidden_files_hidden', 'Fichiers cachés masqués'), 'info');
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                </div>
+
+                <div className="h-px bg-slate-200 dark:bg-slate-800" />
+
+                {/* Max Tree Depth Selector */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <h5 className="text-xs font-semibold" style={{ color: 'var(--strong)' }}>
+                      {t('max_tree_depth_title', 'Profondeur maximale du scan d\'arborescence')}
+                    </h5>
+                    <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                      {t('max_tree_depth_desc', 'Limite la récursion automatique de l\'explorateur pour optimiser le temps de chargement.')}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 p-1 rounded-xl border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+                    {[2, 4, 6, 8].map((depth) => {
+                      const isSel = (settings.fileManagerMaxTreeDepth ?? 6) === depth;
+                      return (
+                        <button
+                          key={depth}
+                          type="button"
+                          onClick={() => {
+                            const next = { ...settings, fileManagerMaxTreeDepth: depth };
+                            setSettings(next);
+                            saveSettings(next).catch(console.error);
+                            showToast(t('depth_updated', 'Profondeur fixée à {0} niveaux', depth), 'info');
+                          }}
+                          className={`px-2.5 py-0.5 rounded-lg text-xs font-mono font-medium transition-all cursor-pointer ${
+                            isSel ? 'bg-amber-500 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {depth}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -63,6 +64,7 @@ from app.services.messaging_gateway import ensure_messaging_gateway_schema
 from app.services.progress_card import ensure_progress_card_schema
 from app.services.share_service import ensure_share_schema
 from app.services.storage import ensure_db_schema
+from app.services.telegram_gateway import telegram_gateway
 from app.services.updater import prefetch_update_check
 from app.services.vector_memory import ensure_vector_memory_schema
 from app.services.web_push import ensure_web_push_schema
@@ -106,7 +108,12 @@ async def lifespan(app: FastAPI):
     cron_task = asyncio.create_task(cron_ticker_loop(), name="cron_ticker")
     logger.info("Filesystem watcher started")
     logger.info("Cron ticker started (tâches planifiées propres à l'application)")
+    embedded_gw = os.environ.get("ANTIGRAVITY_EMBEDDED_TELEGRAM_GATEWAY", "").lower() in ("1", "true")
+    if embedded_gw:
+        await telegram_gateway.start()
     yield
+    if embedded_gw:
+        await telegram_gateway.stop()
     watcher_task.cancel()
     cron_task.cancel()
     try:

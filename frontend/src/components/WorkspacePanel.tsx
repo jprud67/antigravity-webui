@@ -20,6 +20,7 @@ RefreshCw,
   Download,
   FilePlus,
   FolderPlus,
+  FolderUp,
   Trash2,
   Search,
   WrapText,
@@ -56,6 +57,7 @@ import { DiffViewer } from './DiffViewer';
 import { WorkspaceSearchPanel } from './WorkspaceSearchPanel';
 import { registerMonacoCopilot, isCopilotEnabled, setCopilotEnabled } from '../services/copilot';
 import { CopilotActionModal } from './CopilotActionModal';
+import { UploadProgressCard, type UploadProgressInfo } from './UploadProgressCard';
 
 const GitTab = React.lazy(() => import('./GitTab').then(m => ({ default: m.GitTab })));
 const KanbanTab = React.lazy(() => import('./KanbanTab').then(m => ({ default: m.KanbanTab })));
@@ -79,7 +81,8 @@ import {
   getExportHtmlUrl,
   getExportMarkdownUrl,
   getExportJsonUrl,
-  fetchEditorDiagnostics
+  fetchEditorDiagnostics,
+  fetchSettings
 } from '../services/api';
 import { detectLanguage, getInitialMonacoTheme } from '../utils/editorUtils';
 import { showToast } from '../services/toast';
@@ -265,7 +268,85 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
   // Upload & Drag-and-Drop State
   const [isDraggingOverTree, setIsDraggingOverTree] = useState(false);
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
+  const [uploadTargetDir, setUploadTargetDir] = useState<string | null>(null);
+  const [appSettings, setAppSettings] = useState<any>(null);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressInfo | null>(null);
+  const uploadDismissTimeoutRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (uploadDismissTimeoutRef.current) {
+        clearTimeout(uploadDismissTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetchSettings().then(setAppSettings).catch(console.error);
+  }, [isOpen]);
+
+  // Helper to recursively extract files from DataTransferItems (including directories)
+  const getFilesFromDataTransfer = useCallback(async (dataTransfer: DataTransfer): Promise<Array<{ file: File; relativePath?: string }>> => {
+    const results: Array<{ file: File; relativePath?: string }> = [];
+    const items = dataTransfer.items;
+    if (items && items.length > 0 && typeof (items[0] as any).webkitGetAsEntry === 'function') {
+      const traverseEntry = async (entry: any, currentPath = '') => {
+        if (!entry) return;
+        if (entry.isFile) {
+          try {
+            const file: File = await new Promise((resolve, reject) => entry.file(resolve, reject));
+            const rel = currentPath ? `${currentPath}/${file.name}` : file.name;
+            results.push({ file, relativePath: rel });
+          } catch (e) {
+            console.error('Failed to read file entry:', e);
+          }
+        } else if (entry.isDirectory) {
+          try {
+            const dirReader = entry.createReader();
+            const readEntries = async (): Promise<any[]> => {
+              return new Promise((resolve, reject) => {
+                dirReader.readEntries((ents: any[]) => resolve(ents), reject);
+              });
+            };
+            let ents = await readEntries();
+            while (ents.length > 0) {
+              for (const sub of ents) {
+                await traverseEntry(sub, currentPath ? `${currentPath}/${entry.name}` : entry.name);
+              }
+              ents = await readEntries();
+            }
+          } catch (e) {
+            console.error('Failed to read directory entry:', e);
+          }
+        }
+      };
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file') {
+          const entry = (item as any).webkitGetAsEntry();
+          if (entry) {
+            await traverseEntry(entry);
+          } else {
+            const f = item.getAsFile();
+            if (f) results.push({ file: f });
+          }
+        }
+      }
+      if (results.length > 0) return results;
+    }
+
+    if (dataTransfer.files && dataTransfer.files.length > 0) {
+      for (let i = 0; i < dataTransfer.files.length; i++) {
+        const f = dataTransfer.files[i];
+        results.push({ file: f, relativePath: (f as any).webkitRelativePath || undefined });
+      }
+    }
+    return results;
+  }, []);
 
   // Tab Context Menu State
   const [tabContextMenu, setTabContextMenu] = useState<{ x: number; y: number; tabIndex: number } | null>(null);
@@ -597,11 +678,21 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     'xlsx', 'xls', 'pptx', 'ppt', 'bin', 'exe', 'iso', 'odt', 'ods', 'odp'
   ]), []);
 
+  const IMAGE_EXTENSIONS = useMemo(() => new Set([
+    'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'avif'
+  ]), []);
+
   const isBinaryFile = useCallback((p?: string | null) => {
     if (!p) return false;
     const ext = p.split('.').pop()?.toLowerCase() || '';
     return BINARY_EXTENSIONS.has(ext);
   }, [BINARY_EXTENSIONS]);
+
+  const isImageFile = useCallback((p?: string | null) => {
+    if (!p) return false;
+    const ext = p.split('.').pop()?.toLowerCase() || '';
+    return IMAGE_EXTENSIONS.has(ext);
+  }, [IMAGE_EXTENSIONS]);
 
   const handleSelectFile = useCallback(async (path: string) => {
     const existingIdx = openTabs.findIndex(t => t.path === path);
@@ -611,6 +702,26 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     }
 
     const filename = path.split(/[/\\]/).pop() || 'file';
+
+    if (isImageFile(path)) {
+      const newTab: EditorTabItem = {
+        path,
+        name: filename,
+        content: '',
+        originalContent: '',
+        isDirty: false,
+        language: 'plaintext',
+        size: 0,
+        isBinary: false,
+      };
+      setOpenTabs(prev => {
+        const found = prev.findIndex(t => t.path === path);
+        if (found !== -1) return prev;
+        return [...prev, newTab];
+      });
+      setActiveTabIndex(openTabs.length);
+      return;
+    }
 
     if (isBinaryFile(path)) {
       const newTab: EditorTabItem = {
@@ -788,40 +899,193 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     }
   }, [currentWorkspace]);
 
-  const handleUploadFiles = useCallback(async (files: FileList | File[], targetFolder?: string) => {
-    if (!files || files.length === 0) return;
-    const fileArray = Array.from(files);
-    const destination = targetFolder || creatingParent || currentWorkspace;
+  const handleUploadFiles = useCallback(async (
+    files: FileList | File[] | Array<{ file: File; relativePath?: string }>,
+    targetFolder?: string
+  ) => {
+    if (!files || (Array.isArray(files) && files.length === 0) || ('length' in files && files.length === 0)) return;
+
+    const items: Array<{ file: File; relativePath?: string }> = [];
+    if (Array.isArray(files)) {
+      for (const item of files) {
+        if ('file' in (item as any) && (item as any).file instanceof File) {
+          items.push({ file: (item as any).file, relativePath: (item as any).relativePath });
+        } else if (item instanceof File) {
+          items.push({ file: item as File, relativePath: (item as any).webkitRelativePath || undefined });
+        }
+      }
+    } else {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        items.push({ file, relativePath: (file as any).webkitRelativePath || undefined });
+      }
+    }
+    if (items.length === 0) return;
+
+    const destination = targetFolder || (creatingParent && !creatingType ? creatingParent : null) || currentWorkspace || '.';
     let successCount = 0;
     let lastUploadedPath = '';
 
-    for (const file of fileArray) {
+    const maxMB = appSettings?.fileManagerMaxUploadSizeMB ?? 50;
+    const maxBytes = maxMB * 1024 * 1024;
+    const allowedStr = (appSettings?.fileManagerAllowedExtensions || '').trim();
+    const blockedStr = (appSettings?.fileManagerBlockedExtensions || '').trim();
+
+    const allowedSet = (allowedStr && allowedStr !== '*')
+      ? new Set(allowedStr.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean).map((s: string) => s.startsWith('.') ? s : `.${s}`))
+      : null;
+
+    const blockedSet = blockedStr
+      ? new Set(blockedStr.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean).map((s: string) => s.startsWith('.') ? s : `.${s}`))
+      : null;
+
+    const validItems: typeof items = [];
+    for (const item of items) {
+      const ext = ('.' + (item.file.name.split('.').pop() || '')).toLowerCase();
+      if (blockedSet && blockedSet.has(ext)) {
+        showToast(t('upload_ext_blocked', "L'extension « {0} » est bloquée par vos paramètres.", ext), 'error');
+        continue;
+      }
+      if (allowedSet && !allowedSet.has(ext)) {
+        showToast(t('upload_ext_not_allowed', "L'extension « {0} » n'est pas autorisée par vos paramètres.", ext), 'error');
+        continue;
+      }
+      if (item.file.size > maxBytes) {
+        showToast(t('upload_size_exceeded', "Le fichier « {0} » ({1} Mo) dépasse la limite configurée de {2} Mo.", item.file.name, (item.file.size / (1024 * 1024)).toFixed(1), maxMB), 'error');
+        continue;
+      }
+      validItems.push(item);
+    }
+
+    if (validItems.length === 0) return;
+
+    if (uploadDismissTimeoutRef.current) {
+      clearTimeout(uploadDismissTimeoutRef.current);
+      uploadDismissTimeoutRef.current = null;
+    }
+
+    setUploadProgress({
+      totalFiles: validItems.length,
+      completedFiles: 0,
+      currentFileIndex: 1,
+      currentFileName: validItems[0].file.name,
+      filePercent: 0,
+      fileLoaded: 0,
+      fileTotal: validItems[0].file.size,
+      status: 'uploading',
+    });
+
+    for (let i = 0; i < validItems.length; i++) {
+      const item = validItems[i];
+      setUploadProgress(prev => prev ? ({
+        ...prev,
+        currentFileIndex: i + 1,
+        currentFileName: item.file.name,
+        filePercent: 0,
+        fileLoaded: 0,
+        fileTotal: item.file.size,
+      }) : null);
+
       try {
-        const res = await uploadWorkspaceFile(file, destination, currentWorkspace);
+        const res = await uploadWorkspaceFile(
+          item.file,
+          destination,
+          currentWorkspace,
+          item.relativePath,
+          (percent, loaded, total) => {
+            setUploadProgress(prev => prev ? ({
+              ...prev,
+              filePercent: percent,
+              fileLoaded: loaded,
+              fileTotal: total,
+            }) : null);
+          }
+        );
         if (res.success) {
           successCount++;
           lastUploadedPath = res.path;
+          setUploadProgress(prev => prev ? ({
+            ...prev,
+            completedFiles: successCount,
+            filePercent: 100,
+            fileLoaded: item.file.size,
+            fileTotal: item.file.size,
+          }) : null);
         }
       } catch (err: any) {
-        showToast(t('import_error_for_file', "Erreur d'import pour {0} : {1}", file.name, err.message), 'error');
+        showToast(t('import_error_for_file', "Erreur d'import pour {0} : {1}", item.file.name, err.message), 'error');
+        setUploadProgress(prev => prev ? ({
+          ...prev,
+          status: 'error',
+          errorMessage: err.message || t('import_error', "Erreur d'import"),
+        }) : null);
       }
     }
 
     if (successCount > 0) {
+      setUploadProgress(prev => prev ? ({
+        ...prev,
+        status: 'completed',
+        completedFiles: successCount,
+        filePercent: 100,
+      }) : null);
       showToast(t('files_imported_count_success', '{0} fichier(s) importé(s) avec succès.', successCount), 'success');
       await loadTree();
       if (lastUploadedPath) {
         handleSelectFile(lastUploadedPath);
       }
+      uploadDismissTimeoutRef.current = setTimeout(() => {
+        setUploadProgress(null);
+      }, 2500);
+    } else {
+      uploadDismissTimeoutRef.current = setTimeout(() => {
+        setUploadProgress(null);
+      }, 4000);
     }
-  }, [creatingParent, currentWorkspace, loadTree, handleSelectFile, t]);
+  }, [appSettings, creatingParent, creatingType, currentWorkspace, loadTree, handleSelectFile, t]);
+
+  const triggerUploadToFolder = useCallback((folderPath?: string) => {
+    setUploadTargetDir(folderPath || null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  }, []);
+
+  const triggerUploadFolderToFolder = useCallback((folderPath?: string) => {
+    setUploadTargetDir(folderPath || null);
+    if (folderInputRef.current) {
+      folderInputRef.current.value = '';
+      folderInputRef.current.click();
+    }
+  }, []);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      handleUploadFiles(e.target.files);
+      handleUploadFiles(e.target.files, uploadTargetDir || undefined);
       e.target.value = '';
+      setUploadTargetDir(null);
     }
   };
+
+  const handleFolderInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleUploadFiles(e.target.files, uploadTargetDir || undefined);
+      e.target.value = '';
+      setUploadTargetDir(null);
+    }
+  };
+
+  const handleDropFiles = useCallback(async (e: React.DragEvent, targetFolder?: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverTree(false);
+    setDragOverFolder(null);
+    const files = await getFilesFromDataTransfer(e.dataTransfer);
+    if (files.length > 0) {
+      await handleUploadFiles(files, targetFolder);
+    }
+  }, [getFilesFromDataTransfer, handleUploadFiles]);
 
   const handleDuplicateFile = useCallback(async (path: string) => {
     try {
@@ -1248,8 +1512,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const handleCreateNewItem = useCallback(async () => {
     if (!newItemName.trim() || !creatingType) return;
     const name = newItemName.trim();
-    const base = creatingParent || currentWorkspace;
-    const targetPath = `${base}/${name}`;
+    const base = (creatingParent || currentWorkspace || '').replace(/\\/g, '/').replace(/\/+$/, '');
+    const targetPath = base ? `${base}/${name}` : name;
 
     try {
       if (creatingType === 'file') {
@@ -1274,7 +1538,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
   const handleRenameItem = useCallback(async () => {
     if (!renamingPath || !renamedName.trim()) return;
     const newName = renamedName.trim();
-    const parts = renamingPath.replace(/\\/g, '/').split('/');
+    const norm = renamingPath.replace(/\\/g, '/').replace(/\/+$/, '');
+    const parts = norm.split('/');
     parts.pop();
     const parentDir = parts.join('/');
     const newPath = parentDir ? `${parentDir}/${newName}` : newName;
@@ -1315,9 +1580,69 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     }
   }, [currentWorkspace, loadTree, t]);
 
-  const toggleFolder = (folderPath: string) => {
-    setExpandedFolders((prev) => ({ ...prev, [folderPath]: !prev[folderPath] }));
-  };
+  const toggleFolder = useCallback(async (folderPath: string, currentChildren?: any[]) => {
+    const isCurrentlyExpanded = !!expandedFolders[folderPath];
+    setExpandedFolders((prev) => ({ ...prev, [folderPath]: !isCurrentlyExpanded }));
+
+    // If expanding and children are empty or not yet loaded, dynamically fetch deeper tree
+    if (!isCurrentlyExpanded && (!currentChildren || currentChildren.length === 0)) {
+      try {
+        const data = await fetchFileTree(folderPath, 2);
+        if (data.items && data.items.length > 0) {
+          setFileTree((prevTree: any) => {
+            if (!prevTree) return prevTree;
+            const updateChildren = (list: any[]): any[] => {
+              return list.map((item: any) => {
+                if (item.path === folderPath) {
+                  return { ...item, children: data.items };
+                }
+                if (item.is_dir && item.children) {
+                  return { ...item, children: updateChildren(item.children) };
+                }
+                return item;
+              });
+            };
+            return {
+              ...prevTree,
+              items: updateChildren(prevTree.items || [])
+            };
+          });
+        }
+      } catch (err) {
+        console.error('Failed to lazy load subfolder:', err);
+      }
+    }
+  }, [expandedFolders]);
+
+  // Auto-expand matching parent folders on tree search
+  useEffect(() => {
+    if (!treeSearch.trim() || !fileTree?.items) return;
+    const lower = treeSearch.toLowerCase();
+    const toExpand: Record<string, boolean> = {};
+
+    const findMatches = (items: any[]): boolean => {
+      let matched = false;
+      for (const item of items) {
+        const selfMatch = item.name.toLowerCase().includes(lower);
+        let childMatch = false;
+        if (item.is_dir && item.children) {
+          childMatch = findMatches(item.children);
+        }
+        if (selfMatch || childMatch) {
+          matched = true;
+          if (item.is_dir) {
+            toExpand[item.path] = true;
+          }
+        }
+      }
+      return matched;
+    };
+
+    findMatches(fileTree.items);
+    if (Object.keys(toExpand).length > 0) {
+      setExpandedFolders((prev) => ({ ...prev, ...toExpand }));
+    }
+  }, [treeSearch, fileTree]);
 
   // File Tree Recursive Renderer with full actions
   const renderTreeItems = (items: any[], level = 0) => {
@@ -1371,17 +1696,37 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
             );
           }
 
+          const isFolderDragOver = dragOverFolder === item.path;
+
           return (
             <div key={item.path}>
               <div
-                onClick={() => (isDir ? toggleFolder(item.path) : handleSelectFile(item.path))}
+                onClick={() => (isDir ? toggleFolder(item.path, item.children) : handleSelectFile(item.path))}
                 onContextMenu={(e) => handleTreeContextMenu(e, item)}
+                onDragOver={isDir ? (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragOverFolder(item.path);
+                } : undefined}
+                onDragLeave={isDir ? (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (dragOverFolder === item.path) setDragOverFolder(null);
+                } : undefined}
+                onDrop={isDir ? async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragOverFolder(null);
+                  await handleDropFiles(e, item.path);
+                } : undefined}
                 style={{
                   paddingLeft: `${level * 14 + 10}px`,
                   color: isSelected ? undefined : 'var(--text)',
                 }}
                 className={`flex items-center justify-between py-1 pr-1.5 rounded-lg text-xs cursor-pointer group transition-colors ${
-                  isSelected
+                  isFolderDragOver
+                    ? 'bg-emerald-500/20 border-2 border-dashed border-emerald-500 text-emerald-400 font-semibold'
+                    : isSelected
                     ? 'bg-sky-500/15 text-sky-600 dark:text-sky-300 font-medium border-l-2 border-sky-500'
                     : 'hover:bg-black/5 dark:hover:bg-white/5'
                 }`}
@@ -1427,6 +1772,18 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          triggerUploadToFolder(item.path);
+                        }}
+                        title={t('upload_to_folder', 'Importer des fichiers dans ce dossier')}
+                        className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors cursor-pointer"
+                        style={{ color: 'var(--muted)' }}
+                      >
+                        <Upload className="w-3 h-3 hover:text-emerald-500" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setCreatingParent(item.path);
                           setCreatingType('file');
                           setNewItemName('');
@@ -1450,6 +1807,18 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                         style={{ color: 'var(--muted)' }}
                       >
                         <FolderPlus className="w-3 h-3 hover:text-sky-500" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDuplicateFile(item.path);
+                        }}
+                        title={t('duplicate_folder', 'Dupliquer le dossier')}
+                        className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors cursor-pointer"
+                        style={{ color: 'var(--muted)' }}
+                      >
+                        <Copy className="w-3 h-3 hover:text-amber-500" />
                       </button>
                     </>
                   )}
@@ -1938,9 +2307,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   e.preventDefault();
                   e.stopPropagation();
                   setIsDraggingOverTree(false);
-                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                    await handleUploadFiles(e.dataTransfer.files);
-                  }
+                  await handleDropFiles(e);
                 }}
                 className="w-[260px] min-w-[220px] max-w-[340px] border-r flex flex-col shrink-0 relative"
                 style={{
@@ -1961,12 +2328,21 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   </div>
                 )}
 
-                {/* Hidden File Input for Native File Picker */}
+                {/* Hidden File Inputs for Native File and Folder Pickers */}
                 <input
                   ref={fileInputRef}
                   type="file"
                   multiple
+                  accept={appSettings?.fileManagerAllowedExtensions && appSettings.fileManagerAllowedExtensions !== '*' ? appSettings.fileManagerAllowedExtensions : undefined}
                   onChange={handleFileInputChange}
+                  className="hidden"
+                />
+                <input
+                  ref={folderInputRef}
+                  type="file"
+                  multiple
+                  {...({ webkitdirectory: '', directory: '' } as any)}
+                  onChange={handleFolderInputChange}
                   className="hidden"
                 />
 
@@ -2020,11 +2396,20 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => triggerUploadToFolder()}
                     title={t('upload_files_tooltip', 'Importer des fichiers depuis votre ordinateur')}
                     className="p-1.5 rounded-lg border hover:bg-emerald-500/10 text-emerald-500 border-emerald-500/30 cursor-pointer shrink-0 transition-colors"
                   >
                     <Upload className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => triggerUploadFolderToFolder()}
+                    title={t('upload_folder_tooltip', 'Importer un dossier complet depuis votre ordinateur')}
+                    className="p-1.5 rounded-lg border hover:bg-emerald-500/10 text-emerald-500 border-emerald-500/30 cursor-pointer shrink-0 transition-colors"
+                  >
+                    <FolderUp className="w-3.5 h-3.5" />
                   </button>
 
                   <button
@@ -2064,6 +2449,21 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     <RefreshCw className={`w-3.5 h-3.5 ${loadingTree ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
+
+                {/* Upload Progress Indicator */}
+                {uploadProgress && (
+                  <div className="p-2 border-b shrink-0 animate-fadeIn" style={{ borderColor: 'var(--border)' }}>
+                    <UploadProgressCard
+                      progress={uploadProgress}
+                      onDismiss={() => {
+                        if (uploadDismissTimeoutRef.current) {
+                          clearTimeout(uploadDismissTimeoutRef.current);
+                        }
+                        setUploadProgress(null);
+                      }}
+                    />
+                  </div>
+                )}
 
                 {/* Inline Creation Row */}
                 {creatingType && (
@@ -3448,6 +3848,32 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
               <button
                 type="button"
                 onClick={() => {
+                  triggerUploadToFolder(treeContextMenu.item.path);
+                  setTreeContextMenu(null);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                style={{ color: 'var(--text)' }}
+              >
+                <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{t('upload_files_here', 'Importer des fichiers ici...')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  triggerUploadFolderToFolder(treeContextMenu.item.path);
+                  setTreeContextMenu(null);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                style={{ color: 'var(--text)' }}
+              >
+                <FolderUp className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{t('upload_folder_here', 'Importer un dossier ici...')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
                   setCreatingParent(treeContextMenu.item.path);
                   setCreatingType('file');
                   setNewItemName('');
@@ -3476,6 +3902,34 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                 <FolderPlus className="w-3.5 h-3.5 text-sky-400" />
                 <span>{t('new_folder_here', 'Nouveau dossier ici...')}</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleDownloadFile(treeContextMenu.item.path);
+                  setTreeContextMenu(null);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                style={{ color: 'var(--text)' }}
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-500" />
+                <span>{t('download_as_zip', 'Télécharger en archive ZIP')}</span>
+              </button>
+
+              {!treeContextMenu.item.is_root && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDuplicateFile(treeContextMenu.item.path);
+                    setTreeContextMenu(null);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer"
+                  style={{ color: 'var(--text)' }}
+                >
+                  <Copy className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{t('duplicate_folder', 'Dupliquer le dossier')}</span>
+                </button>
+              )}
             </>
           )}
         </div>

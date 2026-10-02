@@ -4,9 +4,11 @@ import mimetypes
 import os
 import re
 import shutil
+import tempfile
 import time
 import unicodedata
 import uuid
+import zipfile
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
@@ -15,6 +17,7 @@ import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from starlette.background import BackgroundTask
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE, GEMINI_DIR, REPO_ROOT
@@ -31,7 +34,13 @@ IGNORED_DIRS = {
     ".vscode", ".idea", "build", "target", "env"
 }
 
-def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2, visited: set[Path] | None = None) -> list[dict[str, Any]]:
+def scan_dir(
+    dir_path: Path,
+    current_depth: int = 0,
+    max_depth: int = 2,
+    visited: set[Path] | None = None,
+    show_hidden: bool = True
+) -> list[dict[str, Any]]:
     if current_depth > max_depth or not dir_path.is_dir():
         return []
 
@@ -57,7 +66,7 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2, visited
         entries = sorted(dir_path.iterdir(), key=_safe_sort_key)
         for entry in entries:
             name = entry.name
-            if name.startswith(".") and name != ".gitignore":
+            if not show_hidden and name.startswith(".") and name != ".gitignore":
                 continue
             if name in IGNORED_DIRS and entry.is_dir():
                 continue
@@ -82,7 +91,7 @@ def scan_dir(dir_path: Path, current_depth: int = 0, max_depth: int = 2, visited
 
                 if is_dir:
                     if current_depth < max_depth:
-                        item["children"] = scan_dir(entry, current_depth + 1, max_depth, visited)
+                        item["children"] = scan_dir(entry, current_depth + 1, max_depth, visited, show_hidden=show_hidden)
                     else:
                         item["children"] = []
 
@@ -185,6 +194,11 @@ def _validate_path_access(file_path: Path | str, base_dir: Path | str | None = N
             target_file_path = Path(p_str)
             if not target_file_path.is_absolute():
                 target_file_path = base_root / target_file_path
+            elif not is_safe_path(target_file_path.resolve(), allowed_roots):
+                # Fallback: if user/client passed a path with leading slash intended as workspace-relative
+                rel_cand = (base_root / p_str.lstrip("/\\")).resolve()
+                if is_safe_path(rel_cand, allowed_roots):
+                    target_file_path = rel_cand
         resolved = target_file_path.resolve()
     except HTTPException:
         raise
@@ -202,7 +216,7 @@ def _validate_path_access(file_path: Path | str, base_dir: Path | str | None = N
 @router.get("/tree")
 def get_file_tree(
     path: str | None = Query(None),
-    depth: int = Query(2, ge=1, le=4),
+    depth: int = Query(2, ge=1, le=8),
     _ = Depends(require_auth)
 ):
     target_path = Path(path) if path else Path(DEFAULT_WORKSPACE)
@@ -215,10 +229,15 @@ def get_file_tree(
     if not resolved_path.exists() or not resolved_path.is_dir():
         raise HTTPException(status_code=400, detail=f"Répertoire invalide : {target_path}")
 
+    settings = get_settings()
+    show_hidden = bool(settings.get("fileManagerShowHiddenFiles", True))
+    cfg_max_depth = int(settings.get("fileManagerMaxTreeDepth", 6))
+    effective_depth = min(depth, cfg_max_depth)
+
     return {
         "root": str(resolved_path),
         "name": resolved_path.name or str(resolved_path),
-        "items": scan_dir(resolved_path, current_depth=0, max_depth=depth)
+        "items": scan_dir(resolved_path, current_depth=0, max_depth=effective_depth, show_hidden=show_hidden)
     }
 
 @router.get("/content")
@@ -403,7 +422,7 @@ def rename_file_or_dir(req: RenameFileRequest, _ = Depends(require_auth)):
     if old_p in allowed_roots:
         raise HTTPException(status_code=403, detail="Impossible de renommer la racine du workspace.")
 
-    if new_p.exists():
+    if new_p.exists() and new_p.resolve() != old_p.resolve():
         raise HTTPException(status_code=409, detail="La cible existe déjà.")
 
     try:
@@ -430,7 +449,7 @@ class DeleteFileRequest(BaseModel):
 def delete_file_or_dir(req: DeleteFileRequest, _ = Depends(require_auth)):
     target = _validate_path_access(req.path, base_dir=req.workspace)
 
-    if not target.exists():
+    if not target.exists() and not target.is_symlink():
         raise HTTPException(status_code=404, detail="Élément introuvable.")
 
     # Guard against deleting workspace roots
@@ -448,8 +467,10 @@ def delete_file_or_dir(req: DeleteFileRequest, _ = Depends(require_auth)):
         raise HTTPException(status_code=403, detail="Interdiction formelle de supprimer la racine du projet.")
 
     try:
-        is_dir = target.is_dir()
-        if is_dir:
+        is_dir = target.is_dir() and not target.is_symlink()
+        if target.is_symlink():
+            target.unlink()
+        elif is_dir:
             shutil.rmtree(target)
         else:
             target.unlink()
@@ -570,9 +591,37 @@ def search_files(
 def download_file(path: str = Query(...), workspace: str | None = Query(None), _ = Depends(require_auth)):
     resolved_path = _validate_path_access(path, base_dir=workspace)
     if not resolved_path.exists():
-        raise HTTPException(status_code=404, detail="Fichier introuvable.")
-    if not resolved_path.is_file():
-        raise HTTPException(status_code=400, detail="La cible n'est pas un fichier.")
+        raise HTTPException(status_code=404, detail="Fichier ou dossier introuvable.")
+
+    if resolved_path.is_dir():
+        # Zip directory on the fly and stream
+        zip_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+        zip_path = Path(zip_temp.name)
+        zip_temp.close()
+        try:
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for root, dirs, files in os.walk(resolved_path):
+                    dirs[:] = [d for d in dirs if d not in IGNORED_DIRS and not d.startswith(".")]
+                    for f in files:
+                        if f.startswith(".") and f != ".gitignore":
+                            continue
+                        full_f = Path(root) / f
+                        if is_blocked_sensitive_path(full_f):
+                            continue
+                        rel_f = full_f.relative_to(resolved_path)
+                        zf.write(full_f, arcname=str(rel_f))
+            archive_name = f"{resolved_path.name or 'workspace'}.zip"
+            return FileResponse(
+                path=str(zip_path),
+                filename=archive_name,
+                media_type="application/zip",
+                background=BackgroundTask(os.unlink, str(zip_path))
+            )
+        except Exception as e:
+            zip_path.unlink(missing_ok=True)
+            logger.error(f"Error archiving directory {resolved_path}: {e}")
+            raise HTTPException(status_code=500, detail=f"Erreur d'archivage zip : {e!s}")
+
     try:
         if isinstance(resolved_path, Path) and not os.access(resolved_path, os.R_OK):
             raise HTTPException(status_code=403, detail="Permission de lecture refusée sur ce fichier.")
@@ -614,27 +663,68 @@ def download_file(path: str = Query(...), workspace: str | None = Query(None), _
         media_type=media_type or "application/octet-stream"
     )
 
-MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
+DEFAULT_MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
 
 @router.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
-    destination_dir: str = Form(...),
+    destination_dir: str | None = Form(None),
     workspace: str | None = Form(None),
+    relative_path: str | None = Form(None),
     _ = Depends(require_auth)
 ):
-    target_dir = Path(destination_dir)
+    settings = get_settings()
+    max_mb = settings.get("fileManagerMaxUploadSizeMB", 50)
+    try:
+        max_upload_size = max(1, int(max_mb)) * 1024 * 1024
+    except (ValueError, TypeError):
+        max_upload_size = DEFAULT_MAX_UPLOAD_SIZE
+
+    dest_str = (destination_dir or "").strip()
+    if not dest_str or dest_str in (".", "/"):
+        target_dir = Path(workspace) if workspace and workspace.strip() else Path(DEFAULT_WORKSPACE)
+    else:
+        target_dir = Path(dest_str)
+
     resolved_dir = _validate_path_access(target_dir, base_dir=workspace)
     if not resolved_dir.exists():
         resolved_dir.mkdir(parents=True, exist_ok=True)
     elif not resolved_dir.is_dir():
         resolved_dir = resolved_dir.parent
 
-    # Sanitize filename: extract strictly the basename and remove dangerous chars
-    raw_name = file.filename or "uploaded_file"
-    safe_name = Path(raw_name).name
+    # Support relative subpaths for directory or batch uploads
+    subpath = (relative_path or "").strip().replace("\\", "/").strip("/")
+    if subpath:
+        parts = [Path(p).name for p in subpath.split("/") if p and p not in (".", "..")]
+        if parts:
+            safe_name = parts.pop()
+            if parts:
+                resolved_dir = resolved_dir.joinpath(*parts)
+                resolved_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            raw_name = file.filename or "uploaded_file"
+            safe_name = Path(raw_name).name
+    else:
+        raw_name = file.filename or "uploaded_file"
+        safe_name = Path(raw_name).name
+
     if not safe_name or safe_name in (".", ".."):
         safe_name = f"uploaded_{uuid.uuid4().hex[:6]}"
+
+    # Validate file extensions against settings
+    file_ext = Path(safe_name).suffix.lower()
+    allowed_exts_str = str(settings.get("fileManagerAllowedExtensions") or "").strip()
+    blocked_exts_str = str(settings.get("fileManagerBlockedExtensions") or "").strip()
+
+    if blocked_exts_str:
+        blocked = {e.strip().lower() if e.strip().startswith(".") else f".{e.strip().lower()}" for e in blocked_exts_str.split(",") if e.strip()}
+        if file_ext in blocked:
+            raise HTTPException(status_code=400, detail=f"Extension '{file_ext}' interdite par la configuration du gestionnaire de fichiers.")
+
+    if allowed_exts_str and allowed_exts_str != "*":
+        allowed = {e.strip().lower() if e.strip().startswith(".") else f".{e.strip().lower()}" for e in allowed_exts_str.split(",") if e.strip()}
+        if file_ext not in allowed:
+            raise HTTPException(status_code=400, detail=f"Extension '{file_ext}' non autorisée. Extensions acceptées : {allowed_exts_str}")
 
     target_file = resolved_dir / safe_name
     if target_file.is_symlink():
@@ -649,7 +739,7 @@ async def upload_file(
         async with aiofiles.open(resolved_target, "wb") as out_f:
             while chunk := await file.read(chunk_size):
                 total_bytes += len(chunk)
-                if total_bytes > MAX_UPLOAD_SIZE:
+                if total_bytes > max_upload_size:
                     await out_f.close()
                     try:
                         resolved_target.unlink(missing_ok=True)
@@ -657,7 +747,7 @@ async def upload_file(
                         pass
                     raise HTTPException(
                         status_code=413,
-                        detail="Fichier trop volumineux (taille maximale de 50 Mo dépassée)."
+                        detail=f"Fichier trop volumineux (taille maximale de {max_mb} Mo dépassée)."
                     )
                 await out_f.write(chunk)
     except HTTPException:
@@ -692,15 +782,38 @@ def duplicate_file(req: DuplicateFileRequest, _ = Depends(require_auth)):
 
     resolved_path = _validate_path_access(file_path, base_dir=req.workspace)
     if not resolved_path.exists():
-        raise HTTPException(status_code=404, detail="Fichier introuvable.")
-    if resolved_path.is_dir():
-        raise HTTPException(status_code=400, detail="La duplication des dossiers n'est pas supportée.")
+        raise HTTPException(status_code=404, detail="Fichier ou dossier introuvable.")
     if resolved_path.is_symlink():
         raise HTTPException(status_code=400, detail="La duplication des liens symboliques n'est pas supportée.")
 
+    parent = resolved_path.parent
+    is_dir = resolved_path.is_dir()
+
+    if is_dir:
+        stem = resolved_path.name
+        candidate_name = f"{stem}_copy"
+        candidate_path = parent / candidate_name
+        counter = 1
+        while candidate_path.exists() or candidate_path.is_symlink():
+            candidate_name = f"{stem}_copy_{counter}"
+            candidate_path = parent / candidate_name
+            counter += 1
+        resolved_candidate = _validate_path_access(candidate_path, base_dir=req.workspace)
+        try:
+            shutil.copytree(resolved_path, resolved_candidate, ignore=shutil.ignore_patterns(*IGNORED_DIRS))
+            return {
+                "success": True,
+                "new_path": str(resolved_candidate),
+                "new_name": resolved_candidate.name,
+                "is_dir": True,
+                "size": 0
+            }
+        except Exception as e:
+            logger.error(f"Error duplicating directory {resolved_path} to {resolved_candidate}: {e}")
+            raise HTTPException(status_code=500, detail=f"Erreur lors de la duplication du dossier : {e!s}")
+
     stem = resolved_path.stem
     suffix = resolved_path.suffix
-    parent = resolved_path.parent
 
     # Find unique name: stem_copy.ext, stem_copy_1.ext, stem_copy_2.ext...
     candidate_name = f"{stem}_copy{suffix}"
@@ -718,6 +831,7 @@ def duplicate_file(req: DuplicateFileRequest, _ = Depends(require_auth)):
             "success": True,
             "new_path": str(resolved_candidate),
             "new_name": resolved_candidate.name,
+            "is_dir": False,
             "size": resolved_candidate.stat().st_size
         }
     except Exception as e:

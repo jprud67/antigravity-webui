@@ -3273,6 +3273,11 @@ def get_settings() -> dict[str, Any]:
         "contextBudgetTokens": 20000,
         "autoCompactContext": True,
         "preserveLastNTurns": 2,
+        "fileManagerMaxUploadSizeMB": 50,
+        "fileManagerAllowedExtensions": "",
+        "fileManagerBlockedExtensions": ".exe,.bat,.cmd,.sh,.msi",
+        "fileManagerShowHiddenFiles": True,
+        "fileManagerMaxTreeDepth": 6,
     }
     with _settings_lock:
         if not SETTINGS_FILE.exists():
@@ -3303,6 +3308,16 @@ def get_settings() -> dict[str, Any]:
                 res["autoCompactContext"] = True
             if "preserveLastNTurns" not in res:
                 res["preserveLastNTurns"] = 2
+            if "fileManagerMaxUploadSizeMB" not in res:
+                res["fileManagerMaxUploadSizeMB"] = 50
+            if "fileManagerAllowedExtensions" not in res:
+                res["fileManagerAllowedExtensions"] = ""
+            if "fileManagerBlockedExtensions" not in res:
+                res["fileManagerBlockedExtensions"] = ".exe,.bat,.cmd,.sh,.msi"
+            if "fileManagerShowHiddenFiles" not in res:
+                res["fileManagerShowHiddenFiles"] = True
+            if "fileManagerMaxTreeDepth" not in res:
+                res["fileManagerMaxTreeDepth"] = 6
             _cached_settings = copy.deepcopy(res)
             _cached_settings_mtime = mtime
             return copy.deepcopy(res)

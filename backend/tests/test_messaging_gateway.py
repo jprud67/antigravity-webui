@@ -1,4 +1,6 @@
 import uuid
+from unittest.mock import patch
+import pytest
 
 from app.services.messaging_gateway import (
     ALPHABET,
@@ -13,6 +15,13 @@ from app.services.messaging_gateway import (
     revoke_device,
     save_gateway_config,
 )
+
+
+@pytest.fixture(autouse=True)
+def isolate_messaging_db(tmp_path):
+    test_db = str(tmp_path / "test_sessions.db")
+    with patch("app.services.messaging_gateway.DB_PATH", test_db):
+        yield
 
 
 def test_pairing_code_format():
