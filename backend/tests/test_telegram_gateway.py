@@ -76,6 +76,8 @@ def test_telegram_gateway_approved_user_command():
         mock_send.assert_called_once()
         assert "Antigravity WebUI" in mock_send.call_args[0][1]
         assert "Passerelle Connectée" in mock_send.call_args[0][1]
+        # Quick menu inline keyboard is attached
+        assert "reply_markup" in mock_send.call_args[1]
 
         # Test /status command
         mock_send.reset_mock()
@@ -94,16 +96,53 @@ def test_telegram_gateway_approved_user_command():
     asyncio.run(_run())
 
 
+def test_telegram_gateway_callback_query():
+    async def _run():
+        user_id = f"test_cb_{uuid.uuid4().hex[:8]}"
+        ok, _, code = request_pairing("telegram", user_id, "cb_tester")
+        assert ok
+        approve_ok, _, _ = approve_pairing_code(code)
+        assert approve_ok
+        assert is_user_approved("telegram", user_id)
+
+        gw = TelegramGateway()
+        gw.answer_callback_query = AsyncMock(return_value=True)
+        gw.edit_message = AsyncMock(return_value=True)
+
+        with patch("app.services.execution_manager.execution_manager.handle_approval", new_callable=AsyncMock) as mock_handle:
+            cb_update = {
+                "update_id": 10,
+                "callback_query": {
+                    "id": "cb_query_123",
+                    "from": {"id": user_id, "username": "cb_tester"},
+                    "data": "approve:conv_test_123",
+                    "message": {
+                        "message_id": 999,
+                        "chat": {"id": 888888}
+                    }
+                }
+            }
+            await gw._handle_update(cb_update)
+
+            gw.answer_callback_query.assert_called_once_with("cb_query_123", text="Action approuvée !")
+            mock_handle.assert_called_once_with("conv_test_123", decision="approved")
+            gw.edit_message.assert_called_once()
+
+    asyncio.run(_run())
+
+
 def test_telegram_session_subscriber_lifecycle():
     async def _run():
         gw = TelegramGateway()
         mock_send = AsyncMock(return_value=True)
+        mock_edit = AsyncMock(return_value=True)
         gw.send_message = mock_send
+        gw.edit_message = mock_edit
 
-        sub = TelegramSessionSubscriber(chat_id=12345, gateway=gw, conv_id="test_conv_abc")
+        sub = TelegramSessionSubscriber(chat_id=12345, gateway=gw, conv_id="test_conv_abc", initial_msg_id=777)
         
         # Receive step_update
-        await sub.send_json({"event": "step_update", "step_update": {"type": "plan"}})
+        await sub.send_json({"event": "step_update", "step_update": {"type": "plan", "name": "bash"}})
         
         # Receive result
         await sub.send_json({"event": "result", "result": {"response": "Response from Antigravity"}})
@@ -112,6 +151,15 @@ def test_telegram_session_subscriber_lifecycle():
         # Receive done
         await sub.send_json({"event": "done"})
         assert sub.is_done
-        mock_send.assert_called_once_with(12345, "Response from Antigravity")
+        # Should edit on step_update (progress) and on done (final response with menu)
+        assert mock_edit.call_count == 2
+        # Verify first call was progress edit
+        assert mock_edit.call_args_list[0][0][2] == "⚙️ *Antigravity en cours...*\nAction : `bash`"
+        # Verify final call was response with quick menu
+        args, kwargs = mock_edit.call_args_list[1]
+        assert args[0] == 12345
+        assert args[1] == 777
+        assert args[2] == "Response from Antigravity"
+        assert "reply_markup" in kwargs
 
     asyncio.run(_run())
