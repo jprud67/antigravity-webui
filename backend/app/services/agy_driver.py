@@ -78,7 +78,7 @@ DEFAULT_MODEL_FAMILIES: list[dict[str, Any]] = [
         "variants": {"default": "claude-opus-4-6-thinking"},
     },
     {
-        "id": "gpt-oss-120b-medium",
+        "id": "gpt-oss-120b",
         "name": "GPT-OSS 120B",
         "default_effort": "medium",
         "supported_efforts": ["medium"],

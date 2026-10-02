@@ -271,6 +271,7 @@ def create_task(req: CreateTaskRequest, _ = Depends(require_auth)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/tasks/bulk")
+@router.delete("/tasks/bulk")
 def bulk_task_action(req: BulkTaskActionRequest, _ = Depends(require_auth)):
     if not req.task_ids:
         return {"success": True, "affected_count": 0, "action": req.action}
