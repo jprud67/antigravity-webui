@@ -197,7 +197,7 @@ export const QuickOpenModal: React.FC<QuickOpenModalProps> = React.memo(({
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold truncate text-[13px]" style={{ color: isSelected ? 'var(--strong)' : undefined }}>
+                        <span className="font-mono font-semibold truncate text-[13px]" style={{ color: isSelected ? 'var(--strong)' : undefined }} title={item.path}>
                           {filename}
                         </span>
                         {item.match_type === 'content' && (

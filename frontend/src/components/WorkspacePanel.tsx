@@ -1724,7 +1724,8 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   paddingLeft: `${level * 14 + 10}px`,
                   color: isSelected ? undefined : 'var(--text)',
                 }}
-                className={`flex items-center justify-between py-1 pr-1.5 rounded-lg text-xs cursor-pointer group transition-colors ${
+                title={item.name}
+                className={`flex items-center justify-between py-1 pr-1.5 rounded-lg text-xs cursor-pointer group transition-colors min-w-full w-max ${
                   isFolderDragOver
                     ? 'bg-emerald-500/20 border-2 border-dashed border-emerald-500 text-emerald-400 font-semibold'
                     : isSelected
@@ -1732,7 +1733,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                     : 'hover:bg-black/5 dark:hover:bg-white/5'
                 }`}
               >
-                <div className="flex items-center gap-1.5 truncate flex-1 min-w-0 mr-1">
+                <div className="flex items-center gap-1.5 flex-1 min-w-0 mr-2" title={item.name}>
                   {isDir ? (
                     <>
                       {isExpanded ? (
@@ -1748,7 +1749,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                       <FileIcon filename={item.name} isDir={false} className="w-3.5 h-3.5 shrink-0" />
                     </>
                   )}
-                  <span className="font-mono truncate">{item.name}</span>
+                  <span className="font-mono whitespace-nowrap" title={item.name}>{item.name}</span>
                 </div>
 
                 {/* Hover Quick Action Buttons */}
@@ -2310,7 +2311,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                   setIsDraggingOverTree(false);
                   await handleDropFiles(e);
                 }}
-                className="w-[260px] min-w-[220px] max-w-[340px] border-r flex flex-col shrink-0 relative"
+                className="w-[280px] sm:w-[320px] min-w-[240px] max-w-[480px] border-r flex flex-col shrink-0 relative"
                 style={{
                   backgroundColor: 'var(--sidebar)',
                   borderColor: 'var(--border)',
@@ -2512,18 +2513,20 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
                 {/* Tree Item List */}
                 <div
                   onContextMenu={handleTreeBackgroundContextMenu}
-                  className="flex-1 overflow-y-auto p-2"
+                  className="flex-1 overflow-auto p-2"
                 >
-                  {loadingTree && !fileTree ? (
-                    <div className="p-4 text-center text-xs flex items-center justify-center gap-2" style={{ color: 'var(--muted)' }}>
-                      <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
-                      <span>{t('loading', 'Chargement...')}</span>
-                    </div>
-                  ) : fileTree && fileTree.items ? (
-                    renderTreeItems(filterTreeItems(fileTree.items, treeSearch))
-                  ) : (
-                    <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>{t('no_files', 'Aucun fichier')}</div>
-                  )}
+                  <div className="min-w-full w-max">
+                    {loadingTree && !fileTree ? (
+                      <div className="p-4 text-center text-xs flex items-center justify-center gap-2" style={{ color: 'var(--muted)' }}>
+                        <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+                        <span>{t('loading', 'Chargement...')}</span>
+                      </div>
+                    ) : fileTree && fileTree.items ? (
+                      renderTreeItems(filterTreeItems(fileTree.items, treeSearch))
+                    ) : (
+                      <div className="p-4 text-center text-xs italic" style={{ color: 'var(--muted)' }}>{t('no_files', 'Aucun fichier')}</div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -3685,11 +3688,11 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
       >
         {/* Header showing item icon, name, and relative path */}
         <div className="px-3 py-1.5 border-b" style={{ borderColor: 'var(--border)' }}>
-          <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold truncate" style={{ color: 'var(--strong)' }}>
+          <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold" style={{ color: 'var(--strong)' }} title={treeContextMenu.item.name}>
             <FileIcon filename={treeContextMenu.item.name} isDir={treeContextMenu.item.is_dir} className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">{treeContextMenu.item.name}</span>
+            <span className="break-all">{treeContextMenu.item.name}</span>
           </div>
-          <div className="text-[10px] font-mono truncate mt-0.5" style={{ color: 'var(--muted)' }}>
+          <div className="text-[10px] font-mono break-all mt-0.5" style={{ color: 'var(--muted)' }} title={getRelativePath(treeContextMenu.item.path)}>
             {getRelativePath(treeContextMenu.item.path)}
           </div>
         </div>
