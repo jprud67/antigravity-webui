@@ -189,16 +189,16 @@ def _resolve_relative_git_path(raw_path: str, target: Path) -> str:
     return clean_rel
 
 
+DEFAULT_GIT_NAME = os.environ.get("ANTIGRAVITY_GIT_USER_NAME") or os.environ.get("GIT_AUTHOR_NAME") or "Antigravity WebUI"
+DEFAULT_GIT_EMAIL = os.environ.get("ANTIGRAVITY_GIT_USER_EMAIL") or os.environ.get("GIT_AUTHOR_EMAIL") or "bot@antigravity-webui"
+
+
 def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | None = None) -> subprocess.CompletedProcess:
     base_args = [
         GIT_BIN,
         "-c", "core.editor=true",
-        "-c", "user.name=jprud67",
-        "-c", "user.email=jprud67@gmail.com",
-        "-c", "author.name=jprud67",
-        "-c", "author.email=jprud67@gmail.com",
-        "-c", "committer.name=jprud67",
-        "-c", "committer.email=jprud67@gmail.com",
+        "-c", f"user.name={DEFAULT_GIT_NAME}",
+        "-c", f"user.email={DEFAULT_GIT_EMAIL}",
         "-c", "format.signoff=false",
         "-c", "commit.gpgsign=false",
         "-c", "trailer.co-authored-by.key=",
@@ -213,11 +213,6 @@ def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | 
     }
     if env:
         merged_env.update(env)
-    # Ensure identity cannot be overridden
-    merged_env["GIT_AUTHOR_NAME"] = "jprud67"
-    merged_env["GIT_AUTHOR_EMAIL"] = "jprud67@gmail.com"
-    merged_env["GIT_COMMITTER_NAME"] = "jprud67"
-    merged_env["GIT_COMMITTER_EMAIL"] = "jprud67@gmail.com"
     try:
         return subprocess.run(
             base_args,

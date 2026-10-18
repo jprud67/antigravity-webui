@@ -27,7 +27,29 @@ MAX_HISTORY = 50
 _sweep_tasks: dict[str, asyncio.Task] = {}
 
 
+def ensure_maintenance_schema() -> None:
+    try:
+        import sqlite3
+
+        from app.config import CONVERSATION_DB
+        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS maintenance_history (
+                    id TEXT PRIMARY KEY,
+                    type TEXT NOT NULL,
+                    workspace TEXT NOT NULL,
+                    result TEXT NOT NULL,
+                    ran_at TEXT NOT NULL
+                )
+            """)
+            conn.commit()
+    except Exception as exc:
+        logger.debug("Failed ensuring maintenance schema: %s", exc)
+
+
 def _add_to_history(sweep_type: str, workspace: str, result: dict[str, Any]) -> None:
+    ensure_maintenance_schema()
     entry = {
         "id": f"sweep_{int(time.time() * 1000)}",
         "type": sweep_type,
@@ -39,8 +61,46 @@ def _add_to_history(sweep_type: str, workspace: str, result: dict[str, Any]) -> 
     if len(_sweep_history) > MAX_HISTORY:
         _sweep_history.pop(0)
 
+    try:
+        import sqlite3
+
+        from app.config import CONVERSATION_DB
+        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO maintenance_history (id, type, workspace, result, ran_at) VALUES (?, ?, ?, ?, ?)",
+                (entry["id"], sweep_type, workspace, json.dumps(result), entry["ran_at"]),
+            )
+            conn.commit()
+    except Exception as exc:
+        logger.debug("Failed persisting sweep history to DB: %s", exc)
+
 
 def get_sweep_history(workspace: str | None = None, sweep_type: str | None = None) -> list[dict[str, Any]]:
+    if not _sweep_history:
+        try:
+            ensure_maintenance_schema()
+            import sqlite3
+
+            from app.config import CONVERSATION_DB
+            with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+                rows = conn.execute(
+                    "SELECT id, type, workspace, result, ran_at FROM maintenance_history ORDER BY ran_at DESC LIMIT 50"
+                ).fetchall()
+                for r in reversed(rows):
+                    try:
+                        res_obj = json.loads(r[3])
+                    except Exception:
+                        res_obj = {}
+                    _sweep_history.append({
+                        "id": r[0],
+                        "type": r[1],
+                        "workspace": r[2],
+                        "result": res_obj,
+                        "ran_at": r[4],
+                    })
+        except Exception as exc:
+            logger.debug("Failed loading sweep history from DB: %s", exc)
+
     history = list(reversed(_sweep_history))
     if workspace:
         history = [h for h in history if h["workspace"] == workspace]

@@ -24,7 +24,31 @@ _alert_log: list[dict[str, Any]] = []
 MAX_ALERTS = 100
 
 
+def ensure_watchdog_schema() -> None:
+    try:
+        import sqlite3
+
+        from app.config import CONVERSATION_DB
+        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS watchdog_alerts (
+                    id TEXT PRIMARY KEY,
+                    category TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    workspace TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    resolved INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            conn.commit()
+    except Exception as exc:
+        logger.debug("Failed ensuring watchdog schema: %s", exc)
+
+
 def _add_alert(category: str, severity: str, message: str, workspace: str = "") -> dict[str, Any]:
+    ensure_watchdog_schema()
     import datetime
     entry = {
         "id": f"alert_{int(time.time() * 1000)}",
@@ -38,11 +62,48 @@ def _add_alert(category: str, severity: str, message: str, workspace: str = "") 
     _alert_log.append(entry)
     if len(_alert_log) > MAX_ALERTS:
         _alert_log.pop(0)
+
+    try:
+        import sqlite3
+
+        from app.config import CONVERSATION_DB
+        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO watchdog_alerts (id, category, severity, message, workspace, timestamp, resolved) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (entry["id"], category, severity, message, workspace, entry["timestamp"], 0),
+            )
+            conn.commit()
+    except Exception as exc:
+        logger.debug("Failed persisting watchdog alert to DB: %s", exc)
+
     return entry
 
 
 def get_alerts(workspace: str | None = None, unresolved_only: bool = True) -> list[dict[str, Any]]:
     """Return watchdog alerts, optionally filtered."""
+    if not _alert_log:
+        try:
+            ensure_watchdog_schema()
+            import sqlite3
+
+            from app.config import CONVERSATION_DB
+            with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+                rows = conn.execute(
+                    "SELECT id, category, severity, message, workspace, timestamp, resolved FROM watchdog_alerts ORDER BY timestamp DESC LIMIT 100"
+                ).fetchall()
+                for r in reversed(rows):
+                    _alert_log.append({
+                        "id": r[0],
+                        "category": r[1],
+                        "severity": r[2],
+                        "message": r[3],
+                        "workspace": r[4],
+                        "timestamp": r[5],
+                        "resolved": bool(r[6]),
+                    })
+        except Exception as exc:
+            logger.debug("Failed loading watchdog alerts from DB: %s", exc)
+
     alerts = _alert_log
     if workspace:
         alerts = [a for a in alerts if a["workspace"] == workspace]
@@ -52,11 +113,24 @@ def get_alerts(workspace: str | None = None, unresolved_only: bool = True) -> li
 
 
 def resolve_alert(alert_id: str) -> bool:
+    found = False
     for a in _alert_log:
         if a["id"] == alert_id:
             a["resolved"] = True
-            return True
-    return False
+            found = True
+            break
+    try:
+        import sqlite3
+
+        from app.config import CONVERSATION_DB
+        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+            cur = conn.execute("UPDATE watchdog_alerts SET resolved = 1 WHERE id = ?", (alert_id,))
+            conn.commit()
+            if cur.rowcount > 0:
+                found = True
+    except Exception as exc:
+        logger.debug("Failed resolving watchdog alert in DB: %s", exc)
+    return found
 
 
 def clear_alerts(workspace: str | None = None) -> int:
@@ -64,10 +138,25 @@ def clear_alerts(workspace: str | None = None) -> int:
     if workspace:
         before = len(_alert_log)
         _alert_log = [a for a in _alert_log if a["workspace"] != workspace]
-        return before - len(_alert_log)
-    count = len(_alert_log)
-    _alert_log = []
-    return count
+        deleted = before - len(_alert_log)
+    else:
+        deleted = len(_alert_log)
+        _alert_log = []
+
+    try:
+        import sqlite3
+
+        from app.config import CONVERSATION_DB
+        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+            if workspace:
+                conn.execute("DELETE FROM watchdog_alerts WHERE workspace = ?", (workspace,))
+            else:
+                conn.execute("DELETE FROM watchdog_alerts")
+            conn.commit()
+    except Exception as exc:
+        logger.debug("Failed clearing watchdog alerts in DB: %s", exc)
+
+    return deleted
 
 
 def _run_cmd(cmd: list[str], cwd: str, timeout: int = 60) -> tuple[int, str]:
@@ -166,7 +255,7 @@ async def _watchdog_loop(workspace_path: str, interval_seconds: int = 300) -> No
 
 def start_watchdog(workspace_path: str, interval_seconds: int = 300) -> dict[str, Any]:
     """Start the background watchdog sentinel (non-blocking)."""
-    global _watchdog_task, _watchdog_running
+    global _watchdog_task
 
     if _watchdog_task and not _watchdog_task.done():
         return {"status": "already_running", "workspace": workspace_path}
@@ -182,7 +271,7 @@ def start_watchdog(workspace_path: str, interval_seconds: int = 300) -> dict[str
 
 def stop_watchdog() -> dict[str, Any]:
     """Stop the background watchdog sentinel."""
-    global _watchdog_task, _watchdog_running
+    global _watchdog_running
     _watchdog_running = False
     if _watchdog_task and not _watchdog_task.done():
         _watchdog_task.cancel()
@@ -191,7 +280,6 @@ def stop_watchdog() -> dict[str, Any]:
 
 
 def get_watchdog_status() -> dict[str, Any]:
-    global _watchdog_task, _watchdog_running
     running = _watchdog_running and _watchdog_task is not None and not _watchdog_task.done()
     return {
         "running": running,

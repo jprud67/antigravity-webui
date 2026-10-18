@@ -74,7 +74,7 @@ def test_sdk_manifest_schema():
     assert "slug" in schema["properties"]
 
 
-def test_plugins_api():
+def test_plugins_api(auth_headers: dict):
     """Basic plugin CRUD via REST."""
     # Register
     r = client.post("/api/plugins", json={
@@ -82,56 +82,56 @@ def test_plugins_api():
         "name": "REST Test Plugin",
         "version": "1.0.0",
         "scopes": ["register_command"],
-    })
+    }, headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert data["slug"] == "rest-test-plugin"
 
     # List
-    r = client.get("/api/plugins")
+    r = client.get("/api/plugins", headers=auth_headers)
     assert r.status_code == 200
     slugs = [p["slug"] for p in r.json()["plugins"]]
     assert "rest-test-plugin" in slugs
 
     # Get by slug
-    r = client.get("/api/plugins/rest-test-plugin")
+    r = client.get("/api/plugins/rest-test-plugin", headers=auth_headers)
     assert r.status_code == 200
 
     # Invoke
-    r = client.post("/api/plugins/rest-test-plugin/invoke", json={"method": "registerCommand"})
+    r = client.post("/api/plugins/rest-test-plugin/invoke", json={"method": "registerCommand"}, headers=auth_headers)
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
 
     # Disable
-    r = client.delete("/api/plugins/rest-test-plugin")
+    r = client.delete("/api/plugins/rest-test-plugin", headers=auth_headers)
     assert r.status_code == 200
     assert r.json()["status"] == "disabled"
 
 
-def test_watchdog_status():
-    r = client.get("/api/watchdog/status")
+def test_watchdog_status(auth_headers: dict):
+    r = client.get("/api/watchdog/status", headers=auth_headers)
     assert r.status_code == 200
     assert "running" in r.json()
 
 
-def test_watchdog_alerts_empty():
-    client.delete("/api/watchdog/alerts")
-    r = client.get("/api/watchdog/alerts")
+def test_watchdog_alerts_empty(auth_headers: dict):
+    client.delete("/api/watchdog/alerts", headers=auth_headers)
+    r = client.get("/api/watchdog/alerts", headers=auth_headers)
     assert r.status_code == 200
 
 
-def test_sweeps_run_changelog():
+def test_sweeps_run_changelog(auth_headers: dict):
     import tempfile, os
     with tempfile.TemporaryDirectory() as tmp:
         r = client.post("/api/sweeps/run", json={
             "workspace_path": tmp,
             "sweep_type": "changelog",
-        })
+        }, headers=auth_headers)
         assert r.status_code == 200
         data = r.json()
         assert data.get("skipped") is True  # No git repo in tmp
 
-def test_sweeps_history():
-    r = client.get("/api/sweeps/history")
+def test_sweeps_history(auth_headers: dict):
+    r = client.get("/api/sweeps/history", headers=auth_headers)
     assert r.status_code == 200
     assert "history" in r.json()

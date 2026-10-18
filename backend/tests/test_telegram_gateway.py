@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.services.messaging_gateway import (
@@ -109,7 +109,7 @@ def test_telegram_gateway_callback_query():
         gw.answer_callback_query = AsyncMock(return_value=True)
         gw.edit_message = AsyncMock(return_value=True)
 
-        with patch("app.services.execution_manager.execution_manager.handle_approval", new_callable=AsyncMock) as mock_handle:
+        with patch("app.services.execution_manager.execution_manager.handle_approval", autospec=True) as mock_handle:
             cb_update = {
                 "update_id": 10,
                 "callback_query": {
@@ -161,5 +161,34 @@ def test_telegram_session_subscriber_lifecycle():
         assert args[1] == 777
         assert args[2] == "Response from Antigravity"
         assert "reply_markup" in kwargs
+
+    asyncio.run(_run())
+
+
+def test_telegram_approval_real_signature_and_logic():
+    async def _run():
+        from app.services.execution_manager import ExecutionManager
+        em = ExecutionManager()
+        session = em.get_or_create_session("test_conv_approval_real")
+
+        mock_proc = MagicMock()
+        mock_stdin = MagicMock()
+        mock_stdin.is_closing.return_value = False
+        mock_stdin.write = MagicMock()
+        mock_stdin.drain = AsyncMock()
+        mock_proc.stdin = mock_stdin
+        mock_proc.returncode = None
+        session.active_proc = mock_proc
+        session.pending_approval = {"tool": "run_command", "command": "echo test"}
+
+        # Test approval without passing 'rule' parameter
+        await em.handle_approval("test_conv_approval_real", decision="approved")
+        mock_stdin.write.assert_called_with(b"y\n")
+        assert session.pending_approval is None
+
+        # Test rejection
+        session.pending_approval = {"tool": "run_command"}
+        await em.handle_approval("test_conv_approval_real", decision="rejected")
+        mock_stdin.write.assert_called_with(b"n\n")
 
     asyncio.run(_run())

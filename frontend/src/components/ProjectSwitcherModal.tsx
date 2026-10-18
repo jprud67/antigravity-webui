@@ -157,6 +157,7 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
+    // oxlint-disable-next-line react/set-state-in-effect
     loadProjects();
   }, [isOpen, loadProjects]);
 
@@ -178,9 +179,10 @@ export const ProjectSwitcherModal: React.FC<ProjectSwitcherModalProps> = ({
 
   useEffect(() => {
     if (isOpen && (activeTab === 'browse' || (activeTab === 'create' && createMode === 'existing'))) {
+      // oxlint-disable-next-line react/set-state-in-effect
       loadExplorerDir(explorerCurrentPath || currentWorkspace || '/root');
     }
-  }, [isOpen, activeTab, createMode, loadExplorerDir]);
+  }, [isOpen, activeTab, createMode, loadExplorerDir, explorerCurrentPath, currentWorkspace]);
 
   // Clickable path segments
   const pathSegments = useMemo(() => {

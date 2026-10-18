@@ -5826,6 +5826,7 @@ def test_files_download_known_developer_mime_types():
     mock_path = MagicMock()
     mock_path.exists.return_value = True
     mock_path.is_file.return_value = True
+    mock_path.is_dir.return_value = False
     mock_path.name = "README.md"
     mock_path.suffix = ".md"
 

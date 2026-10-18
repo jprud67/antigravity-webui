@@ -8,13 +8,11 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sqlite3
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
-
-import sqlite3
 
 from app.config import CONVERSATION_DB
 
@@ -176,7 +174,10 @@ def invoke_plugin(slug: str, method: str, params: dict[str, Any] | None = None) 
         "method": method,
         "params": params or {},
         "status": "ok",
-        "result": {"sandbox": "wasm-worker", "message": f"Method '{method}' dispatched to sandbox"},
+        "result": {
+            "sandbox": "specification-stub",
+            "message": f"Plugin '{slug}' method '{method}' validé selon la spécification SDK (moteur Wasm en cours d'intégration)",
+        },
         "invoked_at": now,
     }
 

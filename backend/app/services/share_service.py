@@ -369,7 +369,7 @@ def update_share_permissions(
         if not row:
             raise ValueError(f"Share session {identifier} not found")
 
-        tok, cid, cur_w, cur_term, cur_appr = row
+        tok, _cid, cur_w, cur_term, cur_appr = row
         new_w = int(can_write) if can_write is not None else cur_w
         new_term = int(can_run_terminal) if can_run_terminal is not None else cur_term
         new_appr = int(requires_approval) if requires_approval is not None else cur_appr

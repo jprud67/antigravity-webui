@@ -11,7 +11,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
 from app.platform_utils import is_blocked_sensitive_path, is_safe_path
-from app.services.storage import get_allowed_workspace_roots
 from app.services.database_studio import (
     DatabaseConnectionInfo,
     DatabaseSchema,
@@ -23,6 +22,7 @@ from app.services.database_studio import (
     export_query_results,
     inspect_database_schema,
 )
+from app.services.storage import get_allowed_workspace_roots
 
 router = APIRouter(prefix="/api/database", tags=["Database Studio"], dependencies=[Depends(require_auth)])
 

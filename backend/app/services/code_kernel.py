@@ -9,6 +9,7 @@ directly inside the kernel without round-tripping through the LLM.
 
 from __future__ import annotations
 
+import ctypes
 import io
 import logging
 import os
@@ -26,6 +27,24 @@ logger = logging.getLogger(__name__)
 
 _MAX_OUTPUT_CHARS = 500_000
 _GLOBAL_EXECUTION_LOCK = threading.RLock()
+
+
+def _terminate_thread(thread: threading.Thread) -> None:
+    """Safely interrupts a running Python thread by injecting a KeyboardInterrupt exception into its thread state."""
+    if not thread.is_alive():
+        return
+    tid = thread.ident
+    if tid is None:
+        return
+    try:
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+            ctypes.c_long(tid),
+            ctypes.py_object(KeyboardInterrupt),
+        )
+        if res > 1:
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(tid), None)
+    except Exception as exc:
+        logger.debug("Failed injecting async exception to thread %s: %s", tid, exc)
 
 
 class KernelToolProxy:
@@ -257,18 +276,28 @@ class PersistentPythonKernel:
                         with SafeStreamRedirect("stdout", out_buf), SafeStreamRedirect("stderr", err_buf):
                             compiled = compile(code, f"<cell-{current_exec_count}>", "exec")
                             exec(compiled, self.globals)  # nosec B102
+                    except KeyboardInterrupt:
+                        status = "timeout"
+                        tb = f"Execution timed out after {timeout} seconds."
                     except SystemExit as se:
                         status = "exit"
                         tb = f"SystemExit: {se.code}"
                     except BaseException:
-                        status = "error"
-                        tb = traceback.format_exc()
+                        if status != "timeout":
+                            status = "error"
+                            tb = traceback.format_exc()
 
                 t = threading.Thread(target=run_code, daemon=True)
                 t.start()
                 t.join(timeout=timeout)
 
+                timed_out = False
                 if t.is_alive():
+                    timed_out = True
+                    _terminate_thread(t)
+                    t.join(timeout=0.5)
+
+                if timed_out or status == "timeout":
                     status = "timeout"
                     tb = f"Execution timed out after {timeout} seconds."
                     self.globals = pre_globals

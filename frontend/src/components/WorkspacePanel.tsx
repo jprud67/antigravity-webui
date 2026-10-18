@@ -763,7 +763,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
     } finally {
       setLoadingContent(false);
     }
-  }, [openTabs, currentWorkspace, isBinaryFile, t]);
+  }, [openTabs, currentWorkspace, isBinaryFile, isImageFile, t]);
 
   const handleCloseTab = useCallback(async (indexToClose: number, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -1640,6 +1640,7 @@ export const WorkspacePanel: React.FC<WorkspacePanelProps> = React.memo(({
 
     findMatches(fileTree.items);
     if (Object.keys(toExpand).length > 0) {
+      // oxlint-disable-next-line react/set-state-in-effect
       setExpandedFolders((prev) => ({ ...prev, ...toExpand }));
     }
   }, [treeSearch, fileTree]);

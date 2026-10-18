@@ -8,10 +8,9 @@ trigger batch operations, and invoke auto-fix remediation.
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.api.auth import require_auth
 from app.config import DEFAULT_WORKSPACE
@@ -54,7 +53,7 @@ def api_get_coordinator_overview(
     try:
         return get_multi_workspace_overview(active_workspace_path=active_workspace)
     except Exception as exc:
-        logger.exception("Error computing multi-workspace overview: %s", exc)
+        logger.exception("Error computing multi-workspace overview")
         raise HTTPException(status_code=500, detail=f"Erreur d'analyse des workspaces: {exc}")
 
 
@@ -72,7 +71,7 @@ def api_get_workspace_pipelines(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        logger.exception("Error discovering pipelines in %s: %s", target_ws, exc)
+        logger.exception("Error discovering pipelines in %s", target_ws)
         raise HTTPException(status_code=500, detail=f"Erreur lors de la détection des pipelines: {exc}")
 
 
@@ -90,7 +89,7 @@ async def api_run_pipeline(payload: PipelineRunRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        logger.exception("Error starting pipeline %s: %s", payload.pipeline_id, exc)
+        logger.exception("Error starting pipeline %s", payload.pipeline_id)
         raise HTTPException(status_code=500, detail=f"Échec du lancement du pipeline: {exc}")
 
 
@@ -128,7 +127,7 @@ def api_build_remediation(payload: CoordinatorRemediationInput):
             step_output=payload.step_output
         )
     except Exception as exc:
-        logger.exception("Error creating remediation context: %s", exc)
+        logger.exception("Error creating remediation context")
         raise HTTPException(status_code=500, detail=f"Erreur lors de la génération du diagnostic: {exc}")
 
 
@@ -138,5 +137,5 @@ async def api_execute_batch(payload: BatchActionRequest):
     try:
         return await execute_batch_action(payload.action, payload.workspace_paths)
     except Exception as exc:
-        logger.exception("Error executing batch action %s: %s", payload.action, exc)
+        logger.exception("Error executing batch action %s", payload.action)
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'action par lot: {exc}")

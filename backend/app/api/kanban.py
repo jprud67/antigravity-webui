@@ -302,7 +302,7 @@ def bulk_task_action(req: BulkTaskActionRequest, _ = Depends(require_auth)):
                     t_completed = row["completed_at"]
                     
                     st_updates = ["status = ?"]
-                    st_params = [new_st]
+                    st_params: list[Any] = [new_st]
                     
                     if new_st in ["running", "in_progress"]:
                         if not t_started:

@@ -595,9 +595,8 @@ def download_file(path: str = Query(...), workspace: str | None = Query(None), _
 
     if resolved_path.is_dir():
         # Zip directory on the fly and stream
-        zip_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
-        zip_path = Path(zip_temp.name)
-        zip_temp.close()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as zip_temp:
+            zip_path = Path(zip_temp.name)
         try:
             with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
                 for root, dirs, files in os.walk(resolved_path):
@@ -621,6 +620,9 @@ def download_file(path: str = Query(...), workspace: str | None = Query(None), _
             zip_path.unlink(missing_ok=True)
             logger.error(f"Error archiving directory {resolved_path}: {e}")
             raise HTTPException(status_code=500, detail=f"Erreur d'archivage zip : {e!s}")
+
+    if hasattr(resolved_path, "is_file") and not resolved_path.is_file():
+        raise HTTPException(status_code=400, detail="Type de fichier non supporté pour le téléchargement direct.")
 
     try:
         if isinstance(resolved_path, Path) and not os.access(resolved_path, os.R_OK):

@@ -3,9 +3,15 @@ import logging
 import time
 import uuid
 from collections import deque
-from typing import Any
+from typing import Any, Protocol
 
 from fastapi import WebSocket
+
+
+class SessionSubscriberProtocol(Protocol):
+    async def send_json(self, data: dict[str, Any]) -> None:
+        ...
+
 
 from app.platform_utils import (
     terminate_process_group_async,
@@ -75,7 +81,7 @@ class ExecutionSession:
         self.conversation_id: str | None = conversation_id
         self.workspace_path: str | None = workspace_path
         self.message_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-        self.subscribers: set[WebSocket] = set()
+        self.subscribers: set[SessionSubscriberProtocol | WebSocket] = set()
         self.active_proc: asyncio.subprocess.Process | None = None
         self.active_task: asyncio.Task | None = None
         self.worker_task: asyncio.Task | None = None
@@ -93,12 +99,12 @@ class ExecutionSession:
         self.live_progress_card: dict[str, Any] | None = None
         self.recent_events: deque[dict[str, Any]] = deque(maxlen=50)
 
-    def add_subscriber(self, ws: WebSocket | None):
+    def add_subscriber(self, ws: SessionSubscriberProtocol | WebSocket | None):
         if ws is not None:
             self.subscribers.add(ws)
         self.last_active_at = time.time()
 
-    def remove_subscriber(self, ws: WebSocket | None):
+    def remove_subscriber(self, ws: SessionSubscriberProtocol | WebSocket | None):
         if ws is not None:
             self.subscribers.discard(ws)
         if not self.subscribers:
@@ -777,7 +783,7 @@ class ExecutionManager:
         self.sessions: dict[str, ExecutionSession] = {}
         self.active_session: ExecutionSession | None = None
         self.connected_sockets: set[WebSocket] = set()
-        self.socket_info: dict[WebSocket, dict[str, Any]] = {}
+        self.socket_info: dict[Any, dict[str, Any]] = {}
         self._background_tasks: set[asyncio.Task[Any]] = set()
         self._lock: asyncio.Lock = asyncio.Lock()
 
@@ -1371,7 +1377,7 @@ class ExecutionManager:
             "queue_size": 0
         })
 
-    async def handle_approval(self, conversation_id: str | None, decision: str, rule: str | None):
+    async def handle_approval(self, conversation_id: str | None, decision: str, rule: str | None = None):
         session = self.get_session(conversation_id)
         if not session:
             return
@@ -1404,7 +1410,7 @@ class ExecutionManager:
             and not closing
         ):
             try:
-                input_char = "y\n" if decision in ["allow-once", "allow-session", "always-allow"] else "n\n"
+                input_char = "y\n" if decision in ["allow-once", "allow-session", "always-allow", "approved"] else "n\n"
                 proc_stdin.write(input_char.encode())
                 await proc_stdin.drain()
             except (BrokenPipeError, ConnectionResetError, ValueError, RuntimeError, OSError):

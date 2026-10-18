@@ -175,3 +175,28 @@ def test_sweep_history_recorded():
         # Instead verify the result structure is correct
         assert result["type"] == "dead_branches"
         assert result.get("skipped") is True
+
+
+# ─────────────────── AUTHENTICATION ENFORCEMENT ──────────────────────────────
+
+def test_plugins_and_watchdog_unauthenticated_rejected():
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    # Anonymous requests must receive 401 or 403
+    r1 = client.get("/api/plugins")
+    assert r1.status_code in (401, 403)
+
+    r2 = client.post("/api/plugins", json={"slug": "anon-plugin", "name": "Anon"})
+    assert r2.status_code in (401, 403)
+
+    r3 = client.get("/api/watchdog/status")
+    assert r3.status_code in (401, 403)
+
+    r4 = client.post("/api/watchdog/start", json={"workspace_path": "/tmp"})
+    assert r4.status_code in (401, 403)
+
+    r5 = client.post("/api/sweeps/run", json={"workspace_path": "/tmp", "sweep_type": "all"})
+    assert r5.status_code in (401, 403)
+

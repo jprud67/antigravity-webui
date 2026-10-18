@@ -117,7 +117,7 @@ class TelegramSessionSubscriber:
                 if evt_type == "interrupted":
                     final_text = (final_text + "\n\n⏹️ *Exécution interrompue.*").strip()
                 elif not final_text and session and session.live_tool_calls:
-                    tools_done = [t.get("name") for t in session.live_tool_calls if t.get("status") == "done"]
+                    tools_done = [str(t.get("name") or "tool") for t in session.live_tool_calls if t.get("status") == "done"]
                     if tools_done:
                         final_text = f"✅ Tâche terminée ({len(tools_done)} action(s) effectuée(s) : {', '.join(tools_done[:3])})."
                 if not final_text:

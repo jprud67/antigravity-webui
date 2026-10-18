@@ -317,7 +317,7 @@ def create_new_workspace(payload: CreateWorkspacePayload, _ = Depends(require_au
         if payload.init_git:
             try:
                 subprocess.run(["git", "init", "-q"], cwd=str(target_p), capture_output=True, timeout=10)
-            except Exception as e:
+            except Exception:
                 pass
 
         # Register workspace
@@ -352,7 +352,7 @@ def clone_new_workspace(payload: CloneWorkspacePayload, _ = Depends(require_auth
     if not url or not parent_str:
         raise HTTPException(status_code=400, detail="URL du dépôt et répertoire parent requis.")
 
-    if not (url.startswith("https://") or url.startswith("http://") or url.startswith("git@") or url.startswith("ssh://")):
+    if not url.startswith(("https://", "http://", "git@", "ssh://")):
         raise HTTPException(status_code=400, detail="URL Git invalide. Doit commencer par https://, git@ ou ssh://")
 
     try:
@@ -367,8 +367,7 @@ def clone_new_workspace(payload: CloneWorkspacePayload, _ = Depends(require_auth
     if not folder_str:
         # Extract folder name from URL
         extracted = url.rstrip("/").split("/")[-1]
-        if extracted.endswith(".git"):
-            extracted = extracted[:-4]
+        extracted = extracted.removesuffix(".git")
         folder_str = extracted
 
     if not folder_str or not re.match(r"^[a-zA-Z0-9_.\-]+$", folder_str):

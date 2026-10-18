@@ -798,7 +798,7 @@ async def execute_batch_action(action: str, workspace_paths: list[str]) -> dict[
     else:
         targets = all_trusted
 
-    results = []
+    results: list[dict[str, Any]] = []
     git_bin = shutil.which("git") or "git"
 
     for ws in targets:

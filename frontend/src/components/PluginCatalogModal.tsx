@@ -201,6 +201,7 @@ export default function PluginCatalogModal({ isOpen, onClose }: PluginCatalogMod
                         <div className="flex items-center gap-2">
                           <h3 className="font-medium text-gray-900 dark:text-white text-sm">{plugin.name}</h3>
                           <span className="text-xs text-gray-500 dark:text-gray-400">v{plugin.version}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-medium">Spécification</span>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{plugin.description}</p>
                         <div className="flex flex-wrap gap-1 mt-2">

@@ -105,6 +105,7 @@ def api_configure_bot(req: ConfigureBotModel):
     )
     if req.platform.lower() == "telegram":
         import asyncio
+
         from app.services.telegram_gateway import telegram_gateway
         try:
             loop = asyncio.get_running_loop()

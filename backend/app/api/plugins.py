@@ -10,40 +10,54 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.services.plugin_sandbox import (
-    ensure_plugin_schema,
-    register_plugin,
-    get_plugin,
-    list_plugins,
-    disable_plugin,
-    invoke_plugin,
-    VALID_SCOPES,
-)
-from app.services.watchdog_sentinel import (
-    start_watchdog,
-    stop_watchdog,
-    get_watchdog_status,
-    get_alerts,
-    resolve_alert,
-    clear_alerts,
-    run_watchdog_scan,
-)
+from app.api.auth import require_auth
+from app.platform_utils import is_blocked_sensitive_path, is_safe_path
 from app.services.maintenance_sweeps import (
-    sweep_dependency_vulnerabilities,
-    sweep_dead_git_branches,
-    sweep_changelog_summary,
     get_sweep_history,
     run_all_sweeps,
+    sweep_changelog_summary,
+    sweep_dead_git_branches,
+    sweep_dependency_vulnerabilities,
+)
+from app.services.plugin_sandbox import (
+    VALID_SCOPES,
+    disable_plugin,
+    get_plugin,
+    invoke_plugin,
+    list_plugins,
+    register_plugin,
+)
+from app.services.storage import get_allowed_workspace_roots
+from app.services.watchdog_sentinel import (
+    clear_alerts,
+    get_alerts,
+    get_watchdog_status,
+    resolve_alert,
+    run_watchdog_scan,
+    start_watchdog,
+    stop_watchdog,
 )
 
 logger = logging.getLogger("antigravity.api.plugins")
 
-router = APIRouter(prefix="/api/plugins", tags=["plugins"])
-watchdog_router = APIRouter(prefix="/api/watchdog", tags=["watchdog"])
-sweeps_router = APIRouter(prefix="/api/sweeps", tags=["sweeps"])
+router = APIRouter(prefix="/api/plugins", tags=["plugins"], dependencies=[Depends(require_auth)])
+watchdog_router = APIRouter(prefix="/api/watchdog", tags=["watchdog"], dependencies=[Depends(require_auth)])
+sweeps_router = APIRouter(prefix="/api/sweeps", tags=["sweeps"], dependencies=[Depends(require_auth)])
+
+
+def _validate_safe_workspace(ws: str) -> None:
+    if not ws or not ws.strip():
+        raise HTTPException(status_code=400, detail="Chemin de workspace vide.")
+    if "\x00" in ws:
+        raise HTTPException(status_code=400, detail="Chemin de workspace invalide.")
+    if is_blocked_sensitive_path(ws):
+        raise HTTPException(status_code=403, detail="Accès au répertoire interdit.")
+    allowed_roots = get_allowed_workspace_roots()
+    if not is_safe_path(ws, allowed_roots):
+        raise HTTPException(status_code=403, detail="Accès refusé : répertoire en dehors des workspaces autorisés.")
 
 
 # ─────────────────────────── PLUGIN MODELS ──────────────────────────────────
@@ -144,6 +158,7 @@ def watchdog_status():
 @watchdog_router.post("/start")
 def start_watchdog_sentinel(body: WatchdogStartBody):
     """Start the watchdog sentinel for a workspace."""
+    _validate_safe_workspace(body.workspace_path)
     result = start_watchdog(body.workspace_path, body.interval_seconds)
     return result
 
@@ -157,6 +172,7 @@ def stop_watchdog_sentinel():
 @watchdog_router.post("/scan")
 def scan_workspace(workspace_path: str):
     """Run a one-off synchronous watchdog scan."""
+    _validate_safe_workspace(workspace_path)
     result = run_watchdog_scan(workspace_path)
     return result
 
@@ -164,6 +180,8 @@ def scan_workspace(workspace_path: str):
 @watchdog_router.get("/alerts")
 def list_watchdog_alerts(workspace: str | None = None, unresolved_only: bool = True):
     """List watchdog alerts."""
+    if workspace:
+        _validate_safe_workspace(workspace)
     alerts = get_alerts(workspace=workspace, unresolved_only=unresolved_only)
     return {"alerts": alerts, "total": len(alerts)}
 
@@ -180,6 +198,8 @@ def resolve_watchdog_alert(alert_id: str):
 @watchdog_router.delete("/alerts")
 def clear_watchdog_alerts(workspace: str | None = None):
     """Clear all (or workspace-specific) watchdog alerts."""
+    if workspace:
+        _validate_safe_workspace(workspace)
     count = clear_alerts(workspace=workspace)
     return {"cleared": count}
 
@@ -196,6 +216,7 @@ class SweepRunBody(BaseModel):
 async def run_sweep(body: SweepRunBody):
     """Run maintenance sweep(s) on a workspace."""
     ws = body.workspace_path
+    _validate_safe_workspace(ws)
     if body.sweep_type == "all":
         result = await run_all_sweeps(ws)
     elif body.sweep_type == "vulnerabilities":

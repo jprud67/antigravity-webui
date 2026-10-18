@@ -183,7 +183,7 @@ def update_comment(comment_id: str, payload: CommentUpdatePayload) -> dict[str, 
         if not row:
             raise ValueError(f"Comment {clean_id} not found")
 
-        cur_id, cid, fp, line_num, author, content, parent_id, resolved, created_at = row
+        _cur_id, cid, fp, line_num, author, content, parent_id, resolved, created_at = row
 
         new_content = payload.content.strip() if payload.content is not None else content
         new_resolved = int(payload.resolved) if payload.resolved is not None else resolved

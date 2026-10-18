@@ -15,8 +15,8 @@ from app.api.canvas_documents import router as canvas_documents_router
 from app.api.chat import router as chat_router
 from app.api.checkpoints import router as checkpoints_router
 from app.api.code_kernel import router as code_kernel_router
-from app.api.coordinator import router as coordinator_router
 from app.api.conversations import router as conv_router
+from app.api.coordinator import router as coordinator_router
 from app.api.copilot import router as copilot_router
 from app.api.crons import router as crons_router
 from app.api.database_studio import router as database_studio_router
@@ -198,11 +198,14 @@ app.include_router(checkpoints_router)   # Agent Dynamic Checkpoint & Rewind Stu
 app.include_router(coordinator_router)   # Autonomous Multi-Workspace Coordinator & Pipelines Engine
 
 # Jalon v0.5.0 — Agentic IDE Ecosystem
-from app.api.plugins import router as plugins_router, watchdog_router, sweeps_router
+from app.api.plugins import router as plugins_router
+from app.api.plugins import sweeps_router, watchdog_router
+
 app.include_router(plugins_router)   # Plugin Sandbox Engine
 app.include_router(watchdog_router)  # Self-Healing Watchdog Sentinel
 app.include_router(sweeps_router)    # Scheduled Maintenance Sweeps
 from app.api.sdk_portal import router as sdk_portal_router
+
 app.include_router(sdk_portal_router)  # Developer SDK & Interactive Documentation Portal
 
 

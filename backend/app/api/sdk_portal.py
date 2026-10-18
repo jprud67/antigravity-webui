@@ -5,9 +5,7 @@ code examples, and plugin development guides.
 """
 from __future__ import annotations
 
-import json
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse

@@ -161,6 +161,7 @@ export const FileExplorerModal: React.FC<FileExplorerModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
+    // oxlint-disable-next-line react/set-state-in-effect
     loadTree();
   }, [isOpen, loadTree]);
 
