@@ -292,19 +292,30 @@ def trigger_cron_job_now(job_id: str, _ = Depends(require_auth)):
 def stop_cron_job(job_id: str, _ = Depends(require_auth)):
     from app.services.cron_ticker import cancel_running_job, is_job_running
 
-    running = is_job_running(job_id)
-    if not running:
-        return {
-            "success": True,
-            "message": f"Le job {job_id} n'est pas en cours d'exécution active",
-            "canceled": False
-        }
+    def _pause(data):
+        for j in data.get("jobs", []):
+            if str(j.get("id")) == str(job_id):
+                j["enabled"] = False
+                j["state"] = "paused"
+                j["paused_at"] = now_iso()
+                j["next_run_at"] = None
+                return dict(j)
+        return None
 
-    canceled = cancel_running_job(job_id)
+    target = update_jobs(_pause)
+    if not target:
+        raise HTTPException(status_code=404, detail="Job cron introuvable")
+
+    running = is_job_running(job_id)
+    canceled = False
+    if running:
+        canceled = cancel_running_job(job_id)
+
     return {
         "success": True,
-        "message": f"Exécution du job {job_id} interrompue avec succès",
-        "canceled": canceled
+        "message": f"Exécution du job {job_id} interrompue et tâche mise en pause",
+        "canceled": canceled,
+        "job": target
     }
 
 

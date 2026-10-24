@@ -650,11 +650,13 @@ async def _execute_job(job: dict[str, Any]) -> None:
                                 j["roadmap_summary"] = last_output_summary
 
                         is_active = (j.get("enabled", True) and j.get("state") not in ("paused", "disabled"))
-                        if is_continuous and is_active:
+                        is_interrupted = result.get("status") in ("interrupted", "cancelled")
+                        if is_continuous and is_active and not is_interrupted:
                             should_continue = True
                             j["next_run_at"] = (datetime.now(timezone.utc) + timedelta(seconds=3)).isoformat()
                             j["state"] = "scheduled"
                         else:
+                            should_continue = False
                             _recompute_job_next_run(j)
                         break
             update_jobs(_update_result)
