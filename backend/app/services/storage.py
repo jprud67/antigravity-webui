@@ -114,15 +114,16 @@ def get_db_connection() -> sqlite3.Connection:
     else:
         try:
             cur = conn.cursor()
-            cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='conversation_summaries'")
-            if cur.fetchone() is None:
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('conversation_summaries', 'deleted_conversations')")
+            existing_tables = {row[0] for row in cur.fetchall()}
+            if "conversation_summaries" not in existing_tables or "deleted_conversations" not in existing_tables:
                 needs_schema = True
         except Exception:
             needs_schema = True
 
     if needs_schema:
         with _schema_lock:
-            ensure_db_schema(conn)
+            ensure_db_schema(conn, force=True)
     return conn
 
 
@@ -149,19 +150,17 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None, force: bool = False
     else:
         db_path_str = str(CONVERSATION_DB)
 
-    if conn is None:
-        if _schema_initialized and db_path_str in _initialized_db_paths and not force:
+    if not force:
+        if conn is None and _schema_initialized and db_path_str in _initialized_db_paths:
             return
-    else:
-        if db_path_str in _initialized_db_paths and not force:
+        if conn is not None and db_path_str in _initialized_db_paths:
             return
 
     with _schema_lock:
-        if conn is None:
-            if _schema_initialized and db_path_str in _initialized_db_paths and not force:
+        if not force:
+            if conn is None and _schema_initialized and db_path_str in _initialized_db_paths:
                 return
-        else:
-            if db_path_str in _initialized_db_paths and not force:
+            if conn is not None and db_path_str in _initialized_db_paths:
                 return
         close_after = False
         if conn is None:
@@ -510,10 +509,12 @@ def list_conversations(limit: int = 100) -> list[dict[str, Any]]:
             # Chunk missing_pinned in batches of 500 to avoid SQLite variable limits
             chunk_size = 500
             for i in range(0, len(missing_pinned), chunk_size):
-                chunk = missing_pinned[i : i + chunk_size]
+                chunk = [cid for cid in missing_pinned[i : i + chunk_size] if cid not in deleted_ids]
+                if not chunk:
+                    continue
                 placeholders = ",".join("?" * len(chunk))
                 query_sql = (
-                    f"SELECT conversation_id, title, preview, step_count, last_modified_time, workspace_uris, status, agent_name, parent_conversation_id, project_id, group_id FROM conversation_summaries WHERE conversation_id IN ({placeholders}) AND conversation_id NOT IN (SELECT conversation_id FROM deleted_conversations)"  # nosec B608
+                    f"SELECT conversation_id, title, preview, step_count, last_modified_time, workspace_uris, status, agent_name, parent_conversation_id, project_id, group_id FROM conversation_summaries WHERE conversation_id IN ({placeholders})"  # nosec B608
                 )
                 cursor.execute(query_sql, tuple(chunk))
                 rows.extend(cursor.fetchall())
@@ -2139,12 +2140,14 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
         try:
             cursor.execute("SELECT conversation_id FROM deleted_conversations")
             deleted_ids = {r[0] for r in cursor.fetchall()}
+            tombstone_clause = "AND conversation_id NOT IN (SELECT conversation_id FROM deleted_conversations)"
         except Exception:
             deleted_ids = set()
+            tombstone_clause = ""
 
         escaped_query = q_clean.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         cursor.execute(
-            """
+            f"""
             SELECT 
                 conversation_id,
                 title,
@@ -2159,10 +2162,10 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                 group_id
             FROM conversation_summaries
             WHERE (title LIKE ? ESCAPE '\\' OR preview LIKE ? ESCAPE '\\')
-              AND conversation_id NOT IN (SELECT conversation_id FROM deleted_conversations)
+              {tombstone_clause}
             ORDER BY last_modified_time DESC
             LIMIT ?
-            """,
+            """,  # nosec B608
             (f"%{escaped_query}%", f"%{escaped_query}%", limit)
         )
         for r in cursor.fetchall():
@@ -2216,7 +2219,7 @@ def search_conversations(query: str, limit: int = 50) -> list[dict[str, Any]]:
                             group_id
                         FROM conversation_summaries
                         WHERE conversation_id IN ({placeholders})
-                          AND conversation_id NOT IN (SELECT conversation_id FROM deleted_conversations)
+                          {tombstone_clause}
                         """,  # nosec B608
                         tuple(chunk),
                     )
@@ -3676,13 +3679,21 @@ def get_conversation_branch_tree(conversation_id: str) -> dict[str, Any]:
 
         root_id = curr_id
 
-        cursor.execute(
-            """
-            SELECT conversation_id, title, preview, step_count, last_modified_time, parent_conversation_id, project_id, group_id
-            FROM conversation_summaries
-            WHERE conversation_id NOT IN (SELECT conversation_id FROM deleted_conversations)
-            """
-        )
+        try:
+            cursor.execute(
+                """
+                SELECT conversation_id, title, preview, step_count, last_modified_time, parent_conversation_id, project_id, group_id
+                FROM conversation_summaries
+                WHERE conversation_id NOT IN (SELECT conversation_id FROM deleted_conversations)
+                """
+            )
+        except Exception:
+            cursor.execute(
+                """
+                SELECT conversation_id, title, preview, step_count, last_modified_time, parent_conversation_id, project_id, group_id
+                FROM conversation_summaries
+                """
+            )
         all_rows = cursor.fetchall()
     finally:
         conn.close()

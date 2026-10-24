@@ -44,7 +44,8 @@ import {
   ChevronDown,
   Network,
   History,
-  Boxes
+  Boxes,
+  RotateCw
 } from 'lucide-react';
 import type { Conversation } from '../types';
 import { AntigravityIcon } from './AntigravityLogo';
@@ -196,6 +197,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   const { lang, t } = useI18n();
   const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === lang) || SUPPORTED_LANGUAGES[0];
   const [searchFilter, setSearchFilter] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Theme quick popover
   const [isThemePopoverOpen, setIsThemePopoverOpen] = useState(false);
@@ -1029,7 +1031,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         {/* Expandable Advanced Filter Drawer */}
         {isFilterPanelOpen && (
           <div
-            className="p-2.5 rounded-xl border space-y-2.5 text-xs transition-all shadow-xs animate-fadeIn"
+            className="p-2.5 rounded-xl border space-y-2.5 text-xs transition-all shadow-xs animate-fadeIn max-h-60 overflow-y-auto scrollbar-thin"
             style={{
               backgroundColor: 'var(--surface)',
               borderColor: 'var(--border)',
@@ -1337,6 +1339,23 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
           <span className="text-[11px] font-semibold uppercase tracking-wider truncate" style={{ color: 'var(--muted)' }}>
             {t('discussions', 'Discussions')} ({filtered.length})
           </span>
+          {onRefreshConversations && (
+            <button
+              type="button"
+              onClick={async () => {
+                setIsRefreshing(true);
+                try {
+                  await onRefreshConversations();
+                } finally {
+                  setIsRefreshing(false);
+                }
+              }}
+              className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              title={t('refresh_conversations', 'Rafraîchir les discussions')}
+            >
+              <RotateCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-sky-500' : ''}`} />
+            </button>
+          )}
         </div>
 
         <button
@@ -1577,8 +1596,32 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       {/* Grouped Conversation List */}
       <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-3 scrollbar-thin">
         {filtered.length === 0 ? (
-          <div className="p-6 text-center text-xs text-slate-500">
-            {searchFilter || activeFilterCount > 0 ? t('no_sessions_match_filters', 'No sessions match filters.') : t('no_sessions_found', 'No sessions found.')}
+          <div className="p-6 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
+            <span>
+              {searchFilter || activeFilterCount > 0 ? t('no_sessions_match_filters', 'No sessions match filters.') : t('no_sessions_found', 'No sessions found.')}
+            </span>
+            {(searchFilter || activeFilterCount > 0) && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="mt-1 px-2.5 py-1 rounded-lg text-xs font-medium border text-sky-500 hover:bg-sky-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>{t('reset_filters', 'Réinitialiser tous les filtres')}</span>
+              </button>
+            )}
+            {conversations.length === 0 && onRefreshConversations && (
+              <button
+                type="button"
+                onClick={() => onRefreshConversations()}
+                className="mt-1 px-2.5 py-1 rounded-lg text-xs font-medium border text-sky-500 hover:bg-sky-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <RotateCw className="w-3 h-3" />
+                <span>{t('refresh', 'Rafraîchir')}</span>
+              </button>
+            )}
           </div>
         ) : (
           groupedConversations.map((group) => (

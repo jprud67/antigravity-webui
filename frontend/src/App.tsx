@@ -566,7 +566,10 @@ export function App() {
       chatSocket.connect();
 
       const [convs, mods, settings, googleRes] = await Promise.all([
-        fetchConversations(100),
+        fetchConversations(100).catch((err) => {
+          console.error('Failed to load conversations:', err);
+          return [];
+        }),
         fetchModels(),
         fetchSettings(),
         fetchGoogleAccounts().catch(() => ({ active_account: null, accounts: [] }))
