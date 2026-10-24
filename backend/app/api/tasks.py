@@ -82,6 +82,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
     subagents: list[dict[str, Any]] = []
     running_processes: list[dict[str, Any]] = []
     active_cmdlines: list[str] = []
+    active_open_files: dict[str, int] = {}
 
     # 1. Scan active process tree for agy and background workers
     try:
@@ -105,6 +106,14 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                         "created_at": info.get('create_time') or 0.0,
                         "memory_mb": round((mem_rss or 0) / (1024 * 1024), 1)
                     })
+                try:
+                    for f in proc.open_files():
+                        try:
+                            active_open_files[os.path.realpath(f.path)] = info['pid']
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError, KeyError, TypeError):
                 continue
     except Exception as e:
@@ -181,10 +190,16 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                         else False
                     )
 
+                    real_path = os.path.realpath(str(tfile))
+                    holding_pid = active_open_files.get(real_path)
+
                     outcome = transcript_outcomes.get(tid)
                     if outcome:
                         status = outcome["status"]
                         exit_code = outcome.get("exit_code")
+                    elif holding_pid or is_active_process:
+                        status = "running"
+                        exit_code = None
                     else:
                         if "[task cancelled by user]" in lower_preview or "task cancelled" in lower_preview:
                             status = "cancelled"
@@ -192,7 +207,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                         elif "status: failed" in lower_preview or "the command exited with code 1" in lower_preview:
                             status = "failed"
                             exit_code = 1
-                        elif has_finish_marker or (now_ts - stat_mtime) > 300 and not is_active_process:
+                        elif has_finish_marker or (now_ts - stat_mtime) > 10:
                             status = "completed"
                             exit_code = 0
                         else:
@@ -204,6 +219,7 @@ def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_au
                         "task_id": tid,
                         "conversation_id": cid,
                         "log_path": str(tfile),
+                        "pid": holding_pid,
                         "size": stat_size,
                         "last_modified": stat_mtime,
                         "preview": preview,

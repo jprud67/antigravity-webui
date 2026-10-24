@@ -14,7 +14,9 @@ import {
   Pencil,
   Check,
   FileText,
-  MessageSquare
+  MessageSquare,
+  Square,
+  Infinity
 } from 'lucide-react';
 import type { CronJobItem, CronListResponse } from '../services/api';
 import { 
@@ -23,6 +25,7 @@ import {
   updateCronJob, 
   deleteCronJob, 
   triggerCronJob,
+  stopCronJob,
   fetchCronJobLog
 } from '../services/api';
 import { showToast } from '../services/toast';
@@ -59,6 +62,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
   const [prompt, setPrompt] = useState('');
   const [preset, setPreset] = useState(SCHEDULE_PRESETS[1].expr);
   const [customExpr, setCustomExpr] = useState('*/15 * * * *');
+  const [continuousMode, setContinuousMode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
@@ -68,7 +72,11 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
   const [editPrompt, setEditPrompt] = useState('');
   const [editPreset, setEditPreset] = useState(SCHEDULE_PRESETS[1].expr);
   const [editCustomExpr, setEditCustomExpr] = useState('*/15 * * * *');
+  const [editContinuousMode, setEditContinuousMode] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+
+  // Roadmap viewer state
+  const [selectedRoadmapJobId, setSelectedRoadmapJobId] = useState<string | null>(null);
 
   // Log viewer state
   const [selectedLogJobId, setSelectedLogJobId] = useState<string | null>(null);
@@ -126,10 +134,12 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
         name: name.trim(),
         prompt: prompt.trim(),
         schedule: finalExpr,
+        continuous_mode: continuousMode,
         deliver: 'local'
       });
       setName('');
       setPrompt('');
+      setContinuousMode(false);
       setActionNotice(t('cron_created', 'Scheduled task created successfully'));
       setTimeout(() => setActionNotice(null), 3000);
       await loadCrons();
@@ -186,6 +196,16 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
     }
   };
 
+  const handleStopJob = async (job: CronJobItem) => {
+    try {
+      await stopCronJob(job.id);
+      showToast(t('cron_stopped_toast', 'Task execution stopped'), 'info');
+      await loadCrons();
+    } catch (e: any) {
+      showToast(e.message || t('cron_error_stop', 'Error stopping task'), 'error');
+    }
+  };
+
   const handleTestInChat = (job: CronJobItem) => {
     if (onExecutePrompt && job.prompt) {
       onExecutePrompt(`[TEST MANUEL CRON: ${job.name}]\n\n${job.prompt}`);
@@ -218,6 +238,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
     setEditingJobId(job.id);
     setEditName(job.name);
     setEditPrompt(job.prompt);
+    setEditContinuousMode(Boolean(job.continuous_mode));
     if (matchedPreset) {
       setEditPreset(matchedPreset.expr);
       setEditCustomExpr(matchedPreset.expr);
@@ -240,6 +261,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
         name: editName.trim(),
         prompt: editPrompt.trim(),
         schedule: finalExpr,
+        continuous_mode: editContinuousMode,
       });
       setEditingJobId(null);
       setActionNotice(t('cron_updated', 'Task updated successfully ✓'));
@@ -465,6 +487,32 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                 />
               </div>
 
+              <div
+                className="p-3 rounded-lg border flex items-start gap-3 transition-colors"
+                style={{
+                  backgroundColor: continuousMode ? 'var(--accent-bg)' : 'var(--surface)',
+                  borderColor: continuousMode ? 'var(--accent)' : 'var(--border)'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  id="create-continuous-mode"
+                  checked={continuousMode}
+                  onChange={e => setContinuousMode(e.target.checked)}
+                  className="mt-0.5 rounded cursor-pointer"
+                  style={{ accentColor: 'var(--accent)' }}
+                />
+                <label htmlFor="create-continuous-mode" className="text-xs cursor-pointer select-none flex-1">
+                  <div className="font-semibold flex items-center gap-1.5" style={{ color: 'var(--strong)' }}>
+                    <Infinity className="w-3.5 h-3.5 text-purple-400" />
+                    <span>{t('cron_continuous_mode', 'Continuous Autonomous Loop')}</span>
+                  </div>
+                  <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'var(--muted)' }}>
+                    {t('cron_continuous_mode_desc', 'Runs non-stop until manually stopped. Analyzes progress, performs auto-critique, and updates roadmap each cycle.')}
+                  </p>
+                </label>
+              </div>
+
               <div className="flex justify-end">
                 <button
                   type="submit"
@@ -542,6 +590,23 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                             >
                               {job.schedule_display || (typeof job.schedule === 'string' ? job.schedule : job.schedule?.display || job.schedule?.expr || 'interval')}
                             </span>
+                            {job.is_running && (
+                              <span className="text-[10px] text-sky-400 bg-sky-500/15 border border-sky-500/30 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1 animate-pulse">
+                                <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                                {t('cron_status_running', 'Running...')}
+                              </span>
+                            )}
+                            {job.continuous_mode && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center gap-1">
+                                <Infinity className="w-3 h-3" />
+                                <span>{t('cron_badge_continuous', 'Continu')}</span>
+                                {(job.cycle_count || 0) > 0 && (
+                                  <span className="text-[9px] opacity-80">
+                                    ({t('cron_cycle', 'Cycle #{0}').replace('{0}', String(job.cycle_count))})
+                                  </span>
+                                )}
+                              </span>
+                            )}
                             {isScheduled ? (
                               <span className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -557,19 +622,30 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                         </div>
 
                         <div className="flex items-center justify-end gap-1.5 shrink-0 flex-wrap">
-                          <button
-                            onClick={() => handleTriggerNow(job)}
-                            className="p-1.5 rounded-lg border transition-colors cursor-pointer text-xs flex items-center gap-1"
-                            style={{
-                              backgroundColor: 'var(--accent-bg)',
-                              borderColor: 'var(--accent)',
-                              color: 'var(--accent-text)'
-                            }}
-                            title={t('cron_run_now_title', 'Run as background task immediately')}
-                          >
-                            <Play className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-semibold hidden sm:inline">{t('cron_run_now', 'Run now')}</span>
-                          </button>
+                          {job.is_running ? (
+                            <button
+                              onClick={() => handleStopJob(job)}
+                              className="p-1.5 rounded-lg border transition-colors cursor-pointer text-xs flex items-center gap-1 bg-rose-500/20 border-rose-500/40 text-rose-400 hover:bg-rose-500/30"
+                              title={t('cron_stop_title', 'Stop active execution')}
+                            >
+                              <Square className="w-3.5 h-3.5 fill-current" />
+                              <span className="text-[10px] font-semibold hidden sm:inline">{t('cron_stop', 'Stop')}</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleTriggerNow(job)}
+                              className="p-1.5 rounded-lg border transition-colors cursor-pointer text-xs flex items-center gap-1"
+                              style={{
+                                backgroundColor: 'var(--accent-bg)',
+                                borderColor: 'var(--accent)',
+                                color: 'var(--accent-text)'
+                              }}
+                              title={t('cron_run_now_title', 'Run as background task immediately')}
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                              <span className="text-[10px] font-semibold hidden sm:inline">{t('cron_run_now', 'Run now')}</span>
+                            </button>
+                          )}
 
                           {onExecutePrompt && (
                             <button
@@ -584,6 +660,22 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                             >
                               <MessageSquare className="w-3.5 h-3.5" />
                               <span className="text-[10px] font-medium hidden md:inline">{t('cron_test_chat', 'Test')}</span>
+                            </button>
+                          )}
+
+                          {job.roadmap_summary && (
+                            <button
+                              onClick={() => setSelectedRoadmapJobId(selectedRoadmapJobId === job.id ? null : job.id)}
+                              className="p-1.5 rounded-lg border transition-colors cursor-pointer text-xs flex items-center gap-1 hover:opacity-100 opacity-70"
+                              style={{
+                                backgroundColor: selectedRoadmapJobId === job.id ? 'var(--accent-bg)' : 'var(--surface-subtle)',
+                                borderColor: selectedRoadmapJobId === job.id ? 'var(--accent)' : 'var(--border)',
+                                color: selectedRoadmapJobId === job.id ? 'var(--accent)' : 'var(--text)'
+                              }}
+                              title={t('cron_roadmap_summary', 'Roadmap & Critique')}
+                            >
+                              <Infinity className="w-3.5 h-3.5 text-purple-400" />
+                              <span className="text-[10px] font-medium hidden md:inline">Roadmap</span>
                             </button>
                           )}
 
@@ -687,6 +779,33 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                         </div>
                       )}
 
+                      {/* Affichage de la roadmap / auto-critique */}
+                      {selectedRoadmapJobId === job.id && job.roadmap_summary && (
+                        <div
+                          className="mt-3 p-3 rounded-xl border text-xs font-mono"
+                          style={{
+                            backgroundColor: 'var(--surface-subtle)',
+                            borderColor: 'var(--border)',
+                            color: 'var(--text)'
+                          }}
+                        >
+                          <div className="flex items-center justify-between pb-2 mb-2 border-b text-[10px] font-sans" style={{ borderColor: 'var(--border-subtle)', color: 'var(--muted)' }}>
+                            <span className="font-semibold flex items-center gap-1.5 text-purple-400">
+                              <Infinity className="w-3.5 h-3.5" /> {t('cron_roadmap_summary', 'Roadmap & Critique')} ({job.name})
+                            </span>
+                            <button
+                              onClick={() => setSelectedRoadmapJobId(null)}
+                              className="text-[10px] hover:underline cursor-pointer opacity-70 hover:opacity-100"
+                            >
+                              {t('close', 'Close')}
+                            </button>
+                          </div>
+                          <pre className="whitespace-pre-wrap overflow-x-auto max-h-52 text-[11px] leading-relaxed select-text p-2 rounded-lg bg-black/20 text-purple-300">
+                            {job.roadmap_summary}
+                          </pre>
+                        </div>
+                      )}
+
                       {/* Formulaire d'édition inline */}
                       {editingJobId === job.id && (
                         <div
@@ -767,6 +886,32 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                                 color: 'var(--text)'
                               }}
                             />
+                          </div>
+
+                          <div
+                            className="p-2.5 rounded-lg border flex items-start gap-2.5 transition-colors"
+                            style={{
+                              backgroundColor: editContinuousMode ? 'var(--accent-bg)' : 'var(--surface)',
+                              borderColor: editContinuousMode ? 'var(--accent)' : 'var(--border)'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              id={`edit-continuous-${job.id}`}
+                              checked={editContinuousMode}
+                              onChange={e => setEditContinuousMode(e.target.checked)}
+                              className="mt-0.5 rounded cursor-pointer"
+                              style={{ accentColor: 'var(--accent)' }}
+                            />
+                            <label htmlFor={`edit-continuous-${job.id}`} className="text-xs cursor-pointer select-none flex-1">
+                              <div className="font-semibold flex items-center gap-1.5" style={{ color: 'var(--strong)' }}>
+                                <Infinity className="w-3.5 h-3.5 text-purple-400" />
+                                <span>{t('cron_continuous_mode', 'Continuous Autonomous Loop')}</span>
+                              </div>
+                              <p className="text-[10px] mt-0.5 leading-relaxed" style={{ color: 'var(--muted)' }}>
+                                {t('cron_continuous_mode_desc', 'Runs non-stop until manually stopped. Analyzes progress, performs auto-critique, and updates roadmap each cycle.')}
+                              </p>
+                            </label>
                           </div>
 
                           <div className="flex justify-end gap-2">

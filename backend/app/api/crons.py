@@ -41,6 +41,8 @@ class CreateCronJobRequest(BaseModel):
     skills: list[str] | None = None
     model: str | None = None
     effort: str | None = None
+    workspace: str | None = None
+    continuous_mode: bool | None = False
     state: str | None = "scheduled"  # "scheduled" or "paused"
     enabled: bool | None = None
 
@@ -54,12 +56,20 @@ class UpdateCronJobRequest(BaseModel):
     skills: list[str] | None = None
     model: str | None = None
     effort: str | None = None
+    workspace: str | None = None
+    continuous_mode: bool | None = None
 
 
 @router.get("")
 def list_cron_jobs(_ = Depends(require_auth)):
+    from app.services.cron_ticker import get_running_job_ids
+
     data = load_jobs()
     jobs = data.get("jobs", [])
+    running_ids = get_running_job_ids()
+    for j in jobs:
+        jid = str(j.get("id"))
+        j["is_running"] = jid in running_ids
 
     # Statut du ticker interne de l'application
     ticker_status = "idle"
@@ -116,6 +126,10 @@ def create_cron_job(req: CreateCronJobRequest, _ = Depends(require_auth)):
         "skills": [s.strip() for s in (req.skills or []) if isinstance(s, str) and s.strip()],
         "model": req.model.strip() if req.model and req.model.strip() else None,
         "effort": req.effort.strip() if req.effort and req.effort.strip() else None,
+        "workspace": req.workspace.strip() if req.workspace and req.workspace.strip() else None,
+        "continuous_mode": bool(req.continuous_mode),
+        "cycle_count": 0,
+        "roadmap_summary": "",
         "enabled": not ((req.state and req.state.lower() in ["paused", "disabled"]) or (req.enabled is False)),
         "state": "paused" if ((req.state and req.state.lower() in ["paused", "disabled"]) or (req.enabled is False)) else "scheduled",
         "created_at": now_iso(),
@@ -165,6 +179,10 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
                     j["model"] = req.model.strip() if req.model and req.model.strip() else None
                 if req.effort is not None:
                     j["effort"] = req.effort.strip() if req.effort and req.effort.strip() else None
+                if req.workspace is not None:
+                    j["workspace"] = req.workspace.strip() if req.workspace and req.workspace.strip() else None
+                if req.continuous_mode is not None:
+                    j["continuous_mode"] = bool(req.continuous_mode)
                 if req.schedule is not None:
                     sched_raw = req.schedule.strip()
                     j["schedule"] = {
@@ -173,7 +191,10 @@ def update_cron_job(job_id: str, req: UpdateCronJobRequest, _ = Depends(require_
                         "display": sched_raw
                     }
                     j["schedule_display"] = sched_raw
-                    j["next_run_at"] = next_run
+                    if j.get("enabled", True) and j.get("state") not in ["paused", "disabled"]:
+                        j["next_run_at"] = next_run
+                    else:
+                        j["next_run_at"] = None
                 if req.enabled is not None:
                     if not req.enabled:
                         j["enabled"] = False
@@ -263,6 +284,27 @@ def trigger_cron_job_now(job_id: str, _ = Depends(require_auth)):
         "message": f"Job {target.get('name')} déclenché immédiatement (prochain tick du ticker interne)",
         "job": target,
         "prompt": target.get("prompt")
+    }
+
+
+@router.post("/{job_id}/stop")
+@router.post("/{job_id}/cancel")
+def stop_cron_job(job_id: str, _ = Depends(require_auth)):
+    from app.services.cron_ticker import cancel_running_job, is_job_running
+
+    running = is_job_running(job_id)
+    if not running:
+        return {
+            "success": True,
+            "message": f"Le job {job_id} n'est pas en cours d'exécution active",
+            "canceled": False
+        }
+
+    canceled = cancel_running_job(job_id)
+    return {
+        "success": True,
+        "message": f"Exécution du job {job_id} interrompue avec succès",
+        "canceled": canceled
     }
 
 

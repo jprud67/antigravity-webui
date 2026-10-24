@@ -19,7 +19,7 @@ import json
 import logging
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +80,16 @@ def cancel_running_job(job_id: str) -> bool:
     return canceled
 
 
+def is_job_running(job_id: str) -> bool:
+    """Retourne True si le job est actuellement en cours d'exécution."""
+    return job_id in _running_jobs
+
+
+def get_running_job_ids() -> set[str]:
+    """Retourne l'ensemble des IDs des jobs actuellement en cours d'exécution."""
+    return set(_running_jobs)
+
+
 def extract_stream_json_text(raw_text: str) -> str:
     """Extrait le texte assistant d'un flux stream-json (NDJSON) si présent."""
     if not raw_text or not raw_text.strip():
@@ -132,7 +142,8 @@ async def run_agy_task(
     model: str | None = None,
     effort: str | None = None,
     timeout: int = JOB_TIMEOUT_SECONDS,
-    job_id: str | None = None
+    job_id: str | None = None,
+    workspace: str | None = None,
 ) -> tuple[str, str, int]:
     """
     Exécute un prompt via `agy` en mode headless. Retourne (stdout, stderr, code).
@@ -171,10 +182,19 @@ async def run_agy_task(
     else:
         cmd.extend(["-p", effective_prompt])
 
+    target_cwd = DEFAULT_WORKSPACE
+    if workspace and isinstance(workspace, str):
+        try:
+            ws_path = Path(workspace.strip()).resolve()
+            if ws_path.exists() and ws_path.is_dir():
+                target_cwd = str(ws_path)
+        except Exception:
+            pass
+
     spawned_at = time.time()
     proc = await asyncio.create_subprocess_exec(
         *cmd,
-        cwd=DEFAULT_WORKSPACE,
+        cwd=target_cwd,
         stdin=asyncio.subprocess.PIPE if via_stdin else asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -315,6 +335,7 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
     skills = job.get("skills", [])
     model = job.get("model")
     effort = job.get("effort")
+    workspace = job.get("workspace")
     if not model or not str(model).strip() or not effort or not str(effort).strip():
         try:
             settings = get_settings()
@@ -331,7 +352,14 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
     while attempts < MAX_TASK_FAILOVER:
         attempts += 1
         try:
-            out, err, code = await run_agy_task(prompt, skills=skills, model=model, effort=effort, job_id=job.get("id"))
+            out, err, code = await run_agy_task(
+                prompt,
+                skills=skills,
+                model=model,
+                effort=effort,
+                job_id=job.get("id"),
+                workspace=workspace,
+            )
         except Exception as exc:
             logger.error(f"[Cron] Exception levée pendant run_agy_task: {exc}", exc_info=True)
             output = f"Exception: {exc}"
@@ -431,6 +459,8 @@ async def run_job_with_failover(job: dict[str, Any]) -> dict[str, Any]:
 
         if code == 0:
             status = "ok"
+        elif code in (-15, -9, 143, 137) or "[interrompu]" in combined.lower() or "[cancelled]" in combined.lower():
+            status = "interrupted"
         else:
             status = "failed"
             logger.error(f"[Cron] Échec du job (code {code}).")
@@ -470,6 +500,13 @@ def _recompute_job_next_run(j: dict[str, Any]) -> None:
     if j.get("state") in ("paused", "disabled") or not j.get("enabled", True):
         j["next_run_at"] = None
         return
+
+    # Si le mode continu non-stop est activé, réenchaîner immédiatement la tâche
+    if j.get("continuous_mode"):
+        j["next_run_at"] = (datetime.now(timezone.utc) + timedelta(seconds=3)).isoformat()
+        j["state"] = "scheduled"
+        return
+
     current_next = j.get("next_run_at")
     is_future = False
     if current_next:
@@ -517,8 +554,13 @@ def _write_job_log_entry(
         f"Basculements: {failovers or 'aucun'}\n"
         f"{'-' * 60}\n"
     )
+    max_log_chars = 500_000
+    safe_output = str(output or "")
+    if len(safe_output) > max_log_chars:
+        safe_output = "[... Journal tronqué pour préserver l'espace disque ...]\n" + safe_output[-max_log_chars:]
+
     try:
-        log_file.write_text(header + str(output or ""), encoding="utf-8")
+        log_file.write_text(header + safe_output, encoding="utf-8")
         restrict_file_permissions(log_file)
         if job_id:
             prune_job_logs(job_id, 20)
@@ -533,43 +575,97 @@ async def _execute_job(job: dict[str, Any]) -> None:
     raw_job_id = job.get("id")
     job_id = str(raw_job_id) if raw_job_id is not None else ""
     name = str(job.get("name") or job_id)
-    started = time.time()
-    logger.info(f"[Cron] Exécution du job « {name} » ({job_id})...")
+    base_prompt = str(job.get("prompt") or "").strip()
+    is_continuous = bool(job.get("continuous_mode", False))
 
-    result = await run_job_with_failover(job)
-    duration = round(time.time() - started, 1)
-    start_dt = datetime.fromtimestamp(started, tz=timezone.utc)
+    cycle = int(job.get("cycle_count") or 0)
+    last_output_summary = str(job.get("roadmap_summary") or "").strip()
 
-    # Journal d'exécution (propre à l'application)
-    log_file = await asyncio.to_thread(
-        _write_job_log_entry,
-        job_id,
-        name,
-        start_dt,
-        duration,
-        result.get("status", "failed"),
-        result.get("output") or "",
-        result.get("attempts", 1),
-        result.get("failovers")
-    )
+    while True:
+        cycle += 1
+        current_job_dict = dict(job)
+        current_job_dict["cycle_count"] = cycle
 
-    # Mise à jour du job (verrou pour éviter les écritures concurrentes)
-    async with _jobs_write_lock:
-        def _update_result(data: dict[str, Any]) -> None:
-            for j in data.get("jobs", []):
-                if j.get("id") == job_id:
-                    j["last_run_at"] = now_iso()
-                    j["last_status"] = result.get("status", "failed")
-                    j["last_duration_seconds"] = duration
-                    if log_file:
-                        j["last_log"] = str(log_file)
-                    failovers = result.get("failovers")
-                    if failovers:
-                        j["last_failover"] = failovers[-1]
-                    _recompute_job_next_run(j)
-                    break
-        update_jobs(_update_result)
-    logger.info(f"[Cron] Job « {name} » terminé: {result.get('status', 'unknown')} ({duration}s).")
+        if is_continuous:
+            critique_prompt = (
+                f"[MODE CONTINU NON-STOP - CYCLE #{cycle}]\n"
+                f"--- BILAN & AUTO-CRITIQUE DU CYCLE PRÉCÉDENT ---\n"
+                f"{last_output_summary if last_output_summary else 'Démarrage du premier cycle de travail continu.'}\n\n"
+                f"--- CONSIGNES DU CYCLE AUTONOME ---\n"
+                f"1. Analyse les résultats obtenus jusqu'ici et effectue une auto-critique méthodique.\n"
+                f"2. Définis/mets à jour la roadmap des étapes restantes (tâches terminées, en cours, à venir).\n"
+                f"3. Exécute immédiatement et concrètement la prochaine étape de la roadmap sans t'arrêter.\n"
+                f"4. Fournis en fin de réponse un bloc clair [ROADMAP_UPDATE] résumant l'avancement et la suite.\n\n"
+                f"--- MISSION PRINCIPALE ---\n"
+                f"{base_prompt}"
+            )
+            current_job_dict["prompt"] = critique_prompt
+
+        started = time.time()
+        logger.info(f"[Cron] Exécution du job « {name} » ({job_id}) - cycle {cycle} (continu={is_continuous})...")
+
+        result = await run_job_with_failover(current_job_dict)
+        duration = round(time.time() - started, 1)
+        start_dt = datetime.fromtimestamp(started, tz=timezone.utc)
+
+        output_str = result.get("output") or ""
+        # Extraire le résumé du roadmap / critique pour le cycle suivant
+        if is_continuous:
+            if "[ROADMAP_UPDATE]" in output_str:
+                last_output_summary = output_str.split("[ROADMAP_UPDATE]")[-1].strip()[:2000]
+            else:
+                last_output_summary = output_str.strip()[-2000:]
+
+        # Journal d'exécution (propre à l'application)
+        log_file = await asyncio.to_thread(
+            _write_job_log_entry,
+            job_id,
+            f"{name} (Cycle #{cycle})" if is_continuous else name,
+            start_dt,
+            duration,
+            result.get("status", "failed"),
+            output_str,
+            result.get("attempts", 1),
+            result.get("failovers")
+        )
+
+        should_continue = False
+        # Mise à jour du job (verrou pour éviter les écritures concurrentes)
+        async with _jobs_write_lock:
+            def _update_result(data: dict[str, Any]) -> None:
+                nonlocal should_continue
+                for j in data.get("jobs", []):
+                    if j.get("id") == job_id:
+                        j["last_run_at"] = now_iso()
+                        j["last_status"] = result.get("status", "failed")
+                        j["last_duration_seconds"] = duration
+                        if log_file:
+                            j["last_log"] = str(log_file)
+                        failovers = result.get("failovers")
+                        if failovers:
+                            j["last_failover"] = failovers[-1]
+                        if is_continuous:
+                            j["cycle_count"] = cycle
+                            if last_output_summary:
+                                j["roadmap_summary"] = last_output_summary
+
+                        is_active = (j.get("enabled", True) and j.get("state") not in ("paused", "disabled"))
+                        if is_continuous and is_active:
+                            should_continue = True
+                            j["next_run_at"] = (datetime.now(timezone.utc) + timedelta(seconds=3)).isoformat()
+                            j["state"] = "scheduled"
+                        else:
+                            _recompute_job_next_run(j)
+                        break
+            update_jobs(_update_result)
+
+        logger.info(f"[Cron] Job « {name} » cycle {cycle} terminé: {result.get('status', 'unknown')} ({duration}s).")
+
+        if not is_continuous or not should_continue:
+            break
+
+        # Courte pause de 3s avant d'enchaîner sans interruption sur le cycle suivant
+        await asyncio.sleep(3.0)
 
 
 async def _guarded_execute(job: dict[str, Any]) -> None:
@@ -620,14 +716,11 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
             except Exception as save_err:
                 logger.error(f"[Cron] Impossible de marquer le job {job_id} comme interrompu: {save_err}")
 
-        finalize_task = asyncio.create_task(_finalize_interrupted())
-        while not finalize_task.done():
-            try:
-                await asyncio.shield(finalize_task)
-            except asyncio.CancelledError:
-                pass
-            except Exception:
-                break
+        try:
+            finalize_fut = asyncio.ensure_future(_finalize_interrupted())
+            await asyncio.shield(finalize_fut)
+        except (asyncio.CancelledError, Exception):
+            pass
         raise
     except Exception as e:
         logger.error(f"[Cron] Erreur pendant l'exécution du job {job_id}: {e}", exc_info=True)
@@ -756,7 +849,22 @@ async def cron_ticker_loop() -> None:
                         j["last_status"] = "interrupted"
                         if j.get("state") in ("scheduled", "active"):
                             nxt = j.get("next_run_at")
-                            if not nxt or nxt < now_iso_str:
+                            recalc = False
+                            if not nxt:
+                                recalc = True
+                            else:
+                                try:
+                                    nxt_dt = datetime.fromisoformat(str(nxt).replace("Z", "+00:00"))
+                                    if nxt_dt.tzinfo is None:
+                                        nxt_dt = nxt_dt.replace(tzinfo=timezone.utc)
+                                    if nxt_dt <= datetime.now(timezone.utc):
+                                        recalc = True
+                                except Exception:
+                                    recalc = True
+                            if j.get("continuous_mode"):
+                                j["next_run_at"] = (datetime.now(timezone.utc) + timedelta(seconds=5)).isoformat()
+                                j["state"] = "scheduled"
+                            elif recalc:
                                 computed = compute_next_run(j.get("schedule") or j.get("schedule_display"))
                                 if computed:
                                     j["next_run_at"] = computed

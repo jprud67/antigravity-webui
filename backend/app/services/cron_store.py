@@ -41,6 +41,7 @@ _jobs_lock = threading.RLock()
 
 def ensure_dirs() -> None:
     CRON_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def now_iso() -> str:
@@ -138,13 +139,44 @@ def update_jobs(modifier: Callable[[dict[str, Any]], T]) -> T:
 
 
 _SCHEDULE_INTERVAL_RE = re.compile(
-    r"^(?:every|toutes les|chaque)\s+(\d+)\s*(s|sec|seconds?|secondes?|m|min|mins|minutes?|h|hr|hrs|hours?|heures?|d|day|days?|jours?|w|week|weeks?|semaines?|mo|month|months?|mois)?$",
+    r"^(?:every|toutes\s+les|tous\s+les|chaque)\s+(\d+)\s*(s|sec|seconds?|secondes?|m|min|mins|minutes?|h|hr|hrs|hours?|heures?|d|day|days?|jours?|w|week|weeks?|semaines?|sem|mo|month|months?|mois)?$",
     re.IGNORECASE
 )
 _DAILY_AT_RE = re.compile(
-    r"^(?:every\s+day|daily|chaque\s+jour|tous\s+les\s+jours)\s+(?:at|à)\s+(\d{1,2})(?:[:hH](\d{1,2})|[hH])?$",
+    r"^(?:every\s+day|daily|chaque\s+jour|tous\s+les\s+jours)\s+(?:at|à)\s+(\d{1,2})(?:[:hH](\d{1,2})|[hH])?\s*(am|pm)?$",
     re.IGNORECASE
 )
+_HOURLY_AT_RE = re.compile(
+    r"^(?:every\s+hour|hourly|chaque\s+heure|toutes\s+les\s+heures)\s+(?:at|à)\s+[:hH]?(\d{1,2})$",
+    re.IGNORECASE
+)
+
+_CRON_ALIASES: dict[str, str] = {
+    "@yearly": "0 0 1 1 *",
+    "@annually": "0 0 1 1 *",
+    "@monthly": "0 0 1 * *",
+    "@weekly": "0 0 * * 0",
+    "@daily": "0 0 * * *",
+    "@midnight": "0 0 * * *",
+    "@hourly": "0 * * * *",
+}
+
+
+def _normalize_unit(u: str) -> str | None:
+    u = u.lower().strip()
+    if u in ("s", "sec", "second", "seconds", "seconde", "secondes"):
+        return "seconds"
+    if u in ("m", "min", "mins", "minute", "minutes"):
+        return "minutes"
+    if u in ("h", "hr", "hrs", "hour", "hours", "heure", "heures"):
+        return "hours"
+    if u in ("d", "day", "days", "jour", "jours", "j"):
+        return "days"
+    if u in ("w", "week", "weeks", "semaine", "semaines", "sem"):
+        return "weeks"
+    if u in ("mo", "month", "months", "mois"):
+        return "months"
+    return None
 
 
 def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
@@ -159,15 +191,15 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
         if schedule.get("kind") == "interval":
             total_delta = timedelta()
             has_units = False
-            unit_defs = [
-                ("months", lambda v: timedelta(days=30 * max(0, int(v)))),
-                ("weeks", lambda v: timedelta(weeks=max(0, int(v)))),
-                ("days", lambda v: timedelta(days=max(0, int(v)))),
-                ("hours", lambda v: timedelta(hours=max(0, int(v)))),
-                ("minutes", lambda v: timedelta(minutes=max(0, int(v)))),
-                ("seconds", lambda v: timedelta(seconds=max(0, int(v)))),
-            ]
-            for unit_key, delta_fn in unit_defs:
+            unit_delta_map = {
+                "months": lambda v: timedelta(days=30 * max(0, int(v))),
+                "weeks": lambda v: timedelta(weeks=max(0, int(v))),
+                "days": lambda v: timedelta(days=max(0, int(v))),
+                "hours": lambda v: timedelta(hours=max(0, int(v))),
+                "minutes": lambda v: timedelta(minutes=max(0, int(v))),
+                "seconds": lambda v: timedelta(seconds=max(0, int(v))),
+            }
+            for unit_key, delta_fn in unit_delta_map.items():
                 if unit_key in schedule and schedule[unit_key] is not None:
                     try:
                         unit_delta = delta_fn(schedule[unit_key])
@@ -185,14 +217,12 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
                 if val_raw is not None and unit_raw:
                     try:
                         val = int(val_raw)
-                        u = str(unit_raw).lower().strip()
-                        for uk, df in unit_defs:
-                            if u.startswith(uk[:-1]) or u == uk:
-                                unit_delta = df(val)
-                                if unit_delta.total_seconds() > 0:
-                                    total_delta += unit_delta
-                                    has_units = True
-                                break
+                        norm_u = _normalize_unit(str(unit_raw))
+                        if norm_u and norm_u in unit_delta_map:
+                            unit_delta = unit_delta_map[norm_u](val)
+                            if unit_delta.total_seconds() > 0:
+                                total_delta += unit_delta
+                                has_units = True
                     except (ValueError, TypeError):
                         logger.debug("Ignored error")
 
@@ -226,12 +256,29 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
     if lower in ("every month", "monthly", "chaque mois", "tous les mois"):
         return (now + timedelta(days=30)).isoformat()
 
+    hourly_at_match = _HOURLY_AT_RE.match(lower)
+    if hourly_at_match:
+        try:
+            m = int(hourly_at_match.group(1))
+            if 0 <= m < 60:
+                target = now.replace(minute=m, second=0)
+                if target <= now:
+                    target += timedelta(hours=1)
+                return target.isoformat()
+        except Exception as e:
+            logger.debug(f"Ignored error: {e}")
+
     daily_at_match = _DAILY_AT_RE.match(lower)
     if daily_at_match:
         try:
             h = int(daily_at_match.group(1))
             m_str = daily_at_match.group(2)
             m = int(m_str) if m_str is not None else 0
+            ampm = (daily_at_match.group(3) or "").lower()
+            if ampm == "pm" and h < 12:
+                h += 12
+            elif ampm == "am" and h == 12:
+                h = 0
             if 0 <= h < 24 and 0 <= m < 60:
                 target = now.replace(hour=h, minute=m, second=0)
                 if target <= now:
@@ -244,25 +291,28 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
     if match:
         try:
             val = max(1, int(match.group(1)))  # minimum 1 pour éviter une boucle d'exécution infinie
-            unit = (match.group(2) or "m").lower()
-            if unit.startswith(("mo", "mois")):
+            norm_u = _normalize_unit(match.group(2) or "m") or "minutes"
+            if norm_u == "months":
                 return (now + timedelta(days=30 * val)).isoformat()
-            elif unit.startswith(("w", "sem")):
+            elif norm_u == "weeks":
                 return (now + timedelta(weeks=val)).isoformat()
-            elif unit.startswith("h"):
+            elif norm_u == "hours":
                 return (now + timedelta(hours=val)).isoformat()
-            elif unit.startswith(("d", "j")):
+            elif norm_u == "days":
                 return (now + timedelta(days=val)).isoformat()
-            elif unit.startswith("s"):
+            elif norm_u == "seconds":
                 return (now + timedelta(seconds=max(10, val))).isoformat()
             else:
                 return (now + timedelta(minutes=val)).isoformat()
         except Exception as e:
             logger.debug(f"Ignored error: {e}")
 
+    # Aliases cron standard (@daily, @hourly...)
+    cron_target = _CRON_ALIASES.get(lower, expr)
+
     try:
-        if croniter.is_valid(expr):
-            iter_cron = croniter(expr, now)
+        if croniter.is_valid(cron_target):
+            iter_cron = croniter(cron_target, now)
             next_dt = iter_cron.get_next(datetime)
             if next_dt.tzinfo is None:
                 next_dt = next_dt.replace(tzinfo=timezone.utc)

@@ -1505,8 +1505,13 @@ export interface CronJobItem {
   skills?: string[];
   model?: string | null;
   effort?: string | null;
+  workspace?: string | null;
+  continuous_mode?: boolean;
+  cycle_count?: number;
+  roadmap_summary?: string;
   enabled: boolean;
   state: 'scheduled' | 'paused';
+  is_running?: boolean;
   created_at: string;
   next_run_at?: string | null;
   last_run_at?: string | null;
@@ -1545,6 +1550,8 @@ export async function createCronJob(job: {
   skills?: string[];
   model?: string | null;
   effort?: string | null;
+  workspace?: string | null;
+  continuous_mode?: boolean;
 }): Promise<{ success: boolean; job: CronJobItem }> {
   const res = await fetch(`${API_BASE}/crons`, {
     method: 'POST',
@@ -1568,6 +1575,8 @@ export async function updateCronJob(
     skills?: string[];
     model?: string | null;
     effort?: string | null;
+    workspace?: string | null;
+    continuous_mode?: boolean;
   }
 ): Promise<{ success: boolean; job: CronJobItem }> {
   const res = await fetch(`${API_BASE}/crons/${encodeURIComponent(jobId)}`, {
@@ -1602,6 +1611,18 @@ export async function triggerCronJob(jobId: string): Promise<{ success: boolean;
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Échec déclenchement job cron' }));
     throw new Error(err.detail || 'Erreur déclenchement cron');
+  }
+  return res.json();
+}
+
+export async function stopCronJob(jobId: string): Promise<{ success: boolean; message: string; canceled: boolean }> {
+  const res = await fetch(`${API_BASE}/crons/${encodeURIComponent(jobId)}/stop`, {
+    method: 'POST',
+    headers: getHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec interruption job cron' }));
+    throw new Error(err.detail || 'Erreur interruption cron');
   }
   return res.json();
 }
