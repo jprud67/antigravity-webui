@@ -50,6 +50,42 @@ if (typeof window !== 'undefined') {
 
 
 export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
+  improve_prompt_btn: {
+    en: 'Improve',
+    fr: 'Améliorer',
+    es: 'Mejorar',
+    de: 'Verbessern',
+  },
+  improve_prompt_tooltip: {
+    en: 'Improve and structure this prompt before sending (Alt+O)',
+    fr: 'Améliorer et structurer ce prompt avant de l\'envoyer (Alt+O)',
+    es: 'Mejorar y estructurar este prompt antes de enviar (Alt+O)',
+    de: 'Diesen Prompt vor dem Senden verbessern und strukturieren (Alt+O)',
+  },
+  prompt_optimizer_tooltip: {
+    en: 'Prompt Optimization & Improvement Studio (/optimize, Alt+O)',
+    fr: 'Studio d\'Optimisation & Amélioration de prompt (/optimize, Alt+O)',
+    es: 'Estudio de optimización y mejora de prompts (/optimize, Alt+O)',
+    de: 'Studio zur Prompt-Optimierung und -Verbesserung (/optimize, Alt+O)',
+  },
+  apply_and_send: {
+    en: 'Apply & Send',
+    fr: 'Appliquer & Envoyer',
+    es: 'Aplicar y Enviar',
+    de: 'Anwenden & Senden',
+  },
+  apply_and_send_tooltip: {
+    en: 'Apply optimized prompt and send immediately to model',
+    fr: 'Appliquer le prompt optimisé et envoyer immédiatement au modèle',
+    es: 'Aplicar el prompt optimizado y enviar inmediatamente al modelo',
+    de: 'Optimierten Prompt anwenden und sofort an das Modell senden',
+  },
+  prompt_applied_and_sent: {
+    en: 'Optimized prompt sent!',
+    fr: 'Prompt optimisé envoyé !',
+    es: '¡Prompt optimizado enviado!',
+    de: 'Optimierter Prompt gesendet!',
+  },
   more_actions: {
     en: 'More actions',
     fr: 'Plus d\'actions',

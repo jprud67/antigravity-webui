@@ -14,6 +14,7 @@ import {
   Code2,
   AlertCircle,
   CheckCircle2,
+  Send,
 } from 'lucide-react';
 import { useI18n } from '../services/i18n';
 import { showToast } from '../services/toast';
@@ -26,6 +27,7 @@ export interface PromptOptimizerModalProps {
   onClose: () => void;
   initialPrompt: string;
   onApplyPrompt: (optimizedPrompt: string) => void;
+  onApplyAndSend?: (optimizedPrompt: string) => void;
   activeModel?: string;
 }
 
@@ -41,6 +43,7 @@ interface PromptOptimizerInnerProps {
   initialPrompt: string;
   onClose: () => void;
   onApplyPrompt: (optimizedPrompt: string) => void;
+  onApplyAndSend?: (optimizedPrompt: string) => void;
   activeModel?: string;
 }
 
@@ -48,6 +51,7 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
   initialPrompt,
   onClose,
   onApplyPrompt,
+  onApplyAndSend,
   activeModel,
 }) => {
   const { t } = useI18n();
@@ -129,11 +133,14 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
         .finally(() => {
           if (!cancelled) setIsAnalyzing(false);
         });
+    } else {
+      setIsOptimizing(false);
+      setIsAnalyzing(false);
     }
     return () => {
       cancelled = true;
     };
-  }, [initialPrompt, selectedPreset, activeModel]);
+  }, []);
 
   // Handle Preset change
   const handlePresetSelect = (preset: PromptPreset) => {
@@ -164,13 +171,26 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
     });
   };
 
-  // Apply to chat
+  // Apply to chat input
   const handleApply = () => {
     const finalPrompt = (optimizedText || draftPrompt).trim();
     if (!finalPrompt) return;
     onApplyPrompt(finalPrompt);
     showToast(t('prompt_applied', 'Prompt optimisé injecté dans le chat'), 'success');
     onClose();
+  };
+
+  // Apply to chat and send immediately
+  const handleApplyAndSend = () => {
+    const finalPrompt = (optimizedText || draftPrompt).trim();
+    if (!finalPrompt) return;
+    if (onApplyAndSend) {
+      onApplyAndSend(finalPrompt);
+      showToast(t('prompt_applied_and_sent', 'Prompt optimisé envoyé !'), 'success');
+      onClose();
+    } else {
+      handleApply();
+    }
   };
 
   const currentScore = backendAnalysis?.clarity_score ?? clientClarity.score;
@@ -465,7 +485,7 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
           </div>
 
           <div
-            className="p-3 border-t flex items-center justify-between gap-2 shrink-0"
+            className="p-3 border-t flex items-center justify-between gap-2 shrink-0 flex-wrap"
             style={{
               backgroundColor: 'var(--surface, #09090b)',
               borderColor: 'var(--border, #27272a)',
@@ -484,14 +504,29 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
               <span>{copied ? t('copied_excl', 'Copié !') : t('copy', 'Copier')}</span>
             </button>
 
-            <button
-              onClick={handleApply}
-              disabled={!optimizedText && !draftPrompt.trim()}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-all cursor-pointer shadow-md shadow-emerald-600/20"
-            >
-              <span>{t('apply_to_chat', 'Appliquer au chat')}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleApply}
+                disabled={!optimizedText && !draftPrompt.trim()}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium border border-sky-500/30 hover:bg-sky-500/10 text-sky-300 transition-all cursor-pointer disabled:opacity-40"
+                title={t('apply_to_chat_tooltip', 'Injecter le prompt optimisé dans le champ de saisie pour révision')}
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+                <span>{t('apply_to_chat', 'Appliquer au chat')}</span>
+              </button>
+
+              {onApplyAndSend && (
+                <button
+                  onClick={handleApplyAndSend}
+                  disabled={!optimizedText && !draftPrompt.trim()}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-all cursor-pointer shadow-md shadow-emerald-600/20 active:scale-95"
+                  title={t('apply_and_send_tooltip', 'Appliquer le prompt optimisé et envoyer immédiatement au modèle')}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{t('apply_and_send', 'Appliquer & Envoyer')}</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -504,6 +539,7 @@ export const PromptOptimizerModal: React.FC<PromptOptimizerModalProps> = ({
   onClose,
   initialPrompt,
   onApplyPrompt,
+  onApplyAndSend,
   activeModel,
 }) => {
   if (!isOpen) return null;
@@ -520,6 +556,7 @@ export const PromptOptimizerModal: React.FC<PromptOptimizerModalProps> = ({
         initialPrompt={initialPrompt}
         onClose={onClose}
         onApplyPrompt={onApplyPrompt}
+        onApplyAndSend={onApplyAndSend}
         activeModel={activeModel}
       />
     </div>

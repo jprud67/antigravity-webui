@@ -20,7 +20,9 @@ import {
   Clock,
   Search,
   Leaf,
-  FileCode2
+  FileCode2,
+  Wand2,
+  Sparkles
 } from 'lucide-react';
 import type { ModelOption, MonacoStudioConfig } from '../types';
 import { ContextRing, type TokenUsageData } from './ContextRing';
@@ -28,7 +30,9 @@ import { ALL_SLASH_COMMANDS, parseSlashCommand, type SlashCommandDef } from '../
 import { applyTheme } from '../services/theme';
 import { useI18n, setLanguage, SUPPORTED_LANGUAGES, getCurrentLanguage } from '../services/i18n';
 import { PromptTemplatesModal } from './PromptTemplatesModal';
+import { PromptOptimizerModal } from './PromptOptimizerModal';
 import { VoiceWaveformVisualizer } from './VoiceWaveformVisualizer';
+import { calculatePromptClarity } from '../utils/promptAnalyzer';
 
 interface ChatInputProps {
   onSendMessage: (
@@ -463,6 +467,10 @@ export const ChatInput = React.memo<ChatInputProps>(({
   const historyMenuRef = useRef<HTMLDivElement>(null);
   const historyButtonRef = useRef<HTMLButtonElement>(null);
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
+  const [isOptimizerModalOpen, setIsOptimizerModalOpen] = useState(false);
+
+  // Real-time client-side prompt clarity evaluation
+  const promptClarity = useMemo(() => calculatePromptClarity(prompt), [prompt]);
 
   // Helper to retrieve and merge persistent history + discussion prompts
   const getMergedHistory = (): string[] => {
@@ -679,6 +687,16 @@ export const ChatInput = React.memo<ChatInputProps>(({
       case '/templates':
       case '/snippets':
         setIsTemplatesModalOpen(true);
+        return true;
+
+      case '/optimize':
+      case '/metaprompt':
+      case '/improve':
+      case '/enhance':
+        if (args) {
+          setPrompt(args);
+        }
+        setIsOptimizerModalOpen(true);
         return true;
 
       case '/tasks':
@@ -1079,6 +1097,13 @@ export const ChatInput = React.memo<ChatInputProps>(({
         historyIndexRef.current = -1;
         return;
       }
+    }
+
+    // Shortcut to open Prompt Optimizer: Alt+O or Ctrl+Shift+O
+    if ((e.altKey && (e.key === 'o' || e.key === 'O')) || (e.ctrlKey && e.shiftKey && (e.key === 'O' || e.key === 'o'))) {
+      e.preventDefault();
+      setIsOptimizerModalOpen(true);
+      return;
     }
 
     // Terminal-like prompt history navigation (ArrowUp / ArrowDown)
@@ -1807,6 +1832,23 @@ export const ChatInput = React.memo<ChatInputProps>(({
               <FileCode2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
 
+            {/* Prompt Optimizer / Enhance Button */}
+            <button
+              type="button"
+              onClick={() => setIsOptimizerModalOpen(true)}
+              className={`p-2 sm:p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+                isOptimizerModalOpen ? 'ring-2 ring-purple-500/50 text-purple-400' : 'hover:opacity-100 opacity-80'
+              }`}
+              style={{
+                backgroundColor: isOptimizerModalOpen ? 'rgba(168, 85, 247, 0.15)' : 'var(--surface-subtle)',
+                borderColor: isOptimizerModalOpen ? 'rgba(168, 85, 247, 0.4)' : 'var(--border)',
+                color: isOptimizerModalOpen ? '#c084fc' : 'var(--muted)'
+              }}
+              title={t('prompt_optimizer_tooltip', 'Studio d\'Optimisation & Amélioration de prompt (/optimize, Alt+O)')}
+            >
+              <Wand2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+            </button>
+
             {/* Workspace Chip (Clickable Button) */}
             <button
               type="button"
@@ -1979,19 +2021,45 @@ export const ChatInput = React.memo<ChatInputProps>(({
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => handleSubmit('normal')}
-                disabled={isReadOnly || (!prompt.trim() && attachments.length === 0)}
-                className="py-1.5 px-4 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer font-sans"
-                style={{
-                  backgroundColor: 'var(--accent)',
-                  color: '#ffffff'
-                }}
-              >
-                <span>{t('send', 'Envoyer')}</span>
-                <Send className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                {prompt.trim().length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsOptimizerModalOpen(true)}
+                    className="py-1.5 px-2.5 sm:px-3 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all hover:bg-purple-500/15 hover:border-purple-500/40 text-purple-400 border-purple-500/25 shadow-xs active:scale-95 cursor-pointer shrink-0"
+                    style={{
+                      backgroundColor: 'rgba(168, 85, 247, 0.08)',
+                    }}
+                    title={t('improve_prompt_tooltip', 'Améliorer et structurer ce prompt avant de l\'envoyer (Alt+O)')}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="hidden sm:inline">{t('improve_prompt_btn', 'Améliorer')}</span>
+                    {promptClarity.score > 0 && (
+                      <span
+                        className="text-[10px] font-mono px-1.5 py-0.2 rounded-md font-bold"
+                        style={{ backgroundColor: promptClarity.badgeBg, color: promptClarity.color }}
+                        title={t('clarity_score_label', 'Score de Clarté : {0}%', promptClarity.score)}
+                      >
+                        {promptClarity.score}%
+                      </span>
+                    )}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => handleSubmit('normal')}
+                  disabled={isReadOnly || (!prompt.trim() && attachments.length === 0)}
+                  className="py-1.5 px-4 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer font-sans"
+                  style={{
+                    backgroundColor: 'var(--accent)',
+                    color: '#ffffff'
+                  }}
+                >
+                  <span>{t('send', 'Envoyer')}</span>
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -2011,6 +2079,28 @@ export const ChatInput = React.memo<ChatInputProps>(({
             textareaRef.current.focus();
           }
         }, 50);
+      }}
+    />
+
+    {/* Prompt Optimizer Studio Modal */}
+    <PromptOptimizerModal
+      isOpen={isOptimizerModalOpen}
+      onClose={() => setIsOptimizerModalOpen(false)}
+      initialPrompt={prompt}
+      activeModel={selectedModel}
+      onApplyPrompt={(optimizedPrompt) => {
+        setPrompt(optimizedPrompt);
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+            textareaRef.current.focus();
+          }
+        }, 50);
+      }}
+      onApplyAndSend={(optimizedPrompt) => {
+        setPrompt(optimizedPrompt);
+        handleSubmit('normal', optimizedPrompt);
       }}
     />
   </div>
