@@ -177,12 +177,40 @@ def parse_jwt_claims(jwt_str: str) -> dict[str, Any]:
         return {}
 
 
-def get_account_meta_from_token_data(data: dict[str, Any]) -> dict[str, Any]:
+def _find_email_by_token(data: dict[str, Any]) -> str | None:
+    token_obj = data.get("token")
+    if not isinstance(token_obj, dict):
+        return None
+    rf = token_obj.get("refresh_token")
+    if not rf:
+        return None
+    try:
+        for p in ACCOUNTS_DIR.glob("*.json"):
+            if p.name.startswith(".") or "compte-inconnu" in p.name.lower():
+                continue
+            with open(p, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            if isinstance(saved.get("token"), dict) and saved["token"].get("refresh_token") == rf:
+                return p.stem.strip()
+    except Exception:
+        pass
+    return None
+
+
+def get_account_meta_from_token_data(data: dict[str, Any], fallback_email: str | None = None) -> dict[str, Any]:
     jwt_str = data.get("id_token")
     claims = parse_jwt_claims(jwt_str) if jwt_str else {}
     
-    email = claims.get("email") or "compte-inconnu@google.com"
-    email_verified = claims.get("email_verified", False)
+    email = (
+        claims.get("email")
+        or data.get("id_token_email")
+        or data.get("email")
+        or (data.get("token", {}).get("email") if isinstance(data.get("token"), dict) else None)
+        or fallback_email
+        or _find_email_by_token(data)
+        or "compte-inconnu@google.com"
+    )
+    email_verified = claims.get("email_verified", False) if claims else bool(email and "compte-inconnu" not in email)
     sub = claims.get("sub", "")
     
     token_obj = data.get("token", {})
@@ -223,7 +251,7 @@ def sync_active_account_to_store():
             data = json.load(f)
         meta = get_account_meta_from_token_data(data)
         email = meta.get("email")
-        if email and "@" in email:
+        if email and "@" in email and "compte-inconnu" not in email.lower():
             # Validation anti-traversée + écriture atomique + permissions 0600
             dest = _validate_account_file(email)
             temp = dest.parent / f".{dest.name}.tmp.{uuid.uuid4().hex[:8]}"
@@ -272,10 +300,16 @@ def list_google_accounts() -> dict[str, Any]:
     for p in ACCOUNTS_DIR.glob("*.json"):
         if p.name.startswith(".") or p.name.endswith(".tmp") or ".tmp." in p.name:
             continue
+        if "compte-inconnu" in p.name.lower():
+            try:
+                p.unlink(missing_ok=True)
+            except Exception:
+                pass
+            continue
         try:
             with open(p, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            meta = get_account_meta_from_token_data(data)
+            meta = get_account_meta_from_token_data(data, fallback_email=p.stem.strip())
             email_val = (meta.get("email") or "").strip().lower()
             meta["is_active"] = bool(active_email and email_val == active_email)
             meta["is_exhausted"] = is_account_marked_exhausted(email_val)
@@ -998,7 +1032,7 @@ def get_candidate_accounts(exclude_email: str | None = None) -> list[str]:
         if p.name.startswith(".") or p.name.endswith(".tmp") or ".tmp." in p.name:
             continue
         email = p.stem.strip()
-        if "@" not in email:
+        if "@" not in email or "compte-inconnu" in email.lower():
             continue
         if norm_exclude and email.lower() == norm_exclude:
             continue

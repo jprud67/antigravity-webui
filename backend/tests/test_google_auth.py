@@ -62,6 +62,37 @@ class TestGoogleAuthService(unittest.TestCase):
         self.assertEqual(meta["expiry"], "2026-10-01T12:00:00Z")
         self.assertEqual(meta["auth_method"], "consumer")
 
+    def test_get_account_meta_without_id_token(self):
+        # Case 1: CLI stores id_token_email when id_token is omitted on refresh
+        token_data_cli = {
+            "token": {"access_token": "ya29.xxx", "expiry": "2026-10-24T04:00:00Z"},
+            "auth_method": "consumer",
+            "id_token_email": "bob@gmail.com"
+        }
+        meta = get_account_meta_from_token_data(token_data_cli)
+        self.assertEqual(meta["email"], "bob@gmail.com")
+        self.assertTrue(meta["email_verified"])
+
+        # Case 2: data has direct email field
+        token_data_direct = {
+            "token": {"access_token": "ya29.yyy"},
+            "email": "charlie@gmail.com"
+        }
+        meta = get_account_meta_from_token_data(token_data_direct)
+        self.assertEqual(meta["email"], "charlie@gmail.com")
+
+        # Case 3: fallback_email provided (e.g. from file name)
+        token_data_fallback = {
+            "token": {"access_token": "ya29.zzz"}
+        }
+        meta = get_account_meta_from_token_data(token_data_fallback, fallback_email="fallback@gmail.com")
+        self.assertEqual(meta["email"], "fallback@gmail.com")
+
+        # Case 4: completely empty data falls back to compte-inconnu
+        meta_unknown = get_account_meta_from_token_data({})
+        self.assertEqual(meta_unknown["email"], "compte-inconnu@google.com")
+        self.assertFalse(meta_unknown["email_verified"])
+
     def test_quota_error_detection(self):
         self.assertTrue(is_quota_error("Resource has been exhausted (code 429)"))
         self.assertTrue(is_quota_error("Rate limit exceeded. Please try again later."))

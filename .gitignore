@@ -39,4 +39,6 @@ backend/tests/.test_env_data/
 *.db
 *.db-journal
 backend/sessions.db
+test-results/
+playwright-report/
 
