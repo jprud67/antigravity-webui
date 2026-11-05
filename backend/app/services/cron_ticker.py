@@ -595,7 +595,9 @@ async def _execute_job(job: dict[str, Any]) -> None:
                 f"1. Analyse les résultats obtenus jusqu'ici et effectue une auto-critique méthodique.\n"
                 f"2. Définis/mets à jour la roadmap des étapes restantes (tâches terminées, en cours, à venir).\n"
                 f"3. Exécute immédiatement et concrètement la prochaine étape de la roadmap sans t'arrêter.\n"
-                f"4. Fournis en fin de réponse un bloc clair [ROADMAP_UPDATE] résumant l'avancement et la suite.\n\n"
+                f"4. Fournis en fin de réponse un bloc clair [ROADMAP_UPDATE] résumant l'avancement et la suite.\n"
+                f"5. RÈGLE STRICTE UI / UX PROFESSIONNELLE : L'interface utilisateur est destinée aux utilisateurs finaux de l'application. Ne JAMAIS écrire, coder ou afficher de numéros de phase, jalons ou termes de feuille de route interne ('Phase XX', 'Jalon YY', 'Sprint ZZ', 'Roadmap') dans l'interface utilisateur (titres, sous-titres, badges, boutons, menus, cartes, alertes ou notifications). Utiliser exclusivement des intitulés métiers clairs, professionnels et axés sur la valeur produit.\n"
+                f"6. RÈGLE STRICTE DONNÉES RÉELLES (AUCUNE SIMULATION) : L'utilisateur refuse expressément les données de simulation ou synthétisées. Ne JAMAIS créer de faux modes de simulation, boutons 'Simuler', badges 'Données Synthétisées/Mode Démo' ou jeux de données artificiels. Brancher systématiquement les fonctionnalités sur les données réelles existantes en base, et si aucune donnée n'existe encore, afficher un écran vide (empty state) soigné invitant à une action concrète.\n\n"
                 f"--- MISSION PRINCIPALE ---\n"
                 f"{base_prompt}"
             )
