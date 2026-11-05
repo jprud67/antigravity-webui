@@ -37,6 +37,7 @@ from app.services.cron_store import (
     OUTPUT_DIR,
     compute_next_run,
     ensure_dirs,
+    load_jobs,
     now_iso,
     update_jobs,
     write_heartbeat,
@@ -583,6 +584,13 @@ async def _execute_job(job: dict[str, Any]) -> None:
 
     while True:
         cycle += 1
+        # Recharger les données fraîches du job depuis jobs.json à chaque cycle pour prendre en compte les modifications
+        for _fresh in load_jobs().get("jobs", []):
+            if str(_fresh.get("id")) == str(job_id):
+                job = dict(_fresh)
+                base_prompt = str(_fresh.get("prompt") or "").strip()
+                name = str(_fresh.get("name") or job_id)
+                break
         current_job_dict = dict(job)
         current_job_dict["cycle_count"] = cycle
 
