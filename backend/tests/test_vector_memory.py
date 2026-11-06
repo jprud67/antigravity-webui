@@ -104,33 +104,44 @@ async def test_store_and_search_vector_memories():
     assert delete_memory(mem1.id) is True
     assert len(list_memories("test_agent")) == 1
 
+    # Empty text rejection
+    with pytest.raises(ValueError, match="cannot be empty"):
+        await store_memory(MemoryStoreInput(text="   ", agentId="test_agent"))
+
+    # Deduplication test
+    dup1 = await store_memory(MemoryStoreInput(text="Unique fact statement", importance=0.5, agentId="test_agent"))
+    dup2 = await store_memory(MemoryStoreInput(text="Unique fact statement", importance=0.9, agentId="test_agent"))
+    assert dup1.id == dup2.id
+    assert dup2.importance == 0.9
+
     clear_memories("test_agent")
 
 
 @pytest.mark.asyncio
 async def test_auto_recall_hook():
     clear_memories("test_recall_agent")
+    clear_memories("default")
 
     # 1. Trivial prompt should be skipped
     res_trivial = await execute_auto_recall_hook("ok thanks", agent_id="test_recall_agent")
     assert res_trivial.should_inject is False
     assert res_trivial.recalled_count == 0
 
-    # 2. Add memory
+    # 2. Add global/default memory
     await store_memory(
         MemoryStoreInput(
             text="Antigravity webui is deployed under C:/laragon/www/antigravity-webui",
             category="fact",
             importance=1.0,
-            agentId="test_recall_agent",
+            agentId="default",
         )
     )
 
-    # 3. Informative prompt matching the memory
+    # 3. Informative prompt matching the memory from a session agent ID (fallback to default)
     cfg = AutoRecallConfig(enabled=True, min_similarity=0.1, max_results=2)
     res_recall = await execute_auto_recall_hook(
         "Where is the antigravity webui project directory?",
-        agent_id="test_recall_agent",
+        agent_id="session_conversation_123",
         cfg=cfg,
     )
     assert res_recall.should_inject is True
@@ -138,6 +149,7 @@ async def test_auto_recall_hook():
     assert "<recalled_memories>" in res_recall.context_block
     assert "antigravity-webui" in res_recall.context_block
 
+    clear_memories("default")
     clear_memories("test_recall_agent")
 
 

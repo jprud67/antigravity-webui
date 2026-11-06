@@ -93,7 +93,7 @@ class AutoRecallConfig(BaseModel):
     api_key: str | None = Field(default=None, validation_alias=AliasChoices("apiKey", "api_key"), serialization_alias="apiKey")
     api_base: str | None = Field(default=None, validation_alias=AliasChoices("apiBase", "api_base"), serialization_alias="apiBase")
     max_results: int = Field(default=3, ge=1, le=10, validation_alias=AliasChoices("maxResults", "max_results"), serialization_alias="maxResults")
-    min_similarity: float = Field(default=0.60, ge=0.0, le=1.0, validation_alias=AliasChoices("minSimilarity", "min_similarity"), serialization_alias="minSimilarity")
+    min_similarity: float = Field(default=0.35, ge=0.0, le=1.0, validation_alias=AliasChoices("minSimilarity", "min_similarity"), serialization_alias="minSimilarity")
     max_chars: int = Field(default=2000, ge=200, le=10000, validation_alias=AliasChoices("maxChars", "max_chars"), serialization_alias="maxChars")
 
 
@@ -198,8 +198,14 @@ async def compute_embedding(text: str, cfg: AutoRecallConfig | None = None) -> l
     """Compute embedding using configured provider with automatic fallback to local."""
     config = cfg or get_auto_recall_config()
 
+    gen_settings: dict[str, Any] = {}
+    try:
+        gen_settings = get_settings()
+    except Exception:
+        gen_settings = {}
+
     if config.provider == "openai":
-        api_key = (config.api_key or os.environ.get("OPENAI_API_KEY") or "").strip()
+        api_key = (config.api_key or os.environ.get("OPENAI_API_KEY") or gen_settings.get("openaiApiKey") or gen_settings.get("apiKey") or "").strip()
         if api_key:
             api_base = (config.api_base.strip() if config.api_base else "https://api.openai.com/v1").rstrip("/")
             model = (config.model or "").strip() or "text-embedding-3-small"
@@ -217,7 +223,7 @@ async def compute_embedding(text: str, cfg: AutoRecallConfig | None = None) -> l
                 logger.warning(f"OpenAI embedding call failed, falling back to local: {e}")
 
     elif config.provider == "gemini":
-        api_key = (config.api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+        api_key = (config.api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or gen_settings.get("geminiApiKey") or gen_settings.get("apiKey") or "").strip()
         if api_key:
             api_base = (config.api_base.strip() if config.api_base else "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
             model = config.model if config.model and "embedding" in config.model else "text-embedding-004"
@@ -259,9 +265,7 @@ async def compute_embedding(text: str, cfg: AutoRecallConfig | None = None) -> l
 def cosine_similarity(v1: list[float], v2: list[float]) -> float:
     """Calculates cosine similarity between two float vectors."""
     if len(v1) != len(v2):
-        min_len = min(len(v1), len(v2))
-        v1 = v1[:min_len]
-        v2 = v2[:min_len]
+        return 0.0
 
     dot = sum(a * b for a, b in zip(v1, v2))
     norm1 = math.sqrt(sum(a * a for a in v1))
@@ -276,13 +280,41 @@ async def store_memory(
     cfg: AutoRecallConfig | None = None,
 ) -> MemoryEntry:
     """Stores a memory entry with computed vector embedding."""
+    clean_text = item.text.strip()
+    if not clean_text:
+        raise ValueError("Memory text cannot be empty.")
+
     ensure_vector_memory_schema()
     doc_id = f"mem_{uuid.uuid4().hex[:12]}"
     now = time.time()
-    vector = await compute_embedding(item.text, cfg)
+    vector = await compute_embedding(clean_text, cfg)
     metadata = item.metadata or {}
 
     with _get_db() as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.execute(
+            "SELECT id, agent_id, text, vector, importance, category, created_at, metadata FROM vector_memories WHERE agent_id = ? AND text = ?",
+            (item.agent_id, clean_text),
+        )
+        existing = cur.fetchone()
+        if existing:
+            # Update importance and timestamp to keep memory fresh without duplicating
+            conn.execute(
+                "UPDATE vector_memories SET importance = ?, vector = ?, created_at = ?, metadata = ? WHERE id = ?",
+                (float(item.importance), json.dumps(vector), now, json.dumps(metadata), existing["id"]),
+            )
+            conn.commit()
+            return MemoryEntry(
+                id=existing["id"],
+                text=clean_text,
+                category=item.category,
+                importance=float(item.importance),
+                agent_id=existing["agent_id"],
+                created_at=now,
+                metadata=metadata,
+                vector=vector,
+            )
+
         conn.execute(
             """
             INSERT INTO vector_memories (id, agent_id, text, vector, importance, category, created_at, metadata)
@@ -291,7 +323,7 @@ async def store_memory(
             (
                 doc_id,
                 item.agent_id,
-                item.text,
+                clean_text,
                 json.dumps(vector),
                 float(item.importance),
                 item.category,
@@ -303,7 +335,7 @@ async def store_memory(
 
     return MemoryEntry(
         id=doc_id,
-        text=item.text,
+        text=clean_text,
         category=item.category,
         importance=item.importance,
         agent_id=item.agent_id,
@@ -323,8 +355,16 @@ async def search_memories(
 
     with _get_db() as conn:
         conn.row_factory = sqlite3.Row
-        sql = "SELECT id, agent_id, text, vector, importance, category, created_at, metadata FROM vector_memories WHERE agent_id = ?"
-        params: list[Any] = [item.agent_id]
+        if item.agent_id and item.agent_id not in ("default", "*", "all"):
+            sql = "SELECT id, agent_id, text, vector, importance, category, created_at, metadata FROM vector_memories WHERE agent_id IN (?, 'default')"
+            params: list[Any] = [item.agent_id]
+        elif item.agent_id in ("*", "all"):
+            sql = "SELECT id, agent_id, text, vector, importance, category, created_at, metadata FROM vector_memories WHERE 1=1"
+            params = []
+        else:
+            sql = "SELECT id, agent_id, text, vector, importance, category, created_at, metadata FROM vector_memories WHERE agent_id = ?"
+            params = [item.agent_id or "default"]
+
         if item.category:
             sql += " AND category = ?"
             params.append(item.category)
@@ -368,8 +408,13 @@ def list_memories(
     ensure_vector_memory_schema()
     with _get_db() as conn:
         conn.row_factory = sqlite3.Row
-        sql = "SELECT id, agent_id, text, importance, category, created_at, metadata FROM vector_memories WHERE agent_id = ?"
-        params: list[Any] = [agent_id]
+        if agent_id in ("*", "all"):
+            sql = "SELECT id, agent_id, text, importance, category, created_at, metadata FROM vector_memories WHERE 1=1"
+            params: list[Any] = []
+        else:
+            sql = "SELECT id, agent_id, text, importance, category, created_at, metadata FROM vector_memories WHERE agent_id = ?"
+            params = [agent_id]
+
         if category:
             sql += " AND category = ?"
             params.append(category)
@@ -454,11 +499,12 @@ async def execute_auto_recall_hook(
         logger.debug(f"Skipping auto-recall for trivial prompt: {prompt[:30]!r}")
         return RecallHookResult(should_inject=False, recalled_count=0, context_block="", memories=[])
 
+    effective_min_sim = min(config.min_similarity, 0.30) if config.provider == "local" else config.min_similarity
     search_input = MemorySearchInput(
         query=prompt,
         agent_id=agent_id,
         limit=config.max_results,
-        min_similarity=config.min_similarity,
+        min_similarity=effective_min_sim,
     )
     matches = await search_memories(search_input, config)
     if not matches:

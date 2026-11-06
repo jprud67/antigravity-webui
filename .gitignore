@@ -42,3 +42,4 @@ backend/sessions.db
 test-results/
 playwright-report/
 
+MEMORY.md

@@ -24,6 +24,7 @@ from app.services.storage import (
     compact_conversation_in_place,
     create_conversation_handoff,
     delete_conversation,
+    derive_session_title,
     export_conversation_html,
     export_conversation_markdown,
     fork_conversation,
@@ -368,6 +369,30 @@ def rename_conversation(conversation_id: str, req: TitleUpdateRequest, _ = Depen
         raise HTTPException(status_code=400, detail="Le titre ne peut pas être vide")
     success = update_conversation_title(conversation_id, req.title.strip())
     return {"success": success, "conversation_id": conversation_id, "title": req.title.strip()}
+
+@router.post("/{conversation_id}/regenerate-title")
+@router.post("/{conversation_id}/generate-title")
+def regenerate_conversation_title(conversation_id: str, _ = Depends(require_auth)):
+    if not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation non valide")
+
+    steps = get_conversation_transcript(conversation_id)
+    raw_source = ""
+    if steps:
+        for s in steps:
+            if s.get("type") == "USER_INPUT" or s.get("source") == "USER_EXPLICIT":
+                raw_source = s.get("content", "")
+                break
+    if not raw_source:
+        conv = get_conversation_by_id(conversation_id)
+        raw_source = (conv.get("preview") if conv else "") or ""
+
+    new_title = derive_session_title(raw_source)
+    if not new_title or new_title.lower() in ("nouvelle session", "new session", "session"):
+        new_title = f"Session {conversation_id[:8]}"
+
+    success = update_conversation_title(conversation_id, new_title)
+    return {"success": success, "conversation_id": conversation_id, "title": new_title}
 
 @router.put("/{conversation_id}/metadata")
 def update_metadata(conversation_id: str, req: MetadataUpdateRequest, _ = Depends(require_auth)):

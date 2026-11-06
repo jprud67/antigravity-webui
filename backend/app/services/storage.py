@@ -280,6 +280,10 @@ def ensure_db_schema(conn: sqlite3.Connection | None = None, force: bool = False
                 END;
                 """
             )
+            try:
+                reconcile_missing_titles(limit=500, conn=conn)
+            except Exception as rec_err:
+                logger.debug(f"reconcile_missing_titles skipped: {rec_err}")
             conn.commit()
             if conn is None or db_path_str == str(CONVERSATION_DB):
                 _schema_initialized = True
@@ -359,7 +363,15 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     """Construit le dict conversation à partir d'une ligne SQLite et des métadonnées session."""
     cid = r["conversation_id"]
     custom_title = (meta.get("customTitle") or meta.get("custom_title") or "").strip()
-    display_title = custom_title or r["title"] or "Nouvelle session"
+    raw_title = (r["title"] or "").strip()
+    if custom_title:
+        display_title = custom_title
+    elif raw_title and raw_title.lower() not in ("nouvelle session", "new session", "session"):
+        display_title = raw_title
+    else:
+        # Fallback dynamique intelligent : si raw_title est vide, dériver depuis preview
+        derived = derive_session_title(r["preview"] or "")
+        display_title = derived if derived and derived.lower() not in ("nouvelle session", "new session", "session") else "Nouvelle session"
     raw_tags = meta.get("tags")
     safe_tags = list(raw_tags) if isinstance(raw_tags, list) else []
     raw_lmt = r["last_modified_time"]
@@ -650,6 +662,12 @@ _COMMAND_FAILURE_RE = re.compile(
     r'(?:The command exited with code (?!0\b)\d+|Command exited with code (?!0\b)\d+|Exit code: (?!0\b)\d+|process terminated with exit code)',
     re.IGNORECASE,
 )
+_ECO_DIRECTIVE_RE = re.compile(r'\[CONSIGNE\s+SYST[ÈE]ME\s+[^\]]*\]\s*', re.IGNORECASE)
+_CONTINUOUS_MEMORY_RE = re.compile(r'##\s*CONTINUOUS\s+AGENT\s+MEMORY[\s\S]*?(?=\n\s*\n\s*(?:[a-zA-Z0-9À-ÿ\"\'\‘\“\`\[]|$)|$)', re.IGNORECASE)
+_SYS_CONTEXT_PREFIX_RE = re.compile(r'^\[Directives\s+Syst[èe]me\s*/\s*Contexte\]\s*:?\s*', re.IGNORECASE)
+_AUTONOMOUS_CYCLE_RE = re.compile(r'\[MODE\s+CONTINU\s+NON-STOP\s*-\s*CYCLE\s*#(\d+)\]', re.IGNORECASE)
+_MISSION_PRINCIPALE_RE = re.compile(r'---\s*MISSION\s+PRINCIPALE\s*---\s*(?:\[CONSIGNE\s+SYST[ÈE]ME\s+[^\]]*\]\s*)?([\s\S]*?)(?:$|\n\s*---\s*)', re.IGNORECASE)
+_CYCLE_CONSIGNES_RE = re.compile(r'---\s*(?:BILAN\s*&|CONSIGNES\s+DU\s+CYCLE)[\s\S]*?(?:---\s*MISSION\s+PRINCIPALE\s*---\s*|$)', re.IGNORECASE)
 
 
 def clean_user_prompt(raw: Any) -> str:
@@ -726,13 +744,96 @@ def clean_user_prompt(raw: Any) -> str:
     if matches:
         text = matches[-1].strip()
     else:
-        # Repli pour les invites brutes sans balise <USER_REQUEST>
-        text = _XML_BLOCKS_RE.sub('', text_no_context)
-        text = _XML_TAGS_RE.sub('', text)
+        text = text_no_context
 
-    # 3. Retirer les préfixes de guidage/file d'attente
+    # 3. Retirer les blocs XML système éventuels (<ADDITIONAL_METADATA>, <USER_SETTINGS_CHANGE>, etc.)
+    text = _XML_BLOCKS_RE.sub('', text)
+    text = _XML_TAGS_RE.sub('', text)
+
+    # 4. Retirer les préfixes de guidage/file d'attente
     text = _STEERING_PREFIX_RE.sub('', text)
+
+    # 5. Retirer les directives système injectées (éco-mode et mémoire continue)
+    text = _ECO_DIRECTIVE_RE.sub('', text)
+    text = _CONTINUOUS_MEMORY_RE.sub('', text)
+    text = _SYS_CONTEXT_PREFIX_RE.sub('', text)
+
+    # 6. Gérer les pings de cycle autonome
+    cycle_match = _AUTONOMOUS_CYCLE_RE.search(text)
+    if cycle_match:
+        cycle_num = cycle_match.group(1)
+        mission_match = _MISSION_PRINCIPALE_RE.search(text)
+        if mission_match:
+            mission_body = _ECO_DIRECTIVE_RE.sub('', mission_match.group(1)).strip()
+            text = f"Cycle #{cycle_num} — {mission_body}"
+        else:
+            text = _CYCLE_CONSIGNES_RE.sub('', text)
+
     return text.strip()
+
+
+def derive_session_title(raw: Any, max_length: int = 60) -> str:
+    """Dérive un titre court, lisible et pertinent à partir du prompt initial ou de la preview."""
+    if not raw:
+        return "Nouvelle session"
+
+    raw_str = str(raw)
+    # 1. Vérifier si cycle autonome
+    cycle_m = _AUTONOMOUS_CYCLE_RE.search(raw_str)
+    if cycle_m:
+        cycle_num = cycle_m.group(1)
+        mission_m = _MISSION_PRINCIPALE_RE.search(raw_str)
+        raw_topic = mission_m.group(1).strip() if mission_m else ""
+        raw_topic = _ECO_DIRECTIVE_RE.sub('', raw_topic).strip()
+        raw_topic = re.sub(r'^(?:Continuer\s+l[\s\']|Continuer\s+|Audit\s+de\s+|Exécuter\s+)', '', raw_topic, flags=re.I).strip()
+        first_phrase = raw_topic.split('\n')[0].split('.')[0].strip()
+        if len(first_phrase) > 40:
+            words = first_phrase.split()
+            trunc: list[str] = []
+            cur = 0
+            for w in words:
+                if cur + len(w) + 1 > 40:
+                    break
+                trunc.append(w)
+                cur += len(w) + 1
+            first_phrase = " ".join(trunc) if trunc else first_phrase[:40]
+        return f"Cycle #{cycle_num} — {first_phrase.capitalize()}" if first_phrase else f"Cycle #{cycle_num}"
+
+    cleaned = clean_user_prompt(raw)
+    if not cleaned:
+        return "Nouvelle session"
+
+    # Découper à la première ligne
+    lines = [l.strip() for l in cleaned.splitlines() if l.strip()]
+    first_line = lines[0] if lines else cleaned
+
+    # Retirer puces et numérotations
+    first_line = re.sub(r'^(?:[-*•#>]|\d+[\.\)])\s*', '', first_line).strip()
+    first_line = re.sub(r'[`*_~]', '', first_line).strip()
+
+    # Si commence par une formule générique
+    first_line = re.sub(r'^(?:peux-tu\s+|pouvez-vous\s+|merci\s+de\s+|please\s+)', '', first_line, flags=re.I).strip()
+
+    # Couper à la première ponctuation forte si elle est raisonnable (≥ 15 chars)
+    punct_match = re.search(r'^(.*?[\?\!\.])(?:\s|$)', first_line)
+    candidate = punct_match.group(1).strip() if (punct_match and len(punct_match.group(1).strip()) >= 15) else first_line
+
+    if len(candidate) > max_length:
+        words = candidate.split()
+        trunc_words: list[str] = []
+        cur_len = 0
+        for w in words:
+            if cur_len + len(w) + 1 > (max_length - 3):
+                break
+            trunc_words.append(w)
+            cur_len += len(w) + 1
+        candidate = (" ".join(trunc_words) + "...") if trunc_words else (candidate[:max_length] + "...")
+
+    candidate = candidate.strip()
+    if candidate:
+        candidate = candidate[0].upper() + candidate[1:]
+
+    return candidate or "Nouvelle session"
 
 
 def calculate_conversation_tokens(steps: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1903,6 +2004,140 @@ def update_conversation_title(conversation_id: str, new_title: str) -> bool:
     _notify_conversations_changed()
     return True
 
+def update_conversation_title_if_unset(conversation_id: str, new_title: str) -> bool:
+    """Met à jour le titre dans SQLite uniquement s'il est vide ou 'Nouvelle session' et sans customTitle."""
+    if not is_safe_conversation_id(conversation_id):
+        return False
+    clean_title = (new_title or "").strip()
+    if not clean_title or clean_title.lower() in ("nouvelle session", "new session", "session"):
+        return False
+
+    meta = get_session_meta(conversation_id)
+    if meta.get("customTitle") or meta.get("custom_title"):
+        return False
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE conversation_summaries
+            SET title = ?
+            WHERE conversation_id = ? AND (title IS NULL OR title = '' OR title = 'Nouvelle session' OR title = 'New session')
+            """,
+            (clean_title, conversation_id),
+        )
+        updated = cursor.rowcount > 0
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.debug(f"Failed to update title if unset for {conversation_id}: {e}")
+        return False
+    finally:
+        conn.close()
+
+    if updated:
+        _notify_conversations_changed()
+    return updated
+
+def reconcile_missing_titles(limit: int = 500, conn: Any = None) -> int:
+    """Scanne les conversations ayant un titre vide ou 'Nouvelle session' et leur génère un titre pertinent."""
+    if not CONVERSATION_DB.exists():
+        return 0
+
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT conversation_id, title, preview
+            FROM conversation_summaries
+            WHERE title IS NULL OR title = '' OR title = 'Nouvelle session' OR title = 'New session'
+            ORDER BY last_modified_time DESC
+            LIMIT ?
+            """,
+            (limit,)
+        )
+        rows = cursor.fetchall()
+        if not rows:
+            return 0
+
+        all_meta = get_all_session_metadata()
+        updates: list[tuple[str, str]] = []
+
+        for r in rows:
+            if isinstance(r, sqlite3.Row):
+                cid = r["conversation_id"]
+                row_prev = r["preview"]
+            elif isinstance(r, dict):
+                cid = r.get("conversation_id", "")
+                row_prev = r.get("preview", "")
+            else:
+                cid = str(r[0])
+                row_prev = str(r[2]) if len(r) > 2 else ""
+
+            meta = all_meta.get(cid, {})
+            if meta.get("customTitle") or meta.get("custom_title"):
+                continue
+
+            raw_source = ""
+            for t_path in [
+                BRAIN_DIR / cid / ".system_generated" / "logs" / "transcript.jsonl",
+                BRAIN_DIR / cid / "logs" / "transcript.jsonl",
+                BRAIN_DIR / cid / "transcript.jsonl",
+            ]:
+                if t_path.exists():
+                    try:
+                        with open(t_path, "r", encoding="utf-8-sig", errors="replace") as f:
+                            for line in f:
+                                l = line.strip().lstrip("\ufeff")
+                                if not l:
+                                    continue
+                                try:
+                                    s = json.loads(l)
+                                    if s.get("type") == "USER_INPUT" or s.get("source") == "USER_EXPLICIT":
+                                        raw_source = s.get("content", "")
+                                        break
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+                    if raw_source:
+                        break
+
+            if not raw_source:
+                raw_source = row_prev or ""
+
+            derived = derive_session_title(raw_source)
+            if derived and derived.lower() not in ("nouvelle session", "new session", "session"):
+                updates.append((derived, cid))
+
+        if updates:
+            cursor.executemany(
+                """
+                UPDATE conversation_summaries
+                SET title = ?
+                WHERE conversation_id = ? AND (title IS NULL OR title = '' OR title = 'Nouvelle session' OR title = 'New session')
+                """,
+                updates
+            )
+            if should_close:
+                conn.commit()
+            logger.info(f"Reconciled {len(updates)} missing conversation titles in database.")
+            _notify_conversations_changed()
+            return len(updates)
+        return 0
+    except Exception as e:
+        logger.warning(f"Error in reconcile_missing_titles: {e}")
+        return 0
+    finally:
+        if should_close:
+            conn.close()
+
 def update_conversation_summary_fields(
     conversation_id: str,
     title: str | None = None,
@@ -1994,13 +2229,22 @@ def update_conversation_after_step_change(
             meta = get_session_meta(conversation_id)
             effective_user_time = (meta.get("createdAt") if isinstance(meta, dict) else None) or now_str
 
+        # Derive title from first user step if current title is empty or placeholder
+        first_user_content = ""
+        for s in steps:
+            if s.get("source") == "USER_EXPLICIT" or s.get("type") == "USER_INPUT":
+                first_user_content = s.get("content") or ""
+                break
+        derived_title = derive_session_title(first_user_content or new_preview)
+
         cursor.execute(
             """
             UPDATE conversation_summaries
-            SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = ?
+            SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = ?,
+                title = CASE WHEN (title IS NULL OR title = '' OR title = 'Nouvelle session' OR title = 'New session') THEN ? ELSE title END
             WHERE conversation_id = ?
             """,
-            (len(steps), new_preview, now_str, new_last_user_idx, effective_user_time, conversation_id),
+            (len(steps), new_preview, now_str, new_last_user_idx, effective_user_time, derived_title, conversation_id),
         )
         conn.commit()
     except Exception as e:

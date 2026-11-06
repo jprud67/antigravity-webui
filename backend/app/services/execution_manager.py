@@ -3,6 +3,7 @@ import logging
 import time
 import uuid
 from collections import deque
+from pathlib import Path
 from typing import Any, Protocol
 
 from fastapi import WebSocket
@@ -497,6 +498,14 @@ class ExecutionSession:
                         if cid and not self.conversation_id:
                             self.conversation_id = cid
                             execution_manager.register_session_cid(self, cid)
+                            try:
+                                from app.services.storage import derive_session_title, update_conversation_title_if_unset
+                                prompt_to_title = params.get("raw_prompt") or prompt
+                                auto_title = derive_session_title(prompt_to_title)
+                                if auto_title and auto_title.lower() not in ("nouvelle session", "new session", "session"):
+                                    update_conversation_title_if_unset(cid, auto_title)
+                            except Exception as title_err:
+                                logger.debug(f"Auto-title error on new session {cid}: {title_err}")
 
                         # Check for quota error in event
                         if event.get("event") == "error":
@@ -738,6 +747,15 @@ class ExecutionSession:
                     tc["status"] = "cancelled" if self.is_steering else "done"
             await self._clear_pending_approval(reason="completed")
             self.last_active_at = time.time()
+            if self.conversation_id:
+                try:
+                    from app.services.storage import derive_session_title, update_conversation_title_if_unset
+                    prompt_to_title = params.get("raw_prompt") or prompt
+                    auto_title = derive_session_title(prompt_to_title)
+                    if auto_title and auto_title.lower() not in ("nouvelle session", "new session", "session"):
+                        update_conversation_title_if_unset(self.conversation_id, auto_title)
+                except Exception as t_err:
+                    logger.debug(f"Title update on turn finish error: {t_err}")
 
     async def queue_worker(self):
         try:
@@ -1232,6 +1250,8 @@ class ExecutionManager:
                 await ws.send_json({"event": "error", "message": "Le prompt ne peut pas être vide."})
             return
 
+        raw_user_prompt = prompt
+
         raw_cid = data.get("conversation_id")
         if raw_cid and isinstance(raw_cid, str) and raw_cid.strip().lower() not in ("", "null", "undefined", "none"):
             if not is_safe_conversation_id(raw_cid.strip()):
@@ -1252,9 +1272,36 @@ class ExecutionManager:
         except Exception as e:
             logger.debug(f"Link understanding enrichment skipped: {e}")
 
+        # Workspace sync for continuous memory store
+        if ws_path and Path(ws_path).is_dir():
+            try:
+                from app.services.memory_store import memory_store
+                memory_store.set_workspace(ws_path)
+            except Exception as e:
+                logger.debug(f"Memory store set_workspace skipped: {e}")
+
+        # Continuous memory snapshot injection for initial turn of a conversation
+        try:
+            from app.services.memory_store import memory_store
+            from app.services.storage import get_conversation_by_id
+            is_new_conv = not conv_id
+            if conv_id and not is_new_conv:
+                existing_conv = get_conversation_by_id(conv_id)
+                if not existing_conv or existing_conv.get("step_count", 0) == 0:
+                    is_new_conv = True
+            if is_new_conv:
+                memory_snapshot = memory_store.get_system_prompt_snapshot()
+                if memory_snapshot and "## CONTINUOUS AGENT MEMORY" not in prompt:
+                    logger.info(f"Injecting continuous memory snapshot into initial turn for session {conv_id}")
+                    prompt = f"{memory_snapshot}\n\n{prompt}"
+                    data["prompt"] = prompt
+        except Exception as e:
+            logger.debug(f"Continuous memory snapshot injection skipped: {e}")
+
         # Auto-recall vector memory hook: if relevant memories exist, prepend them
         try:
-            recall_res = await execute_auto_recall_hook(prompt, agent_id=conv_id or "default")
+            agent_identifier = data.get("agent_mode") or conv_id or "default"
+            recall_res = await execute_auto_recall_hook(prompt, agent_id=agent_identifier)
             if recall_res.should_inject and recall_res.context_block:
                 logger.info(f"Injecting {recall_res.recalled_count} auto-recalled memories into prompt for session {conv_id}")
                 prompt = f"{recall_res.context_block}\n\n{prompt}"
@@ -1268,6 +1315,7 @@ class ExecutionManager:
         session.last_active_at = time.time()
         self.active_session = session
         payload = dict(data)
+        payload["raw_prompt"] = raw_user_prompt
         for k in ("model", "effort", "agent_mode"):
             v = payload.get(k)
             if isinstance(v, str) and not v.strip():

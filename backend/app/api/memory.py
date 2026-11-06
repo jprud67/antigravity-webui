@@ -2,9 +2,10 @@
 backend/app/api/memory.py — Endpoints API pour la Mémoire Continue (USER.md + MEMORY.md).
 """
 
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.api.auth import require_auth
@@ -20,11 +21,14 @@ class MemoryOperationRequest(BaseModel):
     old_text: str | None = None
     new_content: str | None = None
     raw_markdown: str | None = None
+    workspace: str | None = None
 
 
 @router.get("")
-def get_memory_status() -> dict[str, Any]:
+def get_memory_status(workspace: str | None = Query(None)) -> dict[str, Any]:
     """Renvoie l'état complet de la mémoire continue (profil utilisateur et mémoire workspace)."""
+    if workspace and Path(workspace).is_dir():
+        memory_store.set_workspace(workspace)
     return memory_store.get_status()
 
 
@@ -52,6 +56,9 @@ def refresh_memory_snapshot() -> dict[str, Any]:
 @router.post("")
 def execute_memory_operation(req: MemoryOperationRequest) -> dict[str, Any]:
     """Exécute une action sur la mémoire (add, replace, remove, save_raw)."""
+    if req.workspace and Path(req.workspace).is_dir():
+        memory_store.set_workspace(req.workspace)
+
     target = req.target.lower()
     action = req.action.lower()
 

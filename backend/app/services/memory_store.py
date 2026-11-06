@@ -177,8 +177,13 @@ class MemoryStore:
         else:
             # Traite comme paragraphes ou puces
             lines = [l.strip() for l in text.splitlines() if l.strip()]
-            if all(l.startswith(("- ", "* ", "• ")) for l in lines):
-                return [re.sub(r"^[-*•]\s*", "", l) for l in lines]
+            content_lines = [l for l in lines if not l.startswith("#")]
+            if content_lines and all(l.startswith(("- ", "* ", "• ")) for l in content_lines):
+                return [re.sub(r"^[-*•]\s*", "", l) for l in content_lines]
+            if len(lines) > 1 and "\n\n" in text:
+                paras = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
+                cleaned_paras = [re.sub(r"^#+\s+[^\n]+\n*", "", p).strip() for p in paras]
+                return [p for p in cleaned_paras if p]
             return [text.strip()]
             
         entries = []
@@ -275,6 +280,8 @@ class MemoryStore:
     def get_status(self) -> dict[str, Any]:
         """Fournit la télémétrie complète pour l'API et l'UI."""
         with self._lock:
+            self._load_target("user")
+            self._load_target("memory")
             user_count = self.get_char_count("user")
             user_limit = self.get_char_limit("user")
             mem_count = self.get_char_count("memory")
@@ -313,6 +320,7 @@ class MemoryStore:
 
     def _persist(self, target: str, entries: list[str]) -> None:
         path = self._path_for(target)
+        path.parent.mkdir(parents=True, exist_ok=True)
         rendered = self._render_entries(entries)
         # Écriture atomique avec remplacement de fichier temporaire
         tmp_path = path.with_suffix(".tmp")

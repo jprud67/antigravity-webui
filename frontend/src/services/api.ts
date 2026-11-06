@@ -337,6 +337,18 @@ export async function updateConversationTitle(conversationId: string, title: str
   return res.json();
 }
 
+export async function regenerateConversationTitle(conversationId: string): Promise<{ success: boolean; conversation_id: string; title: string }> {
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/regenerate-title`, {
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Échec de la régénération du titre' }));
+    throw new Error(err.detail || 'Échec de la régénération du titre');
+  }
+  return res.json();
+}
+
 export async function updateConversationMetadata(
   conversationId: string,
   metadata: {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Tag, Folder, Palette, Pin, Check, Trash2, Archive, Download, FileText } from 'lucide-react';
+import { X, Tag, Folder, Palette, Pin, Check, Trash2, Archive, Download, FileText, Sparkles } from 'lucide-react';
 import type { Conversation } from '../types';
-import { updateConversationMetadata, deleteConversation, exportConversationMarkdown, exportConversationJSON, triggerFileDownload } from '../services/api';
+import { updateConversationMetadata, deleteConversation, exportConversationMarkdown, exportConversationJSON, triggerFileDownload, regenerateConversationTitle } from '../services/api';
 import { showConfirm } from '../services/dialog';
 import { showToast } from '../services/toast';
 import { useI18n } from '../services/i18n';
@@ -43,6 +43,7 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
   const [archived, setArchived] = useState(false);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [regeneratingTitle, setRegeneratingTitle] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (isOpen && (!prevIsOpen || (conversation && conversation.conversation_id !== prevConvId))) {
@@ -165,7 +166,39 @@ export const SessionMetaModal: React.FC<SessionMetaModalProps> = ({
 
           {/* Title */}
           <div className="space-y-1.5">
-            <label className="font-medium" style={{ color: 'var(--muted)' }}>{t('session_title_label', 'Session Title')}</label>
+            <div className="flex items-center justify-between">
+              <label className="font-medium" style={{ color: 'var(--muted)' }}>{t('session_title_label', 'Session Title')}</label>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!conversation) return;
+                  try {
+                    setRegeneratingTitle(true);
+                    const res = await regenerateConversationTitle(conversation.conversation_id);
+                    if (res && res.title) {
+                      setTitle(res.title);
+                      showToast(t('session_title_regenerated', 'Title regenerated'), 'success');
+                      onUpdated();
+                    }
+                  } catch (err: any) {
+                    showToast(`${t('session_title_regenerate_failed', 'Failed to regenerate title: ')}${err.message}`, 'error');
+                  } finally {
+                    setRegeneratingTitle(false);
+                  }
+                }}
+                disabled={regeneratingTitle}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border transition-all cursor-pointer hover:opacity-90 disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--accent)'
+                }}
+                title={t('session_title_regenerate_desc', 'Ask Antigravity to generate a fresh title from the conversation')}
+              >
+                <Sparkles className={`w-3 h-3 ${regeneratingTitle ? 'animate-spin' : ''}`} />
+                <span>{t('session_title_regenerate', 'Regenerate title')}</span>
+              </button>
+            </div>
             <input
               type="text"
               value={title}
