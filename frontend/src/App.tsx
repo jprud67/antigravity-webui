@@ -500,7 +500,7 @@ export function App() {
           const firstUri = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : (typeof parsed === 'string' ? parsed : null);
           if (firstUri && typeof firstUri === 'string') {
             const cleanWs = firstUri.replace(/^file:\/\//, '').trim();
-            if (cleanWs && cleanWs.startsWith('/') && cleanWs !== currentWorkspace) {
+            if (cleanWs && (cleanWs.startsWith('/') || /^[a-zA-Z]:[/\\]/.test(cleanWs)) && cleanWs !== currentWorkspace) {
               setCurrentWorkspace(cleanWs);
               try {
                 localStorage.setItem('antigravity_workspace', cleanWs);

@@ -22,7 +22,7 @@ from app.services.google_auth import get_active_account
 from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.agent_api")
-router = APIRouter(prefix="/api/v1/agent", tags=["agent-api"])
+router = APIRouter(prefix="/api/v1/agent", tags=["agent-api"], dependencies=[Depends(require_auth)])
 
 
 # ============================================================================

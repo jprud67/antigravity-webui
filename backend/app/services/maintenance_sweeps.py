@@ -11,8 +11,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import sqlite3
 import subprocess
+import sys
 import time
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -20,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import CONVERSATION_DB
+from app.platform_utils import npm_argv
 
 logger = logging.getLogger("antigravity.maintenance")
 
@@ -128,6 +131,22 @@ def _run_cmd(cmd: list[str], cwd: str, timeout: int = 120) -> tuple[int, str]:
         return -1, str(e)
 
 
+def _resolve_pip_check(ws: Path) -> list[str] | None:
+    """Dynamically resolves pip executable for dependency checks across platforms."""
+    candidates = [
+        ws / "backend" / "venv" / "bin" / "pip",
+        ws / "backend" / "venv" / "Scripts" / "pip.exe",
+        ws / "venv" / "bin" / "pip",
+        ws / "venv" / "Scripts" / "pip.exe",
+    ]
+    for c in candidates:
+        if c.is_file() and os.access(c, os.X_OK):
+            return [str(c), "check"]
+    if (ws / "backend" / "venv").exists() or (ws / "venv").exists():
+        return [sys.executable, "-m", "pip", "check"]
+    return None
+
+
 def sweep_dependency_vulnerabilities(workspace_path: str) -> dict[str, Any]:
     """Scan for known dependency vulnerabilities via npm audit / pip check."""
     ws = Path(workspace_path)
@@ -136,7 +155,7 @@ def sweep_dependency_vulnerabilities(workspace_path: str) -> dict[str, Any]:
     # npm audit
     pkg_json = ws / "frontend" / "package.json"
     if pkg_json.exists():
-        rc, out = _run_cmd(["npm", "audit", "--json", "--audit-level=high"], str(ws / "frontend"), timeout=60)
+        rc, out = _run_cmd(npm_argv("audit", "--json", "--audit-level=high"), str(ws / "frontend"), timeout=60)
         if rc != 0 and out:
             try:
                 data = json.loads(out)
@@ -147,9 +166,9 @@ def sweep_dependency_vulnerabilities(workspace_path: str) -> dict[str, Any]:
                 results.append({"source": "npm", "raw": out[:300]})
 
     # pip check
-    venv_pip = ws / "backend" / "venv" / "bin" / "pip"
-    if venv_pip.exists():
-        rc, out = _run_cmd([str(venv_pip), "check"], str(ws / "backend"), timeout=60)
+    py_check_cmd = _resolve_pip_check(ws)
+    if py_check_cmd:
+        rc, out = _run_cmd(py_check_cmd, str(ws / "backend"), timeout=60)
         if rc != 0 and out:
             results.append({"source": "pip", "issues": out[:500]})
 

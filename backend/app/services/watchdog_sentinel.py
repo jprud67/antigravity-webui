@@ -8,14 +8,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import shutil
 import sqlite3
 import subprocess
+import sys
 import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 from app.config import CONVERSATION_DB
+from app.platform_utils import npx_argv
 
 logger = logging.getLogger("antigravity.watchdog")
 
@@ -185,6 +189,23 @@ def _run_cmd(cmd: list[str], cwd: str, timeout: int = 60) -> tuple[int, str]:
         return -1, str(e)
 
 
+def _resolve_pytest_bin(ws: Path) -> list[str]:
+    """Dynamically resolves the pytest binary across Linux, macOS, and Windows."""
+    candidates = [
+        ws / "backend" / "venv" / "bin" / "pytest",
+        ws / "backend" / "venv" / "Scripts" / "pytest.exe",
+        ws / "venv" / "bin" / "pytest",
+        ws / "venv" / "Scripts" / "pytest.exe",
+    ]
+    for c in candidates:
+        if c.is_file() and os.access(c, os.X_OK):
+            return [str(c)]
+    which_pt = shutil.which("pytest")
+    if which_pt:
+        return [which_pt]
+    return [sys.executable, "-m", "pytest"]
+
+
 def run_watchdog_scan(workspace_path: str) -> dict[str, Any]:
     """Run a single watchdog scan on a workspace path.
 
@@ -197,7 +218,7 @@ def run_watchdog_scan(workspace_path: str) -> dict[str, Any]:
     # 1. TypeScript type check
     ts_config = ws / "frontend" / "tsconfig.json"
     if ts_config.exists():
-        rc, out = _run_cmd(["npx", "tsc", "-b", "--noEmit"], str(ws / "frontend"), timeout=90)
+        rc, out = _run_cmd(npx_argv("tsc", "-b", "--noEmit"), str(ws / "frontend"), timeout=90)
         if rc != 0:
             msg = f"TypeScript errors detected:\n{out[:500]}"
             issues.append({"type": "ts_error", "severity": "error", "detail": msg})
@@ -207,7 +228,7 @@ def run_watchdog_scan(workspace_path: str) -> dict[str, Any]:
     # 2. Oxlint
     frontend_src = ws / "frontend" / "src"
     if frontend_src.exists():
-        rc, out = _run_cmd(["npx", "oxlint", "--max-warnings=0"], str(ws / "frontend"), timeout=60)
+        rc, out = _run_cmd(npx_argv("oxlint", "--max-warnings=0"), str(ws / "frontend"), timeout=60)
         if rc != 0 and "error" in out.lower():
             msg = f"Oxlint issues detected:\n{out[:300]}"
             issues.append({"type": "lint_error", "severity": "warning", "detail": msg})
@@ -216,8 +237,9 @@ def run_watchdog_scan(workspace_path: str) -> dict[str, Any]:
     # 3. Backend pytest (quick, bail fast)
     pytest_ini = ws / "backend"
     if pytest_ini.exists():
+        pytest_cmd = _resolve_pytest_bin(ws)
         rc, out = _run_cmd(
-            ["backend/venv/bin/pytest", "-q", "--bail", "--tb=no"],
+            [*pytest_cmd, "-q", "--bail", "--tb=no"],
             str(ws), timeout=120
         )
         if rc not in (0, 5):  # 5 = no tests collected

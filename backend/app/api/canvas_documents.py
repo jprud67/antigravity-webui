@@ -26,7 +26,7 @@ from app.services.canvas_documents import (
     wrap_canvas_html,
 )
 
-router = APIRouter(prefix="/api/canvas", tags=["Canvas Documents"])
+router = APIRouter(prefix="/api/canvas", tags=["Canvas Documents"], dependencies=[Depends(require_auth)])
 
 # Standard CSP header for sandboxed interactive widgets (excluding allow-same-origin to prevent sandbox escape)
 CANVAS_CSP_HEADER = "default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval' https:; sandbox allow-scripts allow-forms;"

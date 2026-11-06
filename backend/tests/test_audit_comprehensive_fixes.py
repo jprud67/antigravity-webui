@@ -853,4 +853,42 @@ async def test_memory_api_workspace_sanitization(auth_headers: dict):
         assert res_valid.status_code == 200
 
 
+def test_npx_argv_and_cross_platform_command_resolution(tmp_path):
+    from app.platform_utils import IS_WINDOWS, npx_argv
+    from app.services.maintenance_sweeps import _resolve_pip_check
+    from app.services.watchdog_sentinel import _resolve_pytest_bin
+
+    npx_cmd = npx_argv("tsc", "--version")
+    if IS_WINDOWS:
+        assert npx_cmd[0] == "cmd"
+        assert npx_cmd[1] == "/c"
+        assert "npx" in npx_cmd[2].lower()
+    else:
+        assert "npx" in npx_cmd[0]
+
+    # Test _resolve_pytest_bin fallback
+    pt_bin = _resolve_pytest_bin(tmp_path)
+    assert len(pt_bin) >= 1
+    assert any("pytest" in p or "python" in p for p in pt_bin)
+
+    # Test _resolve_pip_check fallback
+    pip_cmd = _resolve_pip_check(tmp_path)
+    assert pip_cmd is None or "pip" in str(pip_cmd)
+
+
+@pytest.mark.asyncio
+async def test_canvas_router_strict_auth_enforcement():
+    from httpx import ASGITransport, AsyncClient
+
+    from app.main import app
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        res_serve = await ac.get("/api/canvas/documents/nonexistent_doc/serve")
+        assert res_serve.status_code == 401
+
+        res_asset = await ac.get("/api/canvas/documents/nonexistent_doc/serve/index.html")
+        assert res_asset.status_code == 401
+
+
+
 

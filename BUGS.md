@@ -22,6 +22,11 @@
 | **BUG-009** | **FAIBLE** | Frontend / Rendu | Cascades de re-renders et dépendances de hooks manquantes (React 19) | **Corrigé & Validé** (`oxlint` 0 warn/err) |
 | **BUG-010** | **FAIBLE** | Qualité / Hygiène | 29 imports/variables orphelines et 103 modernisations Python | **Corrigé & Validé** (`ruff` 0 err) |
 | **BUG-011** | **FAIBLE** | Persistance / Audit | Perte d'historique de maintenance et alertes au redémarrage serveur | **Corrigé & Validé** (SQLite WAL) |
+| **BUG-012** | **ÉLEVÉ** | Sécurité / RBAC | Endpoints `/api/canvas/documents/serve` sans authentification obligatoire | **Corrigé & Validé** |
+| **BUG-013** | **MOYEN** | Portabilité / OS | Commandes `npx`, `pytest` et `pip` défaillantes sur environnements Windows | **Corrigé & Validé** |
+| **BUG-014** | **MOYEN** | Frontend / Logique | Synchronisation automatique de workspace ignorée pour les disques Windows | **Corrigé & Validé** |
+| **BUG-015** | **MOYEN** | Réseau / WebSocket | Perte de paramètre de token URL en mode WebSocket subprotocol | **Corrigé & Validé** |
+| **BUG-016** | **FAIBLE** | Frontend / i18n | 109 clés de traduction manquantes créant des replis textuels non traduits | **Corrigé & Validé** |
 
 ---
 

@@ -109,7 +109,7 @@ export class ChatWebSocketClient {
 
     try {
       try {
-        this.ws = protocols ? new WebSocket(baseUrl, protocols) : new WebSocket(wsUrl);
+        this.ws = protocols ? new WebSocket(wsUrl, protocols) : new WebSocket(wsUrl);
       } catch (subErr) {
         // Fallback to query param auth if subprotocol constructor rejects it
         console.warn('[WS] Subprotocol connection failed, falling back to query param auth:', subErr);

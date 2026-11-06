@@ -123,7 +123,8 @@ def test_canvas_api_endpoints(auth_headers):
     assert get_res.status_code == 200
     assert get_res.json()["id"] == doc_id
 
-    # 3. Serve entrypoint and verify CSP headers
+    # 3. Serve entrypoint and verify CSP headers (unauthenticated rejected with 401)
+    assert client.get(f"/api/canvas/documents/{doc_id}/serve").status_code == 401
     serve_res = client.get(f"/api/canvas/documents/{doc_id}/serve", headers=auth_headers)
     assert serve_res.status_code == 200
     assert "Content-Security-Policy" in serve_res.headers

@@ -1861,6 +1861,442 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     en: 'System Diagnostics & Auto-Doctor',
     fr: 'Diagnostics Système & Auto-Doctor',
   },
+  allowed_extensions_desc: {
+    en: 'Allowed extensions during upload (comma-separated). Leave empty or use "*" to accept all extensions.',
+    fr: 'Extensions autorisées lors du téléversement (séparées par une virgule). Laissez vide ou mettez « * » pour accepter toutes les extensions sans restriction.',
+  },
+  allowed_extensions_placeholder: {
+    en: '.ts, .tsx, .js, .py, .md, .txt, .json, .png, .jpg (or empty for all)',
+    fr: '.ts, .tsx, .js, .py, .md, .txt, .json, .png, .jpg (ou vide pour tout accepter)',
+  },
+  allowed_extensions_title: {
+    en: 'Allowed File Types (Whitelist)',
+    fr: 'Types de fichiers acceptés (Liste blanche)',
+  },
+  apply_to_chat_tooltip: {
+    en: 'Inject optimized prompt into chat input for review',
+    fr: 'Injecter le prompt optimisé dans le champ de saisie pour révision',
+  },
+  binary_file_preview_unavailable: {
+    en: 'Binary file preview unavailable',
+    fr: 'Aperçu binaire non disponible',
+  },
+  blacklist_updated: {
+    en: 'Blacklist updated',
+    fr: 'Liste noire mise à jour',
+  },
+  blocked_extensions_desc: {
+    en: 'Extensions automatically rejected during imports (executables, potentially risky system scripts).',
+    fr: 'Extensions automatiquement rejetées lors des imports (fichiers exécutables, scripts systèmes potentiellement risqués).',
+  },
+  blocked_extensions_title: {
+    en: 'Forbidden Extensions (Security Blacklist)',
+    fr: 'Extensions interdites (Liste noire de sécurité)',
+  },
+  click_copy_relative: {
+    en: 'Click to copy relative path',
+    fr: 'Cliquer pour copier le chemin relatif',
+  },
+  code_lens_run: {
+    en: 'Execute in terminal ({0})',
+    fr: 'Exécuter dans le terminal ({0})',
+  },
+  common_cancel: {
+    en: 'Cancel',
+    fr: 'Annuler',
+  },
+  common_copy: {
+    en: 'Copy',
+    fr: 'Copier',
+  },
+  coordinator_auto_fix: {
+    en: '⚡ Auto-Fix with Antigravity',
+    fr: '⚡ Auto-Fix avec Antigravity',
+  },
+  coordinator_batch_actions_title: {
+    en: 'Multi-Project Batch Actions',
+    fr: 'Actions par Lot Multi-Projets',
+  },
+  coordinator_batch_desc: {
+    en: 'Trigger synchronized operations across all connected workspaces.',
+    fr: 'Déclenchez des opérations synchronisées sur l\'ensemble des workspaces connectés.',
+  },
+  coordinator_batch_failed: {
+    en: 'Batch action execution error',
+    fr: 'Erreur lors de l\'exécution de l\'action par lot',
+  },
+  coordinator_batch_fetch: {
+    en: 'Git Fetch All',
+    fr: 'Git Fetch All',
+  },
+  coordinator_batch_install: {
+    en: 'Install Dependencies',
+    fr: 'Installer les Dépendances',
+  },
+  coordinator_batch_pull: {
+    en: 'Git Pull All',
+    fr: 'Git Pull All',
+  },
+  coordinator_batch_success: {
+    en: 'Batch action executed across {0} projects',
+    fr: 'Action par lot exécutée sur {0} projets',
+  },
+  coordinator_batch_tests: {
+    en: 'Run All Test Suites',
+    fr: 'Lancer Tous les Tests',
+  },
+  coordinator_cancel: {
+    en: 'Interrupt',
+    fr: 'Interrompre',
+  },
+  coordinator_cancel_failed: {
+    en: 'Pipeline interruption failed',
+    fr: 'Erreur d\'interruption du pipeline',
+  },
+  coordinator_cancelled: {
+    en: 'Pipeline interrupted',
+    fr: 'Pipeline interrompu',
+  },
+  coordinator_dirty_repos: {
+    en: 'Dirty Repositories',
+    fr: 'Git Modifiés',
+  },
+  coordinator_discovered_pipelines: {
+    en: 'Discovered Pipelines & Workflows',
+    fr: 'Pipelines & Workflows Détectés',
+  },
+  coordinator_health: {
+    en: 'Global Health',
+    fr: 'Santé Globale',
+  },
+  coordinator_load_failed: {
+    en: 'Failed loading workspace summary',
+    fr: 'Échec du chargement de la synthèse workspaces',
+  },
+  coordinator_no_active_run: {
+    en: 'No pipeline selected or currently running',
+    fr: 'Aucun pipeline sélectionné ou en cours d\'exécution',
+  },
+  coordinator_no_pipelines: {
+    en: 'No conventional pipeline detected in this workspace.',
+    fr: 'Aucun pipeline conventionnel détecté dans ce workspace.',
+  },
+  coordinator_out_of_sync: {
+    en: 'Out of Sync',
+    fr: 'Désynchronisés',
+  },
+  coordinator_pipeline_run_failed: {
+    en: 'Pipeline launch failed',
+    fr: 'Échec du lancement du pipeline',
+  },
+  coordinator_pipeline_started: {
+    en: 'Pipeline started successfully',
+    fr: 'Pipeline lancé avec succès',
+  },
+  coordinator_pipelines_desc: {
+    en: 'Conventional pipelines inferred from build, test, and packaging configuration.',
+    fr: 'Pipelines conventionnels déduits des configurations de build, test et packaging.',
+  },
+  coordinator_pipelines_failed: {
+    en: 'Unable to detect pipelines',
+    fr: 'Impossible de détecter les pipelines',
+  },
+  coordinator_remediation_failed: {
+    en: 'Autonomous remediation error',
+    fr: 'Erreur de remédiation autonome',
+  },
+  coordinator_remediation_injected: {
+    en: 'Diagnostic and remediation instructions injected into chat',
+    fr: 'Diagnostic et consigne de remédiation injectés dans le chat',
+  },
+  coordinator_run_pipeline: {
+    en: 'Run Pipeline',
+    fr: 'Lancer le Pipeline',
+  },
+  coordinator_running: {
+    en: 'In progress',
+    fr: 'En cours',
+  },
+  coordinator_scanning_pipelines: {
+    en: 'Analyzing workspace pipelines...',
+    fr: 'Analyse du workspace en cours...',
+  },
+  coordinator_set_active: {
+    en: 'Set Active',
+    fr: 'Définir actif',
+  },
+  coordinator_step_executing: {
+    en: 'Executing step...',
+    fr: 'Exécution en cours...',
+  },
+  coordinator_steps_sequence: {
+    en: 'Execution steps sequence',
+    fr: 'Séquence d\'étapes d\'exécution',
+  },
+  coordinator_subtitle: {
+    en: 'Multi-project orchestration, automatic CI/CD detection, and autonomous remediation',
+    fr: 'Orchestration multi-projets, détection automatique CI/CD et remédiation autonome',
+  },
+  coordinator_tab_logs: {
+    en: 'Execution Console',
+    fr: 'Console d\'Exécution',
+  },
+  coordinator_tab_overview: {
+    en: 'Workspaces & Batch Actions',
+    fr: 'Workspaces & Actions par Lot',
+  },
+  coordinator_tab_pipelines: {
+    en: 'Discovered Pipelines',
+    fr: 'Pipelines Détectés',
+  },
+  coordinator_total_workspaces: {
+    en: 'Workspaces',
+    fr: 'Workspaces',
+  },
+  coordinator_view_pipelines: {
+    en: 'Pipelines',
+    fr: 'Pipelines',
+  },
+  coordinator_workspaces_list: {
+    en: 'Connected Repositories & Projects',
+    fr: 'Dépôts et Projets Connectés',
+  },
+  copy_error: {
+    en: 'Copy error',
+    fr: 'Erreur de copie',
+  },
+  copy_workspace_path: {
+    en: 'Copy workspace path',
+    fr: 'Copier chemin workspace',
+  },
+  copy_workspace_path_tooltip: {
+    en: 'Copy absolute workspace path',
+    fr: 'Copier le chemin absolu du workspace',
+  },
+  depth_updated: {
+    en: 'Depth set to {0} levels',
+    fr: 'Profondeur fixée à {0} niveaux',
+  },
+  doctor_active_monitoring: {
+    en: 'Active Monitoring (0 alerts)',
+    fr: 'Surveillance Active (0 alerte)',
+  },
+  doctor_not_installed: {
+    en: 'Not installed',
+    fr: 'Non installé',
+  },
+  doctor_unavailable: {
+    en: 'Unavailable',
+    fr: 'Indisponible',
+  },
+  download_as_zip: {
+    en: 'Download as ZIP archive',
+    fr: 'Télécharger en archive ZIP',
+  },
+  download_started_named: {
+    en: 'Download of "{0}" started',
+    fr: 'Téléchargement de « {0} » lancé',
+  },
+  duplicate: {
+    en: 'Duplicate',
+    fr: 'Dupliquer',
+  },
+  duplicate_folder: {
+    en: 'Duplicate folder',
+    fr: 'Dupliquer le dossier',
+  },
+  file_manager_settings_desc: {
+    en: 'Configure upload size limit, accepted file extensions, and explorer display rules.',
+    fr: 'Définissez la taille limite des imports, les extensions acceptées ou filtrées, et les règles d\'affichage.',
+  },
+  file_manager_settings_title: {
+    en: 'File Manager Configuration',
+    fr: 'Configuration du Gestionnaire de Fichiers',
+  },
+  git_clone_success: {
+    en: 'Git repository cloned successfully into ',
+    fr: 'Dépôt Git cloné avec succès dans ',
+  },
+  hidden_files_hidden: {
+    en: 'Hidden files concealed',
+    fr: 'Fichiers cachés masqués',
+  },
+  hidden_files_shown: {
+    en: 'Hidden files visible',
+    fr: 'Fichiers cachés visibles',
+  },
+  import_error: {
+    en: 'Import error',
+    fr: 'Erreur d\'import',
+  },
+  insert_in_prompt: {
+    en: 'Insert in prompt',
+    fr: 'Insérer dans le prompt',
+  },
+  kanban_deselect_col: {
+    en: 'Deselect column',
+    fr: 'Désélectionner la colonne',
+  },
+  kanban_priority_label: {
+    en: 'Priority',
+    fr: 'Priorité',
+  },
+  kanban_select_col: {
+    en: 'Select column',
+    fr: 'Sélectionner la colonne',
+  },
+  max_size_updated: {
+    en: 'Maximum size set to {0} MB',
+    fr: 'Taille maximale définie à {0} Mo',
+  },
+  max_tree_depth_desc: {
+    en: 'Limits automatic tree traversal recursion depth in the workspace file explorer.',
+    fr: 'Limite la récursion automatique de l\'arborescence dans l\'explorateur de fichiers.',
+  },
+  max_tree_depth_title: {
+    en: 'Maximum Explorer Scan Depth',
+    fr: 'Profondeur maximale du scan d\'arborescence',
+  },
+  max_upload_size_desc: {
+    en: 'Limits unit size of files uploaded via drag-and-drop or file picker (in Megabytes).',
+    fr: 'Limite le poids unitaire des fichiers importés par glisser-déposer ou sélection locale (en Mégaoctets).',
+  },
+  max_upload_size_title: {
+    en: 'Maximum Upload Size per File',
+    fr: 'Taille maximale par fichier téléversé',
+  },
+  name_copied: {
+    en: 'Name copied: {0}',
+    fr: 'Nom copié : {0}',
+  },
+  next: {
+    en: 'Next',
+    fr: 'Suivant',
+  },
+  open_file: {
+    en: 'Open file',
+    fr: 'Ouvrir le fichier',
+  },
+  open_in_database_studio: {
+    en: 'Open in Database Studio',
+    fr: 'Ouvrir dans Database Studio',
+  },
+  optional_badge: {
+    en: 'Optional',
+    fr: 'Optionnel',
+  },
+  orchestrator_modal_title: {
+    en: 'Multi-Agent Visual Orchestration Studio (Ctrl+Alt+A)',
+    fr: 'Multi-Agent Visual Orchestration Studio (Ctrl+Alt+A)',
+  },
+  path_inserted_in_prompt: {
+    en: 'Path inserted into chat: @{0}',
+    fr: 'Chemin inséré dans le chat : @{0}',
+  },
+  preset_applied: {
+    en: 'Preset applied: {0}',
+    fr: 'Préréglage appliqué : {0}',
+  },
+  previous: {
+    en: 'Previous',
+    fr: 'Précédent',
+  },
+  project_created_success: {
+    en: 'Workspace created successfully: ',
+    fr: 'Workspace créé avec succès : ',
+  },
+  quick_extension_presets: {
+    en: 'Quick Extension Presets',
+    fr: 'Préréglages d\'extensions rapides',
+  },
+  refresh_conversations: {
+    en: 'Refresh conversations',
+    fr: 'Rafraîchir les discussions',
+  },
+  show_hidden_files_desc: {
+    en: 'Display items starting with a dot (e.g. .env, .github, .eslintrc).',
+    fr: 'Affiche les éléments commençant par un point (ex: .env, .github, .eslintrc).',
+  },
+  show_hidden_files_title: {
+    en: 'Show hidden files and folders',
+    fr: 'Afficher les fichiers et dossiers cachés',
+  },
+  sql_studio: {
+    en: 'SQL Studio',
+    fr: 'SQL Studio',
+  },
+  standby_voice_waveform_tooltip: {
+    en: 'Voice visualizer standby indicator',
+    fr: 'Indicateur de veille vocale',
+  },
+  tab_batch_actions: {
+    en: 'Batch Actions',
+    fr: 'Actions par lot',
+  },
+  tab_create_clone: {
+    en: 'New & Clone',
+    fr: 'Nouveau & Cloner',
+  },
+  tab_file_manager: {
+    en: 'Explorer & Files',
+    fr: 'Explorateur & Fichiers',
+  },
+  tab_health_audit: {
+    en: 'Health & Audit',
+    fr: 'Santé & Audit',
+  },
+  tab_projects: {
+    en: 'My Workspaces',
+    fr: 'Mes Workspaces',
+  },
+  tables: {
+    en: 'tables',
+    fr: 'tables',
+  },
+  upload_ext_blocked: {
+    en: 'Extension forbidden by security policy: {0}',
+    fr: 'Extension interdite par la politique de sécurité : {0}',
+  },
+  upload_ext_not_allowed: {
+    en: 'Extension not allowed: {0}',
+    fr: 'Extension non autorisée : {0}',
+  },
+  upload_files: {
+    en: 'Upload files',
+    fr: 'Importer des fichiers',
+  },
+  upload_files_here: {
+    en: 'Upload files here...',
+    fr: 'Importer des fichiers ici...',
+  },
+  upload_folder: {
+    en: 'Upload folder',
+    fr: 'Importer un dossier',
+  },
+  upload_folder_here: {
+    en: 'Upload folder here...',
+    fr: 'Importer un dossier ici...',
+  },
+  upload_folder_tooltip: {
+    en: 'Upload an entire directory from your machine',
+    fr: 'Importer un dossier complet depuis votre ordinateur',
+  },
+  upload_size_exceeded: {
+    en: 'File "{0}" ({1} MB) exceeds maximum allowed size of {2} MB.',
+    fr: 'Le fichier « {0} » ({1} Mo) dépasse la limite configurée de {2} Mo.',
+  },
+  upload_to_folder: {
+    en: 'Upload files to this directory',
+    fr: 'Importer des fichiers dans ce dossier',
+  },
+  workspace_permission: {
+    en: 'Workspace Permission',
+    fr: 'Permission Workspace',
+  },
+  workspace_switched: {
+    en: 'Active workspace switched',
+    fr: 'Workspace actif mis à jour',
+  },
   enable_on_device: {
     en: 'Enable Push on this Device',
     fr: 'Activer Push sur cet appareil',

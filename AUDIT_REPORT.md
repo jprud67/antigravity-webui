@@ -164,3 +164,22 @@ L'ensemble des anomalies identifiées a été intégralement corrigé, éprouvé
 | **Stabilité Runtime & Concurrence** | 7.0 / 10 | **9.5 / 10** | Concurrence SQLite WAL & flux isolés |
 | **Frontend & UX** | 9.0 / 10 | **10.0 / 10** | 0 avertissement Oxlint, React 19 optimisé |
 | **Couverture & Tests CI** | 8.5 / 10 | **10.0 / 10** | 688 tests passants, CI GitHub Actions verte |
+
+---
+
+## 6. Audit Critique Approfondi & Optimisations Cross-Platform (Novembre 2026)
+
+Un nouvel examen rigoureux et sans omission de l'ensemble de la plateforme a été réalisé afin de traquer les angles morts fonctionnels, sécuritaires et cross-platform :
+
+1. **Sécurisation Globale des Routeurs et des Documents Canvas (BUG-012) :**
+   - L'ensemble des endpoints `/api/canvas` (notamment `/serve` et `/serve/{filename:path}`) ainsi que `/api/v1/agent` et `/v1` disposent désormais de la dépendance de sécurité déclarée directement au niveau de leur `APIRouter` (`dependencies=[Depends(require_auth)]`), interdisant tout contournement d'accès non authentifié.
+2. **Robustesse Cross-Platform Linux/Windows/macOS (BUG-013) :**
+   - Introduction du wrapper `npx_argv` dans `platform_utils.py` pour un appel transparent sous Windows (`cmd /c npx`) et POSIX.
+   - Résolution dynamique résiliente des exécutables `pytest` (`_resolve_pytest_bin`) et `pip` (`_resolve_pip_check`) dans `watchdog_sentinel.py` et `maintenance_sweeps.py`, évitant les échecs `FileNotFoundError` sous Windows (`Scripts/pytest.exe`, `Scripts/pip.exe`).
+3. **Synchronisation du Workspace Actif sous Windows (BUG-014) :**
+   - Correction dans `App.tsx` de la détection des chemins de workspace pour accepter les lettres de lecteur Windows (`^[a-zA-Z]:[/\\]`), là où seul le préfixe POSIX `/` était précédemment accepté.
+4. **Résilience de Connexion WebSocket et Traversée de Proxys (BUG-015) :**
+   - Dans `ws.ts`, la connexion WebSocket associe désormais le sous-protocole d'authentification `Sec-WebSocket-Protocol` et le jeton d'URL `?token=...` (`wsUrl`), assurant une connexion sans accroc même derrière des proxys d'entreprise tronquant les en-têtes personnalisés.
+5. **Internationalisation Complète et Cohérence Visuelle (BUG-016) :**
+   - Intégration dans `i18n.ts` de 109 clés de traduction manquantes (`doctor_active_monitoring`, `doctor_not_installed`, `coordinator_*`, `file_manager_*`, etc.), garantissant une expérience bilingue sans repli textuel non traduit.
+

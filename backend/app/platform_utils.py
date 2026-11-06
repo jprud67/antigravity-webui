@@ -177,6 +177,17 @@ def npm_argv(*args: str) -> list[str]:
     return [npm, *args]
 
 
+def npx_argv(*args: str) -> list[str]:
+    """
+    Construit la ligne de commande npx compatible Windows (npx.cmd doit
+    passer par `cmd /c`) et POSIX (Linux/macOS).
+    """
+    npx = which_command("npx") or "npx"
+    if IS_WINDOWS:
+        return ["cmd", "/c", npx, *args]
+    return [npx, *args]
+
+
 def is_safe_path(target: os.PathLike[Any] | str, allowed_roots: Sequence[os.PathLike[Any] | str]) -> bool:
     """
     Vérifie de manière robuste qu'un chemin cible est confiné sous l'un des répertoires autorisés.

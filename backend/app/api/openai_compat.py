@@ -20,7 +20,7 @@ from app.services.google_auth import is_quota_error
 from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.openai_compat")
-router = APIRouter(prefix="/v1", tags=["openai-compatibility"])
+router = APIRouter(prefix="/v1", tags=["openai-compatibility"], dependencies=[Depends(require_auth)])
 
 
 def _is_quota_error(msg: str) -> bool:
