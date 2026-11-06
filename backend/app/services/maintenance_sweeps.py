@@ -242,11 +242,10 @@ def sweep_changelog_summary(workspace_path: str, since_days: int = 7) -> dict[st
 
 async def run_all_sweeps(workspace_path: str) -> dict[str, Any]:
     """Run all maintenance sweeps concurrently."""
-    loop = asyncio.get_event_loop()
     deps, branches, changelog = await asyncio.gather(
-        loop.run_in_executor(None, sweep_dependency_vulnerabilities, workspace_path),
-        loop.run_in_executor(None, sweep_dead_git_branches, workspace_path),
-        loop.run_in_executor(None, sweep_changelog_summary, workspace_path),
+        asyncio.to_thread(sweep_dependency_vulnerabilities, workspace_path),
+        asyncio.to_thread(sweep_dead_git_branches, workspace_path),
+        asyncio.to_thread(sweep_changelog_summary, workspace_path),
     )
     return {
         "workspace": workspace_path,

@@ -227,7 +227,10 @@ class PersistentPythonKernel:
 
     def __init__(self, session_id: str = "default", cwd: str = "."):
         self.session_id = session_id
-        self.cwd = os.path.abspath(cwd)
+        resolved_cwd = os.path.abspath(cwd)
+        if is_blocked_sensitive_path(resolved_cwd):
+            raise PermissionError(f"Accès refusé au dossier sensible : {resolved_cwd}")
+        self.cwd = resolved_cwd
         self.execution_count = 0
         self.created_at = time.time()
         self.last_active_at = time.time()
@@ -246,7 +249,10 @@ class PersistentPythonKernel:
     def reset(self, new_cwd: str | None = None) -> None:
         with self.lock:
             if new_cwd:
-                self.cwd = os.path.abspath(new_cwd)
+                resolved_cwd = os.path.abspath(new_cwd)
+                if is_blocked_sensitive_path(resolved_cwd):
+                    raise PermissionError(f"Accès refusé au dossier sensible : {resolved_cwd}")
+                self.cwd = resolved_cwd
                 self.tool_proxy = KernelToolProxy(cwd=self.cwd)
             self._init_namespace()
             self.execution_count = 0

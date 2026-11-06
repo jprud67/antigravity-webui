@@ -268,7 +268,7 @@ def start_watchdog(workspace_path: str, interval_seconds: int = 300) -> dict[str
         return {"status": "already_running", "workspace": workspace_path}
 
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         _watchdog_task = loop.create_task(_watchdog_loop(workspace_path, interval_seconds))
         return {"status": "started", "workspace": workspace_path, "interval_seconds": interval_seconds}
     except RuntimeError:

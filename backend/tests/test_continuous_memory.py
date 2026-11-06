@@ -124,3 +124,28 @@ def test_memory_api_endpoints(auth_headers):
     }, headers=auth_headers)
     assert resp_rm.status_code == 200
     assert resp_rm.json()["success"] is True
+
+
+def test_memory_workspace_security_confinement(auth_headers):
+    # Sensitive workspace blocked
+    resp = client.get("/api/memory?workspace=/etc", headers=auth_headers)
+    assert resp.status_code in (403, 404)
+
+    # Sensitive path in POST request blocked
+    resp_post = client.post("/api/memory", json={
+        "target": "memory",
+        "action": "add",
+        "content": "Test secret entry",
+        "workspace": "/root/.ssh"
+    }, headers=auth_headers)
+    assert resp_post.status_code == 403
+
+    # Null byte in POST blocked with 400
+    resp_null = client.post("/api/memory", json={
+        "target": "memory",
+        "action": "add",
+        "content": "Test secret entry",
+        "workspace": "/tmp\x00/evil"
+    }, headers=auth_headers)
+    assert resp_null.status_code == 400
+

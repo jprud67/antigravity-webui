@@ -102,3 +102,36 @@ def test_kernel_api_authentication(auth_headers):
     res_stop = client.delete("/api/kernel/test-api-session", headers=auth_headers)
     assert res_stop.status_code == 200
     assert res_stop.json()["success"] is True
+
+
+def test_kernel_cwd_security_confinement(auth_headers):
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app)
+
+    # 1. Sensitive directory (/etc) should be rejected with 403
+    res_sensitive = client.post(
+        "/api/kernel/execute",
+        json={"code": "print(1)", "cwd": "/etc"},
+        headers=auth_headers,
+    )
+    assert res_sensitive.status_code in (403, 404)
+
+    # 2. Null byte in cwd should be rejected with 400
+    res_null = client.post(
+        "/api/kernel/execute",
+        json={"code": "print(1)", "cwd": "/tmp\x00/evil"},
+        headers=auth_headers,
+    )
+    assert res_null.status_code == 400
+
+    # 3. Sensitive path in reset request should be rejected with 403
+    res_reset_sensitive = client.post(
+        "/api/kernel/reset",
+        json={"session_id": "test-reset-sec", "cwd": "/root/.ssh"},
+        headers=auth_headers,
+    )
+    assert res_reset_sensitive.status_code == 403
+

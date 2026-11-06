@@ -189,16 +189,37 @@ def _resolve_relative_git_path(raw_path: str, target: Path) -> str:
     return clean_rel
 
 
-DEFAULT_GIT_NAME = os.environ.get("ANTIGRAVITY_GIT_USER_NAME") or os.environ.get("GIT_AUTHOR_NAME") or "Antigravity WebUI"
-DEFAULT_GIT_EMAIL = os.environ.get("ANTIGRAVITY_GIT_USER_EMAIL") or os.environ.get("GIT_AUTHOR_EMAIL") or "bot@antigravity-webui"
+def _get_default_git_identity() -> tuple[str, str]:
+    name = os.environ.get("ANTIGRAVITY_GIT_USER_NAME") or os.environ.get("GIT_AUTHOR_NAME")
+    email = os.environ.get("ANTIGRAVITY_GIT_USER_EMAIL") or os.environ.get("GIT_AUTHOR_EMAIL")
+    if not name or not email:
+        try:
+            res_name = subprocess.run([GIT_BIN, "config", "user.name"], capture_output=True, text=True, timeout=2)
+            cfg_name = res_name.stdout.strip()
+            if cfg_name and not name:
+                name = cfg_name
+        except Exception:
+            pass
+        try:
+            res_email = subprocess.run([GIT_BIN, "config", "user.email"], capture_output=True, text=True, timeout=2)
+            cfg_email = res_email.stdout.strip()
+            if cfg_email and not email:
+                email = cfg_email
+        except Exception:
+            pass
+    return (name or "jprud67", email or "jprud67@gmail.com")
+
+
+DEFAULT_GIT_NAME, DEFAULT_GIT_EMAIL = _get_default_git_identity()
 
 
 def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | None = None) -> subprocess.CompletedProcess:
+    author_name, author_email = _get_default_git_identity()
     base_args = [
         GIT_BIN,
         "-c", "core.editor=true",
-        "-c", f"user.name={DEFAULT_GIT_NAME}",
-        "-c", f"user.email={DEFAULT_GIT_EMAIL}",
+        "-c", f"user.name={author_name}",
+        "-c", f"user.email={author_email}",
         "-c", "format.signoff=false",
         "-c", "commit.gpgsign=false",
         "-c", "trailer.co-authored-by.key=",
