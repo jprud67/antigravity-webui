@@ -2008,7 +2008,7 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
             [(cid,) for cid in safe_ids]
         )
         # Nettoyage en cascade FTS et partages associés
-        for table in ("session_fts_index_state", "session_fts_indexed_messages", "shared_sessions", "conversations_fts"):
+        for table in ("session_fts_index_state", "session_fts_indexed_messages", "shared_sessions", "conversations_fts", "inline_comments"):
             try:
                 cursor.executemany(f"DELETE FROM {table} WHERE conversation_id = ?", [(cid,) for cid in safe_ids])
             except Exception:
@@ -2029,6 +2029,11 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
         _delete_conversation_sqlite_files(cid)
 
     bulk_delete_session_meta(safe_ids)
+    try:
+        from app.services.progress_card import bulk_delete_progress_cards
+        bulk_delete_progress_cards(safe_ids)
+    except Exception as e:
+        logger.debug(f"Error bulk deleting progress cards: {e}")
     _notify_conversations_changed()
     return True
 
@@ -2052,7 +2057,7 @@ def delete_conversation(conversation_id: str) -> bool:
             (conversation_id,)
         )
         # Nettoyage en cascade FTS et partages associés
-        for table in ("session_fts_index_state", "session_fts_indexed_messages", "shared_sessions", "conversations_fts"):
+        for table in ("session_fts_index_state", "session_fts_indexed_messages", "shared_sessions", "conversations_fts", "inline_comments"):
             try:
                 cursor.execute(f"DELETE FROM {table} WHERE conversation_id = ?", (conversation_id,))
             except Exception:
@@ -2074,6 +2079,11 @@ def delete_conversation(conversation_id: str) -> bool:
 
     # Delete metadata
     delete_session_meta(conversation_id)
+    try:
+        from app.services.progress_card import delete_progress_card
+        delete_progress_card(conversation_id)
+    except Exception as e:
+        logger.debug(f"Error deleting progress card: {e}")
     _notify_conversations_changed()
     return True
 

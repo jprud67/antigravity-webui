@@ -1,4 +1,4 @@
-"""Maintenance Sweeps Scheduler — Antigravity WebUI v0.5.0
+"""Maintenance Sweeps Scheduler — Antigravity WebUI v0.6.0
 
 Autonomous scheduled maintenance tasks:
 - Dependency vulnerability scans
@@ -11,11 +11,15 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sqlite3
 import subprocess
 import time
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from app.config import CONVERSATION_DB
 
 logger = logging.getLogger("antigravity.maintenance")
 
@@ -27,13 +31,26 @@ MAX_HISTORY = 50
 _sweep_tasks: dict[str, asyncio.Task] = {}
 
 
+@contextmanager
+def _get_db():
+    CONVERSATION_DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(CONVERSATION_DB), timeout=15.0)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    try:
+        with conn:
+            yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug("Failed closing maintenance sweeps sqlite connection: %s", e)
+
+
 def ensure_maintenance_schema() -> None:
     try:
-        import sqlite3
-
-        from app.config import CONVERSATION_DB
-        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
+        with _get_db() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS maintenance_history (
                     id TEXT PRIMARY KEY,
@@ -43,7 +60,6 @@ def ensure_maintenance_schema() -> None:
                     ran_at TEXT NOT NULL
                 )
             """)
-            conn.commit()
     except Exception as exc:
         logger.debug("Failed ensuring maintenance schema: %s", exc)
 
@@ -62,15 +78,11 @@ def _add_to_history(sweep_type: str, workspace: str, result: dict[str, Any]) -> 
         _sweep_history.pop(0)
 
     try:
-        import sqlite3
-
-        from app.config import CONVERSATION_DB
-        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+        with _get_db() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO maintenance_history (id, type, workspace, result, ran_at) VALUES (?, ?, ?, ?, ?)",
                 (entry["id"], sweep_type, workspace, json.dumps(result), entry["ran_at"]),
             )
-            conn.commit()
     except Exception as exc:
         logger.debug("Failed persisting sweep history to DB: %s", exc)
 
@@ -79,10 +91,7 @@ def get_sweep_history(workspace: str | None = None, sweep_type: str | None = Non
     if not _sweep_history:
         try:
             ensure_maintenance_schema()
-            import sqlite3
-
-            from app.config import CONVERSATION_DB
-            with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+            with _get_db() as conn:
                 rows = conn.execute(
                     "SELECT id, type, workspace, result, ran_at FROM maintenance_history ORDER BY ran_at DESC LIMIT 50"
                 ).fetchall()

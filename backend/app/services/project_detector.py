@@ -15,6 +15,18 @@ logger = logging.getLogger("antigravity.project_detector")
 _cache: dict[str, tuple[float, dict[str, Any]]] = {}
 _cache_lock = threading.Lock()
 CACHE_TTL = 5.0  # seconds
+MAX_CACHE_ENTRIES = 200
+
+
+def _evict_cache_if_needed(now: float) -> None:
+    """Evict expired or excess items from _cache under _cache_lock."""
+    expired = [k for k, (ts, _) in _cache.items() if now - ts >= CACHE_TTL]
+    for k in expired:
+        _cache.pop(k, None)
+    if len(_cache) > MAX_CACHE_ENTRIES:
+        sorted_keys = sorted(_cache.keys(), key=lambda k: _cache[k][0])
+        for k in sorted_keys[: len(_cache) - MAX_CACHE_ENTRIES]:
+            _cache.pop(k, None)
 
 
 def clear_detector_cache() -> None:
@@ -50,6 +62,7 @@ def detect_project_details(
     # Run inspection
     detail = _inspect_workspace(resolved_path, is_default, is_active)
     with _cache_lock:
+        _evict_cache_if_needed(now)
         _cache[cache_key] = (now, detail)
     return detail
 

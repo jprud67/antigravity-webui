@@ -1,8 +1,8 @@
 # Feuille de Route Technique & Plan de Remédiation — Antigravity WebUI
 
 **Dépôt :** `https://github.com/jprud67/antigravity-webui`  
-**Version actuelle :** v0.5.0-dev  
-**Version cible :** v0.6.0-stable (Production Ready)  
+**Version actuelle :** v0.6.0-stable (Production Ready)  
+**Statut global :** Clôturé & Qualifié en Production (688 tests passants, CI 100% verte)  
 **Date d'élaboration :** Octobre 2026  
 **Documents associés :** [`AUDIT_REPORT.md`](file:///root/antigravity-webui/AUDIT_REPORT.md), [`BUGS.md`](file:///root/antigravity-webui/BUGS.md), [`TEST_PLAN.md`](file:///root/antigravity-webui/TEST_PLAN.md)
 

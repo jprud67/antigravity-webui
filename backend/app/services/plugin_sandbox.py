@@ -1,4 +1,4 @@
-"""Plugin Sandbox Engine — Antigravity WebUI v0.5.0
+"""Plugin Sandbox Engine — Antigravity WebUI v0.6.0
 
 Secure sandboxed plugin system: register, list, invoke, and revoke
 third-party agent plugins with scoped permission grants.

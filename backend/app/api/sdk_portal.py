@@ -1,4 +1,4 @@
-"""Developer SDK & Interactive Documentation Portal — Antigravity WebUI v0.5.0
+"""Developer SDK & Interactive Documentation Portal — Antigravity WebUI v0.6.0
 
 REST API serving the interactive SDK documentation, OpenAPI specs,
 code examples, and plugin development guides.
@@ -20,7 +20,7 @@ PLUGIN_API_SPEC = {
     "info": {
         "title": "Antigravity Plugin SDK",
         "description": "API for developing third-party plugins for Antigravity WebUI",
-        "version": "0.5.0",
+        "version": "0.6.0",
         "contact": {
             "name": "Antigravity Team",
             "url": "https://github.com/antigravity-webui"
@@ -281,7 +281,7 @@ def sdk_overview():
     """SDK portal overview."""
     return {
         "name": "Antigravity Plugin SDK",
-        "version": "0.5.0",
+        "version": "0.6.0",
         "description": "Build and install custom plugins for Antigravity WebUI",
         "endpoints": {
             "spec": "/api/sdk/spec",

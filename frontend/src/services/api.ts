@@ -3766,7 +3766,7 @@ export async function updateSharePermissions(
 
 
 
-// ─────────────────────────── v0.5.0 Plugin Ecosystem API ─────────────────────
+// ─────────────────────────── Plugin Ecosystem API ─────────────────────
 
 export async function fetchPlugins(activeOnly = true): Promise<import('../types').Plugin[]> {
   const res = await fetch(`${API_BASE}/plugins?active_only=${activeOnly}`, { headers: getHeaders() });

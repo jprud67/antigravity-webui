@@ -12,9 +12,14 @@ import logging
 import os
 import shutil
 import subprocess
+import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+_status_cache: dict[str, Any] | None = None
+_status_cache_time: float = 0.0
+_STATUS_CACHE_TTL = 5.0
 
 # Common paths where tailscale binary lives on Windows, macOS, Linux
 _TAILSCALE_CANDIDATE_PATHS = [
@@ -52,14 +57,20 @@ def _run_tailscale_command(args: list[str], timeout: int = 5) -> subprocess.Comp
     )
 
 
-def get_tailscale_status() -> dict[str, Any]:
+def get_tailscale_status(force: bool = False) -> dict[str, Any]:
     """Probe Tailscale status, MagicDNS hostname, and Tailscale IPs.
     
     Equivalent to Antigravity Core extractTailnetHostFromStatusJson & extractTailscaleServeGatewayUrls.
+    Cached for 5 seconds to prevent spamming subprocess invocations.
     """
+    global _status_cache, _status_cache_time
+    now = time.time()
+    if not force and _status_cache is not None and (now - _status_cache_time < _STATUS_CACHE_TTL):
+        return dict(_status_cache)
+
     bin_path = _find_tailscale_binary()
     if not bin_path:
-        return {
+        result = {
             "installed": False,
             "running": False,
             "magicdns": None,
@@ -69,11 +80,14 @@ def get_tailscale_status() -> dict[str, Any]:
             "funnel_active": False,
             "message": "Tailscale n'est pas installé sur cette machine."
         }
+        _status_cache = result
+        _status_cache_time = now
+        return dict(result)
 
     try:
         res = _run_tailscale_command(["status", "--json"], timeout=6)
         if res.returncode != 0:
-            return {
+            result = {
                 "installed": True,
                 "running": False,
                 "magicdns": None,
@@ -83,6 +97,9 @@ def get_tailscale_status() -> dict[str, Any]:
                 "funnel_active": False,
                 "message": f"Tailscale arrêté ou déconnecté ({res.stderr.strip()[:100]})."
             }
+            _status_cache = result
+            _status_cache_time = now
+            return dict(result)
 
         data = json.loads(res.stdout)
         self_info = data.get("Self") or {}
@@ -109,7 +126,7 @@ def get_tailscale_status() -> dict[str, Any]:
         except Exception:
             pass
 
-        return {
+        result = {
             "installed": True,
             "running": True,
             "magicdns": dns_name or None,
@@ -120,9 +137,12 @@ def get_tailscale_status() -> dict[str, Any]:
             "funnel_active": funnel_active,
             "message": "Tailscale connecté et actif."
         }
+        _status_cache = result
+        _status_cache_time = now
+        return dict(result)
     except Exception as exc:
         logger.warning("tailscale: probe failed: %s", exc)
-        return {
+        result = {
             "installed": True,
             "running": False,
             "magicdns": None,
@@ -132,10 +152,16 @@ def get_tailscale_status() -> dict[str, Any]:
             "funnel_active": False,
             "message": f"Erreur de communication avec le démon Tailscale : {exc!s}"
         }
+        _status_cache = result
+        _status_cache_time = now
+        return dict(result)
 
 
 def toggle_tailscale_serve(enable: bool, port: int = 8000) -> dict[str, Any]:
     """Enable or disable Tailscale Serve reverse proxy to local port."""
+    global _status_cache
+    _status_cache = None
+
     if not (1 <= port <= 65535):
         raise ValueError(f"Port invalide: {port}")
 
@@ -154,5 +180,5 @@ def toggle_tailscale_serve(enable: bool, port: int = 8000) -> dict[str, Any]:
         "action": "enable" if enable else "disable",
         "output": res.stdout.strip(),
         "error": res.stderr.strip() if not success else None,
-        "status": get_tailscale_status()
+        "status": get_tailscale_status(force=True)
     }

@@ -1,4 +1,4 @@
-"""Self-Healing Watchdog Sentinel — Antigravity WebUI v0.5.0
+"""Self-Healing Watchdog Sentinel — Antigravity WebUI v0.6.0
 
 Background sentinel that monitors workspace build integrity, lint status,
 and test suite health. Generates proactive patch suggestions when issues
@@ -8,10 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sqlite3
 import subprocess
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+
+from app.config import CONVERSATION_DB
 
 logger = logging.getLogger("antigravity.watchdog")
 
@@ -24,13 +28,26 @@ _alert_log: list[dict[str, Any]] = []
 MAX_ALERTS = 100
 
 
+@contextmanager
+def _get_db():
+    CONVERSATION_DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(CONVERSATION_DB), timeout=15.0)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    try:
+        with conn:
+            yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug("Failed closing watchdog sqlite connection: %s", e)
+
+
 def ensure_watchdog_schema() -> None:
     try:
-        import sqlite3
-
-        from app.config import CONVERSATION_DB
-        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
+        with _get_db() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS watchdog_alerts (
                     id TEXT PRIMARY KEY,
@@ -64,10 +81,7 @@ def _add_alert(category: str, severity: str, message: str, workspace: str = "") 
         _alert_log.pop(0)
 
     try:
-        import sqlite3
-
-        from app.config import CONVERSATION_DB
-        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+        with _get_db() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO watchdog_alerts (id, category, severity, message, workspace, timestamp, resolved) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (entry["id"], category, severity, message, workspace, entry["timestamp"], 0),
@@ -84,10 +98,7 @@ def get_alerts(workspace: str | None = None, unresolved_only: bool = True) -> li
     if not _alert_log:
         try:
             ensure_watchdog_schema()
-            import sqlite3
-
-            from app.config import CONVERSATION_DB
-            with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+            with _get_db() as conn:
                 rows = conn.execute(
                     "SELECT id, category, severity, message, workspace, timestamp, resolved FROM watchdog_alerts ORDER BY timestamp DESC LIMIT 100"
                 ).fetchall()
@@ -120,10 +131,8 @@ def resolve_alert(alert_id: str) -> bool:
             found = True
             break
     try:
-        import sqlite3
-
-        from app.config import CONVERSATION_DB
-        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+        ensure_watchdog_schema()
+        with _get_db() as conn:
             cur = conn.execute("UPDATE watchdog_alerts SET resolved = 1 WHERE id = ?", (alert_id,))
             conn.commit()
             if cur.rowcount > 0:
@@ -144,10 +153,8 @@ def clear_alerts(workspace: str | None = None) -> int:
         _alert_log = []
 
     try:
-        import sqlite3
-
-        from app.config import CONVERSATION_DB
-        with sqlite3.connect(str(CONVERSATION_DB), timeout=15.0) as conn:
+        ensure_watchdog_schema()
+        with _get_db() as conn:
             if workspace:
                 conn.execute("DELETE FROM watchdog_alerts WHERE workspace = ?", (workspace,))
             else:

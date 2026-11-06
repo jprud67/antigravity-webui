@@ -1,4 +1,4 @@
-"""Tests for Plugin Sandbox, Watchdog Sentinel, and Maintenance Sweeps — v0.5.0"""
+"""Tests for Plugin Sandbox, Watchdog Sentinel, and Maintenance Sweeps — v0.6.0"""
 import pytest
 
 from app.services.maintenance_sweeps import (

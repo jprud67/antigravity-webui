@@ -46,8 +46,9 @@ logger = logging.getLogger("antigravity.updater")
 REPO_DIR = REPO_ROOT
 CACHE_FILE = GEMINI_DIR / ".update_check"
 MARKER_FILE = GEMINI_DIR / ".update_incomplete"
-CURRENT_VERSION = "0.5.0"
+CURRENT_VERSION = "0.6.0"
 GIT_BIN: str = shutil.which("git") or "git"
+_background_tasks: set[asyncio.Task[Any]] = set()
 
 # Principe Hermes : cache de 6 h + rafraîchissement périodique de 6 h
 CACHE_DURATION_SECONDS = 6 * 3600
@@ -618,7 +619,9 @@ async def apply_update() -> dict[str, Any]:
             else:
                 logger.info("systemctl not found; skipping automatic service restart.")
 
-        asyncio.create_task(_restart_service_soon())
+        restart_task = asyncio.create_task(_restart_service_soon())
+        _background_tasks.add(restart_task)
+        restart_task.add_done_callback(_background_tasks.discard)
 
     if IS_WINDOWS:
         restart_hint = "Relancez start.bat pour redémarrer le serveur."

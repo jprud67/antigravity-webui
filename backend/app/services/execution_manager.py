@@ -902,7 +902,9 @@ class ExecutionManager:
                 loop = asyncio.get_running_loop()
                 if loop.is_running():
                     for target_cid in affected_cids:
-                        loop.create_task(self.broadcast_presence(target_cid))
+                        task = loop.create_task(self.broadcast_presence(target_cid))
+                        self._background_tasks.add(task)
+                        task.add_done_callback(self._background_tasks.discard)
             except Exception as e:
                 logger.debug(f"Could not broadcast presence on socket unregister: {e}")
 
@@ -1039,7 +1041,9 @@ class ExecutionManager:
         for ws in to_disconnect:
             try:
                 loop = asyncio.get_running_loop()
-                loop.create_task(ws.close(code=4403, reason="Session Share Revoked"))
+                task = loop.create_task(ws.close(code=4403, reason="Session Share Revoked"))
+                self._background_tasks.add(task)
+                task.add_done_callback(self._background_tasks.discard)
             except Exception as e:
                 logger.debug("Failed closing revoked websocket: %s", e)
         return len(to_disconnect)

@@ -17,6 +17,7 @@ logger = logging.getLogger("antigravity.fs_watcher")
 
 # Global asyncio queue where all SSE subscribers register themselves
 _subscribers: set[asyncio.Queue] = set()
+_background_tasks: set[asyncio.Task[Any]] = set()
 
 def get_subscribers() -> set[asyncio.Queue]:
     return _subscribers
@@ -68,7 +69,9 @@ def notify_event_sync(event: dict[str, Any]) -> None:
     """Notifie immédiatement les abonnés SSE depuis un contexte synchrone ou un worker thread."""
     try:
         loop = asyncio.get_running_loop()
-        loop.create_task(_broadcast(event))
+        task = loop.create_task(_broadcast(event))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
         return
     except RuntimeError:
         pass

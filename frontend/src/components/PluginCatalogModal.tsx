@@ -287,7 +287,7 @@ export default function PluginCatalogModal({ isOpen, onClose }: PluginCatalogMod
           <span>Tous les plugins s'exécutent dans un sandbox isolé avec permissions explicites</span>
           <div className="ml-auto flex items-center gap-1">
             <Zap className="w-3.5 h-3.5 text-yellow-500" />
-            <span>Wasm Sandbox v0.5.0</span>
+            <span>Wasm Sandbox v0.6.0</span>
           </div>
         </div>
       </div>

@@ -55,6 +55,7 @@ class TelegramSessionSubscriber:
         self.accumulated_text = ""
         self.is_done = False
         self.current_step_desc = ""
+        self._bg_tasks: set[asyncio.Task[Any]] = set()
 
     async def send_json(self, event: dict[str, Any]) -> None:
         try:
@@ -74,7 +75,9 @@ class TelegramSessionSubscriber:
                     await self.gateway.edit_message(self.chat_id, self.initial_msg_id, status_text)
                 elif now - self.last_action_time > 4.0:
                     self.last_action_time = now
-                    asyncio.create_task(self.gateway.send_chat_action(self.chat_id, "typing"))
+                    t = asyncio.create_task(self.gateway.send_chat_action(self.chat_id, "typing"))
+                    self._bg_tasks.add(t)
+                    t.add_done_callback(self._bg_tasks.discard)
 
             elif evt_type == "approval_request":
                 cmd = event.get("command") or ""

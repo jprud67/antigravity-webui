@@ -1,4 +1,4 @@
-"""Tests for SDK Portal API — Antigravity WebUI v0.5.0"""
+"""Tests for SDK Portal API — Antigravity WebUI v0.6.0"""
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -10,7 +10,7 @@ def test_sdk_overview():
     r = client.get("/api/sdk")
     assert r.status_code == 200
     data = r.json()
-    assert data["version"] == "0.5.0"
+    assert data["version"] == "0.6.0"
     assert "spec" in data["endpoints"]
 
 
@@ -18,7 +18,7 @@ def test_sdk_spec():
     r = client.get("/api/sdk/spec")
     assert r.status_code == 200
     data = r.json()
-    assert data["info"]["version"] == "0.5.0"
+    assert data["info"]["version"] == "0.6.0"
     assert len(data["methods"]) >= 3
     method_names = [m["name"] for m in data["methods"]]
     assert "antigravity.plugins.registerCommand" in method_names

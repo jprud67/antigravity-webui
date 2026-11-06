@@ -6,6 +6,14 @@
 
 ## ✨ Nouveautés
 
+- **🛡️ Version v0.6.0-stable — Production Ready & Durcissement Global :**
+  - **Circuit d'approbation Telegram fiabilisé** : prise en charge native de la validation interactive à distance, signature stricte et synchronisation immédiate avec le processus CLI.
+  - **Contrôle d'accès RBAC & Endpoints protégés** : routes d'administration, surveillance Watchdog Sentinel et Maintenance Sweeps systématiquement verrouillées par authentification.
+  - **Confinement d'exécution et isolation des flux** : exécution sécurisée des blocs de code avec redirection de flux thread-locale `SafeStreamRedirect` et protection contre la contamination des logs serveur.
+  - **Persistance SQLite WAL intégrale** : historique de maintenance, alertes Sentinel et mémoires vectorielles persistés avec `busy_timeout` de 5 s.
+  - **Chaîne d'intégration continue GitHub Actions** : 100% des tests backend (688 tests) et contrôles qualité frontend validés au vert à chaque commit.
+
+
 - **🧩 Tool Calling OpenAI sur la passerelle `/v1` :**
   - Les clients agentiques (SDK OpenAI avec `tools=[...]`, agents autonomes, extensions IDE) reçoivent désormais de vrais **`tool_calls`** : l'agent Antigravity est converti en « modèle sans état » (sortie contrainte par schéma JSON) qui demande les appels d'outils — **sans jamais exécuter ses propres outils** côté serveur.
   - Boucle complète vérifiée de bout en bout (appel d'outil → exécution côté client → résultat → réponse finale), **streaming SSE** et **bascule automatique de compte Google** incluses.
@@ -87,7 +95,8 @@
 - Node.js 18+
 - Antigravity CLI installé (`agy` dans le PATH ou `AGY_BIN` défini)
 
-> **Plateformes supportées** : Linux, macOS et Windows — voir [`docs/platform-support.md`](docs/platform-support.md).
+> **Plateformes supportées** : Linux, macOS et Windows — voir [`docs/platform-support.md`](docs/platform-support.md).  
+> **Déploiement en production** : Guide complet, durcissement et checklist d'exploitation — voir [`docs/PRODUCTION_DEPLOYMENT.md`](docs/PRODUCTION_DEPLOYMENT.md).
 
 ### 2. Lancement
 

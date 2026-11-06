@@ -299,7 +299,7 @@ export function App() {
   const [presenceParticipants, setPresenceParticipants] = useState<PresenceParticipant[]>([]);
   const [isLivePreviewOpen, setIsLivePreviewOpen] = useState(false);
   const [activeProgressCard, setActiveProgressCard] = useState<ProgressCardData | null>(null);
-  // v0.5.0
+  // Plugin Ecosystem State
   const [isPluginCatalogOpen, setIsPluginCatalogOpen] = useState(false);
   const [isSDKPortalOpen, setIsSDKPortalOpen] = useState(false);
 
@@ -2623,7 +2623,7 @@ export function App() {
         />
       )}
 
-      {/* v0.5.0 — Plugin Ecosystem */}
+      {/* Plugin Ecosystem Modals */}
       <PluginCatalogModal
         isOpen={isPluginCatalogOpen}
         onClose={() => setIsPluginCatalogOpen(false)}

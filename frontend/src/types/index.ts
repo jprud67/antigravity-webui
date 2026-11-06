@@ -1452,7 +1452,7 @@ export interface RemoteCursorPresence {
 
 
 
-// ─────────────────────────── v0.5.0 Plugin Ecosystem ─────────────────────────
+// ─────────────────────────── Plugin Ecosystem ─────────────────────────
 
 export type PluginScope =
   | 'register_command'

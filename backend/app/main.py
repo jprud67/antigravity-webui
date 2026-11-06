@@ -36,9 +36,12 @@ from app.api.memory import router as memory_router
 from app.api.messaging_gateway import router as messaging_gateway_router
 from app.api.openai_compat import router as openai_router
 from app.api.orchestrator import router as orchestrator_router
+from app.api.plugins import router as plugins_router
+from app.api.plugins import sweeps_router, watchdog_router
 from app.api.progress_card import router as progress_card_router
 from app.api.prompt import router as prompt_router
 from app.api.rules import router as rules_router
+from app.api.sdk_portal import router as sdk_portal_router
 from app.api.search import router as search_router
 from app.api.settings import router as set_router
 from app.api.share import router as share_router
@@ -60,13 +63,16 @@ from app.services.fts_search import ensure_fts_schema
 from app.services.google_auth import restore_stashed_token_if_needed
 from app.services.inline_comments import ensure_comments_schema
 from app.services.link_understanding import ensure_link_cache_schema
+from app.services.maintenance_sweeps import ensure_maintenance_schema
 from app.services.messaging_gateway import ensure_messaging_gateway_schema
+from app.services.plugin_sandbox import ensure_plugin_schema
 from app.services.progress_card import ensure_progress_card_schema
 from app.services.share_service import ensure_share_schema
 from app.services.storage import ensure_db_schema
 from app.services.telegram_gateway import telegram_gateway
 from app.services.updater import prefetch_update_check
 from app.services.vector_memory import ensure_vector_memory_schema
+from app.services.watchdog_sentinel import ensure_watchdog_schema
 from app.services.web_push import ensure_web_push_schema
 
 logger = logging.getLogger("antigravity.main")
@@ -98,6 +104,9 @@ async def lifespan(app: FastAPI):
     ensure_vector_memory_schema()
     ensure_share_schema()
     ensure_comments_schema()
+    ensure_plugin_schema()
+    ensure_watchdog_schema()
+    ensure_maintenance_schema()
     restore_stashed_token_if_needed()
     prefetch_update_check()
     _warn_if_default_password()
@@ -140,7 +149,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Antigravity WebUI",
     description="Web Interface to orchestrate Antigravity CLI without touching the terminal",
-    version="0.5.0",
+    version="0.6.0",
     lifespan=lifespan
 )
 
@@ -197,15 +206,10 @@ app.include_router(orchestrator_router)  # Multi-Agent Visual Orchestration Stud
 app.include_router(checkpoints_router)   # Agent Dynamic Checkpoint & Rewind Studio
 app.include_router(coordinator_router)   # Autonomous Multi-Workspace Coordinator & Pipelines Engine
 
-# Jalon v0.5.0 — Agentic IDE Ecosystem
-from app.api.plugins import router as plugins_router
-from app.api.plugins import sweeps_router, watchdog_router
-
+# Plugin Sandbox & Extensible IDE Ecosystem
 app.include_router(plugins_router)   # Plugin Sandbox Engine
 app.include_router(watchdog_router)  # Self-Healing Watchdog Sentinel
 app.include_router(sweeps_router)    # Scheduled Maintenance Sweeps
-from app.api.sdk_portal import router as sdk_portal_router
-
 app.include_router(sdk_portal_router)  # Developer SDK & Interactive Documentation Portal
 
 

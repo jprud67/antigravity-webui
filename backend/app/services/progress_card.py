@@ -167,3 +167,18 @@ def delete_progress_card(session_id: str) -> bool:
         )
         conn.commit()
         return cur.rowcount > 0
+
+
+def bulk_delete_progress_cards(session_ids: list[str]) -> None:
+    if not session_ids:
+        return
+    ensure_progress_card_schema()
+    try:
+        with _get_db() as conn:
+            conn.executemany(
+                "DELETE FROM session_progress_cards WHERE session_id = ?",
+                [(sid,) for sid in session_ids],
+            )
+            conn.commit()
+    except Exception as e:
+        logger.debug("Failed bulk deleting progress cards: %s", e)

@@ -87,7 +87,7 @@ export default function SDKPortalModal({ isOpen, onClose }: SDKPortalModalProps)
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">SDK Developer Portal</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Guides, exemples de code et spécifications API — Antigravity Plugin SDK v0.5.0</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Guides, exemples de code et spécifications API — Antigravity Plugin SDK v0.6.0</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">

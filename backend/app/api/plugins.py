@@ -1,4 +1,4 @@
-"""Plugin Sandbox & Watchdog API — Antigravity WebUI v0.5.0
+"""Plugin Sandbox & Watchdog API — Antigravity WebUI v0.6.0
 
 REST endpoints for:
 - Plugin management (register, list, invoke, disable)

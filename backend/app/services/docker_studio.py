@@ -518,4 +518,4 @@ def execute_compose_action(compose_file_path: str, action: str) -> dict[str, Any
             "stderr": res.stderr,
         }
     except Exception as e:
-        raise RuntimeError(f"Échec de l'action compose {action} : {e}")
+        raise RuntimeError(f"Échec de l'action compose {action} : {e}") from e
