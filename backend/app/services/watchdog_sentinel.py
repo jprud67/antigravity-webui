@@ -267,13 +267,21 @@ def start_watchdog(workspace_path: str, interval_seconds: int = 300) -> dict[str
     if _watchdog_task and not _watchdog_task.done():
         return {"status": "already_running", "workspace": workspace_path}
 
+    loop: asyncio.AbstractEventLoop | None = None
     try:
         loop = asyncio.get_running_loop()
+    except RuntimeError:
+        try:
+            from app.services.fs_watcher import get_main_loop
+            loop = get_main_loop()
+        except Exception:
+            loop = None
+
+    if loop and loop.is_running():
         _watchdog_task = loop.create_task(_watchdog_loop(workspace_path, interval_seconds))
         return {"status": "started", "workspace": workspace_path, "interval_seconds": interval_seconds}
-    except RuntimeError:
-        # No running event loop — acceptable in sync contexts
-        return {"status": "deferred", "workspace": workspace_path}
+
+    return {"status": "deferred", "workspace": workspace_path}
 
 
 def stop_watchdog() -> dict[str, Any]:

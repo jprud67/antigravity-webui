@@ -17,7 +17,7 @@ from app.services.google_auth import (
 )
 
 logger = logging.getLogger("antigravity.google_api")
-router = APIRouter(prefix="/api/google", tags=["google_accounts"])
+router = APIRouter(prefix="/api/google", tags=["google_accounts"], dependencies=[Depends(require_auth)])
 
 
 class SwitchAccountRequest(BaseModel):

@@ -37,16 +37,49 @@ _GIT_DEFAULT_ARGS = [
 ]
 
 
+def _get_git_identity() -> tuple[str, str]:
+    name = os.environ.get("ANTIGRAVITY_GIT_USER_NAME") or os.environ.get("GIT_AUTHOR_NAME")
+    email = os.environ.get("ANTIGRAVITY_GIT_USER_EMAIL") or os.environ.get("GIT_AUTHOR_EMAIL")
+    if not name or not email:
+        try:
+            res_name = subprocess.run(["git", "config", "user.name"], capture_output=True, text=True, timeout=2)
+            cfg_name = res_name.stdout.strip()
+            if cfg_name and not name:
+                name = cfg_name
+        except Exception:
+            pass
+        try:
+            res_email = subprocess.run(["git", "config", "user.email"], capture_output=True, text=True, timeout=2)
+            cfg_email = res_email.stdout.strip()
+            if cfg_email and not email:
+                email = cfg_email
+        except Exception:
+            pass
+    return (name or "jprud67", email or "jprud67@gmail.com")
+
+
 def _run_git(args: list[str], cwd: str, timeout: int = _GIT_TIMEOUT) -> subprocess.CompletedProcess[str]:
     """Run git command capturing output without raising on non-zero return codes."""
+    author_name, author_email = _get_git_identity()
+    git_args = [
+        "-c", f"user.name={author_name}",
+        "-c", f"user.email={author_email}",
+        "-c", f"author.name={author_name}",
+        "-c", f"author.email={author_email}",
+        "-c", f"committer.name={author_name}",
+        "-c", f"committer.email={author_email}",
+        "-c", "format.signoff=false",
+        "-c", "commit.gpgsign=false",
+        "-c", "trailer.co-authored-by.key=",
+    ]
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
-    env["GIT_AUTHOR_NAME"] = "jprud67"
-    env["GIT_AUTHOR_EMAIL"] = "jprud67@gmail.com"
-    env["GIT_COMMITTER_NAME"] = "jprud67"
-    env["GIT_COMMITTER_EMAIL"] = "jprud67@gmail.com"
+    env["GIT_AUTHOR_NAME"] = author_name
+    env["GIT_AUTHOR_EMAIL"] = author_email
+    env["GIT_COMMITTER_NAME"] = author_name
+    env["GIT_COMMITTER_EMAIL"] = author_email
     return subprocess.run(
-        ["git", *_GIT_DEFAULT_ARGS, *args],
+        ["git", *git_args, *args],
         cwd=cwd,
         capture_output=True,
         text=True,

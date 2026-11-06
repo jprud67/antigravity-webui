@@ -15,7 +15,7 @@ from app.config import BRAIN_DIR
 from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.tasks")
-router = APIRouter(prefix="/api/tasks", tags=["tasks"])
+router = APIRouter(prefix="/api/tasks", tags=["tasks"], dependencies=[Depends(require_auth)])
 
 _EXIT_CODE_PAT = re.compile(r"exited with code (\d+)", re.IGNORECASE)
 _TASK_OUTCOME_PAT = re.compile(r"Task id [\"\\]*([^\"\\\s]+)[\"\\]* (finished with result|was cancelled)", re.IGNORECASE)

@@ -312,11 +312,16 @@ def _get_process_metrics() -> dict[str, Any]:
 
     try:
         from app.services.execution_manager import execution_manager
+        from app.services.fs_watcher import get_subscribers
         active_sessions = len(execution_manager.sessions)
         running_sessions = len(execution_manager.get_running_conversations())
+        connected_websockets = len(execution_manager.connected_sockets)
+        sse_subscribers = len(get_subscribers())
     except Exception:
         active_sessions = 0
         running_sessions = 0
+        connected_websockets = 0
+        sse_subscribers = 0
 
     return {
         "uptime_seconds": uptime_s,
@@ -324,7 +329,9 @@ def _get_process_metrics() -> dict[str, Any]:
         "memory_rss_mb": rss_mb,
         "threads_count": threads,
         "active_sessions": active_sessions,
-        "running_sessions": running_sessions
+        "running_sessions": running_sessions,
+        "connected_websockets": connected_websockets,
+        "sse_subscribers": sse_subscribers
     }
 
 
@@ -440,13 +447,12 @@ async def run_auto_repair() -> dict[str, Any]:
         if p.exists():
             conn = None
             try:
-                conn = sqlite3.connect(str(p), timeout=15.0)
+                conn = sqlite3.connect(str(p), timeout=15.0, isolation_level=None)
                 conn.execute("PRAGMA journal_mode=WAL;")
                 conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
                 conn.execute("VACUUM;")
                 conn.execute("ANALYZE;")
                 conn.execute("PRAGMA optimize;")
-                conn.commit()
                 vacuumed.append(db_name)
             except Exception as e:
                 logger.warning(f"Failed to vacuum/optimize {db_name}: {e}")
@@ -481,7 +487,20 @@ async def run_auto_repair() -> dict[str, Any]:
         except Exception:
             pass
 
-    # 4. Re-run diagnostics
+    # 4. Proactive orphan session and process reaping
+    try:
+        from app.services.execution_manager import execution_manager
+        reap_stats = await execution_manager.reap_orphaned_and_idle_sessions(max_idle_seconds=1800.0, max_orphan_seconds=3600.0)
+        reaped_count = reap_stats.get("reaped_zombies", 0) + reap_stats.get("reaped_orphans", 0) + reap_stats.get("pruned_idle", 0)
+        if reaped_count > 0:
+            repaired_actions.append(
+                f"Assainissement des sessions d'exécution ({reap_stats.get('reaped_zombies', 0)} zombie(s), "
+                f"{reap_stats.get('reaped_orphans', 0)} orphelin(s), {reap_stats.get('pruned_idle', 0)} inactive(s))"
+            )
+    except Exception as e:
+        logger.debug(f"Doctor auto-repair session reaping failed: {e}")
+
+    # 5. Re-run diagnostics
     post_diag = await run_system_diagnostics()
 
     return {

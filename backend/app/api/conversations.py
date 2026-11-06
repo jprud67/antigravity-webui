@@ -41,7 +41,7 @@ from app.services.storage import (
     update_conversation_title,
 )
 
-router = APIRouter(prefix="/api/conversations", tags=["conversations"])
+router = APIRouter(prefix="/api/conversations", tags=["conversations"], dependencies=[Depends(require_auth)])
 logger = logging.getLogger(__name__)
 
 class ForkRequest(BaseModel):

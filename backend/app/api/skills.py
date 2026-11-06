@@ -12,7 +12,7 @@ from app.platform_utils import is_safe_path
 from app.services.skill_curator import skill_curator
 
 logger = logging.getLogger("antigravity.skills")
-router = APIRouter(prefix="/api/skills", tags=["skills"])
+router = APIRouter(prefix="/api/skills", tags=["skills"], dependencies=[Depends(require_auth)])
 
 
 class SkillDirInfo(TypedDict):

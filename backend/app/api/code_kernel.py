@@ -14,7 +14,7 @@ from app.services.code_kernel import (
 )
 from app.services.storage import get_allowed_workspace_roots
 
-router = APIRouter(prefix="/api/kernel", tags=["kernel"])
+router = APIRouter(prefix="/api/kernel", tags=["kernel"], dependencies=[Depends(require_auth)])
 
 
 def _validate_safe_kernel_cwd(cwd: str | None) -> str:

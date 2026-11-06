@@ -16,7 +16,7 @@ from app.services.project_detector import (
 )
 from app.services.storage import get_settings, save_settings
 
-router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
+router = APIRouter(prefix="/api/workspaces", tags=["workspaces"], dependencies=[Depends(require_auth)])
 
 @router.get("")
 def list_workspaces(_ = Depends(require_auth)) -> list[str]:

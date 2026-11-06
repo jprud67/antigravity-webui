@@ -115,8 +115,13 @@ async def lifespan(app: FastAPI):
         name="fs_watcher"
     )
     cron_task = asyncio.create_task(cron_ticker_loop(), name="cron_ticker")
+    reaper_task = asyncio.create_task(
+        execution_manager.reaper_loop(interval_seconds=60.0),
+        name="session_reaper"
+    )
     logger.info("Filesystem watcher started")
     logger.info("Cron ticker started (tâches planifiées propres à l'application)")
+    logger.info("Session reaper started (surveillance proactive des orphelins CLI)")
     embedded_gw = os.environ.get("ANTIGRAVITY_EMBEDDED_TELEGRAM_GATEWAY", "").lower() in ("1", "true")
     if embedded_gw:
         await telegram_gateway.start()
@@ -125,12 +130,17 @@ async def lifespan(app: FastAPI):
         await telegram_gateway.stop()
     watcher_task.cancel()
     cron_task.cancel()
+    reaper_task.cancel()
     try:
         await watcher_task
     except asyncio.CancelledError:
         pass
     try:
         await cron_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await reaper_task
     except asyncio.CancelledError:
         pass
     try:

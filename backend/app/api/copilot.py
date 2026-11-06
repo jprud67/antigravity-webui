@@ -12,7 +12,7 @@ from app.api.auth import require_auth
 from app.services.google_auth import get_active_account
 
 logger = logging.getLogger("antigravity.copilot")
-router = APIRouter(prefix="/api/copilot", tags=["copilot"])
+router = APIRouter(prefix="/api/copilot", tags=["copilot"], dependencies=[Depends(require_auth)])
 
 # In-memory LRU Cache (max 256 entries) for ultra-fast repeated/similar lookups
 _CACHE_MAX_SIZE = 256

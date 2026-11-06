@@ -30,7 +30,7 @@ from app.services.cron_store import (
 )
 
 logger = logging.getLogger("antigravity.crons")
-router = APIRouter(prefix="/api/crons", tags=["crons"])
+router = APIRouter(prefix="/api/crons", tags=["crons"], dependencies=[Depends(require_auth)])
 
 
 class CreateCronJobRequest(BaseModel):

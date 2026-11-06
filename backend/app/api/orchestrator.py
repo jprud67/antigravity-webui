@@ -22,13 +22,13 @@ from app.services.execution_manager import execution_manager
 
 logger = logging.getLogger("antigravity.orchestrator.api")
 
-router = APIRouter(prefix="/api/orchestrator", tags=["orchestrator"])
+router = APIRouter(prefix="/api/orchestrator", tags=["orchestrator"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/graph/{conversation_id}", response_model=OrchestratorGraphResponse)
 def get_graph(
     conversation_id: str,
-    user: dict[str, Any] = Depends(require_auth)
+    _ = Depends(require_auth)
 ) -> OrchestratorGraphResponse:
     """Returns the multi-agent DAG execution hierarchy for a session."""
     try:
@@ -43,7 +43,7 @@ def get_graph(
 @router.post("/steer")
 def post_steer(
     req: SteerRequest,
-    user: dict[str, Any] = Depends(require_auth)
+    _ = Depends(require_auth)
 ) -> dict[str, Any]:
     """Injects high-priority steering instructions to an agent."""
     try:
@@ -62,7 +62,7 @@ def post_steer(
 @router.post("/terminate")
 def post_terminate(
     req: TerminateRequest,
-    user: dict[str, Any] = Depends(require_auth)
+    _ = Depends(require_auth)
 ) -> dict[str, Any]:
     """Terminates an agent process or cascades termination to its child subagents."""
     try:
@@ -82,7 +82,7 @@ def post_terminate(
 def get_inspect(
     agent_id: str,
     conversation_id: str = Query(..., description="ID of the parent conversation"),
-    user: dict[str, Any] = Depends(require_auth)
+    _ = Depends(require_auth)
 ) -> dict[str, Any]:
     """Retrieves deep telemetry, live thought stream, and tools history for an agent."""
     try:
@@ -97,7 +97,7 @@ def get_inspect(
 @router.post("/fork", response_model=ForkAgentResponse)
 async def post_fork(
     req: ForkAgentRequest,
-    user: dict[str, Any] = Depends(require_auth)
+    _ = Depends(require_auth)
 ) -> ForkAgentResponse:
     """Forks an agent execution branch into an isolated worktree with custom directives and model."""
     try:
@@ -122,7 +122,7 @@ async def post_fork(
 def get_compare(
     conversation_id: str = Query(..., description="ID of the session"),
     agent_ids: str | None = Query(None, description="Comma-separated IDs of agents to compare"),
-    user: dict[str, Any] = Depends(require_auth)
+    _ = Depends(require_auth)
 ) -> AgentComparisonResponse:
     """Compares execution alternatives and forks side-by-side."""
     try:

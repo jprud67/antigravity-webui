@@ -16,7 +16,7 @@ from app.config import DEFAULT_WORKSPACE, GEMINI_DIR
 from app.platform_utils import restrict_file_permissions
 
 logger = logging.getLogger("antigravity.kanban")
-router = APIRouter(prefix="/api/kanban", tags=["kanban"])
+router = APIRouter(prefix="/api/kanban", tags=["kanban"], dependencies=[Depends(require_auth)])
 
 KANBAN_DB_PATH = Path(os.environ.get("ANTIGRAVITY_KANBAN_DB", str(GEMINI_DIR / "webui_kanban.db")))
 

@@ -21,7 +21,7 @@ from app.services.checkpoint_service import (
 
 logger = logging.getLogger("antigravity.checkpoint.api")
 
-router = APIRouter(prefix="/api/checkpoints", tags=["checkpoints"])
+router = APIRouter(prefix="/api/checkpoints", tags=["checkpoints"], dependencies=[Depends(require_auth)])
 
 
 class CreateCheckpointRequest(BaseModel):
@@ -35,7 +35,7 @@ class ForkFromCheckpointRequest(BaseModel):
 @router.get("/{conversation_id}")
 def get_checkpoints(
     conversation_id: str,
-    user: dict[str, Any] = Depends(require_auth),
+    _ = Depends(require_auth),
 ) -> dict[str, Any]:
     """Liste tous les checkpoints d'une conversation."""
     try:
@@ -52,7 +52,7 @@ def get_checkpoints(
 def post_create_checkpoint(
     conversation_id: str,
     req: CreateCheckpointRequest,
-    user: dict[str, Any] = Depends(require_auth),
+    _ = Depends(require_auth),
 ) -> dict[str, Any]:
     """Crée un nouveau checkpoint (snapshot) de l'état actuel de la conversation."""
     try:
@@ -73,7 +73,7 @@ def post_create_checkpoint(
 def get_checkpoint(
     conversation_id: str,
     checkpoint_id: str,
-    user: dict[str, Any] = Depends(require_auth),
+    _ = Depends(require_auth),
 ) -> dict[str, Any]:
     """Récupère les détails complets d'un checkpoint spécifique."""
     try:
@@ -90,7 +90,7 @@ def get_checkpoint(
 def post_restore_checkpoint(
     conversation_id: str,
     checkpoint_id: str,
-    user: dict[str, Any] = Depends(require_auth),
+    _ = Depends(require_auth),
 ) -> dict[str, Any]:
     """Restaure (rewind) la conversation au state du checkpoint sélectionné."""
     try:
@@ -108,7 +108,7 @@ def post_fork_from_checkpoint(
     conversation_id: str,
     checkpoint_id: str,
     req: ForkFromCheckpointRequest | None = None,
-    user: dict[str, Any] = Depends(require_auth),
+    _ = Depends(require_auth),
 ) -> dict[str, Any]:
     """Bifurque (fork) une nouvelle conversation depuis un checkpoint sans toucher à l'originale."""
     try:
@@ -126,7 +126,7 @@ def post_fork_from_checkpoint(
 def delete_checkpoint_endpoint(
     conversation_id: str,
     checkpoint_id: str,
-    user: dict[str, Any] = Depends(require_auth),
+    _ = Depends(require_auth),
 ) -> dict[str, Any]:
     """Supprime un checkpoint spécifique."""
     try:

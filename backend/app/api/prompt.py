@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from app.api.auth import require_auth
 
 logger = logging.getLogger("antigravity.prompt")
-router = APIRouter(prefix="/api/prompt", tags=["prompt"])
+router = APIRouter(prefix="/api/prompt", tags=["prompt"], dependencies=[Depends(require_auth)])
 
 # Regex patterns for heuristic detection
 _FILE_RE = re.compile(

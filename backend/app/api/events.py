@@ -32,14 +32,22 @@ async def _sse_generator(request: Request, q: asyncio.Queue):
             try:
                 event = await asyncio.wait_for(q.get(), timeout=20.0)
                 try:
-                    payload = json.dumps(event)
+                    payload = json.dumps(event, default=str)
                     yield f"data: {payload}\n\n"
+                except Exception as json_err:
+                    logger.debug(f"SSE serialization error: {json_err}")
                 finally:
-                    q.task_done()
+                    try:
+                        q.task_done()
+                    except ValueError:
+                        pass
             except TimeoutError:
                 # Send keepalive ping every 20s to prevent proxy/browser timeout
                 yield 'data: {"type":"ping"}\n\n'
-
+    except (asyncio.CancelledError, ConnectionResetError):
+        pass
+    except Exception as exc:
+        logger.debug(f"SSE client stream error: {exc}")
     finally:
         remove_subscriber(q)
         logger.debug("SSE client disconnected")

@@ -20,7 +20,7 @@ from app.platform_utils import is_safe_path
 from app.services.storage import get_settings
 
 logger = logging.getLogger("antigravity.git")
-router = APIRouter(prefix="/api/git", tags=["git"])
+router = APIRouter(prefix="/api/git", tags=["git"], dependencies=[Depends(require_auth)])
 
 GIT_TIMEOUT = 12
 GIT_BIN = shutil.which("git") or "git"
@@ -220,6 +220,10 @@ def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | 
         "-c", "core.editor=true",
         "-c", f"user.name={author_name}",
         "-c", f"user.email={author_email}",
+        "-c", f"author.name={author_name}",
+        "-c", f"author.email={author_email}",
+        "-c", f"committer.name={author_name}",
+        "-c", f"committer.email={author_email}",
         "-c", "format.signoff=false",
         "-c", "commit.gpgsign=false",
         "-c", "trailer.co-authored-by.key=",
@@ -231,6 +235,10 @@ def run_git(args: list[str], cwd: Path, timeout: int = GIT_TIMEOUT, env: dict | 
         "SSH_ASKPASS": "",
         "GIT_EDITOR": "true",
         "EDITOR": "true",
+        "GIT_AUTHOR_NAME": author_name,
+        "GIT_AUTHOR_EMAIL": author_email,
+        "GIT_COMMITTER_NAME": author_name,
+        "GIT_COMMITTER_EMAIL": author_email,
     }
     if env:
         merged_env.update(env)
@@ -1273,7 +1281,8 @@ def git_commit(req: CommitRequest, _ = Depends(require_auth)):
     # Protection automatique contre l'indexation accidentelle de fichiers sensibles non suivis (.env, clés privées)
     _unstage_sensitive_files(target)
 
-    commit_res = run_git(["commit", "--no-signoff", "--author=jprud67 <jprud67@gmail.com>", "-m", clean_msg], target)
+    author_name, author_email = _get_default_git_identity()
+    commit_res = run_git(["commit", "--no-signoff", f"--author={author_name} <{author_email}>", "-m", clean_msg], target)
     if commit_res.returncode != 0:
         err_msg = commit_res.stderr or commit_res.stdout or ""
         if "nothing to commit" in err_msg.lower() or "working tree clean" in err_msg.lower():

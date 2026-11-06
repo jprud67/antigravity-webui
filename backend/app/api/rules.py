@@ -19,7 +19,7 @@ from app.platform_utils import (
 from app.services.storage import get_settings
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/rules", tags=["rules"])
+router = APIRouter(prefix="/api/rules", tags=["rules"], dependencies=[Depends(require_auth)])
 
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(HOME / ".hermes")))
 GLOBAL_AGENTS_FILE = HOME / "AGENTS.md"

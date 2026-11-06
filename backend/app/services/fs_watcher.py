@@ -37,7 +37,10 @@ async def _broadcast(event: dict[str, Any]) -> None:
             # Drain oldest event to make room for newer state rather than evicting client
             try:
                 q.get_nowait()
-                q.task_done()
+                try:
+                    q.task_done()
+                except (ValueError, Exception):
+                    pass
             except (asyncio.QueueEmpty, ValueError):
                 pass
             except Exception as e:

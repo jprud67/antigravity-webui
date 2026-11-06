@@ -1,10 +1,17 @@
 import asyncio
+import json
 import logging
+import os
 import time
 import uuid
 from collections import deque
 from pathlib import Path
 from typing import Any, Protocol
+
+try:
+    import psutil
+except ImportError:
+    psutil = None  # type: ignore[assignment]
 
 from fastapi import WebSocket
 
@@ -112,6 +119,37 @@ class ExecutionSession:
             self.last_active_at = time.time()
 
 
+    def is_proc_alive(self) -> bool:
+        """
+        Vérifie si le sous-processus CLI actif est réellement vivant au niveau OS.
+        Détecte les processus arrêtés, crashés ou passés à l'état zombie.
+        """
+        if self.active_proc is None:
+            return False
+        if self.active_proc.returncode is not None:
+            return False
+        pid = getattr(self.active_proc, "pid", None)
+        if not isinstance(pid, int):
+            # Dans les tests mockés où pid n'est pas un entier, se fier à returncode
+            return self.active_proc.returncode is None
+        if pid <= 0:
+            return False
+        # Test signal 0 standard POSIX/Windows
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        # Détection d'état zombie via psutil
+        if psutil is not None:
+            try:
+                p = psutil.Process(pid)
+                return p.is_running() and p.status() != psutil.STATUS_ZOMBIE
+            except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied):
+                return False
+            except Exception:
+                return True
+        return True
+
     @property
     def is_busy(self) -> bool:
         return bool(
@@ -160,11 +198,8 @@ class ExecutionSession:
         subs = list(self.subscribers)
         if subs:
             async def _safe_send(ws: Any) -> tuple[bool, Any]:
-                try:
-                    await asyncio.wait_for(ws.send_json(event), timeout=2.0)
-                    return True, ws
-                except Exception:
-                    return False, ws
+                success = await execution_manager.safe_send_socket(ws, event, timeout=3.0)
+                return success, ws
 
             results = await asyncio.gather(*[_safe_send(ws) for ws in subs], return_exceptions=True)
             dead = set()
@@ -808,8 +843,47 @@ class ExecutionManager:
         self.active_session: ExecutionSession | None = None
         self.connected_sockets: set[WebSocket] = set()
         self.socket_info: dict[Any, dict[str, Any]] = {}
+        self.socket_locks: dict[Any, asyncio.Lock] = {}
         self._background_tasks: set[asyncio.Task[Any]] = set()
         self._lock: asyncio.Lock = asyncio.Lock()
+
+    def get_socket_lock(self, ws: Any) -> asyncio.Lock:
+        lock = self.socket_locks.get(ws)
+        if lock is None:
+            lock = asyncio.Lock()
+            self.socket_locks[ws] = lock
+        return lock
+
+    async def safe_send_socket(self, ws: Any, event: dict[str, Any], timeout: float = 3.0) -> bool:
+        """
+        Transmet de manière sérialisée et thread-safe un message JSON vers un WebSocket ou SessionSubscriber.
+        - Prévient l'entrelacement de trames concurrentes grâce à un verrou individuel par socket.
+        - Sérialise via json.dumps(..., default=str) pour parer aux types complexes (Path, datetime, exceptions).
+        - Isole les déconnexions et lenteurs réseau via un timeout paramétrable (défaut 3.0s).
+        """
+        if ws is None:
+            return False
+        lock = self.get_socket_lock(ws)
+        try:
+            payload = json.dumps(event, default=str)
+        except Exception:
+            try:
+                payload = json.dumps({"event": "error", "message": "Format d'événement non sérialisable"}, default=str)
+            except Exception:
+                return False
+
+        async def _do_send() -> None:
+            async with lock:
+                if hasattr(ws, "send_text"):
+                    await ws.send_text(payload)
+                elif hasattr(ws, "send_json"):
+                    await ws.send_json(event)
+
+        try:
+            await asyncio.wait_for(_do_send(), timeout=timeout)
+            return True
+        except Exception:
+            return False
 
     def remove_session(self, conversation_id: str | None) -> None:
         """Immediately removes a session from memory, terminates any active child processes, and cancels tasks."""
@@ -863,6 +937,8 @@ class ExecutionManager:
 
     def register_socket(self, ws: WebSocket, info: dict[str, Any] | None = None):
         self.connected_sockets.add(ws)
+        if ws not in self.socket_locks:
+            self.socket_locks[ws] = asyncio.Lock()
         if info is not None:
             self.socket_info[ws] = info
         else:
@@ -876,6 +952,7 @@ class ExecutionManager:
 
     def unregister_socket(self, ws: WebSocket, prune: bool = True):
         self.connected_sockets.discard(ws)
+        self.socket_locks.pop(ws, None)
         info = self.socket_info.pop(ws, None)
         bound_cid = info.get("bound_conversation_id") if info else None
 
@@ -992,9 +1069,8 @@ class ExecutionManager:
         }
         dead_sockets: list[WebSocket] = []
         for ws in list(self.connected_sockets):
-            try:
-                await ws.send_json(msg)
-            except Exception:
+            success = await self.safe_send_socket(ws, msg, timeout=2.5)
+            if not success:
                 dead_sockets.append(ws)
         for ws in dead_sockets:
             self.unregister_socket(ws)
@@ -1027,10 +1103,7 @@ class ExecutionManager:
 
         for ws in list(session.subscribers):
             if ws != sender_socket:
-                try:
-                    await ws.send_json(event)
-                except Exception:
-                    pass
+                await self.safe_send_socket(ws, event, timeout=1.5)
 
     def disconnect_token(self, share_token: str) -> int:
         """Closes all WebSockets attached to a specific share token."""
@@ -1082,11 +1155,112 @@ class ExecutionManager:
             session.conversation_id = clean
             self.sessions[clean] = session
 
+    def check_and_clean_dead_processes(self) -> int:
+        """
+        Détecte immédiatement les sessions dont le sous-processus CLI est mort ou à l'état zombie
+        au niveau de l'OS alors que la session est restée en état is_running ou active_task suspendue.
+        Assainit l'état interne pour libérer les ressources.
+        """
+        cleaned = 0
+        for cid, s in list(self.sessions.items()):
+            if s.active_proc is not None and not s.is_proc_alive():
+                pid_desc = getattr(s.active_proc, "pid", "inconnu")
+                logger.warning(
+                    f"[ExecutionManager] Détection d'un processus CLI terminé/zombie pour la session {cid} "
+                    f"(PID {pid_desc}). Assainissement immédiat."
+                )
+                if s.active_task and not s.active_task.done():
+                    s.active_task.cancel()
+                s.active_proc = None
+                s.is_running = False
+                cleaned += 1
+        return cleaned
+
+    async def reap_orphaned_and_idle_sessions(
+        self,
+        max_idle_seconds: float = 3600.0,
+        max_orphan_seconds: float = 7200.0,
+    ) -> dict[str, int]:
+        """
+        Balaie proactivement l'ensemble des sessions :
+        1. Nettoie les processus morts/zombies (check_and_clean_dead_processes).
+        2. Détecte et interrompt les sessions en cours d'exécution abandonnées sans aucun client
+           depuis plus de max_orphan_seconds (processus orphelins).
+        3. Élagage des sessions inactives terminées depuis plus de max_idle_seconds.
+        """
+        now = time.time()
+        stats = {"reaped_zombies": 0, "reaped_orphans": 0, "pruned_idle": 0}
+
+        # 1. Processus zombies / terminés
+        stats["reaped_zombies"] = self.check_and_clean_dead_processes()
+
+        # 2. Processus orphelins prolongés
+        orphans_to_kill: list[tuple[str, ExecutionSession]] = []
+        for cid, s in list(self.sessions.items()):
+            if (
+                s.is_busy
+                and len(s.subscribers) == 0
+                and (now - getattr(s, "last_active_at", 0.0)) > max_orphan_seconds
+            ):
+                orphans_to_kill.append((cid, s))
+
+        for cid, s in orphans_to_kill:
+            logger.warning(
+                f"[ExecutionManager] Session orpheline détectée pour {cid} : active depuis > {max_orphan_seconds}s "
+                f"sans client connecté. Terminaison proactive du processus CLI."
+            )
+            if s.active_proc and s.active_proc.returncode is None:
+                try:
+                    await terminate_process_group_async(s.active_proc, grace=1.0)
+                except Exception as e:
+                    logger.debug(f"Erreur arrêt processus orphelin {cid}: {e}")
+            if s.active_task and not s.active_task.done():
+                s.active_task.cancel()
+            s.is_running = False
+            s.active_proc = None
+            s.last_active_at = now
+            stats["reaped_orphans"] += 1
+
+        # 3. Élagage des sessions inactives
+        idle_to_prune: list[str] = []
+        for cid, s in list(self.sessions.items()):
+            if (
+                not s.is_busy
+                and len(s.subscribers) == 0
+                and (now - getattr(s, "last_active_at", 0.0)) > max_idle_seconds
+            ):
+                idle_to_prune.append(cid)
+
+        for cid in idle_to_prune:
+            self.remove_session(cid)
+            stats["pruned_idle"] += 1
+
+        if any(stats.values()):
+            logger.info(f"[ExecutionManager] Bilan du reaper de sessions : {stats}")
+
+        return stats
+
+    async def reaper_loop(self, interval_seconds: float = 60.0) -> None:
+        """Boucle de surveillance périodique en tâche de fond pour la détection proactive d'orphelins."""
+        logger.info(f"Démarrage du reaper périodique de sessions (intervalle: {interval_seconds}s)")
+        try:
+            while True:
+                await asyncio.sleep(interval_seconds)
+                try:
+                    await self.reap_orphaned_and_idle_sessions()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    logger.error(f"[ExecutionManager] Erreur lors du balayage des sessions orphelines : {e}")
+        except asyncio.CancelledError:
+            logger.info("Boucle de surveillance des sessions orphelines arrêtée.")
+
     def prune_inactive_sessions(self, max_idle_seconds: float = 3600.0):
         """
         Prunes idle sessions from memory that are not running, have empty queues,
         no connected subscribers, and have been inactive for over max_idle_seconds.
         """
+        self.check_and_clean_dead_processes()
         now = time.time()
         to_prune = []
         for cid, s in list(self.sessions.items()):

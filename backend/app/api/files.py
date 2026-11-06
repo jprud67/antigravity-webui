@@ -25,7 +25,7 @@ from app.platform_utils import is_blocked_sensitive_path, is_safe_path
 from app.services.storage import _safe_atomic_replace, get_settings
 
 logger = logging.getLogger("antigravity.files")
-router = APIRouter(prefix="/api/files", tags=["files"])
+router = APIRouter(prefix="/api/files", tags=["files"], dependencies=[Depends(require_auth)])
 
 IGNORED_DIRS = {
     ".git", "node_modules", "__pycache__", ".venv", "venv", 

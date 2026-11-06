@@ -11,7 +11,7 @@ from app.services.agy_driver import (
 )
 from app.services.storage import get_settings, save_settings
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(require_auth)])
 
 @router.get("")
 def read_settings(_ = Depends(require_auth)) -> dict[str, Any]:

@@ -7,7 +7,7 @@ from app.api.auth import require_auth
 from app.services.updater import apply_update, check_for_updates, get_local_version_info
 
 logger = logging.getLogger("antigravity.updater_api")
-router = APIRouter(prefix="/api/system", tags=["system_updates"])
+router = APIRouter(prefix="/api/system", tags=["system_updates"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/version")

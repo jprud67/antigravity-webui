@@ -1,5 +1,4 @@
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -18,7 +17,7 @@ from app.services.storage import is_safe_conversation_id
 
 logger = logging.getLogger("antigravity.inline_comments.api")
 
-router = APIRouter(prefix="/api/comments", tags=["Inline Code Reviews"])
+router = APIRouter(prefix="/api/comments", tags=["Inline Code Reviews"], dependencies=[Depends(require_auth)])
 
 
 class TriggerReviewRequest(BaseModel):
@@ -32,7 +31,7 @@ class TriggerReviewRequest(BaseModel):
 def get_comments(
     conversation_id: str = Query(..., description="ID of conversation"),
     file_path: str | None = Query(None, description="Optional file path filter"),
-    user: dict[str, Any] = Depends(require_auth)
+    _ = Depends(require_auth)
 ):
     """Lists inline comments for a conversation, optionally filtered by file."""
     if not is_safe_conversation_id(conversation_id):
@@ -43,7 +42,7 @@ def get_comments(
 @router.post("")
 async def post_comment(
     payload: CommentCreatePayload,
-    user: dict[str, Any] = Depends(require_auth)
+    _ = Depends(require_auth)
 ):
     """Creates a new line-anchored comment. Broadcasts comment_created event via WebSocket."""
     if not is_safe_conversation_id(payload.conversation_id):
@@ -85,7 +84,7 @@ async def post_comment(
 async def patch_comment(
     comment_id: str,
     payload: CommentUpdatePayload,
-    user: dict[str, Any] = Depends(require_auth)
+    _ = Depends(require_auth)
 ):
     """Updates comment content or resolves/reopens it."""
     try:
@@ -109,7 +108,7 @@ async def patch_comment(
 async def remove_comment(
     comment_id: str,
     conversation_id: str = Query(..., description="ID of conversation"),
-    user: dict[str, Any] = Depends(require_auth)
+    _ = Depends(require_auth)
 ):
     """Deletes an inline comment."""
     success = delete_comment(comment_id)
@@ -129,7 +128,7 @@ async def remove_comment(
 @router.post("/trigger-review")
 async def trigger_file_review(
     req: TriggerReviewRequest,
-    user: dict[str, Any] = Depends(require_auth)
+    _ = Depends(require_auth)
 ):
     """Triggers an automated code review on a file with @agent, generating inline review comments."""
     if not is_safe_conversation_id(req.conversation_id):

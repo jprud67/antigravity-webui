@@ -156,7 +156,7 @@ def watchdog_status():
 
 
 @watchdog_router.post("/start")
-def start_watchdog_sentinel(body: WatchdogStartBody):
+async def start_watchdog_sentinel(body: WatchdogStartBody):
     """Start the watchdog sentinel for a workspace."""
     _validate_safe_workspace(body.workspace_path)
     result = start_watchdog(body.workspace_path, body.interval_seconds)
@@ -164,7 +164,7 @@ def start_watchdog_sentinel(body: WatchdogStartBody):
 
 
 @watchdog_router.post("/stop")
-def stop_watchdog_sentinel():
+async def stop_watchdog_sentinel():
     """Stop the watchdog sentinel."""
     return stop_watchdog()
 
