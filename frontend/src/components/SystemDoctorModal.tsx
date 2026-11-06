@@ -10,7 +10,13 @@ import {
   GitBranch, 
   Globe, 
   Loader2,
-  Wrench
+  Wrench,
+  Server,
+  Activity,
+  Terminal,
+  ShieldCheck,
+  Box,
+  Clock
 } from 'lucide-react';
 import { fetchSystemDiagnostics, executeDoctorRepair } from '../services/api';
 import type { SystemDiagnosticsReport } from '../types';
@@ -174,6 +180,64 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                 </div>
               )}
 
+              {/* Grid 0: Server Process & Runtime Telemetry */}
+              {report.system.process && (
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+                    <Server className="w-3.5 h-3.5 text-blue-500" /> {t('doctor_server_process', 'Processus Serveur & Télémétrie Runtime')}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Uptime */}
+                    <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-emerald-500" />
+                          {t('doctor_uptime', 'Disponibilité Serveur')}
+                        </span>
+                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {report.system.process.uptime_formatted}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        {report.system.process.uptime_seconds}s de fonctionnement continu
+                      </p>
+                    </div>
+
+                    {/* Process Memory RSS */}
+                    <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span className="flex items-center gap-1.5">
+                          <Activity className="w-3.5 h-3.5 text-indigo-500" />
+                          {t('doctor_memory_rss', 'Mémoire Processus (RSS)')}
+                        </span>
+                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {report.system.process.memory_rss_mb} Mo
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        {report.system.process.threads_count} {t('doctor_threads', 'threads système actifs')}
+                      </p>
+                    </div>
+
+                    {/* Active Sessions */}
+                    <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span className="flex items-center gap-1.5">
+                          <Terminal className="w-3.5 h-3.5 text-teal-500" />
+                          {t('doctor_active_sessions', "Sessions d'Exécution")}
+                        </span>
+                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {report.system.process.active_sessions}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        {t('doctor_sessions_active_running', '{0} active(s) • {1} en cours', report.system.process.active_sessions, report.system.process.running_sessions)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Grid 1: System Hardware Metrics */}
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
@@ -237,11 +301,145 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                 </div>
               </div>
 
-              {/* Grid 2: LLM Live Endpoints Latencies */}
+              {/* Grid 2: Tools & Execution Engines */}
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                  <Globe className="w-3.5 h-3.5" /> {t('doctor_llm_connectivity', 'Connectivité API LLM en Direct')}
+                  <Terminal className="w-3.5 h-3.5 text-amber-500" /> {t('doctor_cli_ecosystem', "Outils & Moteurs d'Exécution")}
                 </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Antigravity CLI */}
+                  <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <Terminal className="w-4 h-4 text-emerald-500" /> {t('doctor_agy_cli', 'CLI Antigravity')}
+                      </span>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                        report.runtimes.agy?.installed 
+                          ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30' 
+                          : 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
+                      }`}>
+                        {report.runtimes.agy?.installed ? (report.runtimes.agy.version || 'v1.x') : t('doctor_not_installed', 'Non détecté')}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 truncate font-mono">
+                      {report.runtimes.agy?.path || 'Recherche standard PATH'}
+                    </p>
+                  </div>
+
+                  {/* Node.js Runtime */}
+                  <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <Box className="w-4 h-4 text-green-500" /> {t('doctor_node_runtime', 'Environnement Node.js')}
+                      </span>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                        report.runtimes.node?.installed 
+                          ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30' 
+                          : 'bg-slate-500/15 text-slate-500'
+                      }`}>
+                        {report.runtimes.node?.installed ? report.runtimes.node.version : t('doctor_not_installed', 'Non installé')}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {report.runtimes.node?.npm_version ? `npm v${report.runtimes.node.npm_version}` : 'Gestionnaire de paquets'} • {report.runtimes.node?.path || 'N/A'}
+                    </p>
+                  </div>
+
+                  {/* Docker Container Engine */}
+                  <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <Box className="w-4 h-4 text-blue-500" /> {t('doctor_docker_engine', 'Moteur de Conteneurs')}
+                      </span>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                        report.runtimes.docker?.available 
+                          ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30' 
+                          : 'bg-slate-500/15 text-slate-400'
+                      }`}>
+                        {report.runtimes.docker?.available ? (report.runtimes.docker.engine || 'Docker') : t('doctor_unavailable', 'Indisponible')}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      {report.runtimes.docker?.available 
+                        ? t('doctor_docker_running_containers', '{0} conteneur(s) actif(s)', report.runtimes.docker.running_containers) 
+                        : 'Docker ou Podman optionnel pour Container Studio'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid 3: Database & Runtimes */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+                  <Database className="w-3.5 h-3.5" /> {t('doctor_data_integrity', 'Intégrité Données & Environnements')}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* SQLite */}
+                  <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <Database className="w-4 h-4 text-indigo-500" /> {t('doctor_sqlite_db', 'Base de Données SQLite')}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {report.database.wal_mode && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-teal-500/15 text-teal-600 dark:text-teal-400 font-bold border border-teal-500/30">
+                            {t('doctor_sqlite_wal', 'WAL')}
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                          report.database.integrity === 'ok' || report.database.status === 'ok'
+                            ? 'bg-emerald-500/15 text-emerald-500' 
+                            : 'bg-rose-500/15 text-rose-500'
+                        }`}>
+                          {report.database.integrity === 'ok' || report.database.status === 'ok' ? t('status_ok', 'Intègre') : t('status_error', 'Erreur')}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      {t('doctor_disk_size', 'Taille disque :')} {report.database.size_mb} {t('doctor_mb', 'Mo')} • {t('doctor_fts5_index', 'Index FTS5 :')} {report.database.fts5.total_indexed_rows} {t('doctor_messages', 'messages')}
+                      {typeof report.database.query_latency_ms === 'number' && ` • Latence : ${report.database.query_latency_ms} ms`}
+                    </p>
+                  </div>
+
+                  {/* Git & Python */}
+                  <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <GitBranch className="w-4 h-4 text-purple-500" /> {t('doctor_git_python', 'Git & Environnement Python')}
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-500 font-bold">
+                        {report.runtimes.git.branch || 'main'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Python {report.runtimes.python.version} ({report.runtimes.python.is_venv ? t('doctor_venv_active', 'venv actif') : t('doctor_system', 'système')}) • {t('doctor_git_modified_files', 'Fichiers modifiés Git :')} {report.runtimes.git.dirty_files}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid 4: Security Sentinel & Live LLM Connectivity */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <Globe className="w-3.5 h-3.5" /> {t('doctor_llm_connectivity', 'Connectivité API LLM en Direct')}
+                  </h3>
+                  {report.security_watchdog && (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>{t('doctor_security_sentinel', 'Sentinelle de Sécurité')} :</span>
+                      <span className={`font-semibold ${
+                        report.security_watchdog.unresolved_alerts > 0 
+                          ? 'text-amber-500' 
+                          : 'text-emerald-500'
+                      }`}>
+                        {report.security_watchdog.unresolved_alerts === 0 
+                          ? t('doctor_active_monitoring', 'Surveillance Active (0 alerte)') 
+                          : `${report.security_watchdog.unresolved_alerts} alerte(s)`}
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {report.llm_connectivity.map((llm) => {
                     const isOnline = llm.status === 'online';
@@ -267,48 +465,6 @@ export const SystemDoctorModal: React.FC<SystemDoctorModalProps> = ({
                       </div>
                     );
                   })}
-                </div>
-              </div>
-
-              {/* Grid 3: Database & Runtimes */}
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                  <Database className="w-3.5 h-3.5" /> {t('doctor_data_integrity', 'Intégrité Données & Environnements')}
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* SQLite */}
-                  <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                        <Database className="w-4 h-4 text-indigo-500" /> {t('doctor_sqlite_db', 'Base de Données SQLite')}
-                      </span>
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
-                        report.database.integrity === 'ok' 
-                          ? 'bg-emerald-500/15 text-emerald-500' 
-                          : 'bg-rose-500/15 text-rose-500'
-                      }`}>
-                        {report.database.integrity === 'ok' ? t('status_ok', 'Intègre') : t('status_error', 'Erreur')}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500">
-                      {t('doctor_disk_size', 'Taille disque :')} {report.database.size_mb} {t('doctor_mb', 'Mo')} • {t('doctor_fts5_index', 'Index FTS5 :')} {report.database.fts5.total_indexed_rows} {t('doctor_messages', 'messages')} ({report.database.fts5.indexed_sessions} {t('doctor_sessions', 'sessions')})
-                    </p>
-                  </div>
-
-                  {/* Git & Python */}
-                  <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                        <GitBranch className="w-4 h-4 text-purple-500" /> {t('doctor_git_python', 'Git & Environnement Python')}
-                      </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-500 font-bold">
-                        {report.runtimes.git.branch || 'main'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500">
-                      Python {report.runtimes.python.version} ({report.runtimes.python.is_venv ? t('doctor_venv_active', 'venv actif') : t('doctor_system', 'système')}) • {t('doctor_git_modified_files', 'Fichiers modifiés Git :')} {report.runtimes.git.dirty_files}
-                    </p>
-                  </div>
                 </div>
               </div>
             </>

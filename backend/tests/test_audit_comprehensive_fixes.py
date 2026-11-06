@@ -828,3 +828,28 @@ def test_ui_labels_compliance_no_internal_roadmap_terms():
         assert not matches_i18n_sim, f"Forbidden simulation terms {matches_i18n_sim} in i18n.ts"
 
 
+@pytest.mark.asyncio
+async def test_memory_api_workspace_sanitization(auth_headers: dict):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.main import app
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # Sensitive path blocked
+        res_blocked = await ac.get("/api/memory?workspace=/etc/shadow", headers=auth_headers)
+        assert res_blocked.status_code == 403
+
+        # Invalid path characters blocked in POST body
+        res_invalid = await ac.post(
+            "/api/memory",
+            json={"action": "add", "workspace": "/tmp/\x00evil", "content": "test"},
+            headers=auth_headers
+        )
+        assert res_invalid.status_code == 400
+
+        # Normal valid workspace accepted
+        res_valid = await ac.get("/api/memory?workspace=/root/antigravity-webui", headers=auth_headers)
+        assert res_valid.status_code == 200
+
+
+

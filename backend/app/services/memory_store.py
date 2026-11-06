@@ -118,8 +118,12 @@ class MemoryStore:
 
     def set_workspace(self, workspace_dir: Path | str) -> None:
         """Met à jour le workspace actif et recharge MEMORY.md."""
+        resolved = Path(workspace_dir).resolve()
+        from app.platform_utils import is_blocked_sensitive_path
+        if is_blocked_sensitive_path(resolved):
+            raise PermissionError(f"Accès refusé au répertoire sensible : {resolved}")
         with self._lock:
-            self.workspace_dir = Path(workspace_dir)
+            self.workspace_dir = resolved
             self._load_target("memory")
             self._update_snapshot_target("memory")
 

@@ -14,8 +14,10 @@ import os
 import platform
 import shutil
 import sqlite3
+import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -97,6 +99,8 @@ def _check_sqlite_integrity() -> dict[str, Any]:
     total_size_mb = 0.0
     statuses = []
     integrities = []
+    journal_modes: dict[str, str] = {}
+    latencies: list[float] = []
 
     for db_name, p in db_paths:
         if not p.exists():
@@ -104,9 +108,23 @@ def _check_sqlite_integrity() -> dict[str, Any]:
         conn = None
         try:
             size_mb = round(p.stat().st_size / (1024 * 1024), 2)
+            wal_p = p.with_name(p.name + "-wal")
+            if wal_p.exists():
+                size_mb += round(wal_p.stat().st_size / (1024 * 1024), 2)
             total_size_mb += size_mb
+
+            t0 = time.perf_counter()
             conn = sqlite3.connect(str(p), timeout=10.0)
             cursor = conn.cursor()
+            cursor.execute("SELECT 1;")
+            cursor.fetchone()
+            latencies.append((time.perf_counter() - t0) * 1000)
+
+            cursor.execute("PRAGMA journal_mode;")
+            jm_row = cursor.fetchone()
+            jm = jm_row[0].lower() if jm_row else "unknown"
+            journal_modes[db_name] = jm
+
             cursor.execute("PRAGMA integrity_check;")
             row = cursor.fetchone()
             check_result = row[0] if row else "unknown"
@@ -123,30 +141,41 @@ def _check_sqlite_integrity() -> dict[str, Any]:
                     logger.debug("Failed to close SQLite diagnostic connection: %s", close_err)
 
     if not statuses:
-        return {"status": "missing", "size_mb": 0, "integrity": "missing"}
+        return {
+            "status": "missing",
+            "size_mb": 0,
+            "integrity": "missing",
+            "wal_mode": False,
+            "journal_modes": {},
+            "query_latency_ms": 0.0,
+        }
 
     overall_status = "ok" if all(s == "ok" for s in statuses) else ("error" if "error" in statuses else "corrupted")
+    wal_active = bool(journal_modes and all(jm == "wal" for jm in journal_modes.values()))
+    avg_latency = round(sum(latencies) / len(latencies), 2) if latencies else 0.0
+
     return {
         "status": overall_status,
         "size_mb": round(total_size_mb, 2),
-        "integrity": "; ".join(integrities)
+        "integrity": "; ".join(integrities),
+        "wal_mode": wal_active,
+        "journal_modes": journal_modes,
+        "query_latency_ms": avg_latency,
     }
-
 
 
 def _check_git_status() -> dict[str, Any]:
     git_bin = shutil.which("git")
     if not git_bin:
         return {"installed": False, "branch": None, "dirty_files": 0}
-    
+
     branch = None
     dirty_count = 0
     try:
-        import subprocess
         res = subprocess.run([git_bin, "branch", "--show-current"], cwd=str(WORKSPACE_DIR), capture_output=True, text=True, timeout=2)
         if res.returncode == 0:
             branch = res.stdout.strip()
-        
+
         status_res = subprocess.run([git_bin, "status", "--porcelain"], cwd=str(WORKSPACE_DIR), capture_output=True, text=True, timeout=2)
         if status_res.returncode == 0:
             lines = [l for l in status_res.stdout.splitlines() if l.strip()]
@@ -162,8 +191,148 @@ def _check_git_status() -> dict[str, Any]:
     }
 
 
+def _check_agy_status() -> dict[str, Any]:
+    agy_path = shutil.which("agy")
+    if not agy_path:
+        candidate = Path.home() / ".local" / "bin" / "agy"
+        if candidate.exists() and os.access(candidate, os.X_OK):
+            agy_path = str(candidate)
+
+    if not agy_path:
+        return {"installed": False, "version": None, "path": None}
+
+    version = None
+    try:
+        res = subprocess.run([agy_path, "--version"], capture_output=True, text=True, timeout=3)
+        if res.returncode == 0:
+            version = res.stdout.strip() or res.stderr.strip()
+    except Exception:
+        pass
+
+    return {
+        "installed": True,
+        "version": version or "détecté",
+        "path": agy_path
+    }
+
+
+def _check_node_status() -> dict[str, Any]:
+    node_path = shutil.which("node")
+    if not node_path:
+        return {"installed": False, "version": None, "npm_version": None, "path": None}
+
+    version = None
+    npm_version = None
+    try:
+        res = subprocess.run([node_path, "--version"], capture_output=True, text=True, timeout=3)
+        if res.returncode == 0:
+            version = res.stdout.strip()
+    except Exception:
+        pass
+
+    npm_path = shutil.which("npm")
+    if npm_path:
+        try:
+            res_npm = subprocess.run([npm_path, "--version"], capture_output=True, text=True, timeout=3)
+            if res_npm.returncode == 0:
+                npm_version = res_npm.stdout.strip()
+        except Exception:
+            pass
+
+    return {
+        "installed": True,
+        "version": version,
+        "npm_version": npm_version,
+        "path": node_path
+    }
+
+
+def _check_docker_status() -> dict[str, Any]:
+    try:
+        from app.services.docker_studio import get_docker_status
+        st = get_docker_status()
+        return {
+            "available": bool(st.is_available),
+            "engine": st.engine if st.engine != "none" else None,
+            "version": st.version,
+            "running_containers": st.running_count
+        }
+    except Exception:
+        return {
+            "available": False,
+            "engine": None,
+            "version": None,
+            "running_containers": 0
+        }
+
+
+def _check_watchdog_status() -> dict[str, Any]:
+    try:
+        from app.services.watchdog_sentinel import get_alerts, get_watchdog_status
+        ws = get_watchdog_status()
+        unresolved = get_alerts(unresolved_only=True)
+        return {
+            "running": bool(ws.get("running", False)),
+            "unresolved_alerts": len(unresolved),
+            "total_alerts": int(ws.get("total_alerts", 0))
+        }
+    except Exception:
+        return {
+            "running": False,
+            "unresolved_alerts": 0,
+            "total_alerts": 0
+        }
+
+
+def _get_process_metrics() -> dict[str, Any]:
+    try:
+        proc = psutil.Process(os.getpid())
+        create_t = proc.create_time()
+        uptime_s = round(time.time() - create_t, 1)
+
+        days, rem = divmod(int(uptime_s), 86400)
+        hours, rem = divmod(rem, 3600)
+        minutes, seconds = divmod(rem, 60)
+        if days > 0:
+            uptime_fmt = f"{days}j {hours}h {minutes}m"
+        elif hours > 0:
+            uptime_fmt = f"{hours}h {minutes}m"
+        elif minutes > 0:
+            uptime_fmt = f"{minutes}m {seconds}s"
+        else:
+            uptime_fmt = f"{seconds}s"
+
+        rss_mb = round(proc.memory_info().rss / (1024 * 1024), 2)
+        threads = proc.num_threads()
+    except Exception:
+        uptime_s = 0.0
+        uptime_fmt = "inconnu"
+        rss_mb = 0.0
+        threads = 1
+
+    try:
+        from app.services.execution_manager import execution_manager
+        active_sessions = len(execution_manager.sessions)
+        running_sessions = len(execution_manager.get_running_conversations())
+    except Exception:
+        active_sessions = 0
+        running_sessions = 0
+
+    return {
+        "uptime_seconds": uptime_s,
+        "uptime_formatted": uptime_fmt,
+        "memory_rss_mb": rss_mb,
+        "threads_count": threads,
+        "active_sessions": active_sessions,
+        "running_sessions": running_sessions
+    }
+
+
 async def run_system_diagnostics() -> dict[str, Any]:
     """Runs a complete system health scan."""
+    # Process & Server Uptime
+    process_metrics = _get_process_metrics()
+
     # RAM & CPU
     mem = psutil.virtual_memory()
     ram_data = {
@@ -182,13 +351,16 @@ async def run_system_diagnostics() -> dict[str, Any]:
         "used_percent": round(((disk.total - disk.free) / disk.total) * 100, 1)
     }
 
-    # Python & Git
+    # Python, Git, and Ecosystem Runtimes
     python_data = {
         "version": platform.python_version(),
         "executable": sys.executable,
         "is_venv": hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)
     }
     git_data = _check_git_status()
+    agy_data = _check_agy_status()
+    node_data = _check_node_status()
+    docker_data = _check_docker_status()
 
     # Database & FTS
     sqlite_data = _check_sqlite_integrity()
@@ -196,6 +368,9 @@ async def run_system_diagnostics() -> dict[str, Any]:
         fts_stats = get_fts_stats()
     except Exception:
         fts_stats = {"total_indexed_rows": 0, "indexed_sessions": 0, "engine": "unavailable"}
+
+    # Security Watchdog
+    watchdog_data = _check_watchdog_status()
 
     # Probe LLM endpoints concurrently
     probe_tasks = [_probe_endpoint(p) for p in LLM_PROBES]
@@ -209,6 +384,12 @@ async def run_system_diagnostics() -> dict[str, Any]:
         anomalies.append({"level": "warning", "message": f"Espace disque critique ({disk_data['free_gb']} Go restants)"})
     if sqlite_data["status"] != "ok":
         anomalies.append({"level": "error", "message": f"Anomalie intégrité SQLite : {sqlite_data['integrity']}"})
+
+    if watchdog_data.get("unresolved_alerts", 0) > 0:
+        anomalies.append({
+            "level": "warning",
+            "message": f"Sentinelle de Sécurité : {watchdog_data['unresolved_alerts']} alerte(s) en attente de traitement"
+        })
 
     offline_llms = [p["name"] for p in llm_results if p["status"] == "offline"]
     if offline_llms:
@@ -228,16 +409,21 @@ async def run_system_diagnostics() -> dict[str, Any]:
             "cpu_cores": psutil.cpu_count(logical=True),
             "cpu_percent": cpu_percent,
             "ram": ram_data,
-            "disk": disk_data
+            "disk": disk_data,
+            "process": process_metrics,
         },
         "runtimes": {
             "python": python_data,
-            "git": git_data
+            "git": git_data,
+            "agy": agy_data,
+            "node": node_data,
+            "docker": docker_data,
         },
         "database": {
             **sqlite_data,
             "fts5": fts_stats
         },
+        "security_watchdog": watchdog_data,
         "llm_connectivity": llm_results,
         "anomalies": anomalies
     }
@@ -247,7 +433,7 @@ async def run_auto_repair() -> dict[str, Any]:
     """Performs automated maintenance and repair operations."""
     repaired_actions: list[str] = []
 
-    # 1. Vacuum SQLite databases
+    # 1. Vacuum, WAL checkpoint and optimize SQLite databases
     target_dbs = [("sessions.db", DB_PATH), ("conversation_summaries.db", CONVERSATION_DB)]
     vacuumed = []
     for db_name, p in target_dbs:
@@ -255,13 +441,15 @@ async def run_auto_repair() -> dict[str, Any]:
             conn = None
             try:
                 conn = sqlite3.connect(str(p), timeout=15.0)
+                conn.execute("PRAGMA journal_mode=WAL;")
+                conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
                 conn.execute("VACUUM;")
                 conn.execute("ANALYZE;")
                 conn.execute("PRAGMA optimize;")
                 conn.commit()
                 vacuumed.append(db_name)
             except Exception as e:
-                logger.warning(f"Failed to vacuum {db_name}: {e}")
+                logger.warning(f"Failed to vacuum/optimize {db_name}: {e}")
             finally:
                 if conn is not None:
                     try:
@@ -269,8 +457,7 @@ async def run_auto_repair() -> dict[str, Any]:
                     except Exception as close_err:
                         logger.debug("Failed to close vacuum connection: %s", close_err)
     if vacuumed:
-        repaired_actions.append(f"Optimisation et compactage des bases SQLite ({', '.join(vacuumed)}) (VACUUM & ANALYZE)")
-
+        repaired_actions.append(f"Optimisation, synchronisation WAL et compactage des bases SQLite ({', '.join(vacuumed)}) (VACUUM & ANALYZE)")
 
     # 2. Sync and optimize FTS
     try:

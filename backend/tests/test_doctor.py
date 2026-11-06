@@ -13,8 +13,20 @@ async def test_doctor_diagnostics_service():
     assert "system" in report
     assert "ram" in report["system"]
     assert "disk" in report["system"]
+    assert "process" in report["system"]
+    assert "uptime_seconds" in report["system"]["process"]
+    assert "memory_rss_mb" in report["system"]["process"]
     assert "runtimes" in report
+    assert "python" in report["runtimes"]
+    assert "git" in report["runtimes"]
+    assert "agy" in report["runtimes"]
+    assert "node" in report["runtimes"]
+    assert "docker" in report["runtimes"]
     assert "database" in report
+    assert "wal_mode" in report["database"]
+    assert "query_latency_ms" in report["database"]
+    assert "security_watchdog" in report
+    assert "running" in report["security_watchdog"]
     assert "llm_connectivity" in report
     assert len(report["llm_connectivity"]) == 4
 

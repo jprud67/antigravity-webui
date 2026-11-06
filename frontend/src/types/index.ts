@@ -776,6 +776,14 @@ export interface SystemDiagnosticsReport {
       free_gb: number;
       used_percent: number;
     };
+    process?: {
+      uptime_seconds: number;
+      uptime_formatted: string;
+      memory_rss_mb: number;
+      threads_count: number;
+      active_sessions: number;
+      running_sessions: number;
+    };
   };
   runtimes: {
     python: {
@@ -789,16 +797,41 @@ export interface SystemDiagnosticsReport {
       branch?: string;
       dirty_files: number;
     };
+    agy?: {
+      installed: boolean;
+      version?: string | null;
+      path?: string | null;
+    };
+    node?: {
+      installed: boolean;
+      version?: string | null;
+      npm_version?: string | null;
+      path?: string | null;
+    };
+    docker?: {
+      available: boolean;
+      engine?: string | null;
+      version?: string | null;
+      running_containers: number;
+    };
   };
   database: {
     status: string;
     size_mb: number;
     integrity: string;
+    wal_mode?: boolean;
+    journal_modes?: Record<string, string>;
+    query_latency_ms?: number;
     fts5: {
       total_indexed_rows: number;
       indexed_sessions: number;
       engine: string;
     };
+  };
+  security_watchdog?: {
+    running: boolean;
+    unresolved_alerts: number;
+    total_alerts: number;
   };
   llm_connectivity: LlmProbeResult[];
   anomalies: Array<{ level: 'warning' | 'error'; message: string }>;

@@ -1789,6 +1789,62 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     en: 'Run Auto-Doctor Repair',
     fr: 'Lancer Auto-Doctor Réparation',
   },
+  doctor_server_process: {
+    en: 'Server Process & Runtime Telemetry',
+    fr: 'Processus Serveur & Télémétrie Runtime',
+  },
+  doctor_uptime: {
+    en: 'Server Uptime',
+    fr: 'Disponibilité Serveur',
+  },
+  doctor_memory_rss: {
+    en: 'Process Memory (RSS)',
+    fr: 'Mémoire Processus (RSS)',
+  },
+  doctor_active_sessions: {
+    en: 'Execution Sessions',
+    fr: "Sessions d'Exécution",
+  },
+  doctor_sessions_active_running: {
+    en: '{0} active • {1} running',
+    fr: '{0} active(s) • {1} en cours',
+  },
+  doctor_cli_ecosystem: {
+    en: 'Tools & Execution Engines',
+    fr: "Outils & Moteurs d'Exécution",
+  },
+  doctor_agy_cli: {
+    en: 'Antigravity CLI',
+    fr: 'CLI Antigravity',
+  },
+  doctor_node_runtime: {
+    en: 'Node.js Runtime',
+    fr: 'Environnement Node.js',
+  },
+  doctor_docker_engine: {
+    en: 'Container Engine',
+    fr: 'Moteur de Conteneurs',
+  },
+  doctor_docker_running_containers: {
+    en: '{0} active container(s)',
+    fr: '{0} conteneur(s) actif(s)',
+  },
+  doctor_security_sentinel: {
+    en: 'Security Sentinel',
+    fr: 'Sentinelle de Sécurité',
+  },
+  doctor_sqlite_wal: {
+    en: 'WAL Mode',
+    fr: 'Mode WAL',
+  },
+  doctor_query_latency: {
+    en: 'Query Latency',
+    fr: 'Latence Requête',
+  },
+  doctor_threads: {
+    en: 'System Threads',
+    fr: 'Threads Système',
+  },
   doctor_status_critical: {
     en: 'Critical Issue',
     fr: 'Anomalie Critique',
