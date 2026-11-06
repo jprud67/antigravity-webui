@@ -227,41 +227,44 @@ FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
 if (FRONTEND_DIST / "assets").is_dir():
     app.mount("/assets", CacheStaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 
-if FRONTEND_DIST.is_dir():
-    @app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
-    async def serve_frontend(full_path: str):
-        if (
-            full_path in ("api", "ws", "v1", "docs", "redoc", "openapi.json")
-            or full_path.startswith(("api/", "ws/", "v1/", "docs/", "redoc/"))
-        ):
-            raise HTTPException(status_code=404, detail="API route not found")
-        
-        index_file = FRONTEND_DIST / "index.html"
-        no_cache_headers = {
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        }
-        if not full_path or full_path == "/":
-            if index_file.is_file():
-                return FileResponse(index_file, headers=no_cache_headers)
-            raise HTTPException(status_code=404, detail="Index file not found")
 
-        try:
-            dist_resolved = FRONTEND_DIST.resolve()
-            file_candidate = (dist_resolved / full_path).resolve()
-            if file_candidate.is_relative_to(dist_resolved) and file_candidate.is_file():
-                headers = {}
-                if full_path.startswith("assets/"):
-                    headers["Cache-Control"] = "public, max-age=31536000, immutable"
-                elif (
-                    full_path in ("sw.js", "manifest.json", "manifest.webmanifest", "locales.json")
-                    or full_path.endswith((".webmanifest", "/sw.js"))
-                ):
-                    headers = dict(no_cache_headers)
-                return FileResponse(file_candidate, headers=headers)
-        except (ValueError, TypeError, OSError):
-            pass
+@app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
+async def serve_frontend(full_path: str):
+    if (
+        full_path in ("api", "ws", "v1", "docs", "redoc", "openapi.json")
+        or full_path.startswith(("api/", "ws/", "v1/", "docs/", "redoc/"))
+    ):
+        raise HTTPException(status_code=404, detail="API route not found")
+
+    if not FRONTEND_DIST.is_dir():
+        raise HTTPException(status_code=404, detail="Frontend dist not built")
+
+    index_file = FRONTEND_DIST / "index.html"
+    no_cache_headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+    if not full_path or full_path == "/":
         if index_file.is_file():
             return FileResponse(index_file, headers=no_cache_headers)
-        raise HTTPException(status_code=404, detail="Resource not found")
+        raise HTTPException(status_code=404, detail="Index file not found")
+
+    try:
+        dist_resolved = FRONTEND_DIST.resolve()
+        file_candidate = (dist_resolved / full_path).resolve()
+        if file_candidate.is_relative_to(dist_resolved) and file_candidate.is_file():
+            headers = {}
+            if full_path.startswith("assets/"):
+                headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            elif (
+                full_path in ("sw.js", "manifest.json", "manifest.webmanifest", "locales.json")
+                or full_path.endswith((".webmanifest", "/sw.js"))
+            ):
+                headers = dict(no_cache_headers)
+            return FileResponse(file_candidate, headers=headers)
+    except (ValueError, TypeError, OSError):
+        pass
+    if index_file.is_file():
+        return FileResponse(index_file, headers=no_cache_headers)
+    raise HTTPException(status_code=404, detail="Resource not found")

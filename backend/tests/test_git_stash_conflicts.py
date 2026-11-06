@@ -140,7 +140,13 @@ def test_conflict_detection_and_resolution(git_test_repo: Path, auth_headers: di
     run_git_cmd(["commit", "-am", "Change in main"], cwd=git_test_repo)
 
     # Attempt merge - will fail with conflict
-    merge_proc = subprocess.run([GIT_BIN, "merge", "feature"], cwd=git_test_repo, capture_output=True, text=True)
+    merge_proc = subprocess.run([
+        GIT_BIN,
+        "-c", "user.name=TestUser",
+        "-c", "user.email=test@example.com",
+        "-c", "commit.gpgsign=false",
+        "merge", "feature"
+    ], cwd=git_test_repo, capture_output=True, text=True)
     assert merge_proc.returncode != 0
 
     # Status should report conflict

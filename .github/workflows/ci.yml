@@ -29,6 +29,11 @@ jobs:
         run: |
           ruff check backend
 
+      - name: Configure Git Identity for Tests
+        run: |
+          git config --global user.name "CI Runner"
+          git config --global user.email "ci@example.com"
+
       - name: Run Pytest
         run: |
           cd backend && pytest -q
