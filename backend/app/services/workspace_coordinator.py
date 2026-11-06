@@ -1,8 +1,10 @@
 import asyncio
 import json
 import logging
+import os
 import re
 import shutil
+import sys
 import time
 import uuid
 from collections.abc import Callable, Coroutine
@@ -168,6 +170,41 @@ def validate_workspace_path(path_str: str) -> Path:
     return resolved
 
 
+def _resolve_python_bin(target_dir: Path, root_ws: Path) -> str:
+    """Dynamically resolve Python executable preferring virtualenvs, with cross-platform resilience."""
+    candidate_dirs = [
+        target_dir / "venv",
+        target_dir / ".venv",
+        target_dir / "env",
+        root_ws / "backend" / "venv",
+        root_ws / "backend" / ".venv",
+        root_ws / "venv",
+        root_ws / ".venv",
+    ]
+    for c in candidate_dirs:
+        py_win = c / "Scripts" / "python.exe"
+        if py_win.is_file():
+            try:
+                rel = py_win.relative_to(target_dir)
+                return f".\\{rel}" if "\\" in str(rel) or os.name == "nt" else f"./{rel}"
+            except ValueError:
+                return str(py_win.resolve())
+        py_nix = c / "bin" / "python"
+        if py_nix.is_file():
+            try:
+                rel = py_nix.relative_to(target_dir)
+                return f"./{rel}"
+            except ValueError:
+                return str(py_nix.resolve())
+
+    # Fallback to system Python without assuming 'python' is always available
+    if shutil.which("python3"):
+        return "python3"
+    if shutil.which("python"):
+        return "python"
+    return sys.executable or "python3"
+
+
 # ============================================================================
 # Conventional Pipeline Discovery Engine
 # ============================================================================
@@ -215,128 +252,166 @@ def discover_workspace_pipelines(workspace_path: str) -> list[WorkspacePipeline]
             logger.warning(f"Error parsing .antigravity/pipelines.json in {p}: {e}")
 
     # 2. Node.js / JavaScript / TypeScript (package.json)
-    pkg_json = p / "package.json"
-    if pkg_json.is_file():
+    node_targets = [p]
+    for sub in ["frontend", "client", "web", "ui", "app"]:
+        sub_dir = p / sub
+        if sub_dir.is_dir() and (sub_dir / "package.json").is_file():
+            node_targets.append(sub_dir)
+
+    for node_dir in node_targets:
+        pkg_json = node_dir / "package.json"
+        if not pkg_json.is_file():
+            continue
         try:
             pkg_data = json.loads(pkg_json.read_text(encoding="utf-8"))
             scripts = pkg_data.get("scripts", {})
             pm = "npm"
-            if (p / "pnpm-lock.yaml").exists():
+            if (node_dir / "pnpm-lock.yaml").exists() or (p / "pnpm-lock.yaml").exists():
                 pm = "pnpm"
-            elif (p / "yarn.lock").exists():
+            elif (node_dir / "yarn.lock").exists() or (p / "yarn.lock").exists():
                 pm = "yarn"
-            elif (p / "bun.lockb").exists() or (p / "bun.lock").exists():
+            elif (node_dir / "bun.lockb").exists() or (node_dir / "bun.lock").exists() or (p / "bun.lockb").exists() or (p / "bun.lock").exists():
                 pm = "bun"
+
+            is_root = (node_dir == p)
+            id_prefix = "node" if is_root else f"{node_dir.name}_node"
+            name_label = "(Node)" if is_root else f"({node_dir.name})"
+            desc_location = "" if is_root else f" dans {node_dir.name}/"
 
             if "test" in scripts:
                 pipelines.append(WorkspacePipeline(
-                    id="node_test",
+                    id=f"{id_prefix}_test",
                     workspace_path=str(p),
                     workspace_name=workspace_name,
                     pipeline_type="test",
-                    name="Tests Unitaires (Node)",
-                    description=f"Exécute '{pm} test' ({scripts['test']})",
+                    name=f"Tests Unitaires {name_label}",
+                    description=f"Exécute '{pm} test'{desc_location} ({scripts['test']})",
                     steps=[PipelineStep(
-                        id="step_node_test",
+                        id=f"step_{id_prefix}_test",
                         name="Test Suite",
                         command=f"{pm} test",
-                        cwd=str(p)
+                        cwd=str(node_dir)
                     )]
                 ))
 
             if "build" in scripts:
                 pipelines.append(WorkspacePipeline(
-                    id="node_build",
+                    id=f"{id_prefix}_build",
                     workspace_path=str(p),
                     workspace_name=workspace_name,
                     pipeline_type="build",
-                    name="Production Build (Node)",
-                    description=f"Exécute '{pm} run build' ({scripts['build']})",
+                    name=f"Production Build {name_label}",
+                    description=f"Exécute '{pm} run build'{desc_location} ({scripts['build']})",
                     steps=[PipelineStep(
-                        id="step_node_build",
+                        id=f"step_{id_prefix}_build",
                         name="Build Assets",
                         command=f"{pm} run build",
-                        cwd=str(p)
+                        cwd=str(node_dir)
                     )]
                 ))
 
             if "lint" in scripts:
                 pipelines.append(WorkspacePipeline(
-                    id="node_lint",
+                    id=f"{id_prefix}_lint",
                     workspace_path=str(p),
                     workspace_name=workspace_name,
                     pipeline_type="lint",
-                    name="Linter Code (Node)",
-                    description=f"Exécute '{pm} run lint' ({scripts['lint']})",
+                    name=f"Linter Code {name_label}",
+                    description=f"Exécute '{pm} run lint'{desc_location} ({scripts['lint']})",
                     steps=[PipelineStep(
-                        id="step_node_lint",
+                        id=f"step_{id_prefix}_lint",
                         name="Linter",
                         command=f"{pm} run lint",
-                        cwd=str(p)
+                        cwd=str(node_dir)
                     )]
                 ))
 
             if "typecheck" in scripts or "check" in scripts:
                 cmd_script = "typecheck" if "typecheck" in scripts else "check"
                 pipelines.append(WorkspacePipeline(
-                    id="node_typecheck",
+                    id=f"{id_prefix}_typecheck",
                     workspace_path=str(p),
                     workspace_name=workspace_name,
                     pipeline_type="lint",
-                    name="Vérification TypeScript",
-                    description=f"Exécute '{pm} run {cmd_script}'",
+                    name=f"Vérification TypeScript {name_label}",
+                    description=f"Exécute '{pm} run {cmd_script}'{desc_location}",
                     steps=[PipelineStep(
-                        id="step_node_typecheck",
+                        id=f"step_{id_prefix}_typecheck",
                         name="TypeScript Compilation Check",
                         command=f"{pm} run {cmd_script}",
-                        cwd=str(p)
+                        cwd=str(node_dir)
                     )]
                 ))
         except Exception as e:
-            logger.warning(f"Error parsing package.json in {p}: {e}")
+            logger.warning(f"Error parsing package.json in {node_dir}: {e}")
 
     # 3. Python (pyproject.toml, pytest, ruff, tox)
-    pyproject = p / "pyproject.toml"
-    pytest_ini = p / "pytest.ini"
-    setup_cfg = p / "setup.cfg"
-    has_python = pyproject.exists() or pytest_ini.exists() or setup_cfg.exists() or list(p.glob("*.py"))
-    if has_python:
-        # Check pytest
-        py_bin = "python"
-        if (p / "venv" / "Scripts" / "python.exe").exists():
-            py_bin = ".\\venv\\Scripts\\python.exe"
-        elif (p / "venv" / "bin" / "python").exists():
-            py_bin = "./venv/bin/python"
+    py_targets = [p]
+    for sub in ["backend", "api", "server", "service", "core"]:
+        sub_dir = p / sub
+        if sub_dir.is_dir():
+            py_targets.append(sub_dir)
+
+    for py_dir in py_targets:
+        pyproject = py_dir / "pyproject.toml"
+        pytest_ini = py_dir / "pytest.ini"
+        setup_cfg = py_dir / "setup.cfg"
+        reqs = py_dir / "requirements.txt"
+        has_python = (
+            pyproject.exists()
+            or pytest_ini.exists()
+            or setup_cfg.exists()
+            or reqs.exists()
+            or (py_dir / "tests").is_dir()
+            or bool(list(py_dir.glob("*.py")))
+        )
+        if not has_python:
+            continue
+
+        is_root = (py_dir == p)
+        id_prefix = "python" if is_root else f"{py_dir.name}_python"
+        name_label = "(Python)" if is_root else f"({py_dir.name})"
+        desc_location = "" if is_root else f" dans {py_dir.name}/"
+        py_bin = _resolve_python_bin(py_dir, p)
 
         pipelines.append(WorkspacePipeline(
-            id="python_pytest",
+            id=f"{id_prefix}_pytest",
             workspace_path=str(p),
             workspace_name=workspace_name,
             pipeline_type="test",
-            name="Tests Pytest (Python)",
-            description=f"Exécute '{py_bin} -m pytest -v'",
+            name=f"Tests Pytest {name_label}",
+            description=f"Exécute '{py_bin} -m pytest -v'{desc_location}",
             steps=[PipelineStep(
-                id="step_python_pytest",
-                name="Pytest Suite",
+                id=f"step_{id_prefix}_pytest",
+                name=f"Pytest Suite {name_label}",
                 command=f"{py_bin} -m pytest -v",
-                cwd=str(p)
+                cwd=str(py_dir)
             )]
         ))
 
         # Check ruff
-        if pyproject.exists() and "ruff" in pyproject.read_text(encoding="utf-8", errors="ignore"):
+        has_ruff = False
+        if pyproject.exists():
+            try:
+                has_ruff = "ruff" in pyproject.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                pass
+        if not has_ruff and ((py_dir / ".ruff.toml").exists() or (py_dir / "ruff.toml").exists()):
+            has_ruff = True
+
+        if has_ruff:
             pipelines.append(WorkspacePipeline(
-                id="python_ruff",
+                id=f"{id_prefix}_ruff",
                 workspace_path=str(p),
                 workspace_name=workspace_name,
                 pipeline_type="lint",
-                name="Ruff Linter (Python)",
-                description=f"Exécute '{py_bin} -m ruff check .'",
+                name=f"Ruff Linter {name_label}",
+                description=f"Exécute '{py_bin} -m ruff check .'{desc_location}",
                 steps=[PipelineStep(
-                    id="step_python_ruff",
-                    name="Ruff Linter",
+                    id=f"step_{id_prefix}_ruff",
+                    name=f"Ruff Linter {name_label}",
                     command=f"{py_bin} -m ruff check .",
-                    cwd=str(p)
+                    cwd=str(py_dir)
                 )]
             ))
 
@@ -812,7 +887,8 @@ async def execute_batch_action(action: str, workspace_paths: list[str]) -> dict[
                     git_bin, "fetch", "--all",
                     cwd=str(ws_path),
                     stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
+                    stderr=asyncio.subprocess.PIPE,
+                    env={**os.environ, "GIT_TERMINAL_PROMPT": "0"}
                 )
                 stdout, _stderr = await proc.communicate()
                 results.append({
@@ -827,7 +903,8 @@ async def execute_batch_action(action: str, workspace_paths: list[str]) -> dict[
                     git_bin, "pull",
                     cwd=str(ws_path),
                     stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
+                    stderr=asyncio.subprocess.PIPE,
+                    env={**os.environ, "GIT_TERMINAL_PROMPT": "0"}
                 )
                 stdout, _stderr = await proc.communicate()
                 results.append({
@@ -838,30 +915,61 @@ async def execute_batch_action(action: str, workspace_paths: list[str]) -> dict[
                 })
 
             elif action == "install_deps":
-                # Check package manager
-                cmd = None
-                if (ws_path / "package.json").exists():
-                    cmd = "npm install"
-                elif (ws_path / "pyproject.toml").exists() or (ws_path / "requirements.txt").exists():
-                    cmd = "pip install -r requirements.txt" if (ws_path / "requirements.txt").exists() else "pip install ."
-                elif (ws_path / "composer.json").exists():
-                    cmd = "composer install"
+                commands: list[tuple[str, str]] = []  # (command, cwd)
+                # Node root or subdirectories
+                if (ws_path / "package.json").is_file():
+                    commands.append(("npm install", str(ws_path)))
+                elif (ws_path / "frontend" / "package.json").is_file():
+                    commands.append(("npm install", str(ws_path / "frontend")))
 
-                if cmd:
+                # Python root or subdirectories
+                if (ws_path / "backend" / "requirements.txt").is_file():
+                    py_bin = _resolve_python_bin(ws_path / "backend", ws_path)
+                    commands.append((f"{py_bin} -m pip install -r requirements.txt", str(ws_path / "backend")))
+                elif (ws_path / "requirements.txt").is_file():
+                    py_bin = _resolve_python_bin(ws_path, ws_path)
+                    commands.append((f"{py_bin} -m pip install -r requirements.txt", str(ws_path)))
+                elif (ws_path / "backend" / "pyproject.toml").is_file():
+                    py_bin = _resolve_python_bin(ws_path / "backend", ws_path)
+                    commands.append((f"{py_bin} -m pip install -e .", str(ws_path / "backend")))
+                elif (ws_path / "pyproject.toml").is_file():
+                    py_bin = _resolve_python_bin(ws_path, ws_path)
+                    commands.append((f"{py_bin} -m pip install -e .", str(ws_path)))
+
+                # Composer
+                if (ws_path / "composer.json").is_file():
+                    commands.append(("composer install", str(ws_path)))
+
+                if not commands:
+                    results.append({
+                        "workspace": str(ws_path),
+                        "status": "skipped",
+                        "output": "Aucun gestionnaire de dépendances détecté (package.json, requirements.txt, pyproject.toml, composer.json)."
+                    })
+                    continue
+
+                all_outputs: list[str] = []
+                overall_code = 0
+                for cmd_str, cmd_cwd in commands:
                     proc = await asyncio.create_subprocess_shell(
-                        cmd,
-                        cwd=str(ws_path),
+                        cmd_str,
+                        cwd=cmd_cwd,
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE
                     )
-                    stdout, _stderr = await proc.communicate()
-                    results.append({
-                        "workspace": str(ws_path),
-                        "status": "success" if proc.returncode == 0 else "failed",
-                        "command": cmd,
-                        "exit_code": proc.returncode,
-                        "output": stdout.decode("utf-8", errors="replace")[:1000]
-                    })
+                    stdout, stderr = await proc.communicate()
+                    out_text = (stdout + stderr).decode("utf-8", errors="replace").strip()
+                    all_outputs.append(f"[{cmd_str}] (exit {proc.returncode}):\n{out_text[:500]}")
+                    if proc.returncode != 0:
+                        overall_code = proc.returncode
+
+                results.append({
+                    "workspace": str(ws_path),
+                    "status": "success" if overall_code == 0 else "failed",
+                    "command": " && ".join(c[0] for c in commands),
+                    "exit_code": overall_code,
+                    "output": "\n\n".join(all_outputs)[:1000]
+                })
 
             elif action == "run_all_tests":
                 ws_pipelines = discover_workspace_pipelines(str(ws_path))
@@ -873,20 +981,33 @@ async def execute_batch_action(action: str, workspace_paths: list[str]) -> dict[
                         "output": "Aucun pipeline de test détecté dans ce workspace."
                     })
                     continue
-                target_p = test_pipelines[0]
-                run_obj = await execute_pipeline_run(
-                    workspace_path=str(ws_path),
-                    pipeline_id=target_p.id,
-                    wait_complete=True
-                )
+
+                runs: list[PipelineExecutionRun] = []
+                for target_p in test_pipelines:
+                    run_obj = await execute_pipeline_run(
+                        workspace_path=str(ws_path),
+                        pipeline_id=target_p.id,
+                        wait_complete=True
+                    )
+                    runs.append(run_obj)
+
+                first_run = runs[0]
+                all_succeeded = all(r.status == "success" for r in runs)
+                total_duration = sum(r.total_duration_ms for r in runs)
+                total_steps = sum(len(r.steps) for r in runs)
+                combined_output = "\n".join(
+                    f"[{r.pipeline_name}] ({r.status}):\n" + "\n".join(s.output_preview for s in r.steps if s.output_preview)
+                    for r in runs
+                )[:1000]
+
                 results.append({
                     "workspace": str(ws_path),
-                    "status": run_obj.status,
-                    "pipeline_id": target_p.id,
-                    "pipeline_name": target_p.name,
-                    "duration_ms": run_obj.total_duration_ms,
-                    "steps_count": len(run_obj.steps),
-                    "output": "\n".join(s.output_preview for s in run_obj.steps if s.output_preview)[:1000]
+                    "status": "success" if all_succeeded else "failed",
+                    "pipeline_id": first_run.pipeline_id if len(runs) == 1 else ", ".join(r.pipeline_id for r in runs),
+                    "pipeline_name": first_run.pipeline_name if len(runs) == 1 else f"{len(runs)} suites de tests",
+                    "duration_ms": total_duration,
+                    "steps_count": total_steps,
+                    "output": combined_output
                 })
 
             else:

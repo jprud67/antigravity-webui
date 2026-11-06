@@ -182,4 +182,9 @@ Un nouvel examen rigoureux et sans omission de l'ensemble de la plateforme a ét
    - Dans `ws.ts`, la connexion WebSocket associe désormais le sous-protocole d'authentification `Sec-WebSocket-Protocol` et le jeton d'URL `?token=...` (`wsUrl`), assurant une connexion sans accroc même derrière des proxys d'entreprise tronquant les en-têtes personnalisés.
 5. **Internationalisation Complète et Cohérence Visuelle (BUG-016) :**
    - Intégration dans `i18n.ts` de 109 clés de traduction manquantes (`doctor_active_monitoring`, `doctor_not_installed`, `coordinator_*`, `file_manager_*`, etc.), garantissant une expérience bilingue sans repli textuel non traduit.
+6. **Découverte Monorepo et Exécutables Python Cross-Platform dans le Coordinator (BUG-017) :**
+   - Implémentation de `_resolve_python_bin` dans `workspace_coordinator.py` pour détecter dynamiquement les environnements virtuels (`venv`, `.venv`) et exécutables (`python.exe`, `python`, `python3`) sur Linux, macOS et Windows sans jamais présumer un binaire global `python`.
+   - Prise en charge des monorepos fullstack (`frontend/package.json`, `backend/pyproject.toml`) avec scan des sous-dossiers et assignation précise du `cwd` des étapes de build, lint et test.
+   - Sécurisation des actions par lot Git (`GIT_TERMINAL_PROMPT=0`) et support multi-projets de `install_deps`. Suite de tests portée à 697 tests passants (14/14 sur le coordinator).
+
 

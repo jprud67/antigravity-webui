@@ -254,3 +254,155 @@ async def test_broadcast_coordinator_event():
     assert ws.sent[0]["event"] == "coordinator_event"
     assert ws.sent[0]["run_id"] == "test_run"
 
+
+def test_discover_pipelines_monorepo(tmp_path):
+    # Monorepo with frontend and backend subdirectories
+    frontend_dir = tmp_path / "frontend"
+    frontend_dir.mkdir()
+    (frontend_dir / "package.json").write_text(
+        json.dumps({
+            "name": "monorepo-frontend",
+            "scripts": {
+                "test": "vitest",
+                "build": "vite build",
+                "lint": "oxlint",
+                "typecheck": "tsc -b"
+            }
+        }),
+        encoding="utf-8"
+    )
+
+    backend_dir = tmp_path / "backend"
+    backend_dir.mkdir()
+    (backend_dir / "pyproject.toml").write_text(
+        """
+[project]
+name = "monorepo-backend"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+[tool.ruff]
+line-length = 88
+""",
+        encoding="utf-8"
+    )
+
+    pipelines = discover_workspace_pipelines(str(tmp_path))
+    pipeline_ids = [p.id for p in pipelines]
+
+    # Verify frontend pipelines detected
+    assert "frontend_node_test" in pipeline_ids
+    assert "frontend_node_build" in pipeline_ids
+    assert "frontend_node_lint" in pipeline_ids
+    assert "frontend_node_typecheck" in pipeline_ids
+
+    # Verify backend pipelines detected
+    assert "backend_python_pytest" in pipeline_ids
+    assert "backend_python_ruff" in pipeline_ids
+
+    # Verify cwds point to corresponding subdirectories
+    fe_build = next(p for p in pipelines if p.id == "frontend_node_build")
+    assert fe_build.steps[0].cwd == str(frontend_dir)
+    assert fe_build.pipeline_type == "build"
+
+    be_pytest = next(p for p in pipelines if p.id == "backend_python_pytest")
+    assert be_pytest.steps[0].cwd == str(backend_dir)
+    assert be_pytest.pipeline_type == "test"
+
+
+def test_resolve_python_bin_cross_platform(tmp_path):
+    from app.services.workspace_coordinator import _resolve_python_bin
+
+    # 1. Without venv, falls back to system Python
+    fallback_py = _resolve_python_bin(tmp_path, tmp_path)
+    assert fallback_py in ["python3", "python"] or "python" in fallback_py
+
+    # 2. With venv in subfolder
+    sub_backend = tmp_path / "backend"
+    venv_bin = sub_backend / "venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    fake_python = venv_bin / "python"
+    fake_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+
+    resolved_from_sub = _resolve_python_bin(sub_backend, tmp_path)
+    assert "venv" in resolved_from_sub
+    assert "python" in resolved_from_sub
+
+    resolved_from_root = _resolve_python_bin(tmp_path, tmp_path)
+    assert "backend" in resolved_from_root and "venv" in resolved_from_root
+
+
+@pytest.mark.asyncio
+async def test_execute_batch_action_git_terminal_prompt(tmp_path, monkeypatch):
+    str_path = str(tmp_path.resolve())
+    monkeypatch.setattr(
+        "app.services.workspace_coordinator.get_settings",
+        lambda: {"trustedWorkspaces": [str_path], "defaultWorkspace": str_path}
+    )
+
+    captured_env = {}
+
+    async def mock_subprocess_exec(*args, **kwargs):
+        nonlocal captured_env
+        captured_env = kwargs.get("env", {})
+
+        class DummyProcess:
+            returncode = 0
+
+            async def communicate(self):
+                return b"Fetched successfully", b""
+
+        return DummyProcess()
+
+    monkeypatch.setattr("asyncio.create_subprocess_exec", mock_subprocess_exec)
+
+    from app.services.workspace_coordinator import execute_batch_action
+
+    res = await execute_batch_action("git_fetch", [str_path])
+    assert res["processed_count"] == 1
+    assert res["results"][0]["status"] == "success"
+    assert captured_env.get("GIT_TERMINAL_PROMPT") == "0"
+
+
+@pytest.mark.asyncio
+async def test_execute_batch_action_install_deps_monorepo(tmp_path, monkeypatch):
+    str_path = str(tmp_path.resolve())
+    monkeypatch.setattr(
+        "app.services.workspace_coordinator.get_settings",
+        lambda: {"trustedWorkspaces": [str_path], "defaultWorkspace": str_path}
+    )
+
+    frontend_dir = tmp_path / "frontend"
+    frontend_dir.mkdir()
+    (frontend_dir / "package.json").write_text("{}", encoding="utf-8")
+
+    backend_dir = tmp_path / "backend"
+    backend_dir.mkdir()
+    (backend_dir / "requirements.txt").write_text("pytest\n", encoding="utf-8")
+
+    executed_commands = []
+
+    async def mock_subprocess_shell(cmd, **kwargs):
+        executed_commands.append((cmd, kwargs.get("cwd")))
+
+        class DummyProcess:
+            returncode = 0
+
+            async def communicate(self):
+                return b"Dependencies installed", b""
+
+        return DummyProcess()
+
+    monkeypatch.setattr("asyncio.create_subprocess_shell", mock_subprocess_shell)
+
+    from app.services.workspace_coordinator import execute_batch_action
+
+    res = await execute_batch_action("install_deps", [str_path])
+    assert res["processed_count"] == 1
+    assert res["results"][0]["status"] == "success"
+    assert len(executed_commands) == 2
+    assert "npm install" in executed_commands[0][0]
+    assert executed_commands[0][1] == str(frontend_dir)
+    assert "pip install -r requirements.txt" in executed_commands[1][0]
+    assert executed_commands[1][1] == str(backend_dir)
+
+

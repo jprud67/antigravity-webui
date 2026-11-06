@@ -27,6 +27,7 @@
 | **BUG-014** | **MOYEN** | Frontend / Logique | Synchronisation automatique de workspace ignorée pour les disques Windows | **Corrigé & Validé** |
 | **BUG-015** | **MOYEN** | Réseau / WebSocket | Perte de paramètre de token URL en mode WebSocket subprotocol | **Corrigé & Validé** |
 | **BUG-016** | **FAIBLE** | Frontend / i18n | 109 clés de traduction manquantes créant des replis textuels non traduits | **Corrigé & Validé** |
+| **BUG-017** | **MOYEN** | Multi-Workspace / Détection | Découverte pipelines monorepo et résolution exécutable Python cross-platform | **Corrigé & Validé** |
 
 ---
 
@@ -401,3 +402,31 @@ Tout redémarrage de l'application ou mise à jour par l'Updater efface l'intég
 
 #### 2. Remédiation Recommandée
 Persister ces événements dans la base SQLite locale `conversation_summaries.db` via une table dédiée `maintenance_records`.
+
+---
+
+### BUG-017 — Détection Inopérante des Pipelines dans les Monorepos et Résolution Cross-Platform de l'Exécutable Python (Workspace Coordinator)
+
+- **Sévérité :** **MOYEN (Détection & Robustesse Cross-Platform)**
+- **Composants :** `backend/app/services/workspace_coordinator.py`, `backend/app/api/coordinator.py`
+- **Fichiers & Lignes :**
+  - [workspace_coordinator.py:177-380, 840-970](file:///root/antigravity-webui/backend/app/services/workspace_coordinator.py#L177-L380)
+  - [test_workspace_coordinator.py:255-380](file:///root/antigravity-webui/backend/tests/test_workspace_coordinator.py#L255-L380)
+
+#### 1. Description
+Quatre anomalies affectaient le moteur de détection et d'orchestration multi-projets :
+1. **Absence de scan des sous-répertoires dans les monorepos fullstack :**
+   Dans une arborescence type monorepo (comme `antigravity-webui` avec `frontend/package.json` et `backend/pyproject.toml`), `discover_workspace_pipelines` ne vérifiait que la racine (`p / "package.json"` et `p / "*.py"`). Par conséquent, aucune étape de build/lint/test frontend ni étape python n'était découverte au niveau de la racine du dépôt.
+2. **Exécutable Python codé en dur sans détection cross-platform / venv :**
+   La variable `py_bin` était initialisée par défaut à `"python"`. Sur la majorité des distributions Linux récentes et conteneurs où seul `python3` est présent dans le `$PATH`, l'exécution de pipelines via le shell échouait avec `command not found: python` (code de retour 127). De plus, les environnements virtuels dans les sous-dossiers (`backend/venv` ou `backend/.venv`) étaient ignorés.
+3. **Risque de blocage interactif dans les actions Git par lot :**
+   Les actions par lot `git_fetch` et `git_pull` n'injectaient pas `GIT_TERMINAL_PROMPT=0` dans l'environnement du sous-processus, ce qui pouvait figer indéfiniment le worker asynchrone si un dépôt distant requérait des identifiants non configurés.
+4. **Action `install_deps` défaillante dans les monorepos et sur `pip` :**
+   L'action `install_deps` n'installait pas les dépendances des sous-dossiers et invoquait `pip install` directement sans résoudre l'exécutable Python ou l'environnement virtuel.
+
+#### 2. Remédiation & Validation
+- **Fonction `_resolve_python_bin` :** Détection résiliente recherchant `venv` et `.venv` dans le répertoire cible et la racine, avec support des exécutables Windows (`Scripts/python.exe`) et POSIX (`bin/python`), et repli transparent sur `python3` ou `sys.executable`.
+- **Scan Monorepo :** Détection automatique des sous-dossiers standards (`frontend`, `client`, `web`, `ui`, `backend`, `api`, `server`) pour `package.json` et les configurations Python, avec définition précise du répertoire de travail (`cwd`) de chaque étape.
+- **Sécurisation Git & Batch :** Ajout de `GIT_TERMINAL_PROMPT=0` dans l'environnement de commande de `git_fetch` et `git_pull`, et prise en charge des monorepos dans `install_deps`.
+- **Suite de tests :** 14 tests unitaires et d'intégration validés dans `test_workspace_coordinator.py`, confirmant la détection multi-projets et l'isolation des commandes.
+
