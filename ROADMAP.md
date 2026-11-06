@@ -243,10 +243,11 @@ flowchart TD
   3. Aligner la configuration racine `pyproject.toml` avec celle de `backend/pyproject.toml`.
   4. Sécuriser les intitulés UI en éliminant les termes de feuille de route interne et simulations factices conformément aux règles produit.
 - **Critères d'acceptation :**
-  - 100% des tests unitaires backend (687 tests) passent sous pytest.
+  - 100% des tests unitaires backend (688 tests) passent sous pytest.
   - Ruff 0 erreur sur backend et tests.
   - Oxlint 0 avertissement et 0 erreur sur les 103 fichiers frontend.
   - Build frontend Vite sans aucune erreur.
+  - Vérification automatisée de l'absence de jargon interne de roadmap dans l'UI (`test_ui_labels_compliance_no_internal_roadmap_terms`).
 
 ---
 

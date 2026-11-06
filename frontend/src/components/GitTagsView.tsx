@@ -374,7 +374,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
             <p className="text-xs text-slate-400 max-w-sm mt-1 mb-4">
               {searchQuery
                 ? t('git_search_reset_hint', 'Essayez de réinitialiser la recherche ou de changer le filtre de type.')
-                : t('git_first_tag_hint', 'Créez votre première version jalonnée (ex: v0.1.0) pour marquer une étape clé de votre projet.')}
+                : t('git_first_tag_hint', 'Créez votre première version de référence (ex: v0.1.0) pour marquer une étape clé de votre projet.')}
             </p>
             {!searchQuery && (
               <button

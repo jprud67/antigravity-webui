@@ -798,3 +798,21 @@ def test_git_worktree_stale_branch_cleanup(tmp_path):
     assert wt_info["branch"] == stale_branch
     assert Path(wt_info["path"]).exists()
 
+
+def test_ui_labels_compliance_no_internal_roadmap_terms():
+    """Verify that frontend components and i18n dictionaries do not expose internal roadmap jargon to end users."""
+    frontend_src = Path(__file__).resolve().parent.parent.parent / "frontend" / "src"
+    if not frontend_src.exists():
+        pytest.skip("Frontend source tree not present")
+
+    import re
+    # Patterns that shouldn't appear in user-facing JSX strings or UI i18n
+    forbidden_pattern = re.compile(r'\b(Phase\s+[0-9]+|Jalon\s+[0-9]+|Sprint\s+[0-9]+)\b', re.IGNORECASE)
+
+    components_dir = frontend_src / "components"
+    for comp in components_dir.glob("*.tsx"):
+        content = comp.read_text(encoding="utf-8")
+        matches = forbidden_pattern.findall(content)
+        assert not matches, f"Forbidden internal roadmap terms {matches} found in {comp.name}"
+
+

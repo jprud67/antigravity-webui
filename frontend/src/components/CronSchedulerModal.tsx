@@ -508,7 +508,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                     <span>{t('cron_continuous_mode', 'Continuous Autonomous Loop')}</span>
                   </div>
                   <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'var(--muted)' }}>
-                    {t('cron_continuous_mode_desc', 'Runs non-stop until manually stopped. Analyzes progress, performs auto-critique, and updates roadmap each cycle.')}
+                    {t('cron_continuous_mode_desc', 'Runs non-stop until manually stopped. Analyzes progress, performs self-review, and executes planned tasks each cycle.')}
                   </p>
                 </label>
               </div>
@@ -909,7 +909,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                                 <span>{t('cron_continuous_mode', 'Continuous Autonomous Loop')}</span>
                               </div>
                               <p className="text-[10px] mt-0.5 leading-relaxed" style={{ color: 'var(--muted)' }}>
-                                {t('cron_continuous_mode_desc', 'Runs non-stop until manually stopped. Analyzes progress, performs auto-critique, and updates roadmap each cycle.')}
+                                {t('cron_continuous_mode_desc', 'Runs non-stop until manually stopped. Analyzes progress, performs self-review, and executes planned tasks each cycle.')}
                               </p>
                             </label>
                           </div>

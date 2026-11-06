@@ -2729,6 +2729,36 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     es: 'El archivo « {0} » tiene cambios sin guardar. ¿Cerrar de todos modos?',
     de: 'Die Datei „{0}“ hat ungespeicherte Änderungen. Trotzdem schließen?',
   },
+  git_no_tags_matched: {
+    en: 'No tags match your search filter',
+    fr: 'Aucun tag ne correspond à votre filtre',
+    es: 'Ninguna etiqueta coincide con su filtro',
+    de: 'Keine Tags entsprechen Ihrem Filter',
+  },
+  git_no_tags_created: {
+    en: 'No Git tags created yet',
+    fr: 'Aucun tag Git créé',
+    es: 'Aún no se han creado etiquetas Git',
+    de: 'Noch keine Git-Tags erstellt',
+  },
+  git_search_reset_hint: {
+    en: 'Try resetting your search query or changing the tag filter.',
+    fr: 'Essayez de réinitialiser la recherche ou de changer le filtre de type.',
+    es: 'Intente restablecer la consulta de búsqueda o cambiar el filtro de etiquetas.',
+    de: 'Versuchen Sie, die Suche zurückzusetzen oder den Tag-Filter zu ändern.',
+  },
+  git_first_tag_hint: {
+    en: 'Create your first release tag (e.g. v0.1.0) to mark a milestone in your project.',
+    fr: 'Créez votre première version de référence (ex: v0.1.0) pour marquer une étape clé de votre projet.',
+    es: 'Cree su primera etiqueta de versión (ej: v0.1.0) para marcar un hito clave en su proyecto.',
+    de: 'Erstellen Sie Ihren ersten Release-Tag (z. B. v0.1.0), um einen Meilenstein zu markieren.',
+  },
+  create_tag_v010: {
+    en: 'Create tag v0.1.0',
+    fr: 'Créer le tag v0.1.0',
+    es: 'Crear etiqueta v0.1.0',
+    de: 'Tag v0.1.0 erstellen',
+  },
 };
 
 const STORAGE_KEY = 'antigravity-lang';
