@@ -78,6 +78,9 @@ class KillTaskRequest(BaseModel):
 
 @router.get("/list")
 def list_active_tasks(conversation_id: str | None = None, _ = Depends(require_auth)):
+    if conversation_id and not is_safe_conversation_id(conversation_id):
+        raise HTTPException(status_code=400, detail="Identifiant de conversation invalide.")
+
     tasks: list[dict[str, Any]] = []
     subagents: list[dict[str, Any]] = []
     running_processes: list[dict[str, Any]] = []
