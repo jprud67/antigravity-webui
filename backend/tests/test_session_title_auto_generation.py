@@ -140,6 +140,22 @@ def test_reconcile_missing_titles():
             assert r3 == "Titre Fixé"
 
 
+def test_derive_session_title_autonomous_cycle_from_roadmap_task():
+    raw = (
+        "[MODE CONTINU NON-STOP - CYCLE #127]\n"
+        "--- BILAN & AUTO-CRITIQUE DU CYCLE PRÉCÉDENT ---\n"
+        "- **Tâches en cours (Cycle #129)** :\n"
+        "  - [ ] PRIORITÉ 1 / FIX CI ACTIONS : Synchroniser composer.lock avec COMPOSER_ALLOW_SUPERUSER=1 composer update --lock --no-install\n"
+        "--- CONSIGNES DU CYCLE AUTONOME ---\n"
+        "1. Analyse les résultats...\n"
+    )
+    title = derive_session_title(raw, workspace="/root/jambo-api")
+    assert title.startswith("Cycle #127 — ")
+    assert "Synchroniser composer.lock" in title
+    # Do not cut inside filename composer.lock
+    assert "composer" in title and "lock" in title
+
+
 def test_api_regenerate_title_endpoint():
     from fastapi.testclient import TestClient
     from app.main import app

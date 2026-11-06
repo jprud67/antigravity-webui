@@ -359,6 +359,33 @@ _ALLOWED_CONVERSATION_SUMMARY_COLUMNS: frozenset[str] = frozenset({
 })
 
 
+def _read_first_user_prompt_from_transcript(cid: str) -> str:
+    """Lit rapidement le premier prompt utilisateur depuis les logs de transcript."""
+    if not cid:
+        return ""
+    for t_path in [
+        BRAIN_DIR / cid / ".system_generated" / "logs" / "transcript.jsonl",
+        BRAIN_DIR / cid / "logs" / "transcript.jsonl",
+        BRAIN_DIR / cid / "transcript.jsonl",
+    ]:
+        if t_path.exists():
+            try:
+                with open(t_path, "r", encoding="utf-8-sig", errors="replace") as f:
+                    for line in f:
+                        l = line.strip().lstrip("\ufeff")
+                        if not l:
+                            continue
+                        try:
+                            s = json.loads(l)
+                            if s.get("type") == "USER_INPUT" or s.get("source") == "USER_EXPLICIT":
+                                return str(s.get("content") or "")
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+    return ""
+
+
 def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     """Construit le dict conversation à partir d'une ligne SQLite et des métadonnées session."""
     cid = r["conversation_id"]
@@ -366,12 +393,19 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
     raw_title = (r["title"] or "").strip()
     if custom_title:
         display_title = custom_title
-    elif raw_title and raw_title.lower() not in ("nouvelle session", "new session", "session"):
+    elif raw_title and raw_title.lower() not in ("nouvelle session", "new session", "session") and not _BARE_CYCLE_RE.match(raw_title):
         display_title = raw_title
     else:
-        # Fallback dynamique intelligent : si raw_title est vide, dériver depuis preview
-        derived = derive_session_title(r["preview"] or "")
-        display_title = derived if derived and derived.lower() not in ("nouvelle session", "new session", "session") else "Nouvelle session"
+        # Fallback dynamique intelligent : si raw_title est vide ou bare 'Cycle #XX', dériver depuis preview ou transcript
+        ws_hint = str(r["workspace_uris"] or "") if "workspace_uris" in r.keys() else ""
+        derived = derive_session_title(r["preview"] or "", workspace=ws_hint)
+        if not derived or derived.lower() in ("nouvelle session", "new session", "session") or _BARE_CYCLE_RE.match(derived):
+            first_user = _read_first_user_prompt_from_transcript(cid)
+            if first_user:
+                alt = derive_session_title(first_user, workspace=ws_hint)
+                if alt and alt.lower() not in ("nouvelle session", "new session", "session"):
+                    derived = alt
+        display_title = derived if derived and derived.lower() not in ("nouvelle session", "new session", "session") else (raw_title or "Nouvelle session")
     raw_tags = meta.get("tags")
     safe_tags = list(raw_tags) if isinstance(raw_tags, list) else []
     raw_lmt = r["last_modified_time"]
@@ -666,6 +700,7 @@ _ECO_DIRECTIVE_RE = re.compile(r'\[CONSIGNE\s+SYST[ÈE]ME\s+[^\]]*\]\s*', re.IGN
 _CONTINUOUS_MEMORY_RE = re.compile(r'##\s*CONTINUOUS\s+AGENT\s+MEMORY[\s\S]*?(?=\n\s*\n\s*(?:[a-zA-Z0-9À-ÿ\"\'\‘\“\`\[]|$)|$)', re.IGNORECASE)
 _SYS_CONTEXT_PREFIX_RE = re.compile(r'^\[Directives\s+Syst[èe]me\s*/\s*Contexte\]\s*:?\s*', re.IGNORECASE)
 _AUTONOMOUS_CYCLE_RE = re.compile(r'\[MODE\s+CONTINU\s+NON-STOP\s*-\s*CYCLE\s*#(\d+)\]', re.IGNORECASE)
+_BARE_CYCLE_RE = re.compile(r'^Cycle\s*#\d+\s*$', re.IGNORECASE)
 _MISSION_PRINCIPALE_RE = re.compile(r'---\s*MISSION\s+PRINCIPALE\s*---\s*(?:\[CONSIGNE\s+SYST[ÈE]ME\s+[^\]]*\]\s*)?([\s\S]*?)(?:$|\n\s*---\s*)', re.IGNORECASE)
 _CYCLE_CONSIGNES_RE = re.compile(r'---\s*(?:BILAN\s*&|CONSIGNES\s+DU\s+CYCLE)[\s\S]*?(?:---\s*MISSION\s+PRINCIPALE\s*---\s*|$)', re.IGNORECASE)
 
@@ -772,7 +807,7 @@ def clean_user_prompt(raw: Any) -> str:
     return text.strip()
 
 
-def derive_session_title(raw: Any, max_length: int = 60) -> str:
+def derive_session_title(raw: Any, max_length: int = 60, workspace: str | None = None) -> str:
     """Dérive un titre court, lisible et pertinent à partir du prompt initial ou de la preview."""
     if not raw:
         return "Nouvelle session"
@@ -782,22 +817,82 @@ def derive_session_title(raw: Any, max_length: int = 60) -> str:
     cycle_m = _AUTONOMOUS_CYCLE_RE.search(raw_str)
     if cycle_m:
         cycle_num = cycle_m.group(1)
+        raw_topic = ""
+        # A. Chercher dans MISSION PRINCIPALE
         mission_m = _MISSION_PRINCIPALE_RE.search(raw_str)
-        raw_topic = mission_m.group(1).strip() if mission_m else ""
+        if mission_m:
+            raw_topic = mission_m.group(1).strip()
+
+        # B. Si non trouvé, chercher dans les tâches en cours du roadmap
+        if not raw_topic:
+            task_m = re.search(
+                r'T[âa]ches?\s+en\s+cours[^\n]*\n\s*-\s*\[\s*\]\s*(?:PRIORIT[ÉE]\s*\d+\s*/\s*)?([^:\n]+(?::\s*[^\n]+)?)',
+                raw_str,
+                re.IGNORECASE,
+            )
+            if task_m:
+                raw_topic = task_m.group(1).strip()
+
+        # C. Si non trouvé, chercher la première tâche ouverte "- [ ]"
+        if not raw_topic:
+            todo_m = re.search(
+                r'-\s*\[\s*\]\s*(?:PRIORIT[ÉE]\s*\d+\s*/\s*)?([^:\n]+(?::\s*[^\n]+)?)',
+                raw_str,
+            )
+            if todo_m:
+                raw_topic = todo_m.group(1).strip()
+
+        # D. Si non trouvé, chercher un objectif métier textuel
+        if not raw_topic:
+            goal_m = re.search(
+                r'(?:Continuer\s+|Audit\s+|Durcissement\s+|Migration\s+|D[ée]veloppement\s+|Correction\s+|Synchroniser\s+|Refactoriser\s+)[^\n]+',
+                raw_str,
+                re.IGNORECASE,
+            )
+            if goal_m:
+                raw_topic = goal_m.group(0).strip()
+
+        # E. Si toujours non trouvé, tenter d'extraire le projet depuis workspace ou texte
+        if not raw_topic:
+            proj_hint = ""
+            if workspace and isinstance(workspace, str):
+                cleaned_ws = re.sub(r'[\[\]"\'\\]', '', workspace).strip()
+                if "/" in cleaned_ws:
+                    proj_hint = Path(cleaned_ws.split()[-1]).name
+            if not proj_hint:
+                for cand in ("jambo-api", "mailora", "visaway", "moduscap", "captainauto", "autocms"):
+                    if cand in raw_str.lower():
+                        proj_hint = cand
+                        break
+            if proj_hint:
+                raw_topic = f"Projet {proj_hint}"
+
         raw_topic = _ECO_DIRECTIVE_RE.sub('', raw_topic).strip()
-        raw_topic = re.sub(r'^(?:Continuer\s+l[\s\']|Continuer\s+|Audit\s+de\s+|Exécuter\s+)', '', raw_topic, flags=re.I).strip()
-        first_phrase = raw_topic.split('\n')[0].split('.')[0].strip()
-        if len(first_phrase) > 40:
+        raw_topic = re.sub(
+            r'^(?:FIX\s+CI\s+ACTIONS\s*:\s*|PRIORIT[ÉE]\s*\d+\s*/\s*|Continuer\s+l[\s\']|Continuer\s+|Audit\s+de\s+|Exécuter\s+)',
+            '',
+            raw_topic,
+            flags=re.IGNORECASE,
+        ).strip()
+
+        parts = re.split(r'(?<=[a-zA-Z0-9À-ÿ])\.(?:\s+|$)', raw_topic)
+        first_phrase = parts[0].split('\n')[0].strip() if parts else raw_topic
+        first_phrase = re.sub(r'[`*_~]', '', first_phrase).strip()
+
+        if len(first_phrase) > 42:
             words = first_phrase.split()
             trunc: list[str] = []
             cur = 0
             for w in words:
-                if cur + len(w) + 1 > 40:
+                if cur + len(w) + 1 > 42:
                     break
                 trunc.append(w)
                 cur += len(w) + 1
-            first_phrase = " ".join(trunc) if trunc else first_phrase[:40]
-        return f"Cycle #{cycle_num} — {first_phrase.capitalize()}" if first_phrase else f"Cycle #{cycle_num}"
+            first_phrase = (" ".join(trunc) + "...") if trunc else (first_phrase[:42] + "...")
+
+        if first_phrase:
+            return f"Cycle #{cycle_num} — {first_phrase[0].upper() + first_phrase[1:]}"
+        return f"Cycle #{cycle_num} — Tâche autonome"
 
     cleaned = clean_user_prompt(raw)
     if not cleaned:
@@ -2052,16 +2147,17 @@ def reconcile_missing_titles(limit: int = 500, conn: Any = None) -> int:
 
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT conversation_id, title, preview
+        cursor.execute("PRAGMA table_info(conversation_summaries)")
+        table_cols = [c[1] for c in cursor.fetchall()]
+        has_ws = "workspace_uris" in table_cols
+        query_sql = f"""
+            SELECT conversation_id, title, preview{', workspace_uris' if has_ws else ''}
             FROM conversation_summaries
-            WHERE title IS NULL OR title = '' OR title = 'Nouvelle session' OR title = 'New session'
+            WHERE title IS NULL OR title = '' OR title = 'Nouvelle session' OR title = 'New session' OR title LIKE 'Cycle #%'
             ORDER BY last_modified_time DESC
             LIMIT ?
-            """,
-            (limit,)
-        )
+        """
+        cursor.execute(query_sql, (limit,))
         rows = cursor.fetchall()
         if not rows:
             return 0
@@ -2072,13 +2168,23 @@ def reconcile_missing_titles(limit: int = 500, conn: Any = None) -> int:
         for r in rows:
             if isinstance(r, sqlite3.Row):
                 cid = r["conversation_id"]
+                current_title = str(r["title"] or "").strip()
                 row_prev = r["preview"]
+                ws_uris = str(r["workspace_uris"] or "") if has_ws and "workspace_uris" in r.keys() else ""
             elif isinstance(r, dict):
                 cid = r.get("conversation_id", "")
+                current_title = str(r.get("title") or "").strip()
                 row_prev = r.get("preview", "")
+                ws_uris = str(r.get("workspace_uris") or "") if has_ws else ""
             else:
                 cid = str(r[0])
+                current_title = str(r[1] or "").strip()
                 row_prev = str(r[2]) if len(r) > 2 else ""
+                ws_uris = str(r[3]) if has_ws and len(r) > 3 else ""
+
+            # Si le titre actuel est déjà personnalisé, ou s'il est déjà informatif (pas vide, pas placeholder, pas bare Cycle #X), ignorer
+            if current_title and current_title.lower() not in ("nouvelle session", "new session", "session") and not _BARE_CYCLE_RE.match(current_title):
+                continue
 
             meta = all_meta.get(cid, {})
             if meta.get("customTitle") or meta.get("custom_title"):
@@ -2112,8 +2218,8 @@ def reconcile_missing_titles(limit: int = 500, conn: Any = None) -> int:
             if not raw_source:
                 raw_source = row_prev or ""
 
-            derived = derive_session_title(raw_source)
-            if derived and derived.lower() not in ("nouvelle session", "new session", "session"):
+            derived = derive_session_title(raw_source, workspace=ws_uris)
+            if derived and derived.lower() not in ("nouvelle session", "new session", "session") and not _BARE_CYCLE_RE.match(derived):
                 updates.append((derived, cid))
 
         if updates:
@@ -2121,7 +2227,7 @@ def reconcile_missing_titles(limit: int = 500, conn: Any = None) -> int:
                 """
                 UPDATE conversation_summaries
                 SET title = ?
-                WHERE conversation_id = ? AND (title IS NULL OR title = '' OR title = 'Nouvelle session' OR title = 'New session')
+                WHERE conversation_id = ?
                 """,
                 updates
             )
