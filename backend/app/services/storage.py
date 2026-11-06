@@ -397,7 +397,7 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
         display_title = raw_title
     else:
         # Fallback dynamique intelligent : si raw_title est vide ou bare 'Cycle #XX', dériver depuis preview ou transcript
-        ws_hint = str(r["workspace_uris"] or "") if "workspace_uris" in r.keys() else ""
+        ws_hint = str(r["workspace_uris"] or "") if "workspace_uris" in r else ""
         derived = derive_session_title(r["preview"] or "", workspace=ws_hint)
         if not derived or derived.lower() in ("nouvelle session", "new session", "session") or _BARE_CYCLE_RE.match(derived):
             first_user = _read_first_user_prompt_from_transcript(cid)
@@ -905,7 +905,7 @@ def derive_session_title(raw: Any, max_length: int = 60, workspace: str | None =
     first_line = re.sub(r'[`*_~]', '', first_line).strip()
 
     # Si commence par une formule générique
-    first_line = re.sub(r'^(?:peux-tu\s+|pouvez-vous\s+|merci\s+de\s+|please\s+)', '', first_line, flags=re.I).strip()
+    first_line = re.sub(r'^(?:peux-tu\s+|pouvez-vous\s+|merci\s+de\s+|please\s+)', '', first_line, flags=re.IGNORECASE).strip()
 
     # Couper à la première ponctuation forte si elle est raisonnable (≥ 15 chars)
     punct_match = re.search(r'^(.*?[\?\!\.])(?:\s|$)', first_line)
@@ -2168,7 +2168,7 @@ def reconcile_missing_titles(limit: int = 500, conn: Any = None) -> int:
                 cid = r["conversation_id"]
                 current_title = str(r["title"] or "").strip()
                 row_prev = r["preview"]
-                ws_uris = str(r["workspace_uris"] or "") if has_ws and "workspace_uris" in r.keys() else ""
+                ws_uris = str(r["workspace_uris"] or "") if has_ws and "workspace_uris" in r else ""
             elif isinstance(r, dict):
                 cid = r.get("conversation_id", "")
                 current_title = str(r.get("title") or "").strip()

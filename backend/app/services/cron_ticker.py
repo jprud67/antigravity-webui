@@ -19,7 +19,7 @@ import json
 import logging
 import re
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -274,7 +274,7 @@ async def run_agy_task(
     try:
         try:
             await asyncio.wait_for(proc.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             timed_out = True
             await terminate_process_group_async(proc, grace=2.0)
 
@@ -302,7 +302,7 @@ async def run_agy_task(
                     t.cancel()
             try:
                 await asyncio.wait_for(asyncio.shield(asyncio.gather(*pumps, quota_task, return_exceptions=True)), timeout=2.0)
-            except (asyncio.TimeoutError, Exception):
+            except (TimeoutError, Exception):
                 pass
         finally:
             if job_id and _running_job_procs.get(job_id) is proc:
@@ -504,7 +504,7 @@ def _recompute_job_next_run(j: dict[str, Any]) -> None:
 
     # Si le mode continu non-stop est activé, réenchaîner immédiatement la tâche
     if j.get("continuous_mode"):
-        j["next_run_at"] = (datetime.now(timezone.utc) + timedelta(seconds=3)).isoformat()
+        j["next_run_at"] = (datetime.now(UTC) + timedelta(seconds=3)).isoformat()
         j["state"] = "scheduled"
         return
 
@@ -514,8 +514,8 @@ def _recompute_job_next_run(j: dict[str, Any]) -> None:
         try:
             due = datetime.fromisoformat(str(current_next).replace("Z", "+00:00"))
             if due.tzinfo is None:
-                due = due.replace(tzinfo=timezone.utc)
-            if due > datetime.now(timezone.utc):
+                due = due.replace(tzinfo=UTC)
+            if due > datetime.now(UTC):
                 is_future = True
         except (ValueError, TypeError):
             pass
@@ -542,7 +542,7 @@ def _write_job_log_entry(
     """Écrit le fichier journal pour une exécution de tâche cron et applique les restrictions d'accès."""
     ensure_dirs()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    now_dt = datetime.now(timezone.utc)
+    now_dt = datetime.now(UTC)
     stamp = now_dt.strftime("%Y%m%d_%H%M%S")
     log_file = OUTPUT_DIR / f"{job_id}_{stamp}.log"
     if log_file.exists():
@@ -617,7 +617,7 @@ async def _execute_job(job: dict[str, Any]) -> None:
 
         result = await run_job_with_failover(current_job_dict)
         duration = round(time.time() - started, 1)
-        start_dt = datetime.fromtimestamp(started, tz=timezone.utc)
+        start_dt = datetime.fromtimestamp(started, tz=UTC)
 
         output_str = result.get("output") or ""
         # Extraire le résumé du roadmap / critique pour le cycle suivant
@@ -643,28 +643,35 @@ async def _execute_job(job: dict[str, Any]) -> None:
         should_continue = False
         # Mise à jour du job (verrou pour éviter les écritures concurrentes)
         async with _jobs_write_lock:
-            def _update_result(data: dict[str, Any]) -> None:
+            def _update_result(
+                data: dict[str, Any],
+                _res=result,
+                _dur=duration,
+                _lf=log_file,
+                _cyc=cycle,
+                _los=last_output_summary,
+            ) -> None:
                 nonlocal should_continue
                 for j in data.get("jobs", []):
                     if j.get("id") == job_id:
                         j["last_run_at"] = now_iso()
-                        j["last_status"] = result.get("status", "failed")
-                        j["last_duration_seconds"] = duration
-                        if log_file:
-                            j["last_log"] = str(log_file)
-                        failovers = result.get("failovers")
+                        j["last_status"] = _res.get("status", "failed")
+                        j["last_duration_seconds"] = _dur
+                        if _lf:
+                            j["last_log"] = str(_lf)
+                        failovers = _res.get("failovers")
                         if failovers:
                             j["last_failover"] = failovers[-1]
                         if is_continuous:
-                            j["cycle_count"] = cycle
-                            if last_output_summary:
-                                j["roadmap_summary"] = last_output_summary
+                            j["cycle_count"] = _cyc
+                            if _los:
+                                j["roadmap_summary"] = _los
 
                         is_active = (j.get("enabled", True) and j.get("state") not in ("paused", "disabled"))
-                        is_interrupted = result.get("status") in ("interrupted", "cancelled")
+                        is_interrupted = _res.get("status") in ("interrupted", "cancelled")
                         if is_continuous and is_active and not is_interrupted:
                             should_continue = True
-                            j["next_run_at"] = (datetime.now(timezone.utc) + timedelta(seconds=3)).isoformat()
+                            j["next_run_at"] = (datetime.now(UTC) + timedelta(seconds=3)).isoformat()
                             j["state"] = "scheduled"
                         else:
                             should_continue = False
@@ -696,7 +703,7 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
     except asyncio.CancelledError:
         logger.warning(f"[Cron] Job {job_id} annulé.")
         duration = round(time.time() - started, 1)
-        start_dt = datetime.fromtimestamp(started, tz=timezone.utc)
+        start_dt = datetime.fromtimestamp(started, tz=UTC)
 
         async def _finalize_interrupted() -> None:
             log_file = None
@@ -738,7 +745,7 @@ async def _guarded_execute(job: dict[str, Any]) -> None:
     except Exception as e:
         logger.error(f"[Cron] Erreur pendant l'exécution du job {job_id}: {e}", exc_info=True)
         duration = round(time.time() - started, 1)
-        start_dt = datetime.fromtimestamp(started, tz=timezone.utc)
+        start_dt = datetime.fromtimestamp(started, tz=UTC)
         log_file = None
         if job_id:
             log_file = await asyncio.to_thread(
@@ -781,7 +788,7 @@ async def tick_once() -> int:
     to_launch: list[dict[str, Any]] = []
 
     def _collect_due(data: dict[str, Any]) -> list[dict[str, Any]]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         due_jobs: list[dict[str, Any]] = []
 
         for job in data.get("jobs", []):
@@ -800,7 +807,7 @@ async def tick_once() -> int:
             try:
                 due = datetime.fromisoformat(str(nxt).replace("Z", "+00:00"))
                 if due.tzinfo is None:
-                    due = due.replace(tzinfo=timezone.utc)
+                    due = due.replace(tzinfo=UTC)
             except (ValueError, TypeError) as parse_err:
                 logger.warning(
                     f"[Cron] Date next_run_at invalide pour le job {job_id} ('{nxt}': {parse_err}). Recalcul automatique."
@@ -868,13 +875,13 @@ async def cron_ticker_loop() -> None:
                                 try:
                                     nxt_dt = datetime.fromisoformat(str(nxt).replace("Z", "+00:00"))
                                     if nxt_dt.tzinfo is None:
-                                        nxt_dt = nxt_dt.replace(tzinfo=timezone.utc)
-                                    if nxt_dt <= datetime.now(timezone.utc):
+                                        nxt_dt = nxt_dt.replace(tzinfo=UTC)
+                                    if nxt_dt <= datetime.now(UTC):
                                         recalc = True
                                 except Exception:
                                     recalc = True
                             if j.get("continuous_mode"):
-                                j["next_run_at"] = (datetime.now(timezone.utc) + timedelta(seconds=5)).isoformat()
+                                j["next_run_at"] = (datetime.now(UTC) + timedelta(seconds=5)).isoformat()
                                 j["state"] = "scheduled"
                             elif recalc:
                                 computed = compute_next_run(j.get("schedule") or j.get("schedule_display"))
