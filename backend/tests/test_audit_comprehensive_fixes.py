@@ -848,7 +848,8 @@ async def test_memory_api_workspace_sanitization(auth_headers: dict):
         assert res_invalid.status_code == 400
 
         # Normal valid workspace accepted
-        res_valid = await ac.get("/api/memory?workspace=/root/antigravity-webui", headers=auth_headers)
+        from app.config import REPO_ROOT
+        res_valid = await ac.get(f"/api/memory?workspace={REPO_ROOT}", headers=auth_headers)
         assert res_valid.status_code == 200
 
 

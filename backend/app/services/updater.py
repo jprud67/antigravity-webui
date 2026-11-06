@@ -78,15 +78,62 @@ _DEFAULT_GIT_ARGS = [
 ]
 
 
+def _get_git_identity() -> tuple[str, str]:
+    name = os.environ.get("ANTIGRAVITY_GIT_USER_NAME") or os.environ.get("GIT_AUTHOR_NAME")
+    email = os.environ.get("ANTIGRAVITY_GIT_USER_EMAIL") or os.environ.get("GIT_AUTHOR_EMAIL")
+    if not name or not email:
+        try:
+            res_name = subprocess.run([GIT_BIN, "config", "user.name"], capture_output=True, text=True, timeout=2)
+            cfg_name = res_name.stdout.strip()
+            if cfg_name and not name:
+                name = cfg_name
+        except Exception:
+            pass
+        try:
+            res_email = subprocess.run([GIT_BIN, "config", "user.email"], capture_output=True, text=True, timeout=2)
+            cfg_email = res_email.stdout.strip()
+            if cfg_email and not email:
+                email = cfg_email
+        except Exception:
+            pass
+    return (name or "jprud67", email or "jprud67@gmail.com")
+
+
+def _get_git_env() -> dict[str, str]:
+    author_name, author_email = _get_git_identity()
+    return {
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ASKPASS": "",
+        "SSH_ASKPASS": "",
+        "GIT_AUTHOR_NAME": author_name,
+        "GIT_AUTHOR_EMAIL": author_email,
+        "GIT_COMMITTER_NAME": author_name,
+        "GIT_COMMITTER_EMAIL": author_email,
+    }
+
+
+def _get_git_args() -> list[str]:
+    author_name, author_email = _get_git_identity()
+    return [
+        "-c", f"user.name={author_name}",
+        "-c", f"user.email={author_email}",
+        "-c", f"author.name={author_name}",
+        "-c", f"author.email={author_email}",
+        "-c", "format.signoff=false",
+        "-c", "commit.gpgsign=false",
+        "-c", "trailer.co-authored-by.key=",
+    ]
+
+
 def _git_cmd(args: list[str], timeout: int = 10, cwd: Path | None = None) -> str | None:
     target_cwd = cwd or REPO_DIR
     env = {
         **os.environ,
-        **_DEFAULT_GIT_ENV,
+        **_get_git_env(),
     }
     try:
         res = subprocess.run(
-            [GIT_BIN, *_DEFAULT_GIT_ARGS, *args],
+            [GIT_BIN, *_get_git_args(), *args],
             cwd=str(target_cwd),
             capture_output=True,
             text=True,
@@ -298,7 +345,7 @@ def check_for_updates(force: bool = False) -> dict[str, Any]:
         # 1. Fetch des dernières références du dépôt distant
         fetch_env = {
             **os.environ,
-            **_DEFAULT_GIT_ENV,
+            **_get_git_env(),
         }
         fetch_res = subprocess.run(
             [GIT_BIN, "fetch", remote, upstream_branch, "--quiet"],
@@ -400,10 +447,10 @@ async def apply_update() -> dict[str, Any]:
     # 2. Pull fast-forward (avec tentative de rebase automatique si divergence sans conflit)
     git_env = {
         **os.environ,
-        **_DEFAULT_GIT_ENV,
+        **_get_git_env(),
     }
     pull_proc = await asyncio.create_subprocess_exec(
-        GIT_BIN, *_DEFAULT_GIT_ARGS, "pull", "--ff-only", remote, upstream_branch,
+        GIT_BIN, *_get_git_args(), "pull", "--ff-only", remote, upstream_branch,
         cwd=str(REPO_DIR),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -430,7 +477,7 @@ async def apply_update() -> dict[str, Any]:
         if "diverging" in err_msg.lower() or "not possible to fast-forward" in err_msg.lower():
             logger.info(f"Divergence détectée, tentative de git pull --rebase {remote} {upstream_branch}...")
             rebase_proc = await asyncio.create_subprocess_exec(
-                GIT_BIN, *_DEFAULT_GIT_ARGS, "pull", "--rebase", remote, upstream_branch,
+                GIT_BIN, *_get_git_args(), "pull", "--rebase", remote, upstream_branch,
                 cwd=str(REPO_DIR),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
