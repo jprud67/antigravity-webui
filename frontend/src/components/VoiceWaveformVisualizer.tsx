@@ -26,7 +26,7 @@ export const VoiceWaveformVisualizer: React.FC<VoiceWaveformVisualizerProps> = (
     let analyser: AnalyserNode | null = null;
     let stream: MediaStream | null = null;
     let animationFrameId: number | null = null;
-    let simulatedPhase = 0;
+    let wavePhase = 0;
 
     const setupAudio = async () => {
       try {
@@ -119,9 +119,9 @@ export const VoiceWaveformVisualizer: React.FC<VoiceWaveformVisualizerProps> = (
         }
       } else {
         // Fallback animated sine wave equalizer bars
-        simulatedPhase += 0.08;
+        wavePhase += 0.08;
         for (let i = 0; i < totalBars; i++) {
-          const wave = Math.sin(simulatedPhase + i * 0.35) * 0.5 + 0.5;
+          const wave = Math.sin(wavePhase + i * 0.35) * 0.5 + 0.5;
           const minBarHeight = 4;
           const barHeight = Math.max(minBarHeight, wave * (h - 10));
           const x = i * (barWidth + gap);

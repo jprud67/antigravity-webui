@@ -64,10 +64,10 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
   const [savingConfig, setSavingConfig] = useState(false);
   const [configSaved, setConfigSaved] = useState(false);
 
-  // Simulator state
-  const [simPrompt, setSimPrompt] = useState('Où se trouve le projet antigravity-webui ?');
-  const [simResult, setSimResult] = useState<RecallHookResult | null>(null);
-  const [testingSim, setTestingSim] = useState(false);
+  // Evaluation state
+  const [evalPrompt, setEvalPrompt] = useState('Où se trouve le projet antigravity-webui ?');
+  const [evalResult, setEvalResult] = useState<RecallHookResult | null>(null);
+  const [evaluating, setEvaluating] = useState(false);
 
   // Load memories and configuration
   const loadData = useCallback(async () => {
@@ -185,16 +185,16 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
     }
   };
 
-  const handleTestSimulator = async () => {
-    if (!simPrompt.trim()) return;
+  const handleEvaluateRecall = async () => {
+    if (!evalPrompt.trim()) return;
     try {
-      setTestingSim(true);
-      const res = await vectorMemoryApi.executeRecall(simPrompt.trim(), 'default');
-      setSimResult(res);
+      setEvaluating(true);
+      const res = await vectorMemoryApi.executeRecall(evalPrompt.trim(), 'default');
+      setEvalResult(res);
     } catch (err: any) {
       showToast(err.message || 'Evaluation failed', 'error');
     } finally {
-      setTestingSim(false);
+      setEvaluating(false);
     }
   };
 
@@ -543,7 +543,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
               </div>
             </div>
           ) : (
-            /* Settings & Simulator Tab */
+            /* Settings & Real-time Evaluation Tab */
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x overflow-hidden" style={{ borderColor: 'var(--border)' }}>
               {/* Config Form */}
               <div className="p-4 sm:p-6 overflow-y-auto space-y-4" style={{ backgroundColor: 'var(--surface)' }}>
@@ -692,7 +692,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                 </div>
               </div>
 
-              {/* Simulator */}
+              {/* Real-time Recall Evaluation */}
               <div
                 className="p-4 sm:p-6 overflow-y-auto space-y-4 flex flex-col"
                 style={{ backgroundColor: 'var(--surface-subtle)' }}
@@ -710,8 +710,8 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={simPrompt}
-                    onChange={(e) => setSimPrompt(e.target.value)}
+                    value={evalPrompt}
+                    onChange={(e) => setEvalPrompt(e.target.value)}
                     placeholder={t('vector_sim_placeholder', 'Entrez un prompt à évaluer...')}
                     className="flex-1 px-3 py-2 rounded-xl border text-xs focus:outline-hidden"
                     style={{
@@ -721,8 +721,8 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                     }}
                   />
                   <button
-                    onClick={handleTestSimulator}
-                    disabled={testingSim}
+                    onClick={handleEvaluateRecall}
+                    disabled={evaluating}
                     className="px-4 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-sm shrink-0"
                     style={{
                       backgroundColor: 'var(--accent-bg)',
@@ -730,28 +730,28 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                       color: 'var(--accent-text)'
                     }}
                   >
-                    {testingSim ? t('vector_sim_testing', 'Calcul...') : t('vector_sim_btn', 'Évaluer')}
+                    {evaluating ? t('vector_sim_testing', 'Calcul...') : t('vector_sim_btn', 'Évaluer')}
                   </button>
                 </div>
 
-                {simResult && (
+                {evalResult && (
                   <div className="flex-1 flex flex-col space-y-3 pt-2">
                     <div className="flex items-center gap-2 text-xs">
                       <span className="font-semibold" style={{ color: 'var(--muted)' }}>
                         {t('vector_status_label', 'Statut :')}
                       </span>
                       <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium border ${
-                        simResult.shouldInject 
+                        evalResult.shouldInject 
                           ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
                           : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
                       }`}>
-                        {simResult.shouldInject 
-                          ? t('vector_injection_active_count', 'Injection active ({0} souvenirs)', simResult.recalledCount)
+                        {evalResult.shouldInject 
+                          ? t('vector_injection_active_count', 'Injection active ({0} souvenirs)', evalResult.recalledCount)
                           : t('vector_injection_ignored', 'Prompt ignoré ou aucune correspondance')}
                       </span>
                     </div>
 
-                    {simResult.contextBlock ? (
+                    {evalResult.contextBlock ? (
                       <div className="flex-1 flex flex-col space-y-1">
                         <span className="text-[11px] font-mono" style={{ color: 'var(--muted)' }}>
                           {t('vector_xml_block', 'BLOC XML INJECTÉ DANS LE SYSTÈME :')}
@@ -764,7 +764,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                             color: 'var(--text)'
                           }}
                         >
-                          {simResult.contextBlock}
+                          {evalResult.contextBlock}
                         </pre>
                       </div>
                     ) : (

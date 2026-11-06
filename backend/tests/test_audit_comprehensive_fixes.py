@@ -800,19 +800,31 @@ def test_git_worktree_stale_branch_cleanup(tmp_path):
 
 
 def test_ui_labels_compliance_no_internal_roadmap_terms():
-    """Verify that frontend components and i18n dictionaries do not expose internal roadmap jargon to end users."""
+    """Verify that frontend components and i18n dictionaries do not expose internal roadmap jargon or synthetic data modes to end users."""
     frontend_src = Path(__file__).resolve().parent.parent.parent / "frontend" / "src"
     if not frontend_src.exists():
         pytest.skip("Frontend source tree not present")
 
     import re
     # Patterns that shouldn't appear in user-facing JSX strings or UI i18n
-    forbidden_pattern = re.compile(r'\b(Phase\s+[0-9]+|Jalon\s+[0-9]+|Sprint\s+[0-9]+)\b', re.IGNORECASE)
+    forbidden_roadmap_pattern = re.compile(r'\b(Phase\s+[0-9]+|Jalon\s+[0-9]+|Sprint\s+[0-9]+)\b', re.IGNORECASE)
+    forbidden_sim_pattern = re.compile(r'\b(Données Synthétisées|Mode Démo|Mode Demo)\b', re.IGNORECASE)
 
     components_dir = frontend_src / "components"
     for comp in components_dir.glob("*.tsx"):
         content = comp.read_text(encoding="utf-8")
-        matches = forbidden_pattern.findall(content)
-        assert not matches, f"Forbidden internal roadmap terms {matches} found in {comp.name}"
+        matches_roadmap = forbidden_roadmap_pattern.findall(content)
+        assert not matches_roadmap, f"Forbidden internal roadmap terms {matches_roadmap} found in {comp.name}"
+        matches_sim = forbidden_sim_pattern.findall(content)
+        assert not matches_sim, f"Forbidden simulation terms {matches_sim} found in {comp.name}"
+
+    # Also verify i18n dictionary
+    i18n_file = frontend_src / "services" / "i18n.ts"
+    if i18n_file.exists():
+        i18n_content = i18n_file.read_text(encoding="utf-8")
+        matches_i18n_roadmap = forbidden_roadmap_pattern.findall(i18n_content)
+        assert not matches_i18n_roadmap, f"Forbidden internal roadmap terms {matches_i18n_roadmap} in i18n.ts"
+        matches_i18n_sim = forbidden_sim_pattern.findall(i18n_content)
+        assert not matches_i18n_sim, f"Forbidden simulation terms {matches_i18n_sim} in i18n.ts"
 
 

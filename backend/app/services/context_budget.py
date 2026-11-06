@@ -392,7 +392,7 @@ def enforce_context_budget(
     if len(user_step_indices) > (preserve_last_n_turns + 1):
         # Préserve le Tour 1 intégral (contexte originel / objectif)
         # Préserve les N derniers tours utilisateur
-        # Replie les tours intermédiaires dans un point d'étape synthétique
+        # Replie les tours intermédiaires dans un point d'étape consolidé
         first_turn_end = user_step_indices[1]
         interm_steps = steps[first_turn_end:boundary_idx]
 

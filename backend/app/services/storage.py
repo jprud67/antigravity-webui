@@ -1849,7 +1849,7 @@ Cette nouvelle section de chat démarre avec un compteur de tokens réinitialis�
         "type": "PLANNER_RESPONSE",
         "status": "DONE",
         "created_at": now_iso,
-        "content": f"✨ **Nouvelle section de chat initialisée avec mémoire intégrée !**\n\nJ'ai synthétisé et repris tout le contexte de la conversation précédente (**« {source_title} »**). L'ensemble des décisions, fichiers créés et statuts d'avancement sont préservés, tandis que votre compteur de contexte a été réinitialisé à zéro pour vous garantir une réactivité maximale.\n\nQuelle est l'étape suivante sur laquelle nous travaillons ?",
+        "content": f"✨ **Nouvelle section de chat initialisée avec mémoire intégrée !**\n\nJ'ai condensé et résumé tout le contexte de la conversation précédente (**« {source_title} »**). L'ensemble des décisions, fichiers créés et statuts d'avancement sont préservés, tandis que votre compteur de contexte a été réinitialisé à zéro pour vous garantir une réactivité maximale.\n\nQuelle est l'étape suivante sur laquelle nous travaillons ?",
         "conversation_id": new_id
     }
 
