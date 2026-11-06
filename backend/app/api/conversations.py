@@ -645,17 +645,21 @@ def remove_bookmark(conversation_id: str, bookmark_id: str, _ = Depends(require_
 
 
 @router.delete("")
-async def delete_all_conversations(_ = Depends(require_auth)):
+async def delete_all_conversations(current_id: str | None = Query(None), _ = Depends(require_auth)):
     """Supprime toutes les conversations sauf la session active courante.
     Enregistre les tombstones pour empêcher la réapparition via la réconciliation CLI."""
     from app.config import BRAIN_DIR
     from app.services.storage import get_db_connection as _get_db
 
+    running_sessions = set(execution_manager.get_running_conversations())
+    if current_id and is_safe_conversation_id(current_id):
+        running_sessions.add(current_id)
+
     conn = _get_db()
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT conversation_id FROM conversation_summaries")
-        all_ids = [r[0] for r in cursor.fetchall()]
+        all_ids = [r[0] for r in cursor.fetchall() if r[0] not in running_sessions]
     finally:
         conn.close()
 
@@ -664,7 +668,7 @@ async def delete_all_conversations(_ = Depends(require_auth)):
         try:
             for child in BRAIN_DIR.iterdir():
                 if child.is_dir() and is_safe_conversation_id(child.name):
-                    if child.name not in all_ids:
+                    if child.name not in all_ids and child.name not in running_sessions:
                         all_ids.append(child.name)
         except Exception as e:
             logger.debug(f"Brain dir scan in delete_all_conversations error: {e}")

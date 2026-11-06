@@ -2010,7 +2010,7 @@ def bulk_delete_conversations(conversation_ids: list[str]) -> bool:
             [(cid,) for cid in safe_ids]
         )
         # Nettoyage en cascade FTS et partages associés
-        for table in ("session_fts_index_state", "session_fts_indexed_messages", "shared_sessions"):
+        for table in ("session_fts_index_state", "session_fts_indexed_messages", "shared_sessions", "conversations_fts"):
             try:
                 cursor.executemany(f"DELETE FROM {table} WHERE conversation_id = ?", [(cid,) for cid in safe_ids])
             except Exception:
@@ -2054,7 +2054,7 @@ def delete_conversation(conversation_id: str) -> bool:
             (conversation_id,)
         )
         # Nettoyage en cascade FTS et partages associés
-        for table in ("session_fts_index_state", "session_fts_indexed_messages", "shared_sessions"):
+        for table in ("session_fts_index_state", "session_fts_indexed_messages", "shared_sessions", "conversations_fts"):
             try:
                 cursor.execute(f"DELETE FROM {table} WHERE conversation_id = ?", (conversation_id,))
             except Exception:
