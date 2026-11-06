@@ -2,7 +2,7 @@ import logging
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -296,7 +296,7 @@ def _mark_task_cancelled(task_id: str) -> bool:
                 if tfile.exists() and tfile.is_file():
                     try:
                         with open(tfile, "a", encoding="utf-8") as f:
-                            f.write(f"\n[Task cancelled by user]\nCompleted At: {datetime.now(timezone.utc).isoformat()}\n")
+                            f.write(f"\n[Task cancelled by user]\nCompleted At: {datetime.now(UTC).isoformat()}\n")
                         marked = True
                         return True
                     except Exception:

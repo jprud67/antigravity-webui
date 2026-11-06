@@ -1,27 +1,26 @@
 """Tests for Plugin Sandbox, Watchdog Sentinel, and Maintenance Sweeps — v0.5.0"""
 import pytest
+
+from app.services.maintenance_sweeps import (
+    sweep_changelog_summary,
+    sweep_dead_git_branches,
+)
 from app.services.plugin_sandbox import (
-    ensure_plugin_schema,
-    register_plugin,
-    get_plugin,
-    list_plugins,
     disable_plugin,
+    ensure_plugin_schema,
+    get_plugin,
     invoke_plugin,
+    list_plugins,
+    register_plugin,
 )
 from app.services.watchdog_sentinel import (
-    get_alerts,
-    resolve_alert,
-    clear_alerts,
-    run_watchdog_scan,
-    get_watchdog_status,
     _add_alert,
+    clear_alerts,
+    get_alerts,
+    get_watchdog_status,
+    resolve_alert,
+    run_watchdog_scan,
 )
-from app.services.maintenance_sweeps import (
-    sweep_dead_git_branches,
-    sweep_changelog_summary,
-    get_sweep_history,
-)
-
 
 # ─────────────────── PLUGIN SANDBOX ─────────────────────────────────────────
 
@@ -181,6 +180,7 @@ def test_sweep_history_recorded():
 
 def test_plugins_and_watchdog_unauthenticated_rejected():
     from fastapi.testclient import TestClient
+
     from app.main import app
 
     client = TestClient(app)

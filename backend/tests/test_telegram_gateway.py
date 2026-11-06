@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from app.services.messaging_gateway import (

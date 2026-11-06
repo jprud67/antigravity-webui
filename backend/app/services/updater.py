@@ -411,7 +411,7 @@ async def apply_update() -> dict[str, Any]:
     )  # nosec B603, B607
     try:
         stdout, stderr = await asyncio.wait_for(pull_proc.communicate(), timeout=45.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         try:
             await terminate_process_group_async(pull_proc, grace=0.5)
         except Exception as e:
@@ -438,7 +438,7 @@ async def apply_update() -> dict[str, Any]:
             )  # nosec B603, B607
             try:
                 r_out, r_err = await asyncio.wait_for(rebase_proc.communicate(), timeout=45.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 try:
                     await terminate_process_group_async(rebase_proc, grace=0.5)
                 except Exception as e:
@@ -499,7 +499,7 @@ async def apply_update() -> dict[str, Any]:
                         _i_out, i_err = await asyncio.wait_for(install_proc.communicate(), timeout=180.0)
                         if install_proc.returncode != 0:
                             logger.warning(f"npm install warning: {i_err.decode(errors='replace').strip()}")
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         try:
                             await terminate_process_group_async(install_proc, grace=0.5)
                         except Exception as te:
@@ -525,7 +525,7 @@ async def apply_update() -> dict[str, Any]:
                 logger.warning(f"Frontend build failed after update: {build_output}")
             else:
                 build_output = "Frontend compilé avec succès."
-        except asyncio.TimeoutError:
+        except TimeoutError:
             build_ok = False
             build_output = "Délai d'attente dépassé pour la compilation frontend (300s)."
             if build_proc:

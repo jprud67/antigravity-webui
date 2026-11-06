@@ -17,7 +17,7 @@ import re
 import sqlite3
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.config import BRAIN_DIR, CONVERSATION_DB
@@ -167,7 +167,7 @@ class TranscriptFtsService:
         if not text or not text.strip():
             return False
 
-        ts = timestamp or datetime.now(timezone.utc).isoformat()
+        ts = timestamp or datetime.now(UTC).isoformat()
         close_after = False
         if conn is None:
             conn = _get_connection()
@@ -283,7 +283,7 @@ class TranscriptFtsService:
                             content = (content + "\n" + "\n".join(tool_texts)).strip()
 
                     msg_id = f"step_{step_idx}"
-                    ts = step.get("timestamp") or datetime.now(timezone.utc).isoformat()
+                    ts = step.get("timestamp") or datetime.now(UTC).isoformat()
                     cleaned_text = content.strip()
 
                     if cleaned_text:

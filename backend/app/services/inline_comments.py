@@ -10,7 +10,7 @@ import logging
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -131,7 +131,7 @@ def create_comment(payload: CommentCreatePayload) -> dict[str, Any]:
         raise ValueError("Invalid conversation_id")
 
     comment_id = f"comment_{uuid.uuid4().hex[:10]}"
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     clean_content = payload.content.strip()
 
     with _get_db() as conn:

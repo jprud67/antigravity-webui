@@ -641,7 +641,7 @@ async def execute_pipeline_run(
                                     rem_step.status = "skipped"
                                 break
 
-                        except asyncio.TimeoutError:
+                        except TimeoutError:
                             if process and process.returncode is None:
                                 try:
                                     await terminate_process_group_async(process, grace=0.5)

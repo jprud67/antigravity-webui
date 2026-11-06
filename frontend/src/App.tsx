@@ -206,7 +206,7 @@ export function App() {
   }, [activeConversationId, isStreaming, t]);
 
 
-  // Telemetry, Queue & Approval States (Phase 2)
+  // Telemetry, Queue & Approval States
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | undefined>(undefined);
   const [queueCount, setQueueCount] = useState(0);
   const [pendingApproval, setPendingApproval] = useState<{ toolName: string; command?: string; path?: string } | null>(null);
@@ -217,7 +217,7 @@ export function App() {
     chatSocket.connectionStatus
   );
 
-  // Session Metadata Modal (Phase 3)
+  // Session Metadata Modal
   const [isSessionMetaOpen, setIsSessionMetaOpen] = useState(false);
   const [metaTargetConversation, setMetaTargetConversation] = useState<Conversation | null>(null);
 
@@ -1656,7 +1656,7 @@ export function App() {
     isCoordinatorModalOpen, isShareModalOpen, isPinModalOpen, isLivePreviewOpen,
   ]);
 
-  // Phase 3 Session Handlers (Fork, Pin, Tags, Project, Search)
+  // Session Handlers (Fork, Pin, Tags, Project, Search)
   const handleTogglePin = async (convId: string, currentPin: boolean) => {
     try {
       await updateConversationMetadata(convId, { pinned: !currentPin });

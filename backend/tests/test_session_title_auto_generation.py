@@ -2,9 +2,8 @@
 import sqlite3
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from app.services.storage import (
     clean_user_prompt,
     derive_session_title,
@@ -124,7 +123,7 @@ def test_reconcile_missing_titles():
         with patch("app.services.storage.CONVERSATION_DB", db_path), \
              patch("app.services.storage.BRAIN_DIR", brain_path), \
              patch("app.services.storage.get_db_connection", lambda: sqlite3.connect(str(db_path))), \
-             patch("app.services.storage.get_all_session_metadata", lambda: {}), \
+             patch("app.services.storage.get_all_session_metadata", dict), \
              patch("app.services.storage._notify_conversations_changed"):
 
             reconciled_count = reconcile_missing_titles(limit=10)
@@ -158,8 +157,9 @@ def test_derive_session_title_autonomous_cycle_from_roadmap_task():
 
 def test_api_regenerate_title_endpoint():
     from fastapi.testclient import TestClient
-    from app.main import app
+
     from app.api.auth import require_auth
+    from app.main import app
 
     # Override auth dependency for unit test
     app.dependency_overrides[require_auth] = lambda: {"authenticated": True, "role": "admin"}

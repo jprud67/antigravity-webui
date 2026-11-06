@@ -672,10 +672,10 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                                 borderColor: selectedRoadmapJobId === job.id ? 'var(--accent)' : 'var(--border)',
                                 color: selectedRoadmapJobId === job.id ? 'var(--accent)' : 'var(--text)'
                               }}
-                              title={t('cron_roadmap_summary', 'Roadmap & Critique')}
+                              title={t('cron_roadmap_summary', 'Bilan d\'exécution & Suivi')}
                             >
                               <InfinityIcon className="w-3.5 h-3.5 text-purple-400" />
-                              <span className="text-[10px] font-medium hidden md:inline">Roadmap</span>
+                              <span className="text-[10px] font-medium hidden md:inline">{t('cron_progress_btn', 'Suivi')}</span>
                             </button>
                           )}
 
@@ -779,7 +779,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                         </div>
                       )}
 
-                      {/* Affichage de la roadmap / auto-critique */}
+                      {/* Affichage de la progression / auto-critique */}
                       {selectedRoadmapJobId === job.id && job.roadmap_summary && (
                         <div
                           className="mt-3 p-3 rounded-xl border text-xs font-mono"
@@ -791,7 +791,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                         >
                           <div className="flex items-center justify-between pb-2 mb-2 border-b text-[10px] font-sans" style={{ borderColor: 'var(--border-subtle)', color: 'var(--muted)' }}>
                             <span className="font-semibold flex items-center gap-1.5 text-purple-400">
-                              <InfinityIcon className="w-3.5 h-3.5" /> {t('cron_roadmap_summary', 'Roadmap & Critique')} ({job.name})
+                              <InfinityIcon className="w-3.5 h-3.5" /> {t('cron_roadmap_summary', 'Bilan d\'exécution & Suivi')} ({job.name})
                             </span>
                             <button
                               onClick={() => setSelectedRoadmapJobId(null)}

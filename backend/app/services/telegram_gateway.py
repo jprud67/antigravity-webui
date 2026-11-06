@@ -223,7 +223,7 @@ class TelegramGateway:
             self._poller_task.cancel()
             try:
                 await asyncio.wait_for(asyncio.shield(self._poller_task), timeout=2.0)
-            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+            except (TimeoutError, asyncio.CancelledError, Exception):
                 pass
             self._poller_task = None
         logger.info("Telegram gateway service stopped")
@@ -518,7 +518,7 @@ class TelegramGateway:
                         logger.debug(f"Telegram getUpdates returned {resp.status_code}")
                         await asyncio.sleep(2.0)
 
-            except (httpx.TimeoutException, asyncio.TimeoutError):
+            except (TimeoutError, httpx.TimeoutException):
                 continue
             except asyncio.CancelledError:
                 break

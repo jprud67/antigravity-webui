@@ -1,5 +1,6 @@
 import uuid
 from unittest.mock import patch
+
 import pytest
 
 from app.services.messaging_gateway import (

@@ -3,7 +3,7 @@ import logging
 import os
 import shutil
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -53,7 +53,7 @@ def _validate_workspace_path(workspace_path: str) -> Path:
     return resolved
 
 def _get_current_journal_path() -> Path:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     month_str = now.strftime("%Y_%m")
     log_dir = HERMES_HOME / "memories" / "logs"
     return log_dir / f"server_actions_{month_str}.md"
@@ -95,7 +95,7 @@ def _safe_stat(p: Path) -> tuple[bool, int, float]:
 @router.get("/files")
 def list_rules_files(workspace_path: str | None = Query(None), _ = Depends(require_auth)):
     journal_path = _get_current_journal_path()
-    journal_month = datetime.now(timezone.utc).strftime('%Y_%m')
+    journal_month = datetime.now(UTC).strftime('%Y_%m')
 
     ag_exists, ag_size, ag_mtime = _safe_stat(GLOBAL_AGENTS_FILE)
     sc_exists, sc_size, sc_mtime = _safe_stat(SETTINGS_FILE)

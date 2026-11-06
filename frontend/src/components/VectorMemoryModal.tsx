@@ -192,7 +192,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
       const res = await vectorMemoryApi.executeRecall(simPrompt.trim(), 'default');
       setSimResult(res);
     } catch (err: any) {
-      showToast(err.message || 'Simulation failed', 'error');
+      showToast(err.message || 'Evaluation failed', 'error');
     } finally {
       setTestingSim(false);
     }
@@ -700,10 +700,10 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                 <div>
                   <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--strong)' }}>
                     <Zap className="w-4 h-4 text-amber-400" />
-                    <span>{t('vector_sim_title', 'Simulateur Auto-Recall en Direct')}</span>
+                    <span>{t('vector_sim_title', 'Évaluation Auto-Recall en Direct')}</span>
                   </h3>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                    {t('vector_sim_desc', 'Testez comment le hook analyse un prompt et injecte les souvenirs')}
+                    {t('vector_sim_desc', 'Évaluez comment le hook analyse un prompt et injecte les souvenirs réels')}
                   </p>
                 </div>
 
@@ -712,7 +712,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                     type="text"
                     value={simPrompt}
                     onChange={(e) => setSimPrompt(e.target.value)}
-                    placeholder={t('vector_sim_placeholder', 'Entrez un prompt de test...')}
+                    placeholder={t('vector_sim_placeholder', 'Entrez un prompt à évaluer...')}
                     className="flex-1 px-3 py-2 rounded-xl border text-xs focus:outline-hidden"
                     style={{
                       backgroundColor: 'var(--surface)',
@@ -730,7 +730,7 @@ export const VectorMemoryModal: React.FC<VectorMemoryModalProps> = ({
                       color: 'var(--accent-text)'
                     }}
                   >
-                    {testingSim ? t('vector_sim_testing', 'Calcul...') : t('vector_sim_btn', 'Tester')}
+                    {testingSim ? t('vector_sim_testing', 'Calcul...') : t('vector_sim_btn', 'Évaluer')}
                   </button>
                 </div>
 

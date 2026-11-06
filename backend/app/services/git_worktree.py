@@ -15,7 +15,7 @@ import os
 import re
 import subprocess
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -147,7 +147,7 @@ def create_subagent_worktree(
             "branch": branch,
             "repo_root": repo_root,
             "base_commit": base_commit,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(UTC).isoformat()
         }
     except Exception as exc:
         logger.warning("worktree: creation exception: %s", exc)

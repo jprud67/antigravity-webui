@@ -12,7 +12,7 @@ import threading
 import time
 import uuid
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -416,7 +416,7 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
         if ts > 100_000_000_000:
             ts /= 1000.0
         try:
-            safe_lmt = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+            safe_lmt = datetime.fromtimestamp(ts, tz=UTC).isoformat()
         except (OverflowError, ValueError, OSError):
             safe_lmt = str(raw_lmt)
     elif isinstance(raw_lmt, str) and raw_lmt.strip():
@@ -426,7 +426,7 @@ def _build_conversation_dict(r: sqlite3.Row, meta: dict) -> dict:
                 ts = float(stripped_lmt)
                 if ts > 100_000_000_000:
                     ts /= 1000.0
-                safe_lmt = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+                safe_lmt = datetime.fromtimestamp(ts, tz=UTC).isoformat()
             except (OverflowError, ValueError, OSError):
                 safe_lmt = stripped_lmt
         else:
@@ -1644,7 +1644,7 @@ def fork_conversation(
 
         sanitized_title = (new_title or "").strip()
         title = sanitized_title if sanitized_title else f"{source_title} (Branche #{up_to_step_index})"
-        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
+        now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
         
         last_step = forked_steps[-1]
         raw_preview = str(last_step.get("content") or last_step.get("thinking") or "")
@@ -1794,9 +1794,9 @@ def create_conversation_handoff(
             if item.is_file() and item.name.endswith(".md"):
                 artifacts_found.append(item.name)
 
-    now_iso = datetime.now(timezone.utc).isoformat()
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
-    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
+    now_iso = datetime.now(UTC).isoformat()
+    now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
+    now_db = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
 
     user_reqs_md = "\n".join([f"{i+1}. {req}" for i, req in enumerate(user_requests[-6:])]) if user_requests else "Poursuite de la session de développement."
     files_md = "\n".join([f"- `{f}`" for f in list(files_touched)[:12]]) if files_touched else "- Fichiers du workspace de travail"
@@ -2307,7 +2307,7 @@ def update_conversation_after_step_change(
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
+        now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
         last_step = steps[-1] if steps else {}
         raw_prev = last_step.get("content") or last_step.get("thinking") or ""
         if last_step.get("source") == "USER_EXPLICIT" or last_step.get("type") == "USER_INPUT":
@@ -2991,7 +2991,7 @@ def export_conversation_markdown(conversation_id: str) -> str:
     md_lines = [
         f"# {title}",
         f"**ID de Session :** `{conversation_id}`  ",
-        f"**Date d'export :** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}  ",
+        f"**Date d'export :** {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}  ",
         f"**Statistiques :** {len(turns)} échanges ({len(steps)} étapes brutes)",
         "---",
         ""
@@ -3100,7 +3100,7 @@ def export_conversation_html(conversation_id: str) -> str:
     steps = get_conversation_transcript(conversation_id)
     conv = get_conversation_by_id(conversation_id)
     title = conv["title"] if conv else "Conversation Antigravity"
-    date_str = datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M:%S UTC')
+    date_str = datetime.now(UTC).strftime('%d/%m/%Y %H:%M:%S UTC')
     turns = aggregate_steps_into_turns(steps)
 
     def _clean_html_text(val: Any) -> str:
@@ -3558,7 +3558,7 @@ def list_artifacts(conversation_id: str | None = None) -> list[dict[str, Any]]:
                         "relative_path": resolved_p.relative_to(cdir).as_posix(),
                         "full_path": str(resolved_p),
                         "size": stat.st_size,
-                        "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+                        "last_modified": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
                     })
                 except (OSError, ValueError):
                     continue
@@ -3937,8 +3937,8 @@ def import_conversation(payload: dict[str, Any] | list[Any]) -> dict[str, Any]:
     3. Antigravity JSON export format ({ conversation_id, metadata, steps })
     4. Hermes WebUI session format ({ session_id, title, messages, ... })
     """
-    now_iso = datetime.now(timezone.utc).isoformat()
-    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
+    now_iso = datetime.now(UTC).isoformat()
+    now_db = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
 
     # Bulk export or list of conversations
     items_to_import: list[dict[str, Any]] | None = None

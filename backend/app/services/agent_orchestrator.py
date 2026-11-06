@@ -1,7 +1,7 @@
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -377,7 +377,7 @@ def steer_agent(conversation_id: str, target_agent_id: str, instruction: str) ->
     if not instruction or not instruction.strip():
         raise ValueError("Steering instruction cannot be empty")
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     logger.info(f"Steering agent {clean_tid} in conversation {clean_cid}: {instruction.strip()[:60]}")
 
     # Record steering event in agent's inbox / ledger
@@ -519,7 +519,7 @@ def fork_agent_node(req: ForkAgentRequest) -> ForkAgentResponse:
     clean_cid = _validate_safe_id(req.conversation_id, "conversation_id")
     clean_pid = _validate_safe_id(req.parent_agent_id, "parent_agent_id")
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     forked_id = f"fork_{uuid.uuid4().hex[:8]}"
 
     worktree_path = None

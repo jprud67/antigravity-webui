@@ -1,5 +1,5 @@
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -48,7 +48,7 @@ def test_skill_curator_lifecycle():
         # 6. Unpin and simulate old date
         curator.toggle_pin("test-skill-1", pinned=False)
         old_data = curator._load_usage()
-        old_data["test-skill-1"]["last_used_at"] = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat()
+        old_data["test-skill-1"]["last_used_at"] = (datetime.now(UTC) - timedelta(days=20)).isoformat()
         curator._save_usage(old_data)
 
         # Sweep with stale=14, archive=30 -> should transition to stale
@@ -57,7 +57,7 @@ def test_skill_curator_lifecycle():
         assert curator.get_skill_telemetry("test-skill-1")["status"] == STATE_STALE
 
         # Now simulate unused for 40 days -> should transition to archived
-        old_data["test-skill-1"]["last_used_at"] = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat()
+        old_data["test-skill-1"]["last_used_at"] = (datetime.now(UTC) - timedelta(days=40)).isoformat()
         curator._save_usage(old_data)
         sweep_archive = curator.sweep_lifecycle(stale_days=14, archive_days=30)
         assert sweep_archive["transitions_count"] == 1

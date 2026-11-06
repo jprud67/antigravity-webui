@@ -36,7 +36,7 @@ except ImportError:
 import json
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 if "ANTIGRAVITY_DATA_DIR" not in os.environ:
     _TEST_DATA_DIR = Path(__file__).resolve().parent / "tests" / ".test_env_data"
@@ -445,7 +445,7 @@ def test_compute_next_run_days_and_seconds():
     next_days = compute_next_run({"kind": "interval", "days": 3})
     assert next_days is not None
     dt_days = datetime.fromisoformat(next_days)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     diff_days = (dt_days - now).total_seconds() / 86400
     assert 2.9 <= diff_days <= 3.1
 
@@ -643,7 +643,7 @@ def test_get_all_session_metadata_deep_copy():
 
 
 def test_aggregate_steps_non_serializable_objects():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.services.storage import aggregate_steps_into_turns
 
@@ -663,8 +663,8 @@ def test_aggregate_steps_non_serializable_objects():
             "step_index": 1,
             "source": "MODEL",
             "type": "PLANNER_RESPONSE",
-            "thinking": {"timestamp": datetime.now(timezone.utc), "custom": NonSerializableObj()},
-            "content": {"result_date": datetime.now(timezone.utc), "custom": NonSerializableObj()},
+            "thinking": {"timestamp": datetime.now(UTC), "custom": NonSerializableObj()},
+            "content": {"result_date": datetime.now(UTC), "custom": NonSerializableObj()},
             "created_at": "2026-09-16T12:00:01Z"
         }
     ]
@@ -835,7 +835,7 @@ def test_cancel_running_job_process_group():
 
 
 def test_compute_next_run_monthly_and_weekly():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.services.cron_store import compute_next_run
 
@@ -844,7 +844,7 @@ def test_compute_next_run_monthly_and_weekly():
         next_dt = compute_next_run(expr)
         assert next_dt is not None, f"Failed to parse monthly expression: {expr}"
         parsed = datetime.fromisoformat(next_dt)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         diff_days = (parsed - now).total_seconds() / 86400
         assert 28 <= diff_days <= 31, f"Expected ~30 days for {expr}, got {diff_days}"
 
@@ -852,7 +852,7 @@ def test_compute_next_run_monthly_and_weekly():
         next_dt = compute_next_run(expr)
         assert next_dt is not None, f"Failed to parse weekly expression: {expr}"
         parsed = datetime.fromisoformat(next_dt)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         diff_days = (parsed - now).total_seconds() / 86400
         assert 6.5 <= diff_days <= 7.5, f"Expected ~7 days for {expr}, got {diff_days}"
 
@@ -1160,11 +1160,11 @@ def test_bulk_export_limit():
 
 
 def test_compute_next_run_compound_intervals():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.services.cron_store import compute_next_run
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Compound: 1 hour + 30 minutes = 90 minutes
     res_iso = compute_next_run({"kind": "interval", "hours": 1, "minutes": 30})
     assert res_iso is not None
@@ -2640,11 +2640,11 @@ def test_crons_skills_sanitization_trimmed():
 
 
 def test_import_single_conversation_non_dict_items():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.services.storage import _import_single_conversation, delete_conversation
-    now_iso = datetime.now(timezone.utc).isoformat()
-    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    now_iso = datetime.now(UTC).isoformat()
+    now_db = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     # Corrupted payload with non-dict elements in steps
     payload = {
@@ -4442,7 +4442,7 @@ def test_tasks_list_active_tasks_safe_mtime():
 
 def test_import_single_conversation_preserves_project_and_group():
     """Verify that _import_single_conversation persists project, project_id, group_id, and projectColor."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.services.session_metadata import get_session_meta
     from app.services.storage import (
@@ -4451,8 +4451,8 @@ def test_import_single_conversation_preserves_project_and_group():
         get_conversation_by_id,
     )
 
-    now_iso = datetime.now(timezone.utc).isoformat()
-    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    now_iso = datetime.now(UTC).isoformat()
+    now_db = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     payload = {
         "title": "Project Import Test",
@@ -5187,7 +5187,7 @@ def test_openai_compat_tool_mode_sse_role_deduplication():
 
 def test_import_single_conversation_deepcopy_isolation():
     """Verify _import_single_conversation deep-copies steps avoiding memory mutations."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.services.storage import (
         _import_single_conversation,
@@ -5195,8 +5195,8 @@ def test_import_single_conversation_deepcopy_isolation():
         get_conversation_transcript,
     )
 
-    now_iso = datetime.now(timezone.utc).isoformat()
-    now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    now_iso = datetime.now(UTC).isoformat()
+    now_db = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     nested_args = {"CommandLine": "echo original"}
     original_step = {
@@ -7734,7 +7734,7 @@ def test_git_last_commit_and_push_masking():
 
 def test_cron_ticker_recompute_and_log_entry():
     import tempfile
-    from datetime import datetime, timezone
+    from datetime import datetime
     from unittest.mock import patch
 
     from app.services.cron_ticker import _recompute_job_next_run, _write_job_log_entry
@@ -7750,7 +7750,7 @@ def test_cron_ticker_recompute_and_log_entry():
     _recompute_job_next_run(job)
     assert job["next_run_at"] is not None
     dt = datetime.fromisoformat(job["next_run_at"])
-    assert dt > datetime.now(timezone.utc)
+    assert dt > datetime.now(UTC)
 
     # 2. Disabled job
     job_disabled = {
@@ -7768,7 +7768,7 @@ def test_cron_ticker_recompute_and_log_entry():
         log_p = _write_job_log_entry(
             job_id="test_log_job",
             name="Test Log Job",
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
             duration=1.5,
             status="interrupted",
             output="Log content message"
@@ -7848,7 +7848,7 @@ def test_files_download_file_direct_validation():
 def test_cron_ticker_job_id_name_none_safety():
     import asyncio
     import tempfile
-    from datetime import datetime, timezone
+    from datetime import datetime
     from unittest.mock import AsyncMock, patch
 
     from app.services.cron_ticker import _execute_job, _write_job_log_entry
@@ -7858,7 +7858,7 @@ def test_cron_ticker_job_id_name_none_safety():
         log_p = _write_job_log_entry(
             job_id="",
             name="",
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
             duration=0.5,
             status="ok",
             output="Empty id output test",
@@ -8176,11 +8176,11 @@ def test_terminal_set_winsize_safety():
 
 
 def test_cron_clean_orphans_scheduled_state_recomputation():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.services.cron_store import compute_next_run
 
-    now_iso_str = datetime.now(timezone.utc).isoformat()
+    now_iso_str = datetime.now(UTC).isoformat()
     init_data = {
         "jobs": [
             {
@@ -8282,8 +8282,8 @@ def test_storage_import_single_conversation_dynamic_schema():
             "group_id": "test_grp_1"
         }
 
-        now_iso = datetime.now(timezone.utc).isoformat()
-        now_db = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
+        now_iso = datetime.now(UTC).isoformat()
+        now_db = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f+00:00")
         with patch("app.services.storage.BRAIN_DIR", test_brain), \
              patch("app.services.storage.get_db_connection", return_value=conn):
             res = _import_single_conversation(sample_item, now_iso=now_iso, now_db=now_db, conn=conn)
@@ -8399,7 +8399,7 @@ def test_git_devnull_platform_and_unstage_robustness():
 
 def test_cron_log_entry_collision_avoidance():
     import tempfile
-    from datetime import datetime, timezone
+    from datetime import datetime
     from pathlib import Path
     from unittest.mock import patch
 
@@ -8410,7 +8410,7 @@ def test_cron_log_entry_collision_avoidance():
         with patch("app.services.cron_ticker.OUTPUT_DIR", temp_dir), \
              patch("app.services.cron_ticker.ensure_dirs"):
             
-            t0 = datetime.now(timezone.utc)
+            t0 = datetime.now(UTC)
             f1 = _write_job_log_entry("job_1", "Test Job", t0, 1.0, "success", "Output 1")
             assert f1 is not None and f1.exists()
 

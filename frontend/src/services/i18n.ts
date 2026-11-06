@@ -123,10 +123,10 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     de: 'Kontinuierliche autonome Schleife',
   },
   cron_continuous_mode_desc: {
-    en: 'Runs non-stop until manually stopped. Analyzes progress, performs auto-critique, and updates roadmap each cycle.',
-    fr: 'S\'exécute en continu jusqu\'à arrêt manuel. Enchaîne auto-critique, mise à jour de la roadmap et exécution.',
-    es: 'Se ejecuta sin parar hasta que se detenga manualmente con auto-crítica y hoja de ruta.',
-    de: 'Läuft ununterbrochen bis zum manuellen Stopp mit Autokritik und Roadmap-Aktualisierung.',
+    en: 'Runs non-stop until manually stopped. Analyzes progress, performs self-review, and executes planned tasks each cycle.',
+    fr: 'S\'exécute en continu jusqu\'à arrêt manuel. Analyse la progression, affine le plan d\'action et enchaîne les tâches.',
+    es: 'Se ejecuta sin parar hasta que se detenga manualmente con auto-evaluación y ejecución de tareas planificadas.',
+    de: 'Läuft ununterbrochen bis zum manuellen Stopp mit Fortschrittsbewertung und Ausführung geplanter Aufgaben.',
   },
   cron_badge_continuous: {
     en: 'Continuous',
@@ -140,11 +140,17 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     es: 'Ciclo #{0}',
     de: 'Zyklus #{0}',
   },
+  cron_progress_btn: {
+    en: 'Progress',
+    fr: 'Suivi',
+    es: 'Progreso',
+    de: 'Fortschritt',
+  },
   cron_roadmap_summary: {
-    en: 'Roadmap & Critique',
-    fr: 'Feuille de route & Auto-critique',
-    es: 'Hoja de ruta y crítica',
-    de: 'Roadmap und Kritik',
+    en: 'Execution Progress & Review',
+    fr: 'Bilan d\'exécution & Suivi',
+    es: 'Progreso y balance de ejecución',
+    de: 'Fortschritt & Ausführungsbericht',
   },
   more_actions: {
     en: 'More actions',
@@ -2328,12 +2334,12 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     fr: 'Prompt utilisateur à évaluer pour le rappel :',
   },
   vector_sim_test_btn: {
-    en: 'Simulate Recall Hook',
-    fr: 'Simuler le Hook de Rappel',
+    en: 'Evaluate Recall Hook',
+    fr: 'Évaluer le Hook de Rappel',
   },
   vector_sim_title: {
-    en: 'Auto-Recall Simulator',
-    fr: 'Simulateur d\'Auto-Recall',
+    en: 'Auto-Recall Evaluation',
+    fr: 'Évaluation Auto-Recall en Direct',
   },
   vector_tab_memories: {
     en: 'Memories ({0})',
@@ -2472,12 +2478,12 @@ export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     fr: 'Seuil de similarité minimale',
   },
   vector_sim_btn: {
-    en: 'Test',
-    fr: 'Tester',
+    en: 'Evaluate',
+    fr: 'Évaluer',
   },
   vector_sim_desc: {
-    en: 'Test how the hook analyzes a prompt and injects memories',
-    fr: 'Testez comment le hook analyse un prompt et injecte les souvenirs',
+    en: 'Evaluate how the hook analyzes a prompt and injects real memories',
+    fr: 'Évaluez comment le hook analyse un prompt et injecte les souvenirs réels',
   },
   vector_sim_no_injection: {
     en: 'The hook did not inject context (trivial prompt or below threshold).',

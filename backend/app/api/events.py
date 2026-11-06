@@ -36,7 +36,7 @@ async def _sse_generator(request: Request, q: asyncio.Queue):
                     yield f"data: {payload}\n\n"
                 finally:
                     q.task_done()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Send keepalive ping every 20s to prevent proxy/browser timeout
                 yield 'data: {"type":"ping"}\n\n'
 

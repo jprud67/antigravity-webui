@@ -95,7 +95,7 @@ async def terminate_process_group_async(proc, grace: float = 0.8) -> None:
 
     try:
         await asyncio.wait_for(proc.wait(), timeout=grace)
-    except (asyncio.TimeoutError, asyncio.CancelledError):
+    except (TimeoutError, asyncio.CancelledError):
         if IS_WINDOWS:
             _taskkill(proc.pid, force=True)
         else:
@@ -103,7 +103,7 @@ async def terminate_process_group_async(proc, grace: float = 0.8) -> None:
 
         try:
             await asyncio.wait_for(proc.wait(), timeout=2.0)
-        except (asyncio.TimeoutError, asyncio.CancelledError):
+        except (TimeoutError, asyncio.CancelledError):
             logger.warning(f"Le processus {proc.pid} ne répond toujours pas après terminaison forcée.")
     finally:
         for stream in (getattr(proc, "stdin", None), getattr(proc, "stdout", None), getattr(proc, "stderr", None)):

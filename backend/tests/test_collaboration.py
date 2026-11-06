@@ -1,4 +1,3 @@
-import pytest
 from app.services import inline_comments, share_service
 from app.services.inline_comments import CommentCreatePayload, CommentUpdatePayload
 

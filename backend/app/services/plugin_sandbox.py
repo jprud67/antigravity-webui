@@ -11,7 +11,7 @@ import re
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.config import CONVERSATION_DB
@@ -89,7 +89,7 @@ def register_plugin(
     granted_scopes = [s for s in (scopes or []) if s in VALID_SCOPES]
 
     plugin_id = f"plugin_{uuid.uuid4().hex[:10]}"
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     with _get_db() as conn:
         existing = conn.execute("SELECT id FROM plugins WHERE slug = ?", (slug,)).fetchone()
@@ -163,7 +163,7 @@ def invoke_plugin(slug: str, method: str, params: dict[str, Any] | None = None) 
     if not plugin["is_active"]:
         raise PermissionError(f"Plugin '{slug}' is disabled")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     with _get_db() as conn:
         conn.execute("UPDATE plugins SET last_invoked_at = ? WHERE slug = ?", (now, slug))
 

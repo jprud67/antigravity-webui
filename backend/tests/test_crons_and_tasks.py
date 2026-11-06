@@ -2,7 +2,7 @@ import os
 import shutil
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,7 +12,6 @@ from app.services.cron_store import (
     update_jobs,
 )
 from app.services.cron_ticker import (
-    cancel_running_job,
     get_running_job_ids,
     is_job_running,
 )
@@ -130,13 +129,13 @@ class TestCronsAndTasks(unittest.TestCase):
         self.assertEqual(job.get("state"), "scheduled")
         # Ensure scheduled immediately (within ~10s from now)
         next_dt = datetime.fromisoformat(job["next_run_at"])
-        delta = (next_dt - datetime.now(timezone.utc)).total_seconds()
+        delta = (next_dt - datetime.now(UTC)).total_seconds()
         self.assertGreaterEqual(delta, 0)
         self.assertLessEqual(delta, 10)
 
     def test_log_pruning(self):
-        from app.services.cron_ticker import prune_job_logs
         import app.services.cron_ticker as ticker
+        from app.services.cron_ticker import prune_job_logs
 
         orig_out = ticker.OUTPUT_DIR
         test_out = Path(self.temp_dir) / "output"
@@ -161,8 +160,9 @@ class TestCronsAndTasks(unittest.TestCase):
     def test_continuous_autonomous_loop_execution(self):
         import asyncio
         from unittest.mock import AsyncMock
-        import app.services.cron_ticker as ticker
+
         import app.services.cron_store as cs
+        import app.services.cron_ticker as ticker
 
         orig_file = cs.JOBS_FILE
         orig_dir = cs.CRON_DIR
@@ -251,9 +251,10 @@ class TestCronsAndTasks(unittest.TestCase):
 
     def test_api_crud_and_continuous_mode_lifecycle(self):
         from fastapi.testclient import TestClient
-        from app.main import app
+
         import app.services.cron_store as cs
         from app.api.auth import require_auth
+        from app.main import app
 
         orig_file = cs.JOBS_FILE
         orig_dir = cs.CRON_DIR

@@ -512,7 +512,7 @@ def _recompute_job_next_run(j: dict[str, Any]) -> None:
     is_future = False
     if current_next:
         try:
-            due = datetime.fromisoformat(str(current_next).replace("Z", "+00:00"))
+            due = datetime.fromisoformat(str(current_next))
             if due.tzinfo is None:
                 due = due.replace(tzinfo=UTC)
             if due > datetime.now(UTC):
@@ -805,7 +805,7 @@ async def tick_once() -> int:
             if job_id in _running_jobs:
                 continue
             try:
-                due = datetime.fromisoformat(str(nxt).replace("Z", "+00:00"))
+                due = datetime.fromisoformat(str(nxt))
                 if due.tzinfo is None:
                     due = due.replace(tzinfo=UTC)
             except (ValueError, TypeError) as parse_err:
@@ -873,7 +873,7 @@ async def cron_ticker_loop() -> None:
                                 recalc = True
                             else:
                                 try:
-                                    nxt_dt = datetime.fromisoformat(str(nxt).replace("Z", "+00:00"))
+                                    nxt_dt = datetime.fromisoformat(str(nxt))
                                     if nxt_dt.tzinfo is None:
                                         nxt_dt = nxt_dt.replace(tzinfo=UTC)
                                     if nxt_dt <= datetime.now(UTC):

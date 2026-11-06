@@ -129,7 +129,7 @@ async def get_available_models() -> list[dict[str, Any]]:
     )
     try:
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=20.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         await terminate_process_group_async(proc, grace=1.0)
         logger.error("Timeout fetching models via agy CLI")
         raise TimeoutError("agy models timed out after 20s")
@@ -522,7 +522,7 @@ async def stream_turn(
         returncode = await proc.wait()
         try:
             stderr_output = await asyncio.wait_for(stderr_task, timeout=3.0) if stderr_task else ""
-        except (asyncio.TimeoutError, Exception) as err:
+        except (TimeoutError, Exception) as err:
             logger.warning(f"stderr_task timed out or errored: {err}")
             stderr_output = ""
         # La ligne de quota est disponible même si la terminaison est encore en cours
@@ -530,7 +530,7 @@ async def stream_turn(
         if quota_line is None and quota_task:
             try:
                 quota_line = await asyncio.wait_for(quota_task, timeout=2.0)
-            except (asyncio.TimeoutError, Exception):
+            except (TimeoutError, Exception):
                 if not quota_task.done():
                     quota_task.cancel()
                 quota_line = None

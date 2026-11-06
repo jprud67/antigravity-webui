@@ -20,7 +20,7 @@
 | **BUG-007** | **MOYEN** | Typage / Concurrence | Incompatibilité de protocole `TelegramSessionSubscriber` et 11 erreurs Mypy | **Corrigé & Validé** |
 | **BUG-008** | **MOYEN** | Stabilité / Concurrence | Verrou global monolithique `PersistentPythonKernel` et dérive de stdout | Atténué (`SafeStreamRedirect`) |
 | **BUG-009** | **FAIBLE** | Frontend / Rendu | Cascades de re-renders et dépendances de hooks manquantes (React 19) | **Corrigé & Validé** (`oxlint` 0 warn/err) |
-| **BUG-010** | **FAIBLE** | Qualité / Hygiène | 29 imports et variables orphelines dans l'API backend | **Corrigé & Validé** (`ruff` 0 err) |
+| **BUG-010** | **FAIBLE** | Qualité / Hygiène | 29 imports/variables orphelines et 103 modernisations Python | **Corrigé & Validé** (`ruff` 0 err) |
 | **BUG-011** | **FAIBLE** | Persistance / Audit | Perte d'historique de maintenance et alertes au redémarrage serveur | **Corrigé & Validé** (SQLite WAL) |
 
 ---
@@ -369,14 +369,17 @@ L'analyse statique React via `oxlint` signale 6 anomalies :
 
 ---
 
-### BUG-010 — Imports Inutilisés et Variables Orphelines (Ruff Lint)
+### BUG-010 — Imports Inutilisés, Variables Orphelines et Modernisation Python (Ruff Lint)
 
 - **Sévérité :** **FAIBLE (Hygiène de Code)**
-- **Composants :** `backend/app/api/git.py`, `backend/app/api/copilot.py`, `backend/app/api/mcp_catalog.py`, `backend/app/api/openai_compat.py`
-- **Nombre d'occurrences :** 29 violations `F401` et `F841` confirmées par `ruff check`.
+- **Composants :** Ensemble de `backend/app` et `backend/tests`
+- **Nombre d'occurrences initiales :** 29 violations `F401`/`F841` et 103 violations de modernisation (`UP017`, `UP041`, `FURB162`, `I001`).
 
 #### 1. Description
-Des modules tels que `json`, `shutil`, `re` ou `datetime` sont importés sans être exploités, et certaines variables intermédiaires sont assignées sans utilisation.
+Des modules étaient importés sans être exploités, des variables intermédiaires restaient orphelines, et des idiomes obsolètes (`datetime.timezone.utc`, `asyncio.TimeoutError`, remplacements de fuseaux manuels) étaient utilisés au lieu des équivalents natifs Python 3.11+.
+
+#### 2. Remédiation & Validation
+L'ensemble de la base de code a été modernisé vers `datetime.UTC`, `TimeoutError`, et les imports ont été assainis. `ruff check backend` retourne `All checks passed!` sans aucun avertissement.
 
 ---
 

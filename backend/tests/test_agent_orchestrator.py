@@ -258,9 +258,9 @@ def test_fork_agent_node_and_graph_integration(tmp_path, monkeypatch):
     monkeypatch.setattr("app.services.agent_orchestrator.BRAIN_DIR", tmp_path)
     from app.services.agent_orchestrator import (
         ForkAgentRequest,
-        fork_agent_node,
         build_orchestrator_graph,
         compare_execution_branches,
+        fork_agent_node,
     )
 
     req = ForkAgentRequest(

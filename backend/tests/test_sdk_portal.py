@@ -1,5 +1,6 @@
 """Tests for SDK Portal API — Antigravity WebUI v0.5.0"""
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
@@ -121,7 +122,7 @@ def test_watchdog_alerts_empty(auth_headers: dict):
 
 
 def test_sweeps_run_changelog(auth_headers: dict):
-    import tempfile, os
+    import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         r = client.post("/api/sweeps/run", json={
             "workspace_path": tmp,

@@ -16,7 +16,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.config import LOG_DIR
@@ -73,7 +73,7 @@ def _expected_log_candidates(since_ts: float, window: float = 5.0) -> list[Path]
             # Heure locale (défaut CLI)
             names.append("cli-" + datetime.fromtimestamp(t).strftime("%Y%m%d_%H%M%S") + ".log")
             # Heure UTC (au cas où le système/CLI est en UTC)
-            names.append("cli-" + datetime.fromtimestamp(t, tz=timezone.utc).strftime("%Y%m%d_%H%M%S") + ".log")
+            names.append("cli-" + datetime.fromtimestamp(t, tz=UTC).strftime("%Y%m%d_%H%M%S") + ".log")
         except (OverflowError, OSError, ValueError):
             continue
 

@@ -18,7 +18,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -45,7 +45,7 @@ def ensure_dirs() -> None:
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def write_heartbeat() -> None:
@@ -183,7 +183,7 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
     """Calcule la prochaine date d'exécution depuis une expression cron ou un intervalle."""
     if not schedule:
         return None
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = datetime.now(UTC).replace(microsecond=0)
     expr = ""
     if isinstance(schedule, str):
         expr = schedule.strip()
@@ -315,7 +315,7 @@ def compute_next_run(schedule: str | dict[str, Any] | None) -> str | None:
             iter_cron = croniter(cron_target, now)
             next_dt = iter_cron.get_next(datetime)
             if next_dt.tzinfo is None:
-                next_dt = next_dt.replace(tzinfo=timezone.utc)
+                next_dt = next_dt.replace(tzinfo=UTC)
             return next_dt.replace(microsecond=0).isoformat()
     except Exception as e:
         logger.warning(f"Expression cron invalide '{expr}': {e}")

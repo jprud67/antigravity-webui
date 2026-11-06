@@ -15,7 +15,7 @@ import os
 import re
 import shutil
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -387,7 +387,7 @@ def create_canvas_document(
         kind=input_data.kind,
         title=input_data.title,
         preferred_height=input_data.preferred_height,
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
         entry_url=entry_url,
         local_entrypoint=local_entrypoint,
         external_url=external_url,

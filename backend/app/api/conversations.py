@@ -275,16 +275,16 @@ def _do_zip_export(conversation_ids: list[str] | None = None) -> Response:
                 if ts:
                     if isinstance(ts, (int, float)):
                         val = ts / 1000.0 if ts > 10000000000 else ts
-                        date_prefix = datetime.datetime.fromtimestamp(val, tz=datetime.timezone.utc).strftime("%Y%m%d")
+                        date_prefix = datetime.datetime.fromtimestamp(val, tz=datetime.UTC).strftime("%Y%m%d")
                     elif isinstance(ts, str):
                         s = ts.strip()
                         if s.isdigit():
                             val = int(s)
                             val = val / 1000.0 if val > 10000000000 else val
-                            date_prefix = datetime.datetime.fromtimestamp(val, tz=datetime.timezone.utc).strftime("%Y%m%d")
+                            date_prefix = datetime.datetime.fromtimestamp(val, tz=datetime.UTC).strftime("%Y%m%d")
                         else:
                             try:
-                                dt = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+                                dt = datetime.datetime.fromisoformat(s)
                                 date_prefix = dt.strftime("%Y%m%d")
                             except Exception:
                                 date_prefix = "session"
@@ -295,7 +295,7 @@ def _do_zip_export(conversation_ids: list[str] | None = None) -> Response:
                 continue
 
     zip_buffer.seek(0)
-    today_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
+    today_str = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
     return Response(
         content=zip_buffer.getvalue(),
         media_type="application/zip",

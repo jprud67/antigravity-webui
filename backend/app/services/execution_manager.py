@@ -499,7 +499,10 @@ class ExecutionSession:
                             self.conversation_id = cid
                             execution_manager.register_session_cid(self, cid)
                             try:
-                                from app.services.storage import derive_session_title, update_conversation_title_if_unset
+                                from app.services.storage import (
+                                    derive_session_title,
+                                    update_conversation_title_if_unset,
+                                )
                                 prompt_to_title = params.get("raw_prompt") or prompt
                                 auto_title = derive_session_title(prompt_to_title)
                                 if auto_title and auto_title.lower() not in ("nouvelle session", "new session", "session"):
@@ -749,7 +752,10 @@ class ExecutionSession:
             self.last_active_at = time.time()
             if self.conversation_id:
                 try:
-                    from app.services.storage import derive_session_title, update_conversation_title_if_unset
+                    from app.services.storage import (
+                        derive_session_title,
+                        update_conversation_title_if_unset,
+                    )
                     prompt_to_title = params.get("raw_prompt") or prompt
                     auto_title = derive_session_title(prompt_to_title)
                     if auto_title and auto_title.lower() not in ("nouvelle session", "new session", "session"):
@@ -1338,7 +1344,7 @@ class ExecutionManager:
                     session.active_task.cancel()
                     try:
                         await asyncio.wait_for(asyncio.shield(session.active_task), timeout=2.0)
-                    except (asyncio.CancelledError, asyncio.TimeoutError, Exception) as e:
+                    except (TimeoutError, asyncio.CancelledError, Exception) as e:
                         logger.debug(f"Ignored error: {e}")
                 # Purge obsolete pending messages in the queue so the steering directive executes immediately
                 while not session.message_queue.empty():
@@ -1392,7 +1398,7 @@ class ExecutionManager:
             session.active_task.cancel()
             try:
                 await asyncio.wait_for(asyncio.shield(session.active_task), timeout=2.0)
-            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+            except (TimeoutError, asyncio.CancelledError, Exception):
                 logger.debug("Ignored error")
 
         for tc in session.live_tool_calls:

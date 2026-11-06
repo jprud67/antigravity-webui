@@ -175,7 +175,7 @@ export const VoiceWaveformVisualizer: React.FC<VoiceWaveformVisualizerProps> = (
         style={{ height: `${height}px` }}
         title={
           hasMicAccess === false
-            ? t('simulated_voice_waveform_tooltip', "Animation d'ondes vocales simulée")
+            ? t('standby_voice_waveform_tooltip', "Indicateur d'attente vocale")
             : t('live_mic_visualizer_tooltip', 'Visualiseur de microphone en direct')
         }
       />

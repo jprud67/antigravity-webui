@@ -23,7 +23,7 @@ import logging
 import os
 import threading
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -102,7 +102,7 @@ class SkillCurator:
         """Enregistre un événement immuable dans le ledger d'audit."""
         record = {
             "id": f"led_{uuid.uuid4().hex[:16]}",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "action": action,
             "skill_name": skill_name,
             "actor": actor,
@@ -123,14 +123,14 @@ class SkillCurator:
             data = self._load_usage()
             record = data.get(clean, {
                 "use_count": 0,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "pinned": clean in PROTECTED_SKILLS,
                 "status": STATE_ACTIVE,
             })
             is_new = clean not in data
             before_status = record.get("status", STATE_ACTIVE)
             record["use_count"] = record.get("use_count", 0) + 1
-            record["last_used_at"] = datetime.now(timezone.utc).isoformat()
+            record["last_used_at"] = datetime.now(UTC).isoformat()
             if is_new:
                 self._append_ledger("register", clean, actor=actor, before=None, after=STATE_ACTIVE, details="Compétence enregistrée")
             elif record.get("status") in (STATE_STALE, STATE_ARCHIVED):
@@ -148,7 +148,7 @@ class SkillCurator:
             data = self._load_usage()
             record = data.get(clean, {
                 "use_count": 0,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "pinned": False,
                 "status": STATE_ACTIVE,
             })
@@ -177,7 +177,7 @@ class SkillCurator:
           - Stale -> Archived après archive_days sans utilisation.
           - Ne touche JAMAIS aux compétences épinglées ou protégées.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         stale_threshold = now - timedelta(days=stale_days)
         archive_threshold = now - timedelta(days=archive_days)
 
@@ -195,7 +195,7 @@ class SkillCurator:
                     continue
 
                 try:
-                    last_used = datetime.fromisoformat(last_used_str.replace("Z", "+00:00"))
+                    last_used = datetime.fromisoformat(last_used_str)
                 except Exception:
                     continue
 

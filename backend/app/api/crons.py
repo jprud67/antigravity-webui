@@ -10,7 +10,7 @@ L'exécution des jobs est assurée par le ticker interne
 import logging
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from croniter import croniter
@@ -269,7 +269,7 @@ def trigger_cron_job_now(job_id: str, _ = Depends(require_auth)):
                 j["enabled"] = True
                 j["state"] = "scheduled"
                 j["paused_at"] = None
-                j["next_run_at"] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+                j["next_run_at"] = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
                 j["last_triggered_at"] = now_iso()
                 j["last_status"] = "triggered"
                 return dict(j)

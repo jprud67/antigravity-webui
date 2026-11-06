@@ -231,12 +231,31 @@ flowchart TD
 
 ---
 
+### 5.3. Déploiement Pipeline CI GitHub Actions (Item D3)
+
+- **Fichiers cibles :**
+  - [`.github/workflows/ci.yml`](file:///root/antigravity-webui/.github/workflows/ci.yml)
+  - [`backend/requirements-dev.txt`](file:///root/antigravity-webui/backend/requirements-dev.txt)
+  - [`pyproject.toml`](file:///root/antigravity-webui/pyproject.toml)
+- **Actions de correction :**
+  1. Déployer un workflow d'intégration continue GitHub Actions pour tester automatiquement le backend (Python 3.11, ruff check, pytest) et le frontend (Node 20, npm ci, oxlint, npm run build).
+  2. Mettre en place `backend/requirements-dev.txt` incluant pytest et pytest-asyncio.
+  3. Aligner la configuration racine `pyproject.toml` avec celle de `backend/pyproject.toml`.
+  4. Sécuriser les intitulés UI en éliminant les termes de feuille de route interne et simulations factices conformément aux règles produit.
+- **Critères d'acceptation :**
+  - 100% des tests unitaires backend (687 tests) passent sous pytest.
+  - Ruff 0 erreur sur backend et tests.
+  - Oxlint 0 avertissement et 0 erreur sur les 103 fichiers frontend.
+  - Build frontend Vite sans aucune erreur.
+
+---
+
 ## 6. Calendrier Prévisionnel et Critères de Clôture
 
 | Phase | Durée Estimée | Livrable Clé | Critère de Succès | Statut |
 |---|---|---|---|---|
 | **Phase 0 (P0)** | 1 jour | Patch v0.5.1 | Validation Telegram fonctionnelle + Routes protégées + tests passants | **Terminé (100%)** |
-| **Phase 1 (P1)** | 2 jours | Patch v0.5.2 | Noyau avec isolation threads/flux + Identités Git dynamiques | **En cours (Atténué)** |
+| **Phase 1 (P1)** | 2 jours | Patch v0.5.2 | Noyau avec isolation threads/flux + Identités Git dynamiques | **Terminé (Atténué & Conforme)** |
 | **Phase 2 (P2)** | 2 jours | Patch v0.5.3 | Protocole Subscriber normalisé + Ruff 0 avertissement + Plugins clarifiés | **Terminé (100%)** |
 | **Phase 3 (P3)** | 2 jours | Release v0.6.0 | Historique SQLite persistant + Oxlint 0 warning + Suite tests 100% verte | **Terminé (100%)** |
 

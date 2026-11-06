@@ -13,7 +13,7 @@ import json
 import logging
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -55,7 +55,7 @@ def _add_to_history(sweep_type: str, workspace: str, result: dict[str, Any]) -> 
         "type": sweep_type,
         "workspace": workspace,
         "result": result,
-        "ran_at": datetime.now(timezone.utc).isoformat(),
+        "ran_at": datetime.now(UTC).isoformat(),
     }
     _sweep_history.append(entry)
     if len(_sweep_history) > MAX_HISTORY:
@@ -149,7 +149,7 @@ def sweep_dependency_vulnerabilities(workspace_path: str) -> dict[str, Any]:
         "workspace": workspace_path,
         "issues_found": len(results) > 0,
         "findings": results,
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "scanned_at": datetime.now(UTC).isoformat(),
     }
     _add_to_history("dependency_vulnerabilities", workspace_path, summary)
     logger.info("Dep vulnerability sweep for %s: %d issue(s)", workspace_path, len(results))
@@ -175,7 +175,7 @@ def sweep_dead_git_branches(workspace_path: str) -> dict[str, Any]:
         "workspace": workspace_path,
         "dead_branches": dead_branches,
         "count": len(dead_branches),
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "scanned_at": datetime.now(UTC).isoformat(),
     }
     _add_to_history("dead_branches", workspace_path, summary)
     return summary
@@ -225,7 +225,7 @@ def sweep_changelog_summary(workspace_path: str, since_days: int = 7) -> dict[st
         "since_days": since_days,
         "commit_count": len(commits),
         "markdown": markdown,
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "scanned_at": datetime.now(UTC).isoformat(),
     }
     _add_to_history("changelog", workspace_path, summary)
     return summary
@@ -246,5 +246,5 @@ async def run_all_sweeps(workspace_path: str) -> dict[str, Any]:
             "dead_branches": branches,
             "changelog": changelog,
         },
-        "ran_at": datetime.now(timezone.utc).isoformat(),
+        "ran_at": datetime.now(UTC).isoformat(),
     }

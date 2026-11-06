@@ -56,7 +56,7 @@ def _add_alert(category: str, severity: str, message: str, workspace: str = "") 
         "severity": severity,  # "info" | "warning" | "error"
         "message": message,
         "workspace": workspace,
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "resolved": False,
     }
     _alert_log.append(entry)

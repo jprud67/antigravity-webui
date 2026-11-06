@@ -8,7 +8,7 @@ import json
 import logging
 import shutil
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -127,7 +127,7 @@ def create_checkpoint(
 
     # Generate checkpoint ID
     checkpoint_id = str(uuid.uuid4())[:12]
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # Calculate token usage
     usage = calculate_conversation_tokens(steps)

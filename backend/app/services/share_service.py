@@ -12,7 +12,7 @@ import logging
 import secrets
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from app.config import CONVERSATION_DB
@@ -106,7 +106,7 @@ def create_share_link(
         permission = "read"
 
     token = secrets.token_urlsafe(24)
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     created_at = now_utc.isoformat()
 
     expires_at = None
@@ -168,7 +168,7 @@ def verify_share_token(token: str, pin_code: str | None = None) -> dict[str, Any
     if expires_at_str:
         try:
             expires_at = datetime.fromisoformat(expires_at_str)
-            if datetime.now(timezone.utc) > expires_at:
+            if datetime.now(UTC) > expires_at:
                 return {"valid": False, "reason": "expired", "conversation_id": conv_id}
         except Exception as e:
             logger.warning("Error parsing expires_at (%s): %s", expires_at_str, e)
@@ -219,7 +219,7 @@ def list_share_links(conversation_id: str) -> list[dict[str, Any]]:
         rows = cursor.fetchall()
 
     results: list[dict[str, Any]] = []
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
 
     for row in rows:
         token, conv_id, permission, pin_hash, expires_at_str, created_at_str, created_by, is_revoked = row
@@ -289,7 +289,7 @@ def get_shared_session_info(token: str) -> dict[str, Any] | None:
         return None
 
     token, conv_id, permission, pin_hash, expires_at_str, created_at_str, is_revoked = row
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     is_expired = False
     if expires_at_str:
         try:

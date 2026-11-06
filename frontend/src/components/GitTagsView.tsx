@@ -268,7 +268,7 @@ export const GitTagsView: React.FC<GitTagsViewProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              {t('git_tags_subtitle', 'Jalonnez vos versions logicielles et publiez des releases interactives')}
+              {t('git_tags_subtitle', 'Identifiez et publiez vos versions logicielles et releases')}
             </p>
           </div>
         </div>

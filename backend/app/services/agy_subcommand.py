@@ -22,7 +22,7 @@ async def run_agy_subcommand(args: list[str], timeout: float = 15.0) -> tuple[in
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         ret_code = proc.returncode if proc.returncode is not None else -1
         return ret_code, stdout.decode(errors="replace"), stderr.decode(errors="replace")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error(f"Timeout executing agy {' '.join(args)}")
         if proc:
             try:
