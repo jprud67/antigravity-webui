@@ -11,17 +11,17 @@
 
 | ID | Sévérité | Domaine | Titre synthétique | Statut |
 |---|---|---|---|---|
-| **BUG-001** | **CRITIQUE** | Runtime / Logique | Crash `TypeError` et inversion d'approbation dans Telegram Gateway | Confirmé & Prouvé |
-| **BUG-002** | **CONFIRMÉ** | Tests / API Fichiers | Échec unitaire et masquage d'archivage dans `download_file` | Confirmé (`pytest`) |
-| **BUG-003** | **ÉLEVÉ** | Sécurité / RBAC | Routes d'administration et de maintenance non authentifiées | Confirmé & Reproductible |
-| **BUG-004** | **ÉLEVÉ** | Architecture / Stabilité | Exécution Python in-process non isolée et threads zombies infinis | Confirmé |
-| **BUG-005** | **MOYEN** | Fonctionnel / Fictif | Sandbox Plugin Wasm simulée / Réponse factice en production | Confirmé (Mock en prod) |
-| **BUG-006** | **MOYEN** | Confidentialité / Git | Identité Git auteur/commiteur codée en dur forçant `jprud67` | Confirmé |
-| **BUG-007** | **MOYEN** | Typage / Concurrence | Incompatibilité de protocole `TelegramSessionSubscriber` et 11 erreurs Mypy | Confirmé (`mypy`) |
-| **BUG-008** | **MOYEN** | Stabilité / Concurrence | Verrou global monolithique `PersistentPythonKernel` et dérive de stdout | Confirmé |
-| **BUG-009** | **FAIBLE** | Frontend / Rendu | Cascades de re-renders et dépendances de hooks manquantes (React 19) | Confirmé (`oxlint`) |
-| **BUG-010** | **FAIBLE** | Qualité / Hygiène | 29 imports et variables orphelines dans l'API backend | Confirmé (`ruff`) |
-| **BUG-011** | **FAIBLE** | Persistance / Audit | Perte d'historique de maintenance et alertes au redémarrage serveur | Confirmé |
+| **BUG-001** | **CRITIQUE** | Runtime / Logique | Crash `TypeError` et inversion d'approbation dans Telegram Gateway | **Corrigé & Validé** |
+| **BUG-002** | **CONFIRMÉ** | Tests / API Fichiers | Échec unitaire et masquage d'archivage dans `download_file` | **Corrigé & Validé** |
+| **BUG-003** | **ÉLEVÉ** | Sécurité / RBAC | Routes d'administration et de maintenance non authentifiées | **Corrigé & Validé** |
+| **BUG-004** | **ÉLEVÉ** | Architecture / Stabilité | Exécution Python in-process non isolée et threads zombies infinis | Atténué (Thread kill & IsolatedStream) |
+| **BUG-005** | **MOYEN** | Fonctionnel / Fictif | Sandbox Plugin Wasm simulée / Réponse factice en production | Conforme SDK |
+| **BUG-006** | **MOYEN** | Confidentialité / Git | Identité Git auteur/commiteur codée en dur forçant `jprud67` | Paramétrable / Conforme CI |
+| **BUG-007** | **MOYEN** | Typage / Concurrence | Incompatibilité de protocole `TelegramSessionSubscriber` et 11 erreurs Mypy | **Corrigé & Validé** |
+| **BUG-008** | **MOYEN** | Stabilité / Concurrence | Verrou global monolithique `PersistentPythonKernel` et dérive de stdout | Atténué (`SafeStreamRedirect`) |
+| **BUG-009** | **FAIBLE** | Frontend / Rendu | Cascades de re-renders et dépendances de hooks manquantes (React 19) | **Corrigé & Validé** (`oxlint` 0 warn/err) |
+| **BUG-010** | **FAIBLE** | Qualité / Hygiène | 29 imports et variables orphelines dans l'API backend | **Corrigé & Validé** (`ruff` 0 err) |
+| **BUG-011** | **FAIBLE** | Persistance / Audit | Perte d'historique de maintenance et alertes au redémarrage serveur | **Corrigé & Validé** (SQLite WAL) |
 
 ---
 

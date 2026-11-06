@@ -779,11 +779,9 @@ def clean_user_prompt(raw: Any) -> str:
     if matches:
         text = matches[-1].strip()
     else:
-        text = text_no_context
-
-    # 3. Retirer les blocs XML système éventuels (<ADDITIONAL_METADATA>, <USER_SETTINGS_CHANGE>, etc.)
-    text = _XML_BLOCKS_RE.sub('', text)
-    text = _XML_TAGS_RE.sub('', text)
+        # Repli pour les invites brutes sans balise <USER_REQUEST>
+        text = _XML_BLOCKS_RE.sub('', text_no_context)
+        text = _XML_TAGS_RE.sub('', text)
 
     # 4. Retirer les préfixes de guidage/file d'attente
     text = _STEERING_PREFIX_RE.sub('', text)
@@ -2343,15 +2341,28 @@ def update_conversation_after_step_change(
                 break
         derived_title = derive_session_title(first_user_content or new_preview)
 
-        cursor.execute(
-            """
-            UPDATE conversation_summaries
-            SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = ?,
-                title = CASE WHEN (title IS NULL OR title = '' OR title = 'Nouvelle session' OR title = 'New session') THEN ? ELSE title END
-            WHERE conversation_id = ?
-            """,
-            (len(steps), new_preview, now_str, new_last_user_idx, effective_user_time, derived_title, conversation_id),
-        )
+        cursor.execute("PRAGMA table_info(conversation_summaries)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+
+        if "title" in existing_cols:
+            cursor.execute(
+                """
+                UPDATE conversation_summaries
+                SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = ?,
+                    title = CASE WHEN (title IS NULL OR title = '' OR title = 'Nouvelle session' OR title = 'New session') THEN ? ELSE title END
+                WHERE conversation_id = ?
+                """,
+                (len(steps), new_preview, now_str, new_last_user_idx, effective_user_time, derived_title, conversation_id),
+            )
+        else:
+            cursor.execute(
+                """
+                UPDATE conversation_summaries
+                SET step_count = ?, preview = ?, last_modified_time = ?, last_user_input_step_index = ?, last_user_input_time = ?
+                WHERE conversation_id = ?
+                """,
+                (len(steps), new_preview, now_str, new_last_user_idx, effective_user_time, conversation_id),
+            )
         conn.commit()
     except Exception as e:
         conn.rollback()

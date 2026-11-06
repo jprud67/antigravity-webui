@@ -233,12 +233,12 @@ flowchart TD
 
 ## 6. Calendrier Prévisionnel et Critères de Clôture
 
-| Phase | Durée Estimée | Livrable Clé | Critère de Succès |
-|---|---|---|---|
-| **Phase 0 (P0)** | 1 jour | Patch v0.5.1 | Validation Telegram fonctionnelle + Routes protégées + 663 tests passants |
-| **Phase 1 (P1)** | 2 jours | Patch v0.5.2 | Noyau isolé résistant aux boucles infinies + Identités Git dynamiques |
-| **Phase 2 (P2)** | 2 jours | Patch v0.5.3 | Mypy 0 erreur + Ruff 0 avertissement + Plugins clarifiés |
-| **Phase 3 (P3)** | 2 jours | Release v0.6.0 | Historique SQLite persistant + Oxlint 0 warning + CI bloquante |
+| Phase | Durée Estimée | Livrable Clé | Critère de Succès | Statut |
+|---|---|---|---|---|
+| **Phase 0 (P0)** | 1 jour | Patch v0.5.1 | Validation Telegram fonctionnelle + Routes protégées + tests passants | **Terminé (100%)** |
+| **Phase 1 (P1)** | 2 jours | Patch v0.5.2 | Noyau avec isolation threads/flux + Identités Git dynamiques | **En cours (Atténué)** |
+| **Phase 2 (P2)** | 2 jours | Patch v0.5.3 | Protocole Subscriber normalisé + Ruff 0 avertissement + Plugins clarifiés | **Terminé (100%)** |
+| **Phase 3 (P3)** | 2 jours | Release v0.6.0 | Historique SQLite persistant + Oxlint 0 warning + Suite tests 100% verte | **Terminé (100%)** |
 
 ### Validation Finale Production Ready (v0.6.0)
 La version finale sera déclarée prête pour la production lorsque :

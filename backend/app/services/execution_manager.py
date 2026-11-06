@@ -1267,7 +1267,6 @@ class ExecutionManager:
         try:
             enriched_prompt, extracted = await enrich_user_prompt_with_links(prompt)
             if extracted:
-                data["prompt"] = enriched_prompt
                 prompt = enriched_prompt
         except Exception as e:
             logger.debug(f"Link understanding enrichment skipped: {e}")
@@ -1280,34 +1279,34 @@ class ExecutionManager:
             except Exception as e:
                 logger.debug(f"Memory store set_workspace skipped: {e}")
 
-        # Continuous memory snapshot injection for initial turn of a conversation
-        try:
-            from app.services.memory_store import memory_store
-            from app.services.storage import get_conversation_by_id
-            is_new_conv = not conv_id
-            if conv_id and not is_new_conv:
-                existing_conv = get_conversation_by_id(conv_id)
-                if not existing_conv or existing_conv.get("step_count", 0) == 0:
-                    is_new_conv = True
-            if is_new_conv:
-                memory_snapshot = memory_store.get_system_prompt_snapshot()
-                if memory_snapshot and "## CONTINUOUS AGENT MEMORY" not in prompt:
-                    logger.info(f"Injecting continuous memory snapshot into initial turn for session {conv_id}")
-                    prompt = f"{memory_snapshot}\n\n{prompt}"
-                    data["prompt"] = prompt
-        except Exception as e:
-            logger.debug(f"Continuous memory snapshot injection skipped: {e}")
+        # Continuous memory snapshot injection for initial turn of a conversation (skip on steering)
+        if mode != "steer":
+            try:
+                from app.services.memory_store import memory_store
+                from app.services.storage import get_conversation_by_id
+                is_new_conv = not conv_id
+                if conv_id and not is_new_conv:
+                    existing_conv = get_conversation_by_id(conv_id)
+                    if not existing_conv or existing_conv.get("step_count", 0) == 0:
+                        is_new_conv = True
+                if is_new_conv:
+                    memory_snapshot = memory_store.get_system_prompt_snapshot()
+                    if memory_snapshot and "## CONTINUOUS AGENT MEMORY" not in prompt:
+                        logger.info(f"Injecting continuous memory snapshot into initial turn for session {conv_id}")
+                        prompt = f"{memory_snapshot}\n\n{prompt}"
+            except Exception as e:
+                logger.debug(f"Continuous memory snapshot injection skipped: {e}")
 
-        # Auto-recall vector memory hook: if relevant memories exist, prepend them
-        try:
-            agent_identifier = data.get("agent_mode") or conv_id or "default"
-            recall_res = await execute_auto_recall_hook(prompt, agent_id=agent_identifier)
-            if recall_res.should_inject and recall_res.context_block:
-                logger.info(f"Injecting {recall_res.recalled_count} auto-recalled memories into prompt for session {conv_id}")
-                prompt = f"{recall_res.context_block}\n\n{prompt}"
-                data["prompt"] = prompt
-        except Exception as e:
-            logger.debug(f"Auto-recall memory hook skipped: {e}")
+        # Auto-recall vector memory hook: if relevant memories exist, prepend them (skip on steering)
+        if mode != "steer":
+            try:
+                agent_identifier = data.get("agent_mode") or conv_id or "default"
+                recall_res = await execute_auto_recall_hook(prompt, agent_id=agent_identifier)
+                if recall_res.should_inject and recall_res.context_block:
+                    logger.info(f"Injecting {recall_res.recalled_count} auto-recalled memories into prompt for session {conv_id}")
+                    prompt = f"{recall_res.context_block}\n\n{prompt}"
+            except Exception as e:
+                logger.debug(f"Auto-recall memory hook skipped: {e}")
 
         session = self.get_or_create_session(conv_id, ws_path, ws=ws)
         if ws is not None:
@@ -1315,6 +1314,7 @@ class ExecutionManager:
         session.last_active_at = time.time()
         self.active_session = session
         payload = dict(data)
+        payload["prompt"] = prompt
         payload["raw_prompt"] = raw_user_prompt
         for k in ("model", "effort", "agent_mode"):
             v = payload.get(k)

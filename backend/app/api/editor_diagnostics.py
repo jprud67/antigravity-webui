@@ -123,7 +123,7 @@ def _lint_python(content: str, file_path: str | None) -> list[DiagnosticItem]:
                 [ruff_bin, "check", "--output-format=json", "--stdin-filename", stdin_filename, "-"],
                 input=content.encode("utf-8", errors="replace"),
                 capture_output=True,
-                timeout=4
+                timeout=10
             )
             raw_out = proc.stdout.decode("utf-8", errors="ignore").strip()
             if raw_out:

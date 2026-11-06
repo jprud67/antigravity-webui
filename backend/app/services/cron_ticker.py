@@ -856,7 +856,6 @@ async def cron_ticker_loop() -> None:
         async with _jobs_write_lock:
             def _clean_orphans(init_data: dict[str, Any]) -> bool:
                 cleaned = False
-                now_iso_str = datetime.now(timezone.utc).isoformat()
                 for j in init_data.get("jobs", []):
                     if j.get("last_status") == "running":
                         j["last_status"] = "interrupted"

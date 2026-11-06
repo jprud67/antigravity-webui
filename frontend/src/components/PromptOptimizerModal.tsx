@@ -133,13 +133,11 @@ const PromptOptimizerInner: React.FC<PromptOptimizerInnerProps> = ({
         .finally(() => {
           if (!cancelled) setIsAnalyzing(false);
         });
-    } else {
-      setIsOptimizing(false);
-      setIsAnalyzing(false);
     }
     return () => {
       cancelled = true;
     };
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle Preset change

@@ -16,7 +16,7 @@ import {
   FileText,
   MessageSquare,
   Square,
-  Infinity
+  Infinity as InfinityIcon
 } from 'lucide-react';
 import type { CronJobItem, CronListResponse } from '../services/api';
 import { 
@@ -504,7 +504,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                 />
                 <label htmlFor="create-continuous-mode" className="text-xs cursor-pointer select-none flex-1">
                   <div className="font-semibold flex items-center gap-1.5" style={{ color: 'var(--strong)' }}>
-                    <Infinity className="w-3.5 h-3.5 text-purple-400" />
+                    <InfinityIcon className="w-3.5 h-3.5 text-purple-400" />
                     <span>{t('cron_continuous_mode', 'Continuous Autonomous Loop')}</span>
                   </div>
                   <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'var(--muted)' }}>
@@ -598,7 +598,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                             )}
                             {job.continuous_mode && (
                               <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center gap-1">
-                                <Infinity className="w-3 h-3" />
+                                <InfinityIcon className="w-3 h-3" />
                                 <span>{t('cron_badge_continuous', 'Continu')}</span>
                                 {(job.cycle_count || 0) > 0 && (
                                   <span className="text-[9px] opacity-80">
@@ -674,7 +674,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                               }}
                               title={t('cron_roadmap_summary', 'Roadmap & Critique')}
                             >
-                              <Infinity className="w-3.5 h-3.5 text-purple-400" />
+                              <InfinityIcon className="w-3.5 h-3.5 text-purple-400" />
                               <span className="text-[10px] font-medium hidden md:inline">Roadmap</span>
                             </button>
                           )}
@@ -791,7 +791,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                         >
                           <div className="flex items-center justify-between pb-2 mb-2 border-b text-[10px] font-sans" style={{ borderColor: 'var(--border-subtle)', color: 'var(--muted)' }}>
                             <span className="font-semibold flex items-center gap-1.5 text-purple-400">
-                              <Infinity className="w-3.5 h-3.5" /> {t('cron_roadmap_summary', 'Roadmap & Critique')} ({job.name})
+                              <InfinityIcon className="w-3.5 h-3.5" /> {t('cron_roadmap_summary', 'Roadmap & Critique')} ({job.name})
                             </span>
                             <button
                               onClick={() => setSelectedRoadmapJobId(null)}
@@ -905,7 +905,7 @@ export const CronSchedulerModal: React.FC<CronSchedulerModalProps> = ({
                             />
                             <label htmlFor={`edit-continuous-${job.id}`} className="text-xs cursor-pointer select-none flex-1">
                               <div className="font-semibold flex items-center gap-1.5" style={{ color: 'var(--strong)' }}>
-                                <Infinity className="w-3.5 h-3.5 text-purple-400" />
+                                <InfinityIcon className="w-3.5 h-3.5 text-purple-400" />
                                 <span>{t('cron_continuous_mode', 'Continuous Autonomous Loop')}</span>
                               </div>
                               <p className="text-[10px] mt-0.5 leading-relaxed" style={{ color: 'var(--muted)' }}>
